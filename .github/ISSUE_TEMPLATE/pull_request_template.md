@@ -1,5 +1,5 @@
 ---
-name: pr template
+name: PULL_REQUEST_TEMPLATE
 about: pr template
 title: ''
 labels: ''
