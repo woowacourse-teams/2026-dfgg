@@ -1,4 +1,4 @@
-package dfgg.staticdata.client;
+package dfgg.infrastructure.client;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
