@@ -1,4 +1,4 @@
-package dfgg.infrastructure.client;
+package dfgg.infrastructure.external.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -7,7 +7,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import dfgg.infrastructure.dto.ChampionResponse;
+import dfgg.infrastructure.external.dto.ChampionResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -103,8 +103,9 @@ public class DataDragonClientTest {
                         {
                           "data": {
                             "Aatrox": {
-                              "key": "12",
-                              "name": "아트록스"
+                              "key": "266",
+                              "name": "아트록스",
+                              "tags": ["Fighter", "Tank"]
                             }
                           }
                         }
@@ -115,7 +116,52 @@ public class DataDragonClientTest {
 
         // then
         assertThat(response.data().get("Aatrox").name()).isEqualTo("아트록스");
-        assertThat(response.data().get("Aatrox").key()).isEqualTo("12");
+        assertThat(response.data().get("Aatrox").key()).isEqualTo("266");
+        assertThat(response.data().get("Aatrox").tags())
+                .containsExactly("Fighter", "Tank");
+
+        server.verify();
+    }
+
+    @Test
+    void 챔피언_데이터가_비어있으면_예외가_발생한다() {
+        // given
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.15.1\"]", MediaType.APPLICATION_JSON));
+
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/data/ko_KR/champion.json"))
+                .andRespond(withSuccess("{\"data\": {}}", MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertThatThrownBy(client::getChampions)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Data Dragon champion response is empty");
+
+        server.verify();
+    }
+
+    @Test
+    void 필수_챔피언_필드가_누락되면_예외가_발생한다() {
+        // given
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.15.1\"]", MediaType.APPLICATION_JSON));
+
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/data/ko_KR/champion.json"))
+                .andRespond(withSuccess("""
+                        {
+                          "data": {
+                            "Aatrox": {
+                              "key": "266",
+                              "name": "아트록스"
+                            }
+                          }
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertThatThrownBy(client::getChampions)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Data Dragon champion data is invalid");
 
         server.verify();
     }

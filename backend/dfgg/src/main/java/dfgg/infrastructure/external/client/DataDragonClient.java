@@ -1,6 +1,6 @@
-package dfgg.infrastructure.client;
+package dfgg.infrastructure.external.client;
 
-import dfgg.infrastructure.dto.ChampionResponse;
+import dfgg.infrastructure.external.dto.ChampionResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -36,8 +36,21 @@ public class DataDragonClient {
                 .retrieve()
                 .body(ChampionResponse.class);
 
-        if (response == null) {
+        if (response == null || response.data() == null || response.data().isEmpty()) {
             throw new IllegalStateException("[Error] Data Dragon champion response is empty");
+        }
+
+        boolean hasInvalidChampion = response.data().values().stream()
+                .anyMatch(data -> data == null
+                        || data.key() == null
+                        || data.key().isBlank()
+                        || data.name() == null
+                        || data.name().isBlank()
+                        || data.tags() == null
+                        || data.tags().isEmpty());
+
+        if (hasInvalidChampion) {
+            throw new IllegalStateException("[Error] Data Dragon champion data is invalid");
         }
 
         return response;
