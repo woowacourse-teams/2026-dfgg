@@ -1,4 +1,6 @@
-package dfgg.domain;
+package dfgg.domain.stats;
+
+import dfgg.domain.team.Team;
 
 public record CombinationContext(
         boolean enemyTankHeavy,

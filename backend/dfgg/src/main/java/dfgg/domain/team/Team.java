@@ -1,4 +1,4 @@
-package dfgg.domain;
+package dfgg.domain.team;
 
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionTag;
