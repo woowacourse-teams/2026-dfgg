@@ -1,12 +1,12 @@
 package dfgg.application;
 
 import dfgg.common.CompositionStatsNotFoundException;
-import dfgg.domain.ChampionBuildStatsRepository;
+import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
-import dfgg.presentation.dto.ChampionInfo;
+import dfgg.presentation.dto.ChampionDto;
 import dfgg.presentation.dto.request.RecommendationRequest;
 import dfgg.presentation.dto.response.RecommendationResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,9 +46,9 @@ class RecommendationServiceTest {
     void recommend_success() {
         // given
         RecommendationRequest request = new RecommendationRequest(
-                new ChampionInfo("징크스", "BOTTOM"),
-                List.of(new ChampionInfo("쓰레쉬", "SUPPORT")),
-                List.of(new ChampionInfo("케이틀린", "BOTTOM"))
+                new ChampionDto("징크스", "BOTTOM"),
+                List.of(new ChampionDto("쓰레쉬", "SUPPORT")),
+                List.of(new ChampionDto("케이틀린", "BOTTOM"))
         );
 
         Champion myChampion = mock(Champion.class);
@@ -90,7 +90,7 @@ class RecommendationServiceTest {
     void recommend_WhenStatsNotFound_ThrowCompositionStatsNotFoundException() {
         // given
         RecommendationRequest request = new RecommendationRequest(
-                new ChampionInfo("징크스", "BOTTOM"),
+                new ChampionDto("징크스", "BOTTOM"),
                 List.of(),
                 List.of()
         );
