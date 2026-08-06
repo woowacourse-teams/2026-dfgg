@@ -1,4 +1,5 @@
 import { type SubmitEvent, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import banner from '../../assets/dfgg.png';
 
@@ -59,7 +60,14 @@ export default function Nickname() {
       </div>
 
       <div className="mx-auto max-w-full px-6 pt-11 pb-13 text-center">
-        <h1 className="font-display text-4xl leading-none font-bold text-balance sm:text-6xl">
+        <Link
+          to="/"
+          className="inline-block text-sm text-ink-3 transition-colors hover:text-hextech"
+        >
+          ← 처음으로
+        </Link>
+
+        <h1 className="mt-6 font-display text-4xl leading-none font-bold text-balance sm:text-6xl">
           다음 판, <em className="text-hextech not-italic">뭘 골라야</em> 이길까
         </h1>
 
