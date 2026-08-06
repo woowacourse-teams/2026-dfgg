@@ -48,6 +48,12 @@ module.exports = {
     open: true,
     hot: true,
     historyApiFallback: true,
+    proxy: [
+      {
+        context: ['/recommendations'],
+        target: 'http://localhost:8080',
+      },
+    ],
     client: {
       overlay: true,
     },
