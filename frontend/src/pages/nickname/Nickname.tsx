@@ -1,26 +1,50 @@
-import { useState } from 'react';
+import { type SubmitEvent, useState } from 'react';
 
 import banner from '../../assets/dfgg.png';
 
+interface Item {
+  id: string;
+  name: string;
+  imageUrl: string;
+}
+
 export default function Nickname() {
   const [nickname, setNickname] = useState('');
-  const [item, setItem] = useState<[] | string>([]);
+  const [item, setItem] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = () => {
-    const getData = async () => {
+  const handleSubmit = (event: SubmitEvent) => {
+    event.preventDefault();
+    const query = nickname.trim();
+    const [gameName, tagLine] = query.split('#');
+
+    if (!gameName || !tagLine) {
+      setError('소환사 이름을 "이름#태그" 형식으로 입력해 주세요.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    const getData = async ({ gameName, tagLine }: { gameName: string; tagLine: string }) => {
       try {
-        const response = await fetch('/recommendations', {
-          method: 'GET',
-        });
+        const response = await fetch(
+          `/recommendations?nickname=${encodeURIComponent(gameName)}&hash=${encodeURIComponent(tagLine)}`,
+          {
+            method: 'GET',
+          },
+        );
+        if (!response.ok) throw new Error(String(response.status));
         const data = await response.json();
         setItem(data);
       } catch (error) {
         console.error(error);
-        setError('error');
+        setError('데이터 로드 중 에러 발생');
+      } finally {
+        setLoading(false);
       }
     };
-    getData();
+    getData({ gameName, tagLine });
   };
 
   return (
@@ -67,6 +91,19 @@ export default function Nickname() {
           </button>
         </form>
       </div>
+      {loading && <p>로딩 중...</p>}
+      {error && (
+        <>
+          <p>{error}</p>
+        </>
+      )}
+      {item.length === 0 && (
+        <p>
+          {item.map((value) => {
+            return <p key={value.id}>{value.name}</p>;
+          })}
+        </p>
+      )}
     </div>
   );
 }
