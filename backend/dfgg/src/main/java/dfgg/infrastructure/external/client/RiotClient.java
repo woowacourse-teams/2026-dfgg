@@ -14,16 +14,36 @@ import org.springframework.web.client.RestClient;
 public class RiotClient {
 
     private static final String RIOT_TOKEN_HEADER = "X-Riot-Token";
+    private static final int RANKED_SOLO_QUEUE_ID = 420;
+    private static final int DEFAULT_MATCH_START = 0;
+    private static final int DEFAULT_MATCH_COUNT = 20;
     private static final ParameterizedTypeReference<List<LeagueEntryResponse>> LEAGUE_ENTRY_LIST_TYPE =
             new ParameterizedTypeReference<>() {
             };
+    private static final ParameterizedTypeReference<List<String>> STRING_LIST_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
 
-    private final RestClient restClient;
+    private final RestClient platformRestClient;
+    private final RestClient regionalRestClient;
 
     public RiotClient(RestClient.Builder builder, RiotApiProperties properties) {
-        this.restClient = builder
-                .baseUrl(properties.platformBaseUrl().toString())
-                .defaultHeader(RIOT_TOKEN_HEADER, properties.key())
+        this.platformRestClient = createRestClient(
+                builder.clone(),
+                properties.platformBaseUrl().toString(),
+                properties.key()
+        );
+        this.regionalRestClient = createRestClient(
+                builder.clone(),
+                properties.regionalBaseUrl().toString(),
+                properties.key()
+        );
+    }
+
+    private RestClient createRestClient(RestClient.Builder builder, String baseUrl, String apiKey) {
+        return builder
+                .baseUrl(baseUrl)
+                .defaultHeader(RIOT_TOKEN_HEADER, apiKey)
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                 .build();
     }
@@ -39,7 +59,7 @@ public class RiotClient {
         Assert.hasText(division, "division must not be blank");
         Assert.isTrue(page > 0, "page must be greater than zero");
 
-        List<LeagueEntryResponse> response = restClient.get()
+        List<LeagueEntryResponse> response = platformRestClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/lol/league/v4/entries/{queue}/{tier}/{division}")
                         .queryParam("page", page)
@@ -49,6 +69,31 @@ public class RiotClient {
 
         if (response == null) {
             throw new IllegalStateException("[Error] Riot League entries response is empty");
+        }
+        return List.copyOf(response);
+    }
+
+    public List<String> getMatchIds(String puuid) {
+        return getMatchIds(puuid, DEFAULT_MATCH_START, DEFAULT_MATCH_COUNT);
+    }
+
+    public List<String> getMatchIds(String puuid, int start, int count) {
+        Assert.hasText(puuid, "puuid must not be blank");
+        Assert.isTrue(start >= 0, "start must not be negative");
+        Assert.isTrue(count >= 0 && count <= 100, "count must be between 0 and 100");
+
+        List<String> response = regionalRestClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/lol/match/v5/matches/by-puuid/{puuid}/ids")
+                        .queryParam("queue", RANKED_SOLO_QUEUE_ID)
+                        .queryParam("start", start)
+                        .queryParam("count", count)
+                        .build(puuid))
+                .retrieve()
+                .body(STRING_LIST_TYPE);
+
+        if (response == null) {
+            throw new IllegalStateException("[Error] Riot Match IDs response is empty");
         }
         return List.copyOf(response);
     }

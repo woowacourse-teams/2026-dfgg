@@ -24,6 +24,7 @@ import org.springframework.web.client.RestClient;
 class RiotClientTest {
 
     private static final String PLATFORM_BASE_URL = "https://kr.api.riotgames.com";
+    private static final String REGIONAL_BASE_URL = "https://asia.api.riotgames.com";
     private static final String API_KEY = "test-api-key";
 
     private MockRestServiceServer server;
@@ -37,9 +38,64 @@ class RiotClientTest {
         RiotApiProperties properties = new RiotApiProperties(
                 API_KEY,
                 URI.create(PLATFORM_BASE_URL),
-                URI.create("https://asia.api.riotgames.com")
+                URI.create(REGIONAL_BASE_URL)
         );
         client = new RiotClient(builder, properties);
+    }
+
+    @Test
+    void PUUID로_솔로_랭크_매치_ID를_조회한다() {
+        server.expect(requestTo(REGIONAL_BASE_URL
+                        + "/lol/match/v5/matches/by-puuid/encrypted-puuid/ids?queue=420&start=5&count=2"))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
+                .andRespond(withSuccess("""
+                        [
+                          "KR_1234567890",
+                          "KR_0987654321"
+                        ]
+                        """, MediaType.APPLICATION_JSON));
+
+        List<String> matchIds = client.getMatchIds("encrypted-puuid", 5, 2);
+
+        assertThat(matchIds).containsExactly("KR_1234567890", "KR_0987654321");
+        server.verify();
+    }
+
+    @Test
+    void 매치_ID는_Riot_기본_페이지로_조회할_수_있다() {
+        server.expect(requestTo(REGIONAL_BASE_URL
+                        + "/lol/match/v5/matches/by-puuid/encrypted-puuid/ids?queue=420&start=0&count=20"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        List<String> matchIds = client.getMatchIds("encrypted-puuid");
+
+        assertThat(matchIds).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    void 매치_ID_응답_본문이_없으면_예외가_발생한다() {
+        server.expect(requestTo(REGIONAL_BASE_URL
+                        + "/lol/match/v5/matches/by-puuid/encrypted-puuid/ids?queue=420&start=0&count=20"))
+                .andRespond(withNoContent());
+
+        assertThatThrownBy(() -> client.getMatchIds("encrypted-puuid"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Riot Match IDs response is empty");
+
+        server.verify();
+    }
+
+    @Test
+    void 매치_ID_조회_범위를_검증한다() {
+        assertThatThrownBy(() -> client.getMatchIds("encrypted-puuid", -1, 20))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("start must not be negative");
+
+        assertThatThrownBy(() -> client.getMatchIds("encrypted-puuid", 0, 101))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("count must be between 0 and 100");
     }
 
     @Test
