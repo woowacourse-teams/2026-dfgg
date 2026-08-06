@@ -1,1 +1,66 @@
 @import 'tailwindcss';
+
+@theme {
+  /* 배너 계열 */
+  --color-cornflower: #5b78dc;
+  --color-cornflower-deep: #3f57b4;
+  --color-hextech: #4fd9d2;
+  --color-hextech-bright: #7ceee8;
+  --color-sky: #8ccbf2;
+
+  /* 바탕은 순검정, 면만 푸른기를 얹어 띄운다 */
+  --color-ground: #000000;
+  --color-surface: #080c1a;
+  --color-surface-2: #0e1428;
+  --color-line: #1b2344;
+
+  /* 중립은 순회색이 아니라 푸른기를 섞은 값 */
+  --color-ink: #e9edfb;
+  --color-ink-2: #98a5cf;
+  --color-ink-3: #6b78a4;
+
+  /* 수치 판단용 — 액센트와 분리해서 쓴다 */
+  --color-win: #3fc094;
+  --color-loss: #ec6d86;
+
+  --font-display:
+    'Bahnschrift', 'DIN Alternate', 'DIN Condensed', 'Oswald', 'Arial Narrow', system-ui, sans-serif;
+  --font-body:
+    'Pretendard Variable', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui,
+    -apple-system, sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+.chamfer {
+  clip-path: polygon(
+    12px 0,
+    100% 0,
+    100% calc(100% - 12px),
+    calc(100% - 12px) 100%,
+    0 100%,
+    0 12px
+  );
+}
+
+.chamfer-sm {
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+}
+
+/* 배너 하단을 검정 바탕으로 녹이는 베일 */
+.banner-veil {
+  background: linear-gradient(
+    180deg,
+    rgb(0 0 0 / 0.12) 0%,
+    rgb(0 0 0 / 0) 42%,
+    rgb(0 0 0 / 0.55) 82%,
+    #000 100%
+  );
+}
