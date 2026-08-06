@@ -10,6 +10,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import dfgg.infrastructure.external.config.RiotApiProperties;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
+import dfgg.infrastructure.external.dto.MatchResponse;
 import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,6 +97,75 @@ class RiotClientTest {
         assertThatThrownBy(() -> client.getMatchIds("encrypted-puuid", 0, 101))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("count must be between 0 and 100");
+    }
+
+    @Test
+    void 매치_ID로_매치_상세를_조회한다() {
+        server.expect(requestTo(REGIONAL_BASE_URL + "/lol/match/v5/matches/KR_1234567890"))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
+                .andRespond(withSuccess("""
+                        {
+                          "metadata": {
+                            "dataVersion": "2",
+                            "matchId": "KR_1234567890",
+                            "participants": ["blue-puuid"]
+                          },
+                          "info": {
+                            "gameDuration": 1832,
+                            "participants": [
+                              {
+                                "puuid": "blue-puuid",
+                                "championId": 266,
+                                "championName": "Aatrox",
+                                "teamId": 100,
+                                "teamPosition": "TOP",
+                                "kills": 8,
+                                "item0": 3071,
+                                "item1": 6610,
+                                "item2": 3053,
+                                "item3": 3111,
+                                "item4": 6333,
+                                "item5": 0,
+                                "item6": 3364,
+                                "win": true
+                              }
+                            ],
+                            "queueId": 420
+                          }
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        MatchResponse match = client.getMatch("KR_1234567890");
+
+        assertThat(match.info().participants()).singleElement().satisfies(participant -> {
+            assertThat(participant.puuid()).isEqualTo("blue-puuid");
+            assertThat(participant.championId()).isEqualTo(266);
+            assertThat(participant.teamId()).isEqualTo(100);
+            assertThat(participant.teamPosition()).isEqualTo("TOP");
+            assertThat(participant.item0()).isEqualTo(3071);
+            assertThat(participant.win()).isTrue();
+        });
+        server.verify();
+    }
+
+    @Test
+    void 매치_상세_응답_본문이_없으면_예외가_발생한다() {
+        server.expect(requestTo(REGIONAL_BASE_URL + "/lol/match/v5/matches/KR_1234567890"))
+                .andRespond(withNoContent());
+
+        assertThatThrownBy(() -> client.getMatch("KR_1234567890"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Riot Match response is empty");
+
+        server.verify();
+    }
+
+    @Test
+    void 매치_ID는_비어_있을_수_없다() {
+        assertThatThrownBy(() -> client.getMatch(" "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("matchId must not be blank");
     }
 
     @Test
