@@ -12,12 +12,18 @@ import dfgg.infrastructure.external.config.RiotApiProperties;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
 import dfgg.infrastructure.external.dto.MatchResponse;
 import java.net.URI;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -30,6 +36,7 @@ class RiotClientTest {
 
     private MockRestServiceServer server;
     private RiotClient client;
+    private List<Duration> retryDelays;
 
     @BeforeEach
     void setUp() {
@@ -41,7 +48,12 @@ class RiotClientTest {
                 URI.create(PLATFORM_BASE_URL),
                 URI.create(REGIONAL_BASE_URL)
         );
-        client = new RiotClient(builder, properties);
+        retryDelays = new ArrayList<>();
+        RiotRateLimitExecutor rateLimitExecutor = new RiotRateLimitExecutor(
+                Clock.fixed(Instant.parse("2026-08-06T08:00:00Z"), ZoneOffset.UTC),
+                retryDelays::add
+        );
+        client = new RiotClient(builder, properties, rateLimitExecutor);
     }
 
     @Test
@@ -60,6 +72,23 @@ class RiotClientTest {
         List<String> matchIds = client.getMatchIds("encrypted-puuid", 5, 2);
 
         assertThat(matchIds).containsExactly("KR_1234567890", "KR_0987654321");
+        server.verify();
+    }
+
+    @Test
+    void 매치_ID_호출이_제한되면_Retry_After_이후에_재시도한다() {
+        String requestUrl = REGIONAL_BASE_URL
+                + "/lol/match/v5/matches/by-puuid/encrypted-puuid/ids?queue=420&start=0&count=20";
+        server.expect(requestTo(requestUrl))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
+                        .header(HttpHeaders.RETRY_AFTER, "2"));
+        server.expect(requestTo(requestUrl))
+                .andRespond(withSuccess("[\"KR_1234567890\"]", MediaType.APPLICATION_JSON));
+
+        List<String> matchIds = client.getMatchIds("encrypted-puuid");
+
+        assertThat(matchIds).containsExactly("KR_1234567890");
+        assertThat(retryDelays).containsExactly(Duration.ofSeconds(2));
         server.verify();
     }
 
@@ -169,6 +198,34 @@ class RiotClientTest {
     }
 
     @Test
+    void 매치_원본_응답을_문자열로_조회한다() {
+        String rawData = """
+                {"info":{"participants":[]}}
+                """;
+        server.expect(requestTo(REGIONAL_BASE_URL + "/lol/match/v5/matches/KR_1234567890"))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
+                .andRespond(withSuccess(rawData, MediaType.APPLICATION_JSON));
+
+        String response = client.getRawMatch("KR_1234567890");
+
+        assertThat(response).isEqualTo(rawData);
+        server.verify();
+    }
+
+    @Test
+    void 매치_원본_응답_본문이_없으면_예외가_발생한다() {
+        server.expect(requestTo(REGIONAL_BASE_URL + "/lol/match/v5/matches/KR_1234567890"))
+                .andRespond(withNoContent());
+
+        assertThatThrownBy(() -> client.getRawMatch("KR_1234567890"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Riot raw Match response is empty");
+
+        server.verify();
+    }
+
+    @Test
     void 티어와_디비전의_리그_엔트리를_페이지로_조회한다() {
         server.expect(requestTo(PLATFORM_BASE_URL
                         + "/lol/league/v4/entries/RANKED_SOLO_5x5/EMERALD/I?page=2"))
@@ -244,21 +301,68 @@ class RiotClientTest {
     }
 
     @Test
-    void 호출이_제한되면_Retry_After를_포함한_예외가_전파된다() {
+    void 호출이_제한되면_Retry_After_이후에_재시도한다() {
         server.expect(requestTo(PLATFORM_BASE_URL
                         + "/lol/league/v4/entries/RANKED_SOLO_5x5/EMERALD/III?page=1"))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
                         .header(HttpHeaders.RETRY_AFTER, "7"));
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/entries/RANKED_SOLO_5x5/EMERALD/III?page=1"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        List<LeagueEntryResponse> entries = client.getLeagueEntries(
+                "RANKED_SOLO_5x5",
+                "EMERALD",
+                "III",
+                1
+        );
+
+        assertThat(entries).isEmpty();
+        assertThat(retryDelays).containsExactly(Duration.ofSeconds(7));
+
+        server.verify();
+    }
+
+    @Test
+    void Retry_After가_없으면_429_예외를_즉시_전파한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/entries/RANKED_SOLO_5x5/EMERALD/III?page=1"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
 
         assertThatThrownBy(() -> client.getLeagueEntries(
                 "RANKED_SOLO_5x5",
                 "EMERALD",
                 "III",
                 1
-        ))
-                .isInstanceOfSatisfying(HttpClientErrorException.TooManyRequests.class, exception ->
-                        assertThat(exception.getResponseHeaders().getFirst(HttpHeaders.RETRY_AFTER))
-                                .isEqualTo("7"));
+        )).isInstanceOfSatisfying(HttpClientErrorException.TooManyRequests.class, exception ->
+                assertThat(exception.getMessage()).doesNotContain(API_KEY));
+
+        assertThat(retryDelays).isEmpty();
+
+        server.verify();
+    }
+
+    @Test
+    void 호출_제한_재시도_횟수를_초과하면_429_예외를_전파한다() {
+        server.expect(
+                        ExpectedCount.times(3),
+                        requestTo(PLATFORM_BASE_URL
+                                + "/lol/league/v4/entries/RANKED_SOLO_5x5/EMERALD/III?page=1")
+                )
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
+                        .header(HttpHeaders.RETRY_AFTER, "1"));
+
+        assertThatThrownBy(() -> client.getLeagueEntries(
+                "RANKED_SOLO_5x5",
+                "EMERALD",
+                "III",
+                1
+        )).isInstanceOf(HttpClientErrorException.TooManyRequests.class);
+
+        assertThat(retryDelays).containsExactly(
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1)
+        );
 
         server.verify();
     }
