@@ -1,7 +1,19 @@
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+
+import ChampionSelect from './pages/champion-select/ChampionSelect';
+import Home from './pages/home/Home';
 import Nickname from './pages/nickname/Nickname';
 
 function App() {
-  return <Nickname />;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/nickname" element={<Nickname />} />
+        <Route path="/champion-select" element={<ChampionSelect />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
 export default App;
