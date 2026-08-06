@@ -2,6 +2,7 @@ package dfgg.application;
 
 import dfgg.common.ChampionNotFoundException;
 import dfgg.domain.champion.Champion;
+import dfgg.domain.champion.ChampionRepository;
 import org.springframework.stereotype.Component;
 
 /**
