@@ -8,3 +8,9 @@ spring:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
+
+riot:
+  api:
+    key: "test-riot-api-key"
+    platform-base-url: "https://kr.api.riotgames.com"
+    regional-base-url: "https://asia.api.riotgames.com"
