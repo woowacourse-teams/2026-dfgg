@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -12,7 +14,10 @@ import static org.mockito.Mockito.when;
 
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
+import dfgg.domain.match.RawMatchTimeline;
+import dfgg.domain.match.RawMatchTimelineRepository;
 import dfgg.domain.player.PlayerRepository;
+import dfgg.domain.player.PlayerCohortRepository;
 import dfgg.infrastructure.external.client.RiotClient;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,6 +45,18 @@ class RiotMatchSyncServiceTest {
     @Mock
     private RawMatchPersistenceService persistenceService;
 
+    @Mock
+    private RawMatchTimelineRepository rawMatchTimelineRepository;
+
+    @Mock
+    private RawMatchTimelinePersistenceService timelinePersistenceService;
+
+    @Mock
+    private PlayerCohortRepository playerCohortRepository;
+
+    @Mock
+    private MatchParticipantCohortPersistenceService cohortPersistenceService;
+
     @InjectMocks
     private RiotMatchSyncService riotMatchSyncService;
 
@@ -54,8 +71,13 @@ class RiotMatchSyncServiceTest {
         when(rawMatchRepository.findExistingMatchIds(
                 new LinkedHashSet<>(List.of("KR_1", "KR_2", "KR_3"))
         )).thenReturn(Set.of("KR_2"));
+        when(rawMatchTimelineRepository.findExistingMatchIds(
+                new LinkedHashSet<>(List.of("KR_1", "KR_2", "KR_3"))
+        )).thenReturn(Set.of("KR_2"));
         when(riotClient.getRawMatch("KR_1")).thenReturn("{\"match\":1}");
         when(riotClient.getRawMatch("KR_3")).thenReturn("{\"match\":3}");
+        when(riotClient.getRawMatchTimeline("KR_1")).thenReturn("{\"timeline\":1}");
+        when(riotClient.getRawMatchTimeline("KR_3")).thenReturn("{\"timeline\":3}");
 
         riotMatchSyncService.syncMatches(1, 10, 0, 20);
 
@@ -68,6 +90,14 @@ class RiotMatchSyncServiceTest {
                         tuple("KR_1", "{\"match\":1}"),
                         tuple("KR_3", "{\"match\":3}")
                 );
+        ArgumentCaptor<RawMatchTimeline> timelineCaptor = ArgumentCaptor.forClass(RawMatchTimeline.class);
+        verify(timelinePersistenceService, times(2)).persist(timelineCaptor.capture());
+        assertThat(timelineCaptor.getAllValues())
+                .extracting(RawMatchTimeline::getMatchId, RawMatchTimeline::getRawData)
+                .containsExactly(
+                        tuple("KR_1", "{\"timeline\":1}"),
+                        tuple("KR_3", "{\"timeline\":3}")
+                );
     }
 
     @Test
@@ -77,7 +107,13 @@ class RiotMatchSyncServiceTest {
 
         riotMatchSyncService.syncMatches(0, 20, 0, 20);
 
-        verifyNoInteractions(riotClient, rawMatchRepository, persistenceService);
+        verifyNoInteractions(
+                riotClient,
+                rawMatchRepository,
+                rawMatchTimelineRepository,
+                persistenceService,
+                timelinePersistenceService
+        );
     }
 
     @Test
@@ -86,11 +122,79 @@ class RiotMatchSyncServiceTest {
                 .thenReturn(List.of("puuid-1"));
         when(riotClient.getMatchIds("puuid-1", 0, 20)).thenReturn(List.of("KR_1"));
         when(rawMatchRepository.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of("KR_1"));
+        when(rawMatchTimelineRepository.findExistingMatchIds(Set.of("KR_1")))
+                .thenReturn(Set.of("KR_1"));
 
         riotMatchSyncService.syncMatches(0, 20, 0, 20);
 
         verify(riotClient, never()).getRawMatch(any());
+        verify(riotClient, never()).getRawMatchTimeline(any());
         verifyNoInteractions(persistenceService);
+        verifyNoInteractions(timelinePersistenceService);
+    }
+
+    @Test
+    void 상세_원본만_저장된_매치는_Timeline만_보완한다() {
+        when(playerRepository.findPuuidsByPlatform("KR", PageRequest.of(0, 20)))
+                .thenReturn(List.of("puuid-1"));
+        when(riotClient.getMatchIds("puuid-1", 0, 20)).thenReturn(List.of("KR_1"));
+        when(rawMatchRepository.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of("KR_1"));
+        when(rawMatchTimelineRepository.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());
+        when(riotClient.getRawMatchTimeline("KR_1")).thenReturn("{\"timeline\":1}");
+
+        riotMatchSyncService.syncMatches(0, 20, 0, 20);
+
+        verify(riotClient, never()).getRawMatch(any());
+        verify(riotClient).getRawMatchTimeline("KR_1");
+        verifyNoInteractions(persistenceService);
+        verify(timelinePersistenceService).persist(any());
+    }
+
+    @Test
+    void 기존_원본_중_Timeline이_없는_매치만_보완한다() {
+        RawMatch existing = new RawMatch("KR_1", "{\"match\":1}");
+        RawMatch missing = new RawMatch("KR_2", "{\"match\":2}");
+        when(rawMatchRepository.findAll()).thenReturn(List.of(existing, missing));
+        when(rawMatchTimelineRepository.findExistingMatchIds(
+                new LinkedHashSet<>(List.of("KR_1", "KR_2"))
+        )).thenReturn(Set.of("KR_1"));
+        when(riotClient.getRawMatchTimeline("KR_2")).thenReturn("{\"timeline\":2}");
+        when(timelinePersistenceService.persist(any())).thenReturn(true);
+
+        int persisted = riotMatchSyncService.syncMissingTimelines();
+
+        assertThat(persisted).isEqualTo(1);
+        verify(riotClient, never()).getRawMatchTimeline("KR_1");
+        verify(riotClient).getRawMatchTimeline("KR_2");
+        verify(timelinePersistenceService).persist(argThat(timeline ->
+                timeline.getMatchId().equals("KR_2")
+                        && timeline.getRawData().equals("{\"timeline\":2}")));
+    }
+
+    @Test
+    void 매치_수집_당시_PUUID와_티어를_매치에_연결한다() {
+        PlayerCohortRepository.Target cohort = mock(PlayerCohortRepository.Target.class);
+        when(cohort.getPuuid()).thenReturn("puuid-1");
+        when(cohort.getQueueType()).thenReturn("RANKED_SOLO_5x5");
+        when(cohort.getTier()).thenReturn("PLATINUM");
+        when(cohort.getDivision()).thenReturn("I");
+        when(playerRepository.findPuuidsByPlatform("KR", PageRequest.of(0, 1)))
+                .thenReturn(List.of("puuid-1"));
+        when(playerCohortRepository.findTargetsByPuuidsAndQueueType(
+                List.of("puuid-1"), "RANKED_SOLO_5x5"))
+                .thenReturn(List.of(cohort));
+        when(riotClient.getMatchIds("puuid-1", 0, 1)).thenReturn(List.of("KR_1"));
+        when(rawMatchRepository.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());
+        when(rawMatchTimelineRepository.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());
+        when(riotClient.getRawMatch("KR_1")).thenReturn("{\"match\":1}");
+        when(riotClient.getRawMatchTimeline("KR_1")).thenReturn("{\"timeline\":1}");
+
+        riotMatchSyncService.syncMatches(0, 1, 0, 1);
+
+        verify(cohortPersistenceService).persist(argThat(saved ->
+                saved.getMatchId().equals("KR_1")
+                        && saved.getPuuid().equals("puuid-1")
+                        && saved.getTier().equals("PLATINUM")));
     }
 
     @Test
@@ -108,6 +212,13 @@ class RiotMatchSyncServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("count must be between 1 and 100");
 
-        verifyNoInteractions(riotClient, playerRepository, rawMatchRepository, persistenceService);
+        verifyNoInteractions(
+                riotClient,
+                playerRepository,
+                rawMatchRepository,
+                rawMatchTimelineRepository,
+                persistenceService,
+                timelinePersistenceService
+        );
     }
 }

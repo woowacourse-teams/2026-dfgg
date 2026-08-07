@@ -11,6 +11,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import dfgg.infrastructure.external.config.RiotApiProperties;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
 import dfgg.infrastructure.external.dto.MatchResponse;
+import dfgg.infrastructure.external.dto.MatchTimelineResponse;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -145,6 +146,7 @@ class RiotClientTest {
                             "participants": [
                               {
                                 "puuid": "blue-puuid",
+                                "participantId": 1,
                                 "championId": 266,
                                 "championName": "Aatrox",
                                 "teamId": 100,
@@ -169,12 +171,72 @@ class RiotClientTest {
 
         assertThat(match.info().participants()).singleElement().satisfies(participant -> {
             assertThat(participant.puuid()).isEqualTo("blue-puuid");
+            assertThat(participant.participantId()).isEqualTo(1);
             assertThat(participant.championId()).isEqualTo(266);
             assertThat(participant.teamId()).isEqualTo(100);
             assertThat(participant.teamPosition()).isEqualTo("TOP");
             assertThat(participant.item0()).isEqualTo(3071);
             assertThat(participant.win()).isTrue();
         });
+        assertThat(match.info().gameVersion()).isNull();
+        assertThat(match.info().queueId()).isEqualTo(420);
+        server.verify();
+    }
+
+    @Test
+    void 매치_Timeline을_파싱한다() {
+        server.expect(requestTo(
+                        REGIONAL_BASE_URL + "/lol/match/v5/matches/KR_1234567890/timeline"))
+                .andRespond(withSuccess("""
+                        {
+                          "metadata": {
+                            "dataVersion": "2",
+                            "matchId": "KR_1234567890",
+                            "participants": ["blue-puuid", "red-puuid"]
+                          },
+                          "info": {
+                            "frameInterval": 60000,
+                            "frames": [
+                              {
+                                "events": [
+                                  {
+                                    "timestamp": 1234,
+                                    "type": "ITEM_PURCHASED",
+                                    "participantId": 1,
+                                    "itemId": 3071
+                                  },
+                                  {
+                                    "timestamp": 2345,
+                                    "type": "ITEM_SOLD",
+                                    "participantId": 1,
+                                    "itemId": 1036
+                                  },
+                                  {
+                                    "timestamp": 3456,
+                                    "type": "ITEM_UNDO",
+                                    "participantId": 1,
+                                    "beforeId": 3071,
+                                    "afterId": 0
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        MatchTimelineResponse timeline = client.getMatchTimeline("KR_1234567890");
+
+        assertThat(timeline.metadata().participants())
+                .containsExactly("blue-puuid", "red-puuid");
+        assertThat(timeline.puuidForParticipantId(1)).contains("blue-puuid");
+        assertThat(timeline.puuidForParticipantId(3)).isEmpty();
+        assertThat(timeline.info().frameInterval()).isEqualTo(60000L);
+        List<MatchTimelineResponse.Event> parsedEvents = timeline.info().frames().get(0).events();
+        assertThat(parsedEvents).hasSize(3);
+        assertThat(parsedEvents.get(0).itemId()).isEqualTo(3071);
+        assertThat(parsedEvents.get(2).beforeId()).isEqualTo(3071);
+        assertThat(parsedEvents.get(2).afterId()).isEqualTo(0);
         server.verify();
     }
 
@@ -221,6 +283,36 @@ class RiotClientTest {
         assertThatThrownBy(() -> client.getRawMatch("KR_1234567890"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("[Error] Riot raw Match response is empty");
+
+        server.verify();
+    }
+
+    @Test
+    void 매치_Timeline_원본_응답을_문자열로_조회한다() {
+        String rawData = """
+                {"info":{"frames":[]}}
+                """;
+        server.expect(requestTo(
+                        REGIONAL_BASE_URL + "/lol/match/v5/matches/KR_1234567890/timeline"))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
+                .andRespond(withSuccess(rawData, MediaType.APPLICATION_JSON));
+
+        String response = client.getRawMatchTimeline("KR_1234567890");
+
+        assertThat(response).isEqualTo(rawData);
+        server.verify();
+    }
+
+    @Test
+    void 매치_Timeline_원본_응답_본문이_없으면_예외가_발생한다() {
+        server.expect(requestTo(
+                        REGIONAL_BASE_URL + "/lol/match/v5/matches/KR_1234567890/timeline"))
+                .andRespond(withNoContent());
+
+        assertThatThrownBy(() -> client.getRawMatchTimeline("KR_1234567890"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Riot raw Match timeline response is empty");
 
         server.verify();
     }
