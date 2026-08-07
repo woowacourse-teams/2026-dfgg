@@ -3,6 +3,8 @@ package dfgg.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.domain.player.Player;
+import dfgg.domain.player.PlayerCohort;
+import dfgg.domain.player.PlayerCohortRepository;
 import dfgg.domain.player.PlayerRepository;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
 import jakarta.persistence.EntityManager;
@@ -18,7 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(LeagueEntryPersistenceService.class)
+@Import({LeagueEntryPersistenceService.class, PlayerCohortPersistenceService.class})
 class LeagueEntryPersistenceServiceTest {
 
     @Autowired
@@ -26,6 +28,9 @@ class LeagueEntryPersistenceServiceTest {
 
     @Autowired
     private PlayerRepository playerRepository;
+
+    @Autowired
+    private PlayerCohortRepository playerCohortRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -46,6 +51,9 @@ class LeagueEntryPersistenceServiceTest {
         assertThat(player.getPlatform()).isEqualTo("KR");
         assertThat(player.getFirstSeenAt()).isEqualTo(collectedAt);
         assertThat(player.getLastSeenAt()).isEqualTo(collectedAt);
+        PlayerCohort cohort = playerCohortRepository.findAll().getFirst();
+        assertThat(cohort.getTier()).isEqualTo("PLATINUM");
+        assertThat(cohort.getDivision()).isEqualTo("I");
     }
 
     @Test
@@ -59,6 +67,7 @@ class LeagueEntryPersistenceServiceTest {
         entityManager.clear();
 
         assertThat(playerRepository.count()).isEqualTo(1);
+        assertThat(playerCohortRepository.count()).isEqualTo(1);
     }
 
     @Test

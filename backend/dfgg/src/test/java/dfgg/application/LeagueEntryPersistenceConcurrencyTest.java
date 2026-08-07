@@ -3,6 +3,7 @@ package dfgg.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.domain.player.PlayerRepository;
+import dfgg.domain.player.PlayerCohortRepository;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
 import java.time.Instant;
 import java.util.List;
@@ -25,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(LeagueEntryPersistenceService.class)
+@Import({LeagueEntryPersistenceService.class, PlayerCohortPersistenceService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class LeagueEntryPersistenceConcurrencyTest {
 
@@ -35,9 +36,13 @@ class LeagueEntryPersistenceConcurrencyTest {
     @Autowired
     private PlayerRepository playerRepository;
 
+    @Autowired
+    private PlayerCohortRepository playerCohortRepository;
+
     @BeforeEach
     @AfterEach
     void cleanUp() {
+        playerCohortRepository.deleteAll();
         playerRepository.deleteAll();
     }
 
@@ -65,6 +70,7 @@ class LeagueEntryPersistenceConcurrencyTest {
         }
 
         assertThat(playerRepository.count()).isEqualTo(1);
+        assertThat(playerCohortRepository.count()).isEqualTo(1);
     }
 
     private void persistAfterSignal(

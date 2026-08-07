@@ -39,7 +39,11 @@ class ItemSyncServiceTest {
         ItemResponse response = new ItemResponse(Map.of(
                 "1036", new ItemData("롱소드", List.of("3071")),
                 "3071", new ItemData("칠흑의 양날 도끼", null),
-                "6672", new ItemData("크라켄 학살자", List.of())
+                "6672", new ItemData("크라켄 학살자", List.of()),
+                "1055", new ItemData("도란의 검", List.of(), List.of("Damage"), Map.of("11", true), false, 1),
+                "2003", new ItemData("체력 물약", List.of(), List.of("Consumable"), Map.of("11", true), true),
+                "3340", new ItemData("와드 토템", List.of(), List.of("Trinket"), Map.of("11", true), false),
+                "9999", new ItemData("다른 맵 아이템", List.of(), List.of(), Map.of("11", false), false)
         ));
         when(dataDragonClient.getItems()).thenReturn(response);
 

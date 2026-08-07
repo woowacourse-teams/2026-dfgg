@@ -12,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import dfgg.application.RiotMatchSyncService;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
+import dfgg.domain.match.RawMatchTimeline;
+import dfgg.domain.match.RawMatchTimelineRepository;
 import dfgg.domain.player.Player;
 import dfgg.domain.player.PlayerRepository;
 import dfgg.infrastructure.external.client.RiotClient;
@@ -36,6 +38,7 @@ class RiotMatchControllerIntegrationTest {
 
     private static final String MATCH_ID = "KR_1234567890";
     private static final String RAW_DATA = "{\"info\":{\"participants\":[]}}";
+    private static final String RAW_TIMELINE = "{\"info\":{\"frames\":[]}}";
 
     @Autowired
     private MockMvc mockMvc;
@@ -50,6 +53,9 @@ class RiotMatchControllerIntegrationTest {
     private RawMatchRepository rawMatchRepository;
 
     @Autowired
+    private RawMatchTimelineRepository rawMatchTimelineRepository;
+
+    @Autowired
     private RiotMatchSyncService riotMatchSyncService;
 
     @Autowired
@@ -58,6 +64,7 @@ class RiotMatchControllerIntegrationTest {
     @BeforeEach
     @AfterEach
     void cleanUp() {
+        rawMatchTimelineRepository.deleteAll();
         rawMatchRepository.deleteAll();
         playerRepository.deleteAll();
     }
@@ -82,6 +89,10 @@ class RiotMatchControllerIntegrationTest {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
             return RAW_DATA;
         });
+        when(riotClient.getRawMatchTimeline(MATCH_ID)).thenAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            return RAW_TIMELINE;
+        });
 
         mockMvc.perform(post("/admin/riot/matches"))
                 .andExpect(status().isNoContent());
@@ -91,9 +102,13 @@ class RiotMatchControllerIntegrationTest {
         RawMatch saved = rawMatchRepository.findById(MATCH_ID).orElseThrow();
         assertThat(saved.getRawData()).isEqualTo(RAW_DATA);
         assertThat(rawMatchRepository.count()).isEqualTo(1);
+        RawMatchTimeline savedTimeline = rawMatchTimelineRepository.findById(MATCH_ID).orElseThrow();
+        assertThat(savedTimeline.getRawData()).isEqualTo(RAW_TIMELINE);
+        assertThat(rawMatchTimelineRepository.count()).isEqualTo(1);
         verify(riotClient, times(2)).getMatchIds("puuid-1", 0, 1);
         verify(riotClient, never()).getMatchIds("puuid-na", 0, 1);
         verify(riotClient).getRawMatch(MATCH_ID);
+        verify(riotClient).getRawMatchTimeline(MATCH_ID);
     }
 
     @Test
@@ -123,6 +138,10 @@ class RiotMatchControllerIntegrationTest {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
             return RAW_DATA;
         });
+        when(riotClient.getRawMatchTimeline(MATCH_ID)).thenAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            return RAW_TIMELINE;
+        });
 
         transactionTemplate.executeWithoutResult(status -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
@@ -144,6 +163,7 @@ class RiotMatchControllerIntegrationTest {
         ));
         when(riotClient.getMatchIds("puuid-2", 0, 1)).thenReturn(List.of(MATCH_ID));
         when(riotClient.getRawMatch(MATCH_ID)).thenReturn(RAW_DATA);
+        when(riotClient.getRawMatchTimeline(MATCH_ID)).thenReturn(RAW_TIMELINE);
 
         mockMvc.perform(post("/admin/riot/matches")
                         .param("playerPage", "1")

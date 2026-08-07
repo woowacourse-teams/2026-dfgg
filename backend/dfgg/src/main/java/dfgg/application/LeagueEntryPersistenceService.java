@@ -1,6 +1,7 @@
 package dfgg.application;
 
 import dfgg.domain.player.PlayerRepository;
+import dfgg.domain.player.PlayerCohort;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
 import java.time.Instant;
 import java.util.List;
@@ -13,9 +14,14 @@ import org.springframework.util.Assert;
 public class LeagueEntryPersistenceService {
 
     private final PlayerRepository playerRepository;
+    private final PlayerCohortPersistenceService cohortPersistenceService;
 
-    public LeagueEntryPersistenceService(PlayerRepository playerRepository) {
+    public LeagueEntryPersistenceService(
+            PlayerRepository playerRepository,
+            PlayerCohortPersistenceService cohortPersistenceService
+    ) {
         this.playerRepository = playerRepository;
+        this.cohortPersistenceService = cohortPersistenceService;
     }
 
     @Transactional
@@ -41,5 +47,12 @@ public class LeagueEntryPersistenceService {
         Assert.hasText(entry.puuid(), "puuid must not be blank");
 
         playerRepository.upsert(entry.puuid(), platform, collectedAt);
+        cohortPersistenceService.persist(new PlayerCohort(
+                entry.puuid(),
+                entry.queueType(),
+                entry.tier(),
+                entry.rank(),
+                collectedAt
+        ));
     }
 }
