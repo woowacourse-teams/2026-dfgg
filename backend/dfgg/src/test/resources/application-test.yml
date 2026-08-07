@@ -9,6 +9,9 @@ spring:
       ddl-auto: create-drop
     open-in-view: false
 
+  test:
+    database:
+      replace: none
 riot:
   api:
     key: "test-riot-api-key"
