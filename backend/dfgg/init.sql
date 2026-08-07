@@ -1,0 +1,4 @@
+CREATE USER tuise WITH PASSWORD 'tuise';
+CREATE DATABASE dfgg_test;
+GRANT ALL PRIVILEGES ON DATABASE dfgg_test TO tuise;
+ALTER DATABASE dfgg_test OWNER TO tuise;
