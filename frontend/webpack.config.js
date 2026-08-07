@@ -52,6 +52,7 @@ module.exports = {
       {
         context: ['/recommendations'],
         target: 'http://localhost:8080',
+        changeOrigin: true,
       },
     ],
     client: {
