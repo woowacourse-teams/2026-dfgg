@@ -1,6 +1,7 @@
 package dfgg.infrastructure.external.client;
 
 import dfgg.infrastructure.external.dto.ChampionResponse;
+import dfgg.infrastructure.external.dto.ItemResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -51,6 +52,19 @@ public class DataDragonClient {
 
         if (hasInvalidChampion) {
             throw new IllegalStateException("[Error] Data Dragon champion data is invalid");
+        }
+
+        return response;
+    }
+
+    public ItemResponse getItems() {
+        ItemResponse response = restClient.get()
+                .uri("/cdn/{version}/data/ko_KR/item.json", getLatestVersion())
+                .retrieve()
+                .body(ItemResponse.class);
+
+        if (response == null || response.data() == null || response.data().isEmpty()) {
+            throw new IllegalStateException("[Error] Data Dragon item response is empty");
         }
 
         return response;

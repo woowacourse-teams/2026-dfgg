@@ -8,6 +8,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import dfgg.infrastructure.external.dto.ChampionResponse;
+import dfgg.infrastructure.external.dto.ItemResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -165,4 +166,70 @@ public class DataDragonClientTest {
 
         server.verify();
     }
+
+    @Test
+    void 최신_버전의_아이템_목록과_상위_아이템_정보를_조회한다() {
+        // given
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.15.1\"]", MediaType.APPLICATION_JSON));
+
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/data/ko_KR/item.json"))
+                .andRespond(withSuccess("""
+                        {
+                          "data": {
+                            "1036": {
+                              "name": "롱소드",
+                              "into": ["3071"]
+                            },
+                            "3071": {
+                              "name": "칠흑의 양날 도끼"
+                            }
+                          }
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        // when
+        ItemResponse response = client.getItems();
+
+        // then
+        assertThat(response.data().get("1036").into()).containsExactly("3071");
+        assertThat(response.data().get("3071").into()).isNull();
+
+        server.verify();
+    }
+
+    @Test
+    void 아이템_목록_응답_본문이_비어있으면_예외가_발생한다() {
+        // given
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.15.1\"]", MediaType.APPLICATION_JSON));
+
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/data/ko_KR/item.json"))
+                .andRespond(withNoContent());
+
+        // when & then
+        assertThatThrownBy(client::getItems)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Data Dragon item response is empty");
+
+        server.verify();
+    }
+
+    @Test
+    void 아이템_데이터가_비어있으면_예외가_발생한다() {
+        // given
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.15.1\"]", MediaType.APPLICATION_JSON));
+
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/data/ko_KR/item.json"))
+                .andRespond(withSuccess("{\"data\": {}}", MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertThatThrownBy(client::getItems)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Data Dragon item response is empty");
+
+        server.verify();
+    }
+
 }
