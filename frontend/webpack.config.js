@@ -17,7 +17,19 @@ module.exports = {
           {
             loader: 'babel-loader',
             options: {
-              presets: ['@babel/preset-env', '@babel/preset-react', '@babel/preset-typescript'],
+              presets: [
+                '@babel/preset-env',
+                [
+                  '@babel/preset-react',
+                  {
+                    runtime: 'automatic',
+                    // webpack의 --mode는 babel에 전달되지 않는다. 명시하지 않으면
+                    // 프로덕션 번들에도 jsxDEV가 들어가 런타임에서 터진다.
+                    development: process.env.NODE_ENV !== 'production',
+                  },
+                ],
+                '@babel/preset-typescript',
+              ],
             },
           },
         ],
