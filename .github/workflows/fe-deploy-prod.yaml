@@ -1,0 +1,64 @@
+name: fe-deploy-prod
+
+on:
+  push:
+    branches: [main]
+    paths: ["frontend/**", ".github/workflows/fe-deploy-prod.yaml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 배포 중 취소되면 파일이 일부만 전송된 채로 남는다. 취소 대신 큐에 쌓아 순차 실행한다.
+concurrency:
+  group: fe-deploy-prod
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  deploy:
+    name: FE-DEPLOY-PROD
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: pnpm 바이너리 설치
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - name: 노드 설치
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: 린트 검사
+        run: pnpm lint
+
+      - name: 타입 검사
+        run: pnpm typecheck
+
+      - name: 빌드
+        run: pnpm build
+
+      - name: SSH 키 준비
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY_PROD }}" > ~/.ssh/deploy.pem
+          chmod 600 ~/.ssh/deploy.pem
+          ssh-keyscan -H ${{ secrets.EC2_HOST_PROD }} >> ~/.ssh/known_hosts
+
+      - name: 배포
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy.pem" \
+            dist/ ubuntu@${{ secrets.EC2_HOST_PROD }}:/var/www/dfgg/
