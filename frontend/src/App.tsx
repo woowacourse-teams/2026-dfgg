@@ -1,10 +1,19 @@
-const App = () => {
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+
+import ChampionSelect from './pages/champion-select/ChampionSelect';
+import Home from './pages/home/Home';
+import Nickname from './pages/nickname/Nickname';
+
+function App() {
   return (
-    <div>
-      <h1 className="text-xl text-fuchsia-400">김벤지</h1>
-      <p>asdf</p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/nickname" element={<Nickname />} />
+        <Route path="/champion-select" element={<ChampionSelect />} />
+      </Routes>
+    </BrowserRouter>
   );
-};
+}
 
 export default App;
