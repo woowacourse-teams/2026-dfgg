@@ -30,7 +30,7 @@ export default function Nickname() {
     const getData = async ({ gameName, tagLine }: { gameName: string; tagLine: string }) => {
       try {
         const response = await fetch(
-          `/recommendations?nickname=${encodeURIComponent(gameName)}&hash=${encodeURIComponent(tagLine)}`,
+          `/recommendations?gameName=${encodeURIComponent(gameName)}&tagLine=${encodeURIComponent(tagLine)}`,
           {
             method: 'GET',
           },
