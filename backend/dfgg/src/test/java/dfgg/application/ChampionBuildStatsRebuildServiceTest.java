@@ -27,8 +27,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class ChampionBuildStatsRebuildServiceTest {
 
     @Mock
@@ -66,9 +68,9 @@ class ChampionBuildStatsRebuildServiceTest {
 
     @Test
     void 전체_통계_집계는_기존_파생_데이터를_삭제하지_않는다() {
-        int recorded = rebuildService.rebuildAll("PLATINUM");
+        ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM");
 
-        assertThat(recorded).isZero();
+        assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
         verify(sampleRepository, never()).deleteAllInBatch();
         verify(statsRepository, never()).deleteAll();
         verify(normalizedParticipantRepository, never()).deleteAllInBatch();
@@ -96,15 +98,20 @@ class ChampionBuildStatsRebuildServiceTest {
     }
 
     @Test
-    void 전체_재생성에서는_Timeline이_없는_매치를_건너뛴다() {
+    void 전체_집계에서는_Timeline이_없는_매치를_결과와_로그에_기록한다(CapturedOutput output) {
         RawMatch rawMatch = new RawMatch("KR_1", "{\"info\":{}}");
         when(rawMatchRepository.findAll()).thenReturn(List.of(rawMatch));
         when(itemRepository.findAll()).thenReturn(List.of());
         when(rawMatchTimelineRepository.findById("KR_1")).thenReturn(Optional.empty());
 
-        int recorded = rebuildService.rebuildAll("PLATINUM", List.of());
+        ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM", List.of());
 
-        assertThat(recorded).isZero();
+        assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(1, 0, 1, 0));
+        assertThat(output)
+                .contains("Champion build stats rebuild started: tier=PLATINUM, totalMatches=1")
+                .contains("Champion build stats rebuild progress: tier=PLATINUM, visitedMatches=1/1")
+                .contains("Champion build stats rebuild completed: tier=PLATINUM, totalMatches=1")
+                .contains("skippedMissingTimeline=1");
         verifyNoInteractions(matchNormalizer, normalizedPersistenceService, aggregationService);
     }
 }

@@ -2,6 +2,7 @@ package dfgg.presentation;
 
 import dfgg.application.RiotMatchSyncService;
 import dfgg.application.ChampionBuildStatsRebuildService;
+import dfgg.application.ChampionBuildStatsRebuildResult;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
@@ -50,7 +51,7 @@ public class RiotMatchController {
     }
 
     @PostMapping("/riot/matches/stats")
-    public ResponseEntity<Void> rebuildStats(
+    public ResponseEntity<ChampionBuildStatsRebuildResult> rebuildStats(
             @RequestParam
             @Pattern(regexp = "IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND")
             String tier
@@ -58,7 +59,7 @@ public class RiotMatchController {
         if (statsRebuildService == null) {
             throw new IllegalStateException("stats rebuild service is not configured");
         }
-        statsRebuildService.rebuildAll(tier);
-        return ResponseEntity.noContent().build();
+        ChampionBuildStatsRebuildResult result = statsRebuildService.rebuildAll(tier);
+        return ResponseEntity.ok(result);
     }
 }

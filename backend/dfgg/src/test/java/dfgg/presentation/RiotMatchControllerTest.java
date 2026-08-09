@@ -2,9 +2,12 @@ package dfgg.presentation;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import dfgg.application.ChampionBuildStatsRebuildResult;
 import dfgg.application.RiotMatchSyncService;
 import dfgg.application.ChampionBuildStatsRebuildService;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,10 +59,17 @@ class RiotMatchControllerTest {
     }
 
     @Test
-    void 지정한_티어의_빌드_통계를_재생성한다() throws Exception {
+    void 지정한_티어의_빌드_통계_집계_결과를_반환한다() throws Exception {
+        when(statsRebuildService.rebuildAll("PLATINUM"))
+                .thenReturn(new ChampionBuildStatsRebuildResult(10, 9, 1, 32));
+
         mockMvc.perform(post("/admin/riot/matches/stats")
                         .param("tier", "PLATINUM"))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalMatches").value(10))
+                .andExpect(jsonPath("$.processedMatches").value(9))
+                .andExpect(jsonPath("$.skippedMissingTimeline").value(1))
+                .andExpect(jsonPath("$.recordedSamples").value(32));
 
         verify(statsRebuildService).rebuildAll("PLATINUM");
     }

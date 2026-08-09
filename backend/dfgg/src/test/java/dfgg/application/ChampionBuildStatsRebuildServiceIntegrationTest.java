@@ -126,11 +126,11 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
         Long existingStatsId = existingStats.getId();
         entityManager.clear();
 
-        int recordedSamples = rebuildService.rebuildAll("PLATINUM");
+        ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM");
 
         entityManager.flush();
         entityManager.clear();
-        assertThat(recordedSamples).isZero();
+        assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
         assertThat(normalizedRepository.findByMatchId("KR_EXISTING")).hasSize(1);
         assertThat(statsRepository.findById(existingStatsId))
                 .get()
@@ -178,12 +178,14 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
                 ]}}
                 """));
 
-        rebuildService.rebuildAll("PLATINUM");
+        ChampionBuildStatsRebuildResult firstResult = rebuildService.rebuildAll("PLATINUM");
+        assertThat(firstResult).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 32));
         assertThat(normalizedRepository.count()).isEqualTo(3);
         assertThat(statsRepository.count()).isEqualTo(32);
         assertThat(sampleRepository.count()).isEqualTo(32);
 
-        rebuildService.rebuildAll("PLATINUM");
+        ChampionBuildStatsRebuildResult secondResult = rebuildService.rebuildAll("PLATINUM");
+        assertThat(secondResult).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 0));
         assertThat(normalizedRepository.count()).isEqualTo(3);
         assertThat(statsRepository.count()).isEqualTo(32);
         assertThat(sampleRepository.count()).isEqualTo(32);
