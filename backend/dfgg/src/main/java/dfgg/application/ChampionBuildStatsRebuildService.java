@@ -2,14 +2,11 @@ package dfgg.application;
 
 import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
-import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import dfgg.domain.match.MatchParticipantCohortRepository;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
 import dfgg.domain.match.RawMatchTimelineRepository;
-import dfgg.domain.stats.ChampionBuildStatsRepository;
-import dfgg.domain.stats.CompositionStatsSampleRepository;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Set;
@@ -27,9 +24,6 @@ public class ChampionBuildStatsRebuildService {
     private final RawMatchRepository rawMatchRepository;
     private final RawMatchTimelineRepository rawMatchTimelineRepository;
     private final ItemRepository itemRepository;
-    private final NormalizedMatchParticipantRepository normalizedParticipantRepository;
-    private final CompositionStatsSampleRepository sampleRepository;
-    private final ChampionBuildStatsRepository statsRepository;
     private final MatchNormalizer matchNormalizer;
     private final NormalizedMatchPersistenceService normalizedPersistenceService;
     private final ChampionBuildStatsAggregationService aggregationService;
@@ -39,9 +33,6 @@ public class ChampionBuildStatsRebuildService {
             RawMatchRepository rawMatchRepository,
             RawMatchTimelineRepository rawMatchTimelineRepository,
             ItemRepository itemRepository,
-            NormalizedMatchParticipantRepository normalizedParticipantRepository,
-            CompositionStatsSampleRepository sampleRepository,
-            ChampionBuildStatsRepository statsRepository,
             MatchNormalizer matchNormalizer,
             NormalizedMatchPersistenceService normalizedPersistenceService,
             ChampionBuildStatsAggregationService aggregationService,
@@ -50,9 +41,6 @@ public class ChampionBuildStatsRebuildService {
         this.rawMatchRepository = rawMatchRepository;
         this.rawMatchTimelineRepository = rawMatchTimelineRepository;
         this.itemRepository = itemRepository;
-        this.normalizedParticipantRepository = normalizedParticipantRepository;
-        this.sampleRepository = sampleRepository;
-        this.statsRepository = statsRepository;
         this.matchNormalizer = matchNormalizer;
         this.normalizedPersistenceService = normalizedPersistenceService;
         this.aggregationService = aggregationService;
@@ -64,7 +52,6 @@ public class ChampionBuildStatsRebuildService {
         if (tier == null || tier.isBlank()) {
             throw new IllegalArgumentException("tier must not be blank");
         }
-        clearDerivedData();
         Set<Integer> coreItemIds = coreItemIds();
         int recordedSamples = 0;
         int skippedMatches = 0;
@@ -94,8 +81,6 @@ public class ChampionBuildStatsRebuildService {
     @Transactional
     public int rebuildAll(String tier, Collection<String> cohortPuuids) {
         Objects.requireNonNull(cohortPuuids, "cohortPuuids must not be null");
-        clearDerivedData();
-
         Set<Integer> coreItemIds = coreItemIds();
         int recordedSamples = 0;
         int skippedMatches = 0;
@@ -144,12 +129,6 @@ public class ChampionBuildStatsRebuildService {
         );
         normalizedPersistenceService.replace(normalized);
         return aggregationService.aggregate(normalized, tier, cohortPuuids);
-    }
-
-    private void clearDerivedData() {
-        sampleRepository.deleteAllInBatch();
-        statsRepository.deleteAll();
-        normalizedParticipantRepository.deleteAllInBatch();
     }
 
     private Set<Integer> coreItemIds() {

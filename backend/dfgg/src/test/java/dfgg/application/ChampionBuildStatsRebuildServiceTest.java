@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
+import dfgg.domain.match.MatchParticipantCohortRepository;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
@@ -56,8 +58,21 @@ class ChampionBuildStatsRebuildServiceTest {
     @Mock
     private ChampionBuildStatsAggregationService aggregationService;
 
+    @Mock
+    private MatchParticipantCohortRepository cohortRepository;
+
     @InjectMocks
     private ChampionBuildStatsRebuildService rebuildService;
+
+    @Test
+    void 전체_통계_집계는_기존_파생_데이터를_삭제하지_않는다() {
+        int recorded = rebuildService.rebuildAll("PLATINUM");
+
+        assertThat(recorded).isZero();
+        verify(sampleRepository, never()).deleteAllInBatch();
+        verify(statsRepository, never()).deleteAll();
+        verify(normalizedParticipantRepository, never()).deleteAllInBatch();
+    }
 
     @Test
     void 원본_매치와_Timeline을_정규화하고_통계를_집계한다() {

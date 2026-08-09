@@ -3,19 +3,26 @@ package dfgg.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.domain.champion.Champion;
+import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
-import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import dfgg.domain.match.MatchParticipantCohort;
 import dfgg.domain.match.MatchParticipantCohortRepository;
+import dfgg.domain.match.NormalizedMatch;
+import dfgg.domain.match.NormalizedMatchParticipant;
+import dfgg.domain.match.NormalizedMatchParticipantRepository;
+import dfgg.domain.match.NormalizedParticipant;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
 import dfgg.domain.match.RawMatchTimelineRepository;
+import dfgg.domain.stats.ChampionBuildStats;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
+import dfgg.domain.stats.CompositionStatsSample;
 import dfgg.domain.stats.CompositionStatsSampleRepository;
+import jakarta.persistence.EntityManager;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,8 +70,80 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
     @Autowired
     private CompositionStatsSampleRepository sampleRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
     @Test
-    void raw_데이터만으로_정규화와_통계를_삭제_후_재생성한다() {
+    void 특정_티어를_집계해도_기존의_다른_티어_파생_데이터를_삭제하지_않는다() {
+        Champion champion = championRepository.save(new Champion(
+                1L,
+                "Aatrox",
+                "아트록스",
+                List.of(ChampionTag.FIGHTER)
+        ));
+        Item item = itemRepository.save(new Item(3071L, "아이템 A"));
+        NormalizedMatch existingMatch = new NormalizedMatch(
+                "KR_EXISTING",
+                "16.15",
+                420,
+                List.of(new NormalizedParticipant(
+                        "p-existing",
+                        1,
+                        1,
+                        100,
+                        "TOP",
+                        true,
+                        List.of(3071),
+                        List.of(3071),
+                        true
+                ))
+        );
+        normalizedRepository.saveAndFlush(new NormalizedMatchParticipant(
+                existingMatch,
+                existingMatch.participants().getFirst()
+        ));
+        ChampionBuildStats existingStats = statsRepository.saveAndFlush(new ChampionBuildStats(
+                "16.15",
+                420,
+                champion,
+                ChampionPosition.TOP,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "GOLD",
+                "3071",
+                List.of(item),
+                1,
+                1
+        ));
+        sampleRepository.saveAndFlush(new CompositionStatsSample(
+                existingStats,
+                "KR_EXISTING",
+                "p-existing"
+        ));
+        Long existingStatsId = existingStats.getId();
+        entityManager.clear();
+
+        int recordedSamples = rebuildService.rebuildAll("PLATINUM");
+
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(recordedSamples).isZero();
+        assertThat(normalizedRepository.findByMatchId("KR_EXISTING")).hasSize(1);
+        assertThat(statsRepository.findById(existingStatsId))
+                .get()
+                .satisfies(stats -> {
+                    assertThat(stats.getTier()).isEqualTo("GOLD");
+                    assertThat(stats.getGameCount()).isEqualTo(1);
+                    assertThat(stats.getWinCount()).isEqualTo(1);
+                });
+        assertThat(sampleRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void 같은_raw_데이터를_반복_집계해도_정규화와_통계가_중복되지_않는다() {
         championRepository.saveAll(List.of(
                 new Champion(1L, "Aatrox", "아트록스", List.of(ChampionTag.FIGHTER)),
                 new Champion(2L, "Ally", "아군", List.of(ChampionTag.FIGHTER)),
