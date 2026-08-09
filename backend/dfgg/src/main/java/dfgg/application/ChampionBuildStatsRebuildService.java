@@ -7,6 +7,7 @@ import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
 import dfgg.domain.match.RawMatchTimelineRepository;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -27,30 +29,24 @@ public class ChampionBuildStatsRebuildService {
     private final RawMatchRepository rawMatchRepository;
     private final RawMatchTimelineRepository rawMatchTimelineRepository;
     private final ItemRepository itemRepository;
-    private final MatchNormalizer matchNormalizer;
-    private final NormalizedMatchPersistenceService normalizedPersistenceService;
-    private final ChampionBuildStatsAggregationService aggregationService;
+    private final ChampionBuildStatsMatchProcessor matchProcessor;
     private final MatchParticipantCohortRepository cohortRepository;
 
     public ChampionBuildStatsRebuildService(
             RawMatchRepository rawMatchRepository,
             RawMatchTimelineRepository rawMatchTimelineRepository,
             ItemRepository itemRepository,
-            MatchNormalizer matchNormalizer,
-            NormalizedMatchPersistenceService normalizedPersistenceService,
-            ChampionBuildStatsAggregationService aggregationService,
+            ChampionBuildStatsMatchProcessor matchProcessor,
             MatchParticipantCohortRepository cohortRepository
     ) {
         this.rawMatchRepository = rawMatchRepository;
         this.rawMatchTimelineRepository = rawMatchTimelineRepository;
         this.itemRepository = itemRepository;
-        this.matchNormalizer = matchNormalizer;
-        this.normalizedPersistenceService = normalizedPersistenceService;
-        this.aggregationService = aggregationService;
+        this.matchProcessor = matchProcessor;
         this.cohortRepository = cohortRepository;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ChampionBuildStatsRebuildResult rebuildAll(String tier) {
         if (tier == null || tier.isBlank()) {
             throw new IllegalArgumentException("tier must not be blank");
@@ -65,7 +61,7 @@ public class ChampionBuildStatsRebuildService {
         );
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ChampionBuildStatsRebuildResult rebuildAll(String tier, Collection<String> cohortPuuids) {
         Objects.requireNonNull(cohortPuuids, "cohortPuuids must not be null");
         return rebuildAllMatches(tier, rawMatch -> cohortPuuids);
@@ -83,6 +79,7 @@ public class ChampionBuildStatsRebuildService {
         int processedMatches = 0;
         int recordedSamples = 0;
         int skippedMatches = 0;
+        List<ChampionBuildStatsRebuildResult.Failure> failures = new ArrayList<>();
         int visitedMatches = 0;
         int progressLogInterval = progressLogInterval(totalMatches);
         log.info("Champion build stats rebuild started: tier={}, totalMatches={}", tier, totalMatches);
@@ -99,34 +96,41 @@ public class ChampionBuildStatsRebuildService {
                         totalMatches,
                         processedMatches,
                         skippedMatches,
+                        failures.size(),
                         recordedSamples,
                         progressLogInterval
                 );
                 continue;
             }
+            Collection<String> cohortPuuids = cohortPuuidsResolver.apply(rawMatch);
             try {
-                recordedSamples += rebuildOne(
+                recordedSamples += matchProcessor.rebuild(
                         rawMatch,
                         timeline,
                         tier,
-                        cohortPuuidsResolver.apply(rawMatch),
+                        cohortPuuids,
                         coreItemIds
                 );
                 processedMatches++;
             } catch (RuntimeException exception) {
+                failures.add(new ChampionBuildStatsRebuildResult.Failure(
+                        rawMatch.getMatchId(),
+                        failureReason(exception)
+                ));
                 log.error(
-                        "Champion build stats rebuild failed: tier={}, matchId={}, visitedMatches={}/{}, "
-                                + "processedMatches={}, skippedMissingTimeline={}, recordedSamples={}",
+                        "Champion build stats match failed and will be skipped: tier={}, matchId={}, "
+                                + "visitedMatches={}/{}, processedMatches={}, skippedMissingTimeline={}, "
+                                + "failedMatches={}, recordedSamples={}",
                         tier,
                         rawMatch.getMatchId(),
                         visitedMatches,
                         totalMatches,
                         processedMatches,
                         skippedMatches,
+                        failures.size(),
                         recordedSamples,
                         exception
                 );
-                throw exception;
             }
             logProgress(
                     tier,
@@ -134,6 +138,7 @@ public class ChampionBuildStatsRebuildService {
                     totalMatches,
                     processedMatches,
                     skippedMatches,
+                    failures.size(),
                     recordedSamples,
                     progressLogInterval
             );
@@ -143,13 +148,15 @@ public class ChampionBuildStatsRebuildService {
                 totalMatches,
                 processedMatches,
                 skippedMatches,
-                recordedSamples
+                failures.size(),
+                recordedSamples,
+                failures
         );
         logCompleted(tier, result, startedAtNanos);
         return result;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public int rebuildOne(String matchId, String tier, Collection<String> cohortPuuids) {
         Objects.requireNonNull(matchId, "matchId must not be null");
         Set<Integer> coreItemIds = coreItemIds();
@@ -157,24 +164,7 @@ public class ChampionBuildStatsRebuildService {
                 .orElseThrow(() -> new IllegalArgumentException("raw match not found: " + matchId));
         RawMatchTimeline timeline = rawMatchTimelineRepository.findById(matchId)
                 .orElseThrow(() -> new IllegalStateException("raw match timeline not found: " + matchId));
-        return rebuildOne(rawMatch, timeline, tier, cohortPuuids, coreItemIds);
-    }
-
-    private int rebuildOne(
-            RawMatch rawMatch,
-            RawMatchTimeline timeline,
-            String tier,
-            Collection<String> cohortPuuids,
-            Set<Integer> coreItemIds
-    ) {
-        var normalized = matchNormalizer.normalize(
-                rawMatch.getMatchId(),
-                rawMatch.getRawData(),
-                timeline.getRawData(),
-                coreItemIds
-        );
-        normalizedPersistenceService.replace(normalized);
-        return aggregationService.aggregate(normalized, tier, cohortPuuids);
+        return matchProcessor.rebuild(rawMatch, timeline, tier, cohortPuuids, coreItemIds);
     }
 
     private Set<Integer> coreItemIds() {
@@ -200,6 +190,7 @@ public class ChampionBuildStatsRebuildService {
             int totalMatches,
             int processedMatches,
             int skippedMatches,
+            int failedMatches,
             int recordedSamples,
             int progressLogInterval
     ) {
@@ -208,12 +199,13 @@ public class ChampionBuildStatsRebuildService {
         }
         log.info(
                 "Champion build stats rebuild progress: tier={}, visitedMatches={}/{}, processedMatches={}, "
-                        + "skippedMissingTimeline={}, recordedSamples={}",
+                        + "skippedMissingTimeline={}, failedMatches={}, recordedSamples={}",
                 tier,
                 visitedMatches,
                 totalMatches,
                 processedMatches,
                 skippedMatches,
+                failedMatches,
                 recordedSamples
         );
     }
@@ -226,13 +218,22 @@ public class ChampionBuildStatsRebuildService {
         long durationMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos);
         log.info(
                 "Champion build stats rebuild completed: tier={}, totalMatches={}, processedMatches={}, "
-                        + "skippedMissingTimeline={}, recordedSamples={}, durationMs={}",
+                        + "skippedMissingTimeline={}, failedMatches={}, recordedSamples={}, durationMs={}",
                 tier,
                 result.totalMatches(),
                 result.processedMatches(),
                 result.skippedMissingTimeline(),
+                result.failedMatches(),
                 result.recordedSamples(),
                 durationMillis
         );
+    }
+
+    private String failureReason(RuntimeException exception) {
+        String type = exception.getClass().getSimpleName();
+        if (exception.getMessage() == null || exception.getMessage().isBlank()) {
+            return type;
+        }
+        return type + ": " + exception.getMessage();
     }
 }

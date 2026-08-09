@@ -1,6 +1,10 @@
 package dfgg.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
@@ -22,25 +26,30 @@ import dfgg.domain.stats.ChampionBuildStats;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.stats.CompositionStatsSample;
 import dfgg.domain.stats.CompositionStatsSampleRepository;
-import jakarta.persistence.EntityManager;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
         ChampionBuildStatsRebuildService.class,
+        ChampionBuildStatsMatchProcessor.class,
         ChampionBuildStatsAggregationService.class,
         NormalizedMatchPersistenceService.class,
         MatchNormalizer.class,
         CoreItemPurchaseOrderCalculator.class
 })
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ChampionBuildStatsRebuildServiceIntegrationTest {
 
     @Autowired
@@ -70,8 +79,20 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
     @Autowired
     private CompositionStatsSampleRepository sampleRepository;
 
-    @Autowired
-    private EntityManager entityManager;
+    @MockitoSpyBean
+    private ChampionBuildStatsAggregationService aggregationService;
+
+    @BeforeEach
+    void cleanUp() {
+        sampleRepository.deleteAllInBatch();
+        statsRepository.deleteAll();
+        normalizedRepository.deleteAllInBatch();
+        cohortRepository.deleteAllInBatch();
+        rawMatchTimelineRepository.deleteAllInBatch();
+        rawMatchRepository.deleteAllInBatch();
+        itemRepository.deleteAllInBatch();
+        championRepository.deleteAllInBatch();
+    }
 
     @Test
     void 특정_티어를_집계해도_기존의_다른_티어_파생_데이터를_삭제하지_않는다() {
@@ -124,12 +145,9 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
                 "p-existing"
         ));
         Long existingStatsId = existingStats.getId();
-        entityManager.clear();
 
         ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM");
 
-        entityManager.flush();
-        entityManager.clear();
         assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
         assertThat(normalizedRepository.findByMatchId("KR_EXISTING")).hasSize(1);
         assertThat(statsRepository.findById(existingStatsId))
@@ -194,6 +212,77 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
                     assertThat(stats.getGameCount()).isEqualTo(1);
                     assertThat(stats.getWinCount()).isEqualTo(1);
                 });
+    }
+
+    @Test
+    void 한_매치가_실패해도_성공한_매치의_통계는_독립적으로_커밋된다() {
+        championRepository.saveAll(List.of(
+                new Champion(1L, "Aatrox", "아트록스", List.of(ChampionTag.FIGHTER)),
+                new Champion(2L, "Ally", "아군", List.of(ChampionTag.FIGHTER)),
+                new Champion(3L, "Enemy", "적군", List.of(ChampionTag.TANK))
+        ));
+        itemRepository.saveAll(List.of(
+                new Item(3071L, "아이템 A"),
+                new Item(6610L, "아이템 B")
+        ));
+        cohortRepository.save(new MatchParticipantCohort(
+                "KR_VALID",
+                "p-focal",
+                "RANKED_SOLO_5x5",
+                "PLATINUM",
+                "I",
+                java.time.Instant.parse("2026-08-06T08:00:00Z")
+        ));
+        String rawMatchData = """
+                {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
+                  {"puuid":"p-focal","participantId":1,"championId":1,"teamId":100,
+                   "teamPosition":"TOP","item0":3071,"item1":6610,"win":true},
+                  {"puuid":"p-ally","participantId":2,"championId":2,"teamId":100,"win":false},
+                  {"puuid":"p-enemy","participantId":3,"championId":3,"teamId":200,"win":false}
+                ]}}
+                """;
+        String timelineData = """
+                {"metadata":{"participants":["p-focal","p-ally","p-enemy"]},"info":{"frames":[
+                  {"events":[
+                    {"timestamp":100,"type":"ITEM_PURCHASED","participantId":1,"itemId":3071},
+                    {"timestamp":200,"type":"ITEM_PURCHASED","participantId":1,"itemId":6610}
+                  ]}
+                ]}}
+                """;
+        rawMatchRepository.saveAll(List.of(
+                new RawMatch("KR_VALID", rawMatchData),
+                new RawMatch("KR_INVALID", rawMatchData)
+        ));
+        rawMatchTimelineRepository.saveAll(List.of(
+                new RawMatchTimeline("KR_VALID", timelineData),
+                new RawMatchTimeline("KR_INVALID", timelineData)
+        ));
+        doAnswer(invocation -> {
+            NormalizedMatch match = invocation.getArgument(0);
+            if (match.matchId().equals("KR_INVALID")) {
+                throw new IllegalStateException("forced aggregation failure");
+            }
+            return invocation.callRealMethod();
+        }).when(aggregationService).aggregate(any(NormalizedMatch.class), anyString(), anyCollection());
+
+        ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM");
+
+        assertThat(result.totalMatches()).isEqualTo(2);
+        assertThat(result.processedMatches()).isEqualTo(1);
+        assertThat(result.skippedMissingTimeline()).isZero();
+        assertThat(result.failedMatches()).isEqualTo(1);
+        assertThat(result.recordedSamples()).isEqualTo(32);
+        assertThat(result.failures())
+                .singleElement()
+                .satisfies(failure -> {
+                    assertThat(failure.matchId()).isEqualTo("KR_INVALID");
+                    assertThat(failure.reason())
+                            .isEqualTo("IllegalStateException: forced aggregation failure");
+                });
+        assertThat(normalizedRepository.findByMatchId("KR_VALID")).hasSize(3);
+        assertThat(normalizedRepository.findByMatchId("KR_INVALID")).isEmpty();
+        assertThat(statsRepository.count()).isEqualTo(32);
+        assertThat(sampleRepository.count()).isEqualTo(32);
     }
 
 }

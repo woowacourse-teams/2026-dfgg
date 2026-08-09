@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import dfgg.application.ChampionBuildStatsRebuildResult;
 import dfgg.application.RiotMatchSyncService;
 import dfgg.application.ChampionBuildStatsRebuildService;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
@@ -61,15 +62,29 @@ class RiotMatchControllerTest {
     @Test
     void 지정한_티어의_빌드_통계_집계_결과를_반환한다() throws Exception {
         when(statsRebuildService.rebuildAll("PLATINUM"))
-                .thenReturn(new ChampionBuildStatsRebuildResult(10, 9, 1, 32));
+                .thenReturn(new ChampionBuildStatsRebuildResult(
+                        10,
+                        8,
+                        1,
+                        1,
+                        32,
+                        List.of(new ChampionBuildStatsRebuildResult.Failure(
+                                "KR_FAILED",
+                                "IllegalStateException: invalid match data"
+                        ))
+                ));
 
         mockMvc.perform(post("/admin/riot/matches/stats")
                         .param("tier", "PLATINUM"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalMatches").value(10))
-                .andExpect(jsonPath("$.processedMatches").value(9))
+                .andExpect(jsonPath("$.processedMatches").value(8))
                 .andExpect(jsonPath("$.skippedMissingTimeline").value(1))
-                .andExpect(jsonPath("$.recordedSamples").value(32));
+                .andExpect(jsonPath("$.failedMatches").value(1))
+                .andExpect(jsonPath("$.recordedSamples").value(32))
+                .andExpect(jsonPath("$.failures[0].matchId").value("KR_FAILED"))
+                .andExpect(jsonPath("$.failures[0].reason")
+                        .value("IllegalStateException: invalid match data"));
 
         verify(statsRebuildService).rebuildAll("PLATINUM");
     }

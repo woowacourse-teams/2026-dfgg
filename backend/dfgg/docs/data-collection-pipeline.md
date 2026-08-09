@@ -107,18 +107,22 @@ curl -X POST \
 
 `composition_stats`에는 패치, 큐, 티어, 챔피언, 포지션, 조합 조건, 코어 아이템 구매 순서가 저장됩니다.
 
-응답에는 전체 원본 매치 수, 처리한 매치 수, Timeline 누락으로 건너뛴 매치 수, 새로 기록한 sample 수가 포함됩니다.
+응답에는 전체 원본 매치 수, 처리한 매치 수, Timeline 누락 수, 실패 수와 사유, 새로 기록한 sample 수가 포함됩니다.
 
 ```json
 {
   "totalMatches": 1131,
   "processedMatches": 1131,
   "skippedMissingTimeline": 0,
-  "recordedSamples": 32
+  "failedMatches": 0,
+  "recordedSamples": 32,
+  "failures": []
 }
 ```
 
-같은 데이터를 다시 집계하면 중복 sample은 추가되지 않으므로 `recordedSamples`는 `0`이 될 수 있습니다. 실행 중에는 애플리케이션 로그에서 시작, 약 10% 단위 진행 상황, 완료 결과와 소요 시간을 확인할 수 있습니다.
+각 매치는 독립 트랜잭션으로 처리됩니다. 한 매치가 실패하면 그 매치에서 변경한 정규화·통계 데이터만 롤백하고 다음 매치를 계속 처리합니다. 실패한 매치 ID와 사유는 `failures`에 포함되며, `processedMatches`에는 커밋까지 성공한 매치만 포함됩니다.
+
+같은 데이터를 다시 집계하면 중복 sample은 추가되지 않으므로 `recordedSamples`는 `0`이 될 수 있습니다. 실행 중에는 애플리케이션 로그에서 시작, 약 10% 단위 진행 상황, 실패 건수, 완료 결과와 소요 시간을 확인할 수 있습니다.
 
 ## 처음부터 최소 단위로 테스트하기
 
