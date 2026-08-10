@@ -5,27 +5,23 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
-import dfgg.domain.match.MatchParticipantCohortRepository;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
 import dfgg.domain.match.RawMatchTimelineRepository;
-import dfgg.domain.match.NormalizedMatchParticipantRepository;
-import dfgg.domain.stats.ChampionBuildStatsRepository;
-import dfgg.domain.stats.CompositionStatsSampleRepository;
+import dfgg.domain.stats.StatsAggregationCompletionRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -44,31 +40,32 @@ class ChampionBuildStatsRebuildServiceTest {
     private ItemRepository itemRepository;
 
     @Mock
-    private NormalizedMatchParticipantRepository normalizedParticipantRepository;
-
-    @Mock
-    private CompositionStatsSampleRepository sampleRepository;
-
-    @Mock
-    private ChampionBuildStatsRepository statsRepository;
-
-    @Mock
     private ChampionBuildStatsMatchProcessor matchProcessor;
 
     @Mock
-    private MatchParticipantCohortRepository cohortRepository;
+    private StatsAggregationCompletionRepository completionRepository;
 
-    @InjectMocks
     private ChampionBuildStatsRebuildService rebuildService;
 
+    @BeforeEach
+    void setUp() {
+        rebuildService = new ChampionBuildStatsRebuildService(
+                rawMatchRepository,
+                rawMatchTimelineRepository,
+                itemRepository,
+                matchProcessor,
+                completionRepository,
+                100
+        );
+    }
+
     @Test
-    void 전체_통계_집계는_기존_파생_데이터를_삭제하지_않는다() {
+    void 처리할_신규_대상이_없으면_원본_데이터를_조회하지_않는다() {
         ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM");
 
         assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
-        verify(sampleRepository, never()).deleteAllInBatch();
-        verify(statsRepository, never()).deleteAll();
-        verify(normalizedParticipantRepository, never()).deleteAllInBatch();
+        verify(completionRepository).countPendingMatches("RANKED_SOLO_5x5", "PLATINUM", "v1");
+        verifyNoInteractions(rawMatchRepository, rawMatchTimelineRepository, itemRepository, matchProcessor);
     }
 
     @Test
@@ -78,22 +75,43 @@ class ChampionBuildStatsRebuildServiceTest {
         when(itemRepository.findAll()).thenReturn(List.of(new Item(3071L, "아이템 A")));
         when(rawMatchRepository.findById("KR_1")).thenReturn(Optional.of(rawMatch));
         when(rawMatchTimelineRepository.findById("KR_1")).thenReturn(Optional.of(timeline));
-        when(matchProcessor.rebuild(any(), any(), anyString(), anyCollection(), anySet())).thenReturn(32);
+        when(matchProcessor.rebuild(
+                any(),
+                any(),
+                anyString(),
+                anyString(),
+                anyCollection(),
+                anySet(),
+                anyString()
+        )).thenReturn(new ChampionBuildStatsMatchProcessor.Result(1, 32));
 
         int recorded = rebuildService.rebuildOne("KR_1", "PLATINUM", List.of("p-1"));
 
         assertThat(recorded).isEqualTo(32);
-        verify(matchProcessor).rebuild(rawMatch, timeline, "PLATINUM", List.of("p-1"), Set.of(3071));
+        verify(matchProcessor).rebuild(
+                rawMatch,
+                timeline,
+                "RANKED_SOLO_5x5",
+                "PLATINUM",
+                List.of("p-1"),
+                Set.of(3071),
+                "v1"
+        );
     }
 
     @Test
     void 전체_집계에서는_Timeline이_없는_매치를_결과와_로그에_기록한다(CapturedOutput output) {
         RawMatch rawMatch = new RawMatch("KR_1", "{\"info\":{}}");
-        when(rawMatchRepository.findAll()).thenReturn(List.of(rawMatch));
+        when(completionRepository.countPendingMatches("RANKED_SOLO_5x5", "PLATINUM", "v1"))
+                .thenReturn(1L);
+        when(completionRepository.findPendingTargetsAfter(
+                "RANKED_SOLO_5x5", "PLATINUM", "v1", "", "", 100
+        )).thenReturn(List.of(target("KR_1", "p-1")));
         when(itemRepository.findAll()).thenReturn(List.of());
+        when(rawMatchRepository.findById("KR_1")).thenReturn(Optional.of(rawMatch));
         when(rawMatchTimelineRepository.findById("KR_1")).thenReturn(Optional.empty());
 
-        ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM", List.of());
+        ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM");
 
         assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(1, 0, 1, 0));
         assertThat(output)
@@ -110,16 +128,40 @@ class ChampionBuildStatsRebuildServiceTest {
         RawMatch succeededMatch = new RawMatch("KR_SUCCEEDED", "{\"info\":{}}");
         RawMatchTimeline failedTimeline = new RawMatchTimeline("KR_FAILED", "{\"info\":{}}");
         RawMatchTimeline succeededTimeline = new RawMatchTimeline("KR_SUCCEEDED", "{\"info\":{}}");
+        when(completionRepository.countPendingMatches("RANKED_SOLO_5x5", "PLATINUM", "v1"))
+                .thenReturn(2L);
+        when(completionRepository.findPendingTargetsAfter(
+                "RANKED_SOLO_5x5", "PLATINUM", "v1", "", "", 100
+        )).thenReturn(List.of(
+                target("KR_FAILED", "p-failed"),
+                target("KR_SUCCEEDED", "p-succeeded")
+        ));
         when(itemRepository.findAll()).thenReturn(List.of());
-        when(rawMatchRepository.findAll()).thenReturn(List.of(failedMatch, succeededMatch));
+        when(rawMatchRepository.findById("KR_FAILED")).thenReturn(Optional.of(failedMatch));
+        when(rawMatchRepository.findById("KR_SUCCEEDED")).thenReturn(Optional.of(succeededMatch));
         when(rawMatchTimelineRepository.findById("KR_FAILED")).thenReturn(Optional.of(failedTimeline));
         when(rawMatchTimelineRepository.findById("KR_SUCCEEDED")).thenReturn(Optional.of(succeededTimeline));
-        when(matchProcessor.rebuild(failedMatch, failedTimeline, "PLATINUM", List.of(), Set.of()))
+        when(matchProcessor.rebuild(
+                failedMatch,
+                failedTimeline,
+                "RANKED_SOLO_5x5",
+                "PLATINUM",
+                List.of("p-failed"),
+                Set.of(),
+                "v1"
+        ))
                 .thenThrow(new IllegalStateException("invalid match data"));
-        when(matchProcessor.rebuild(succeededMatch, succeededTimeline, "PLATINUM", List.of(), Set.of()))
-                .thenReturn(32);
+        when(matchProcessor.rebuild(
+                succeededMatch,
+                succeededTimeline,
+                "RANKED_SOLO_5x5",
+                "PLATINUM",
+                List.of("p-succeeded"),
+                Set.of(),
+                "v1"
+        )).thenReturn(new ChampionBuildStatsMatchProcessor.Result(1, 32));
 
-        ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM", List.of());
+        ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM");
 
         assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(
                 2,
@@ -136,6 +178,28 @@ class ChampionBuildStatsRebuildServiceTest {
                 .contains("Champion build stats match failed and will be skipped")
                 .contains("matchId=KR_FAILED")
                 .contains("failedMatches=1");
-        verify(matchProcessor).rebuild(succeededMatch, succeededTimeline, "PLATINUM", List.of(), Set.of());
+        verify(matchProcessor).rebuild(
+                succeededMatch,
+                succeededTimeline,
+                "RANKED_SOLO_5x5",
+                "PLATINUM",
+                List.of("p-succeeded"),
+                Set.of(),
+                "v1"
+        );
+    }
+
+    private StatsAggregationCompletionRepository.PendingTarget target(String matchId, String puuid) {
+        return new StatsAggregationCompletionRepository.PendingTarget() {
+            @Override
+            public String getMatchId() {
+                return matchId;
+            }
+
+            @Override
+            public String getPuuid() {
+                return puuid;
+            }
+        };
     }
 }

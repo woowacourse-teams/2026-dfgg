@@ -2,21 +2,23 @@ package dfgg.application;
 
 import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
-import dfgg.domain.match.MatchParticipantCohortRepository;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
 import dfgg.domain.match.RawMatchTimelineRepository;
+import dfgg.domain.stats.StatsAggregationCompletionRepository;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,25 +27,33 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChampionBuildStatsRebuildService {
 
     private static final Logger log = LoggerFactory.getLogger(ChampionBuildStatsRebuildService.class);
+    private static final String QUEUE_TYPE = "RANKED_SOLO_5x5";
+    private static final String AGGREGATION_REVISION = "v1";
 
     private final RawMatchRepository rawMatchRepository;
     private final RawMatchTimelineRepository rawMatchTimelineRepository;
     private final ItemRepository itemRepository;
     private final ChampionBuildStatsMatchProcessor matchProcessor;
-    private final MatchParticipantCohortRepository cohortRepository;
+    private final StatsAggregationCompletionRepository completionRepository;
+    private final int batchSize;
 
     public ChampionBuildStatsRebuildService(
             RawMatchRepository rawMatchRepository,
             RawMatchTimelineRepository rawMatchTimelineRepository,
             ItemRepository itemRepository,
             ChampionBuildStatsMatchProcessor matchProcessor,
-            MatchParticipantCohortRepository cohortRepository
+            StatsAggregationCompletionRepository completionRepository,
+            @Value("${stats.rebuild.batch-size:100}") int batchSize
     ) {
+        if (batchSize < 1) {
+            throw new IllegalArgumentException("stats rebuild batch size must be positive");
+        }
         this.rawMatchRepository = rawMatchRepository;
         this.rawMatchTimelineRepository = rawMatchTimelineRepository;
         this.itemRepository = itemRepository;
         this.matchProcessor = matchProcessor;
-        this.cohortRepository = cohortRepository;
+        this.completionRepository = completionRepository;
+        this.batchSize = batchSize;
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -51,45 +61,99 @@ public class ChampionBuildStatsRebuildService {
         if (tier == null || tier.isBlank()) {
             throw new IllegalArgumentException("tier must not be blank");
         }
-        return rebuildAllMatches(
-                tier,
-                rawMatch -> cohortRepository.findPuuidsByMatchIdAndQueueTypeAndTier(
-                        rawMatch.getMatchId(),
-                        "RANKED_SOLO_5x5",
-                        tier
-                )
-        );
+        return rebuildPendingMatches(tier);
     }
 
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public ChampionBuildStatsRebuildResult rebuildAll(String tier, Collection<String> cohortPuuids) {
-        Objects.requireNonNull(cohortPuuids, "cohortPuuids must not be null");
-        return rebuildAllMatches(tier, rawMatch -> cohortPuuids);
-    }
-
-    private ChampionBuildStatsRebuildResult rebuildAllMatches(
-            String tier,
-            Function<RawMatch, Collection<String>> cohortPuuidsResolver
-    ) {
+    private ChampionBuildStatsRebuildResult rebuildPendingMatches(String tier) {
         long startedAtNanos = System.nanoTime();
         log.info("Champion build stats rebuild requested: tier={}", tier);
+        int totalMatches = Math.toIntExact(completionRepository.countPendingMatches(
+                QUEUE_TYPE,
+                tier,
+                AGGREGATION_REVISION
+        ));
+        log.info("Champion build stats rebuild started: tier={}, totalMatches={}", tier, totalMatches);
+        if (totalMatches == 0) {
+            ChampionBuildStatsRebuildResult result = new ChampionBuildStatsRebuildResult(0, 0, 0, 0);
+            logCompleted(tier, result, startedAtNanos);
+            return result;
+        }
+
         Set<Integer> coreItemIds = coreItemIds();
-        List<RawMatch> rawMatches = rawMatchRepository.findAll();
-        int totalMatches = rawMatches.size();
         int processedMatches = 0;
         int recordedSamples = 0;
         int skippedMatches = 0;
         List<ChampionBuildStatsRebuildResult.Failure> failures = new ArrayList<>();
         int visitedMatches = 0;
         int progressLogInterval = progressLogInterval(totalMatches);
-        log.info("Champion build stats rebuild started: tier={}, totalMatches={}", tier, totalMatches);
+        PendingTarget cursor = PendingTarget.initialCursor();
 
-        for (RawMatch rawMatch : rawMatches) {
-            visitedMatches++;
-            RawMatchTimeline timeline = rawMatchTimelineRepository.findById(rawMatch.getMatchId()).orElse(null);
-            if (timeline == null) {
-                skippedMatches++;
-                log.warn("Skipping match {} because its raw timeline is missing", rawMatch.getMatchId());
+        while (true) {
+            List<PendingTarget> targets = nextPendingTargets(tier, cursor);
+            if (targets.isEmpty()) {
+                break;
+            }
+            for (Map.Entry<String, List<String>> entry : groupPuuidsByMatch(targets).entrySet()) {
+                visitedMatches++;
+                String matchId = entry.getKey();
+                RawMatch rawMatch = rawMatchRepository.findById(matchId).orElse(null);
+                if (rawMatch == null) {
+                    failures.add(new ChampionBuildStatsRebuildResult.Failure(
+                            matchId,
+                            "IllegalStateException: raw match not found"
+                    ));
+                    continue;
+                }
+                RawMatchTimeline timeline = rawMatchTimelineRepository.findById(matchId).orElse(null);
+                if (timeline == null) {
+                    skippedMatches++;
+                    log.warn("Skipping match {} because its raw timeline is missing", matchId);
+                    logProgress(
+                            tier,
+                            visitedMatches,
+                            totalMatches,
+                            processedMatches,
+                            skippedMatches,
+                            failures.size(),
+                            recordedSamples,
+                            progressLogInterval
+                    );
+                    continue;
+                }
+                try {
+                    ChampionBuildStatsMatchProcessor.Result matchResult = matchProcessor.rebuild(
+                            rawMatch,
+                            timeline,
+                            QUEUE_TYPE,
+                            tier,
+                            entry.getValue(),
+                            coreItemIds,
+                            AGGREGATION_REVISION
+                    );
+                    if (matchResult.claimedParticipants() > 0) {
+                        recordedSamples += matchResult.recordedSamples();
+                        processedMatches++;
+                    }
+                } catch (RuntimeException exception) {
+                    failures.add(new ChampionBuildStatsRebuildResult.Failure(
+                            matchId,
+                            failureReason(exception)
+                    ));
+                    log.error(
+                            "Champion build stats match failed and will be skipped: tier={}, matchId={}, "
+                                    + "visitedMatches={}/{}, processedMatches={}, skippedMissingTimeline={}, "
+                                    + "failedMatches={}, recordedSamples={}",
+                            tier,
+                            matchId,
+                            visitedMatches,
+                            totalMatches,
+                            processedMatches,
+                            skippedMatches,
+                            failures.size(),
+                            recordedSamples,
+                            exception
+                    );
+                }
                 logProgress(
                         tier,
                         visitedMatches,
@@ -100,48 +164,8 @@ public class ChampionBuildStatsRebuildService {
                         recordedSamples,
                         progressLogInterval
                 );
-                continue;
             }
-            Collection<String> cohortPuuids = cohortPuuidsResolver.apply(rawMatch);
-            try {
-                recordedSamples += matchProcessor.rebuild(
-                        rawMatch,
-                        timeline,
-                        tier,
-                        cohortPuuids,
-                        coreItemIds
-                );
-                processedMatches++;
-            } catch (RuntimeException exception) {
-                failures.add(new ChampionBuildStatsRebuildResult.Failure(
-                        rawMatch.getMatchId(),
-                        failureReason(exception)
-                ));
-                log.error(
-                        "Champion build stats match failed and will be skipped: tier={}, matchId={}, "
-                                + "visitedMatches={}/{}, processedMatches={}, skippedMissingTimeline={}, "
-                                + "failedMatches={}, recordedSamples={}",
-                        tier,
-                        rawMatch.getMatchId(),
-                        visitedMatches,
-                        totalMatches,
-                        processedMatches,
-                        skippedMatches,
-                        failures.size(),
-                        recordedSamples,
-                        exception
-                );
-            }
-            logProgress(
-                    tier,
-                    visitedMatches,
-                    totalMatches,
-                    processedMatches,
-                    skippedMatches,
-                    failures.size(),
-                    recordedSamples,
-                    progressLogInterval
-            );
+            cursor = targets.getLast();
         }
         logSkippedMatches(skippedMatches);
         ChampionBuildStatsRebuildResult result = new ChampionBuildStatsRebuildResult(
@@ -164,7 +188,52 @@ public class ChampionBuildStatsRebuildService {
                 .orElseThrow(() -> new IllegalArgumentException("raw match not found: " + matchId));
         RawMatchTimeline timeline = rawMatchTimelineRepository.findById(matchId)
                 .orElseThrow(() -> new IllegalStateException("raw match timeline not found: " + matchId));
-        return matchProcessor.rebuild(rawMatch, timeline, tier, cohortPuuids, coreItemIds);
+        return matchProcessor.rebuild(
+                rawMatch,
+                timeline,
+                QUEUE_TYPE,
+                tier,
+                cohortPuuids,
+                coreItemIds,
+                AGGREGATION_REVISION
+        ).recordedSamples();
+    }
+
+    private List<PendingTarget> nextPendingTargets(String tier, PendingTarget cursor) {
+        List<PendingTarget> targets = completionRepository.findPendingTargetsAfter(
+                        QUEUE_TYPE,
+                        tier,
+                        AGGREGATION_REVISION,
+                        cursor.matchId(),
+                        cursor.puuid(),
+                        batchSize
+                ).stream()
+                .map(PendingTarget::from)
+                .collect(Collectors.toCollection(ArrayList::new));
+        if (targets.isEmpty()) {
+            return List.of();
+        }
+
+        PendingTarget lastTarget = targets.getLast();
+        completionRepository.findRemainingTargetsForMatch(
+                        lastTarget.matchId(),
+                        QUEUE_TYPE,
+                        tier,
+                        AGGREGATION_REVISION,
+                        lastTarget.puuid()
+                ).stream()
+                .map(PendingTarget::from)
+                .forEach(targets::add);
+        return List.copyOf(targets);
+    }
+
+    private Map<String, List<String>> groupPuuidsByMatch(List<PendingTarget> targets) {
+        Map<String, List<String>> grouped = new LinkedHashMap<>();
+        for (PendingTarget target : targets) {
+            grouped.computeIfAbsent(target.matchId(), ignored -> new ArrayList<>())
+                    .add(target.puuid());
+        }
+        return grouped;
     }
 
     private Set<Integer> coreItemIds() {
@@ -235,5 +304,16 @@ public class ChampionBuildStatsRebuildService {
             return type;
         }
         return type + ": " + exception.getMessage();
+    }
+
+    private record PendingTarget(String matchId, String puuid) {
+
+        private static PendingTarget initialCursor() {
+            return new PendingTarget("", "");
+        }
+
+        private static PendingTarget from(StatsAggregationCompletionRepository.PendingTarget target) {
+            return new PendingTarget(target.getMatchId(), target.getPuuid());
+        }
     }
 }
