@@ -121,30 +121,31 @@ public class ChampionBuildStatsAggregationService {
                 tier,
                 buildKey
         );
-        ChampionBuildStats stats = statsRepository.findByStatsKey(statsKey)
-                .orElseGet(() -> statsRepository.saveAndFlush(new ChampionBuildStats(
-                        match.patch(),
-                        match.queueId(),
-                        champion,
-                        position,
-                        variant.enemyTankHeavy(),
-                        variant.enemyApHeavy(),
-                        variant.enemyAssassinHeavy(),
-                        variant.allyHasMarksman(),
-                        variant.allyTankHeavy(),
-                        tier,
-                        buildKey,
-                        buildItems,
-                        0,
-                        0
-                )));
-
-        int inserted = sampleRepository.insertIfAbsent(statsKey, match.matchId(), participant.puuid());
-        if (inserted == 1) {
-            stats.recordGame(participant.win());
-            statsRepository.save(stats);
+        int insertedStats = statsRepository.insertIfAbsent(
+                match.patch(),
+                match.queueId(),
+                champion.getChampionId(),
+                position.name(),
+                variant.enemyTankHeavy(),
+                variant.enemyApHeavy(),
+                variant.enemyAssassinHeavy(),
+                variant.allyHasMarksman(),
+                variant.allyTankHeavy(),
+                tier,
+                buildKey,
+                statsKey
+        );
+        if (insertedStats == 1) {
+            for (int itemOrder = 0; itemOrder < buildItems.size(); itemOrder++) {
+                statsRepository.insertItem(statsKey, buildItems.get(itemOrder).getItemId(), itemOrder);
+            }
         }
-        return inserted;
+        return sampleRepository.insertAndIncrementIfAbsent(
+                statsKey,
+                match.matchId(),
+                participant.puuid(),
+                participant.win()
+        );
     }
 
     private Map<Integer, Champion> loadChampions(NormalizedMatch match) {

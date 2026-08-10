@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
@@ -20,6 +21,10 @@ import org.springframework.util.Assert;
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_match_participant_cohort",
                 columnNames = {"match_id", "puuid", "queue_type"}
+        ),
+        indexes = @Index(
+                name = "idx_match_participant_cohort_stats_pending",
+                columnList = "queue_type,tier,match_id,puuid"
         )
 )
 public class MatchParticipantCohort {
