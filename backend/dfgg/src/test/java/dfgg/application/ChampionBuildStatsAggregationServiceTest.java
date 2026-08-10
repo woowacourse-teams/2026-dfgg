@@ -2,25 +2,24 @@ package dfgg.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import dfgg.domain.champion.Champion;
-import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.domain.match.NormalizedParticipant;
-import dfgg.domain.stats.ChampionBuildStats;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
-import dfgg.domain.stats.CombinationContext;
 import dfgg.domain.stats.CompositionStatsSampleRepository;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -56,10 +55,26 @@ class ChampionBuildStatsAggregationServiceTest {
                 new Item(3071L, "아이템 A"),
                 new Item(6610L, "아이템 B")
         ));
-        when(statsRepository.findByStatsKey(anyString())).thenReturn(Optional.empty());
-        when(statsRepository.saveAndFlush(any(ChampionBuildStats.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        when(sampleRepository.insertIfAbsent(anyString(), anyString(), anyString())).thenReturn(1);
+        when(statsRepository.insertIfAbsent(
+                anyString(),
+                anyInt(),
+                anyLong(),
+                anyString(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                anyString(),
+                anyString(),
+                anyString()
+        )).thenReturn(1);
+        when(sampleRepository.insertAndIncrementIfAbsent(
+                anyString(),
+                anyString(),
+                anyString(),
+                eq(true)
+        )).thenReturn(1);
 
         NormalizedMatch match = new NormalizedMatch(
                 "KR_1",
@@ -75,22 +90,32 @@ class ChampionBuildStatsAggregationServiceTest {
         int recorded = aggregationService.aggregate(match, "PLATINUM", List.of("p-focal"));
 
         assertThat(recorded).isEqualTo(32);
-        ArgumentCaptor<ChampionBuildStats> captor = ArgumentCaptor.forClass(ChampionBuildStats.class);
-        verify(statsRepository, times(32)).saveAndFlush(captor.capture());
-        assertThat(captor.getAllValues())
-                .allSatisfy(stats -> {
-                    assertThat(stats.getPatch()).isEqualTo("16.15");
-                    assertThat(stats.getQueueId()).isEqualTo(420);
-                    assertThat(stats.getBuildKey()).isEqualTo("3071>6610");
-                    assertThat(stats.getGameCount()).isEqualTo(1);
-                    assertThat(stats.getWinCount()).isEqualTo(1);
-                });
-        assertThat(captor.getAllValues().stream()
-                .map(ChampionBuildStats::getItems)
-                .findFirst()
-                .orElseThrow())
-                .extracting(Item::getItemId)
-                .containsExactly(3071L, 6610L);
+        verify(statsRepository, times(32)).insertIfAbsent(
+                eq("16.15"),
+                eq(420),
+                eq(1L),
+                eq("TOP"),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq("PLATINUM"),
+                eq("3071>6610"),
+                anyString()
+        );
+        verify(statsRepository, times(64)).insertItem(anyString(), anyLong(), anyInt());
+        ArgumentCaptor<String> statsKeyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(sampleRepository, times(32)).insertAndIncrementIfAbsent(
+                statsKeyCaptor.capture(),
+                eq("KR_1"),
+                eq("p-focal"),
+                eq(true)
+        );
+        assertThat(statsKeyCaptor.getAllValues())
+                .hasSize(32)
+                .allMatch(statsKey -> statsKey.startsWith("16.15|420|1|TOP|"))
+                .allMatch(statsKey -> statsKey.endsWith("|PLATINUM|3071>6610"));
     }
 
     private Champion champion(Long id, String tag) {
