@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
+import dfgg.domain.match.RawMatchTimeline;
+import dfgg.domain.match.RawMatchTimelineRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;
+import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -40,6 +43,9 @@ class RawMatchRepositoryTest {
     private RawMatchRepository rawMatchRepository;
 
     @Autowired
+    private RawMatchTimelineRepository timelineRepository;
+
+    @Autowired
     private EntityManager entityManager;
 
     @Test
@@ -64,5 +70,22 @@ class RawMatchRepositoryTest {
 
         assertThatThrownBy(entityManager::flush)
                 .isInstanceOf(PersistenceException.class);
+    }
+
+    @Test
+    void Timeline이_없는_매치_ID를_cursor_다음부터_조회한다() {
+        rawMatchRepository.save(new RawMatch("KR_1", RAW_DATA));
+        rawMatchRepository.save(new RawMatch("KR_2", RAW_DATA));
+        rawMatchRepository.save(new RawMatch("KR_3", RAW_DATA));
+        timelineRepository.save(new RawMatchTimeline("KR_2", "{}"));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(rawMatchRepository.findMatchIdsMissingTimelineAfter(
+                "", PageRequest.of(0, 1)
+        )).containsExactly("KR_1");
+        assertThat(rawMatchRepository.findMatchIdsMissingTimelineAfter(
+                "KR_1", PageRequest.of(0, 100)
+        )).containsExactly("KR_3");
     }
 }

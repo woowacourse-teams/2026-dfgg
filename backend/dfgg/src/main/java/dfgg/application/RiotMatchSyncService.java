@@ -13,8 +13,11 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -24,8 +27,10 @@ import org.springframework.util.Assert;
 @Service
 public class RiotMatchSyncService {
 
+    private static final Logger log = LoggerFactory.getLogger(RiotMatchSyncService.class);
     private static final String PLATFORM = "KR";
     private static final String QUEUE_TYPE = "RANKED_SOLO_5x5";
+    private static final int TIMELINE_BATCH_SIZE = 100;
 
     private final RiotClient riotClient;
     private final PlayerRepository playerRepository;
@@ -57,7 +62,7 @@ public class RiotMatchSyncService {
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public void syncMatches(
+    public SyncResult syncMatches(
             int playerPage,
             int playerCount,
             int matchStart,
@@ -74,66 +79,95 @@ public class RiotMatchSyncService {
                 "count must be between 1 and 100"
         );
 
+        List<Failure> failures = new ArrayList<>();
         MatchCollection matchCollection = collectMatchIds(
                 playerPage,
                 playerCount,
                 matchStart,
-                matchCount
+                matchCount,
+                failures
         );
         LinkedHashSet<String> matchIds = matchCollection.matchIds();
         if (matchIds.isEmpty()) {
-            return;
+            return SyncResult.empty(matchCollection.scannedPlayers(), failures);
         }
 
         Set<String> existingMatchIds = rawMatchRepository.findExistingMatchIds(matchIds);
         Set<String> existingTimelineIds = rawMatchTimelineRepository.findExistingMatchIds(matchIds);
 
-        matchIds.forEach(matchId -> fetchAndPersist(
-                matchId,
-                existingMatchIds.contains(matchId),
-                existingTimelineIds.contains(matchId),
-                matchCollection.cohortsByMatchId().getOrDefault(matchId, List.of())
-        ));
+        int newMatches = 0;
+        int newTimelines = 0;
+        int skippedItems = 0;
+        for (String matchId : matchIds) {
+            ItemCollectionResult result = fetchAndPersist(
+                    matchId,
+                    existingMatchIds.contains(matchId),
+                    existingTimelineIds.contains(matchId),
+                    matchCollection.cohortsByMatchId().getOrDefault(matchId, List.of()),
+                    failures
+            );
+            newMatches += result.newMatches();
+            newTimelines += result.newTimelines();
+            skippedItems += result.skippedItems();
+        }
+        return new SyncResult(
+                matchCollection.scannedPlayers(),
+                newMatches,
+                newTimelines,
+                skippedItems,
+                failures
+        );
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public int syncMissingTimelines() {
-        List<RawMatch> rawMatches = rawMatchRepository.findAll();
-        if (rawMatches.isEmpty()) {
-            return 0;
-        }
+        return syncMissingTimelinesWithResult().newTimelines();
+    }
 
-        LinkedHashSet<String> matchIds = rawMatches.stream()
-                .map(RawMatch::getMatchId)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        Set<String> existingTimelineIds = rawMatchTimelineRepository.findExistingMatchIds(matchIds);
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public SyncResult syncMissingTimelinesWithResult() {
         int persistedCount = 0;
-        for (RawMatch rawMatch : rawMatches) {
-            if (existingTimelineIds.contains(rawMatch.getMatchId())) {
-                continue;
+        int skippedItems = 0;
+        List<Failure> failures = new ArrayList<>();
+        String cursor = "";
+        while (true) {
+            List<String> matchIds = rawMatchRepository.findMatchIdsMissingTimelineAfter(
+                    cursor,
+                    PageRequest.of(0, TIMELINE_BATCH_SIZE)
+            );
+            if (matchIds.isEmpty()) {
+                break;
             }
-            String rawData = riotClient.getRawMatchTimeline(rawMatch.getMatchId());
-            if (timelinePersistenceService.persist(
-                    new RawMatchTimeline(rawMatch.getMatchId(), rawData)
-            )) {
-                persistedCount++;
+            for (String matchId : matchIds) {
+                try {
+                    String rawData = riotClient.getRawMatchTimeline(matchId);
+                    if (timelinePersistenceService.persist(new RawMatchTimeline(matchId, rawData))) {
+                        persistedCount++;
+                    } else {
+                        skippedItems++;
+                    }
+                } catch (RuntimeException exception) {
+                    recordFailure(failures, "TIMELINE", matchId, exception);
+                }
             }
+            cursor = matchIds.getLast();
         }
-        return persistedCount;
+        return new SyncResult(0, 0, persistedCount, skippedItems, failures);
     }
 
     private MatchCollection collectMatchIds(
             int playerPage,
             int playerCount,
             int matchStart,
-            int matchCount
+            int matchCount,
+            List<Failure> failures
     ) {
         List<String> puuids = playerRepository.findPuuidsByPlatform(
                 PLATFORM,
                 PageRequest.of(playerPage, playerCount)
         );
         if (puuids.isEmpty()) {
-            return new MatchCollection(new LinkedHashSet<>(), Map.of());
+            return new MatchCollection(0, new LinkedHashSet<>(), Map.of());
         }
 
         List<PlayerCohortRepository.Target> latestCohorts =
@@ -152,50 +186,151 @@ public class RiotMatchSyncService {
         LinkedHashSet<String> matchIds = new LinkedHashSet<>();
         Map<String, List<PlayerCohortRepository.Target>> cohortsByMatchId = new HashMap<>();
 
-        puuids.forEach(puuid -> {
-            List<String> puuidMatchIds = riotClient.getMatchIds(puuid, matchStart, matchCount);
+        for (String puuid : puuids) {
+            List<String> puuidMatchIds;
+            try {
+                puuidMatchIds = riotClient.getMatchIds(puuid, matchStart, matchCount);
+            } catch (RuntimeException exception) {
+                recordFailure(failures, "MATCH_IDS", puuid, exception);
+                continue;
+            }
             matchIds.addAll(puuidMatchIds);
             PlayerCohortRepository.Target cohort = cohortsByPuuid.get(puuid);
             if (cohort == null) {
-                return;
+                continue;
             }
             puuidMatchIds.forEach(matchId ->
                     cohortsByMatchId.computeIfAbsent(matchId, ignored -> new ArrayList<>()).add(cohort)
             );
-        });
-        return new MatchCollection(matchIds, cohortsByMatchId);
+        }
+        return new MatchCollection(puuids.size(), matchIds, cohortsByMatchId);
     }
 
-    private void fetchAndPersist(
+    private ItemCollectionResult fetchAndPersist(
             String matchId,
             boolean matchAlreadyPersisted,
             boolean timelineAlreadyPersisted,
-            List<PlayerCohortRepository.Target> cohorts
+            List<PlayerCohortRepository.Target> cohorts,
+            List<Failure> failures
     ) {
+        int newMatches = 0;
+        int newTimelines = 0;
+        int skippedItems = 0;
         if (!matchAlreadyPersisted) {
-            String rawData = riotClient.getRawMatch(matchId);
-            persistenceService.persist(new RawMatch(matchId, rawData));
+            try {
+                String rawData = riotClient.getRawMatch(matchId);
+                if (persistenceService.persist(new RawMatch(matchId, rawData))) {
+                    newMatches++;
+                } else {
+                    skippedItems++;
+                }
+            } catch (RuntimeException exception) {
+                recordFailure(failures, "MATCH", matchId, exception);
+                return new ItemCollectionResult(newMatches, newTimelines, skippedItems);
+            }
+        } else {
+            skippedItems++;
         }
         if (!timelineAlreadyPersisted) {
-            String rawData = riotClient.getRawMatchTimeline(matchId);
-            timelinePersistenceService.persist(new RawMatchTimeline(matchId, rawData));
+            try {
+                String rawData = riotClient.getRawMatchTimeline(matchId);
+                if (timelinePersistenceService.persist(new RawMatchTimeline(matchId, rawData))) {
+                    newTimelines++;
+                } else {
+                    skippedItems++;
+                }
+            } catch (RuntimeException exception) {
+                recordFailure(failures, "TIMELINE", matchId, exception);
+            }
+        } else {
+            skippedItems++;
         }
         Instant matchCollectedAt = Instant.now();
-        cohorts.forEach(cohort -> cohortPersistenceService.persist(
-                new dfgg.domain.match.MatchParticipantCohort(
-                        matchId,
-                        cohort.getPuuid(),
-                        cohort.getQueueType(),
-                        cohort.getTier(),
-                        cohort.getDivision(),
-                        matchCollectedAt
-                )
-        ));
+        for (PlayerCohortRepository.Target cohort : cohorts) {
+            try {
+                if (!cohortPersistenceService.persist(
+                        new dfgg.domain.match.MatchParticipantCohort(
+                                matchId,
+                                cohort.getPuuid(),
+                                cohort.getQueueType(),
+                                cohort.getTier(),
+                                cohort.getDivision(),
+                                matchCollectedAt
+                        )
+                )) {
+                    skippedItems++;
+                }
+            } catch (RuntimeException exception) {
+                recordFailure(
+                        failures,
+                        "MATCH_COHORT",
+                        matchId + "/" + cohort.getPuuid(),
+                        exception
+                );
+            }
+        }
+        return new ItemCollectionResult(newMatches, newTimelines, skippedItems);
+    }
+
+    private void recordFailure(
+            List<Failure> failures,
+            String stage,
+            String targetId,
+            RuntimeException exception
+    ) {
+        Failure failure = Failure.from(stage, targetId, exception);
+        failures.add(failure);
+        log.warn(
+                "Riot match collection item failed: stage={}, targetId={}, reason={}",
+                failure.stage(),
+                failure.targetId(),
+                failure.reason()
+        );
     }
 
     private record MatchCollection(
+            int scannedPlayers,
             LinkedHashSet<String> matchIds,
             Map<String, List<PlayerCohortRepository.Target>> cohortsByMatchId
     ) {
+    }
+
+    private record ItemCollectionResult(int newMatches, int newTimelines, int skippedItems) {
+    }
+
+    public record SyncResult(
+            int scannedPlayers,
+            int newMatches,
+            int newTimelines,
+            int skippedItems,
+            List<Failure> failures
+    ) {
+
+        public SyncResult {
+            failures = List.copyOf(Objects.requireNonNull(failures, "failures must not be null"));
+        }
+
+        private static SyncResult empty(int scannedPlayers, List<Failure> failures) {
+            return new SyncResult(scannedPlayers, 0, 0, 0, failures);
+        }
+    }
+
+    public record Failure(String stage, String targetId, String reason) {
+
+        public Failure {
+            Objects.requireNonNull(stage, "stage must not be null");
+            Objects.requireNonNull(targetId, "targetId must not be null");
+            Objects.requireNonNull(reason, "reason must not be null");
+        }
+
+        private static Failure from(String stage, String targetId, RuntimeException exception) {
+            String type = exception.getClass().getSimpleName();
+            String message = exception.getMessage();
+            return new Failure(
+                    stage,
+                    targetId,
+                    message == null || message.isBlank() ? type : type + ": " + message
+            );
+        }
     }
 }

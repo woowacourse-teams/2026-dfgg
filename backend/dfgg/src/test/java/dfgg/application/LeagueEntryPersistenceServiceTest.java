@@ -61,13 +61,15 @@ class LeagueEntryPersistenceServiceTest {
         Instant collectedAt = Instant.parse("2026-08-06T08:00:00Z");
         LeagueEntryResponse entry = leagueEntry("puuid-1", "PLATINUM", "II", 42, 80, 70);
 
-        persistenceService.persist("KR", List.of(entry), collectedAt);
-        persistenceService.persist("KR", List.of(entry), collectedAt);
+        int firstNewPlayers = persistenceService.persist("KR", List.of(entry), collectedAt);
+        int secondNewPlayers = persistenceService.persist("KR", List.of(entry), collectedAt);
         entityManager.flush();
         entityManager.clear();
 
         assertThat(playerRepository.count()).isEqualTo(1);
         assertThat(playerCohortRepository.count()).isEqualTo(1);
+        assertThat(firstNewPlayers).isEqualTo(1);
+        assertThat(secondNewPlayers).isZero();
     }
 
     @Test

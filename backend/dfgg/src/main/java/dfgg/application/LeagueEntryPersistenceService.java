@@ -25,7 +25,7 @@ public class LeagueEntryPersistenceService {
     }
 
     @Transactional
-    public void persist(
+    public int persist(
             String platform,
             List<LeagueEntryResponse> entries,
             Instant collectedAt
@@ -35,10 +35,15 @@ public class LeagueEntryPersistenceService {
         Objects.requireNonNull(entries, "entries must not be null");
         Objects.requireNonNull(collectedAt, "collectedAt must not be null");
 
-        entries.forEach(entry -> persistEntry(platform, entry, collectedAt));
+        if (entries.isEmpty()) {
+            return 0;
+        }
+        return entries.stream()
+                .mapToInt(entry -> persistEntry(platform, entry, collectedAt))
+                .sum();
     }
 
-    private void persistEntry(
+    private int persistEntry(
             String platform,
             LeagueEntryResponse entry,
             Instant collectedAt
@@ -46,7 +51,10 @@ public class LeagueEntryPersistenceService {
         Objects.requireNonNull(entry, "entry must not be null");
         Assert.hasText(entry.puuid(), "puuid must not be blank");
 
-        playerRepository.upsert(entry.puuid(), platform, collectedAt);
+        int inserted = playerRepository.insertIfAbsent(entry.puuid(), platform, collectedAt);
+        if (inserted == 0) {
+            playerRepository.updateObservation(entry.puuid(), platform, collectedAt);
+        }
         cohortPersistenceService.persist(new PlayerCohort(
                 entry.puuid(),
                 entry.queueType(),
@@ -54,5 +62,6 @@ public class LeagueEntryPersistenceService {
                 entry.rank(),
                 collectedAt
         ));
+        return inserted;
     }
 }

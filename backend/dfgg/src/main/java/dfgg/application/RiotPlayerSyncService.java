@@ -22,7 +22,7 @@ public class RiotPlayerSyncService {
         this.persistenceService = persistenceService;
     }
 
-    public void syncLeagueEntries(
+    public int syncLeagueEntries(
             String queue,
             String tier,
             String division,
@@ -35,7 +35,7 @@ public class RiotPlayerSyncService {
                 page
         );
 
-        persistenceService.persist(
+        return persistenceService.persist(
                 PLATFORM,
                 entries,
                 Instant.now()

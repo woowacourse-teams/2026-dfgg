@@ -151,24 +151,90 @@ class RiotMatchSyncServiceTest {
     }
 
     @Test
+    void 한_매치가_실패해도_다음_매치를_계속_수집한다() {
+        when(playerRepository.findPuuidsByPlatform("KR", PageRequest.of(0, 1)))
+                .thenReturn(List.of("puuid-1"));
+        when(riotClient.getMatchIds("puuid-1", 0, 2)).thenReturn(List.of("KR_1", "KR_2"));
+        when(rawMatchRepository.findExistingMatchIds(Set.of("KR_1", "KR_2"))).thenReturn(Set.of());
+        when(rawMatchTimelineRepository.findExistingMatchIds(Set.of("KR_1", "KR_2"))).thenReturn(Set.of());
+        when(riotClient.getRawMatch("KR_1")).thenThrow(new IllegalStateException("match failed"));
+        when(riotClient.getRawMatch("KR_2")).thenReturn("{\"match\":2}");
+        when(riotClient.getRawMatchTimeline("KR_2")).thenReturn("{\"timeline\":2}");
+        when(persistenceService.persist(any())).thenReturn(true);
+        when(timelinePersistenceService.persist(any())).thenReturn(true);
+
+        RiotMatchSyncService.SyncResult result = riotMatchSyncService.syncMatches(0, 1, 0, 2);
+
+        assertThat(result.newMatches()).isEqualTo(1);
+        assertThat(result.newTimelines()).isEqualTo(1);
+        assertThat(result.failures())
+                .extracting(RiotMatchSyncService.Failure::stage, RiotMatchSyncService.Failure::targetId)
+                .containsExactly(tuple("MATCH", "KR_1"));
+        verify(riotClient).getRawMatch("KR_2");
+    }
+
+    @Test
+    void 실패한_Timeline은_다음_실행에서_다시_수집한다() {
+        when(playerRepository.findPuuidsByPlatform("KR", PageRequest.of(0, 1)))
+                .thenReturn(List.of("puuid-1"));
+        when(riotClient.getMatchIds("puuid-1", 0, 1)).thenReturn(List.of("KR_1"));
+        when(rawMatchRepository.findExistingMatchIds(Set.of("KR_1")))
+                .thenReturn(Set.of(), Set.of("KR_1"));
+        when(rawMatchTimelineRepository.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());
+        when(riotClient.getRawMatch("KR_1")).thenReturn("{\"match\":1}");
+        when(persistenceService.persist(any())).thenReturn(true);
+        when(riotClient.getRawMatchTimeline("KR_1"))
+                .thenThrow(new IllegalStateException("temporary failure"))
+                .thenReturn("{\"timeline\":1}");
+        when(timelinePersistenceService.persist(any())).thenReturn(true);
+
+        RiotMatchSyncService.SyncResult first = riotMatchSyncService.syncMatches(0, 1, 0, 1);
+        RiotMatchSyncService.SyncResult second = riotMatchSyncService.syncMatches(0, 1, 0, 1);
+
+        assertThat(first.failures()).hasSize(1);
+        assertThat(first.newTimelines()).isZero();
+        assertThat(second.failures()).isEmpty();
+        assertThat(second.newTimelines()).isEqualTo(1);
+        verify(riotClient, times(1)).getRawMatch("KR_1");
+        verify(riotClient, times(2)).getRawMatchTimeline("KR_1");
+    }
+
+    @Test
     void 기존_원본_중_Timeline이_없는_매치만_보완한다() {
-        RawMatch existing = new RawMatch("KR_1", "{\"match\":1}");
-        RawMatch missing = new RawMatch("KR_2", "{\"match\":2}");
-        when(rawMatchRepository.findAll()).thenReturn(List.of(existing, missing));
-        when(rawMatchTimelineRepository.findExistingMatchIds(
-                new LinkedHashSet<>(List.of("KR_1", "KR_2"))
-        )).thenReturn(Set.of("KR_1"));
+        when(rawMatchRepository.findMatchIdsMissingTimelineAfter(
+                "", PageRequest.of(0, 100)
+        )).thenReturn(List.of("KR_2"));
+        when(rawMatchRepository.findMatchIdsMissingTimelineAfter(
+                "KR_2", PageRequest.of(0, 100)
+        )).thenReturn(List.of());
         when(riotClient.getRawMatchTimeline("KR_2")).thenReturn("{\"timeline\":2}");
         when(timelinePersistenceService.persist(any())).thenReturn(true);
 
         int persisted = riotMatchSyncService.syncMissingTimelines();
 
         assertThat(persisted).isEqualTo(1);
-        verify(riotClient, never()).getRawMatchTimeline("KR_1");
         verify(riotClient).getRawMatchTimeline("KR_2");
         verify(timelinePersistenceService).persist(argThat(timeline ->
                 timeline.getMatchId().equals("KR_2")
                         && timeline.getRawData().equals("{\"timeline\":2}")));
+    }
+
+    @Test
+    void Timeline_저장_경합은_건너뛴_항목으로_집계한다() {
+        when(rawMatchRepository.findMatchIdsMissingTimelineAfter(
+                "", PageRequest.of(0, 100)
+        )).thenReturn(List.of("KR_2"));
+        when(rawMatchRepository.findMatchIdsMissingTimelineAfter(
+                "KR_2", PageRequest.of(0, 100)
+        )).thenReturn(List.of());
+        when(riotClient.getRawMatchTimeline("KR_2")).thenReturn("{\"timeline\":2}");
+        when(timelinePersistenceService.persist(any())).thenReturn(false);
+
+        RiotMatchSyncService.SyncResult result = riotMatchSyncService.syncMissingTimelinesWithResult();
+
+        assertThat(result.newTimelines()).isZero();
+        assertThat(result.skippedItems()).isEqualTo(1);
+        assertThat(result.failures()).isEmpty();
     }
 
     @Test

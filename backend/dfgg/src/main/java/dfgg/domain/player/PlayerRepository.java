@@ -25,15 +25,26 @@ public interface PlayerRepository extends JpaRepository<Player, String> {
     @Query(value = """
             INSERT INTO players (puuid, platform, first_seen_at, last_seen_at)
             VALUES (:puuid, :platform, :seenAt, :seenAt)
-            ON CONFLICT (puuid) DO UPDATE SET
+            ON CONFLICT (puuid) DO NOTHING
+            """, nativeQuery = true)
+    int insertIfAbsent(
+            @Param("puuid") String puuid,
+            @Param("platform") String platform,
+            @Param("seenAt") Instant seenAt
+    );
+
+    @Modifying
+    @Query(value = """
+            UPDATE players SET
                 platform = CASE
-                    WHEN EXCLUDED.last_seen_at >= players.last_seen_at THEN EXCLUDED.platform
+                    WHEN :seenAt >= last_seen_at THEN :platform
                     ELSE players.platform
                 END,
-                first_seen_at = LEAST(players.first_seen_at, EXCLUDED.first_seen_at),
-                last_seen_at = GREATEST(players.last_seen_at, EXCLUDED.last_seen_at)
+                first_seen_at = LEAST(first_seen_at, :seenAt),
+                last_seen_at = GREATEST(last_seen_at, :seenAt)
+            WHERE puuid = :puuid
             """, nativeQuery = true)
-    void upsert(
+    int updateObservation(
             @Param("puuid") String puuid,
             @Param("platform") String platform,
             @Param("seenAt") Instant seenAt
