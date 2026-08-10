@@ -22,10 +22,16 @@ public class RecommendationService {
 
     private final ChampionNameNormalizer championNameNormalizer;
     private final ChampionBuildStatsRepository statsRepository;
+    private final RecommendationBuildComposer buildComposer;
 
-    public RecommendationService (ChampionNameNormalizer championNameNormalizer, ChampionBuildStatsRepository statsRepository) {
+    public RecommendationService(
+            ChampionNameNormalizer championNameNormalizer,
+            ChampionBuildStatsRepository statsRepository,
+            RecommendationBuildComposer buildComposer
+    ) {
         this.championNameNormalizer = championNameNormalizer;
         this.statsRepository = statsRepository;
+        this.buildComposer = buildComposer;
     }
 
     public RecommendationResponse recommend(RecommendationRequest request) {
@@ -41,7 +47,7 @@ public class RecommendationService {
 
         CombinationContext combinationContext = CombinationContext.analyze(enemies, allies);
 
-        ChampionBuildStats bestStats = statsRepository.findBestMatchingStats(
+        List<ChampionBuildStats> matchingStats = statsRepository.findAllMatchingStats(
                 myChampion.getChampionId(),
                 position.name(),
                 combinationContext.enemyTankHeavy(),
@@ -49,9 +55,15 @@ public class RecommendationService {
                 combinationContext.enemyAssassinHeavy(),
                 combinationContext.allyHasMarksman(),
                 combinationContext.allyTankHeavy()
-        ).orElseThrow(() -> new CompositionStatsNotFoundException(myChampion.getName(), position.name()));
+        );
+        if (matchingStats.isEmpty()) {
+            throw new CompositionStatsNotFoundException(myChampion.getName(), position.name());
+        }
 
-        List<Item> bestItems = bestStats.getItems();
+        List<Item> bestItems = buildComposer.compose(matchingStats);
+        if (bestItems.isEmpty()) {
+            throw new CompositionStatsNotFoundException(myChampion.getName(), position.name());
+        }
         List<ItemDto> itemDtos = bestItems.stream()
                 .map(ItemDto::from)
                 .toList();
