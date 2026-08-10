@@ -44,9 +44,12 @@ class RiotPlayerSyncServiceTest {
         ));
         when(riotClient.getLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
                 .thenReturn(entries);
+        when(persistenceService.persist(eq("KR"), eq(entries), any(Instant.class))).thenReturn(1);
         Instant beforeSync = Instant.now();
 
-        riotPlayerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
+        int newPlayers = riotPlayerSyncService.syncLeagueEntries(
+                "RANKED_SOLO_5x5", "PLATINUM", "I", 1
+        );
 
         Instant afterSync = Instant.now();
         ArgumentCaptor<Instant> collectedAtCaptor = ArgumentCaptor.forClass(Instant.class);
@@ -56,6 +59,7 @@ class RiotPlayerSyncServiceTest {
                 collectedAtCaptor.capture()
         );
         assertThat(collectedAtCaptor.getValue()).isBetween(beforeSync, afterSync);
+        assertThat(newPlayers).isEqualTo(1);
     }
 
     @Test

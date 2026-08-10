@@ -16,6 +16,96 @@ Match-v5 상세 원본 + Timeline 원본 저장
 ChampionBuildStats 집계
 ```
 
+## 자동 파이프라인 빠른 실행
+
+### 1. 사전 준비
+
+- PostgreSQL의 `dfgg` 데이터베이스를 실행합니다.
+- Riot Developer Portal에서 발급받은 API Key를 준비합니다.
+- 프로젝트 루트에 `.env`가 없다면 예제 파일을 복사합니다.
+
+```bash
+cp .env.example .env
+```
+
+기존 `.env`가 있다면 덮어쓰지 말고 필요한 항목만 추가합니다.
+
+### 2. 환경변수 설정
+
+`.env`에 데이터베이스 접속 정보, Riot API Key, 스케줄러 설정을 입력합니다.
+
+```properties
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+RIOT_API_KEY=발급받은_Riot_API_Key
+
+COLLECTION_SCHEDULER_ENABLED=true
+COLLECTION_SCHEDULER_CRON=0 */5 * * * *
+COLLECTION_SCHEDULER_ZONE=Asia/Seoul
+COLLECTION_SCHEDULER_TIERS=PLATINUM
+COLLECTION_SCHEDULER_DIVISIONS=IV
+COLLECTION_SCHEDULER_LEAGUE_PAGE_COUNT=1
+COLLECTION_SCHEDULER_PLAYER_PAGE_SIZE=100
+COLLECTION_SCHEDULER_MATCH_START=0
+COLLECTION_SCHEDULER_MATCH_COUNT=20
+```
+
+각 환경변수는 한 번만 선언해야 합니다. 같은 키가 여러 번 선언되면 뒤에 있는 값이 적용되어
+예상과 다른 주기로 실행될 수 있습니다.
+
+### 3. 애플리케이션 실행
+
+```bash
+./gradlew bootRun
+```
+
+`COLLECTION_SCHEDULER_ENABLED=true`이면 애플리케이션 시작 후 다음 cron 시각에 자동 파이프라인이
+실행됩니다. `0 */5 * * * *`는 매시 `0, 5, 10, 15 ...`분의 0초에 실행한다는 뜻입니다.
+
+자동 실행 순서:
+
+1. 챔피언 메타데이터 수집
+2. 코어 아이템 메타데이터 수집
+3. 플레이어 PUUID와 티어·디비전 cohort 수집
+4. 플레이어별 Match ID 조회
+5. Match 상세 원본과 Timeline 원본 저장
+6. 누락 Timeline 보완
+7. 신규 매치 정규화 및 통계 집계
+
+### 4. 실행 확인
+
+파이프라인이 시작되면 다음 형태의 로그가 출력됩니다.
+
+```text
+Riot collection scheduler started: ...
+```
+
+정상적으로 끝나면 다음 완료 로그가 출력됩니다.
+
+```text
+Riot collection scheduler completed: status=COMPLETED, ...
+```
+
+일부 항목이 실패해도 나머지 단계는 계속 실행되며 완료 상태는
+`COMPLETED_WITH_FAILURES`로 기록됩니다. 실패한 범위는 다음 스케줄에서 다시 시도합니다.
+
+### 5. 자동 실행 중지
+
+`.env`에서 스케줄러를 비활성화한 뒤 애플리케이션을 재시작합니다.
+
+```properties
+COLLECTION_SCHEDULER_ENABLED=false
+```
+
+### 실행 시 주의사항
+
+- 기본 권장 주기는 5분입니다. 수집 작업보다 짧은 주기를 사용하지 않습니다.
+- 현재 스케줄러는 단일 애플리케이션 인스턴스 실행을 전제로 합니다.
+- 여러 서버 인스턴스를 동시에 실행하면 각 인스턴스에서 같은 스케줄이 실행됩니다.
+- 진행 위치는 메모리에 있으므로 애플리케이션을 재시작하면 설정된 시작 범위부터 다시 시작합니다.
+- 이미 저장된 Match와 Timeline, 이미 완료된 통계는 중복 저장·집계되지 않습니다.
+- 전체 파이프라인을 기다리지 않고 단계별로 확인하려면 아래의 관리자 API 실행 방법을 사용합니다.
+
 ## 사전 조건
 
 애플리케이션을 먼저 실행합니다.
@@ -174,3 +264,61 @@ SELECT 'composition_stats_samples', COUNT(*) FROM composition_stats_samples;
 2. `/admin/riot/matches`를 플레이어 페이지와 매치 범위별로 호출합니다.
 3. 필요하면 `/admin/riot/matches/timelines`로 누락 Timeline을 보완합니다.
 4. 모든 매치 수집이 끝난 후 `/admin/riot/matches/stats?tier=...`로 정규화 데이터와 통계를 반영합니다.
+
+## 스케줄러 자동 수집
+
+기본값은 비활성화이며, 활성화하면 5분마다(Asia/Seoul) 실행되도록 설정되어 있습니다.
+
+```yaml
+collection:
+  scheduler:
+    enabled: false
+    cron: "0 */5 * * * *"
+    zone: "Asia/Seoul"
+```
+
+운영 환경에서는 다음 환경변수로 활성화합니다.
+
+```properties
+COLLECTION_SCHEDULER_ENABLED=true
+COLLECTION_SCHEDULER_CRON=0 */5 * * * *
+COLLECTION_SCHEDULER_ZONE=Asia/Seoul
+COLLECTION_SCHEDULER_TIERS=PLATINUM,EMERALD
+COLLECTION_SCHEDULER_DIVISIONS=I,II,III,IV
+```
+
+추가 수집 범위 설정:
+
+| 환경변수 | 기본값 | 의미 |
+| --- | --- | --- |
+| `COLLECTION_SCHEDULER_TIERS` | `PLATINUM` | 쉼표로 구분한 대상 티어 |
+| `COLLECTION_SCHEDULER_DIVISIONS` | `I` | 수집을 시작할 디비전. 한 개를 설정하면 해당 디비전부터 I까지 진행 |
+| `COLLECTION_SCHEDULER_LEAGUE_PAGE_COUNT` | `1` | 한 스케줄에서 진행할 League API 페이지 수 |
+| `COLLECTION_SCHEDULER_PLAYER_PAGE_SIZE` | `100` | 한 번에 조회할 저장 플레이어 수 |
+| `COLLECTION_SCHEDULER_MATCH_START` | `0` | 서버 시작 후 첫 플레이어별 매치 조회 위치 |
+| `COLLECTION_SCHEDULER_MATCH_COUNT` | `20` | 한 스케줄에서 플레이어별로 조회할 매치 수 |
+
+서버는 위 설정을 초기값과 처리 크기로 사용합니다. 예를 들어 디비전을 `IV`로 설정하면 League
+범위는 `IV/page-1 → III/page-1 → II/page-1 → I/page-1 → IV/page-2 ...` 순서로 진행합니다.
+디비전을 여러 개 설정한 경우에는 명시한 순서대로 순환한 뒤 다음 페이지로 이동합니다. 매치 조회
+위치는 기본 설정에서 `0 → 20 → 40 ...`처럼 증가합니다.
+수집 도중 실패한 범위는 증가시키지 않고 다음 스케줄에서 다시 시도합니다. 이 진행 위치는
+서버 메모리에만 있으므로 서버를 재시작하면 설정된 초기 범위부터 다시 시작하며, 이미 저장된
+매치와 타임라인은 저장소의 중복 방지 조건에 의해 다시 저장되지 않습니다.
+
+자동 실행 순서는 다음과 같습니다.
+
+현재 자동 수집 대상 큐는 기존 매치·통계 집계 계약과 동일한 `RANKED_SOLO_5x5`로 고정되어 있습니다. Flex 큐 자동화는 Match-v5 queue ID와 통계 completion scope를 함께 일반화해야 하므로 이번 범위에는 포함하지 않습니다.
+
+1. 챔피언 메타데이터
+2. 코어 아이템 메타데이터
+3. 설정된 티어·디비전의 플레이어와 cohort
+4. 저장된 플레이어의 미수집 raw match와 timeline
+5. 기존 raw match의 누락 timeline 보완
+6. 설정된 티어별 신규 매치 정규화와 통계 집계
+
+스케줄 작업은 내부 HTTP API를 거치지 않고 관리자 API와 동일한 Application Service를 직접 호출합니다. 현재는 단일 애플리케이션 인스턴스 운영을 전제로 하며 별도의 분산 lock을 사용하지 않습니다. 다중 인스턴스로 확장할 때는 동일 cron이 각 인스턴스에서 실행되므로 ShedLock이나 PostgreSQL advisory lock 같은 실행 조정 장치를 추가해야 합니다.
+
+raw match, timeline, cohort는 `ON CONFLICT DO NOTHING` 또는 upsert로 저장하고, 통계는 `matchId + puuid + queue + tier + revision` completion을 먼저 claim합니다. 따라서 실패 항목은 completion이 남지 않아 다음 실행에서 다시 대상이 되며, 이미 완료된 항목은 중복 집계되지 않습니다.
+
+완료 로그에는 시작·종료 시각, 소요 시간, 신규 플레이어/매치/timeline 수, 처리 매치 수, 기록 표본 수, 건너뛴 항목 수, 단계별 실패 수가 포함됩니다. 개별 실패 로그에는 `stage`, `targetId`, `reason`이 기록됩니다.
