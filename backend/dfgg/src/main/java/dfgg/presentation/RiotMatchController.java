@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -61,5 +62,18 @@ public class RiotMatchController {
         }
         ChampionBuildStatsRebuildResult result = statsRebuildService.rebuildAll(tier);
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/riot/matches/{matchId}/stats/replay")
+    public ResponseEntity<ChampionBuildStatsRebuildResult> replayStats(
+            @PathVariable String matchId,
+            @RequestParam
+            @Pattern(regexp = "IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND")
+            String tier
+    ) {
+        if (statsRebuildService == null) {
+            throw new IllegalStateException("stats rebuild service is not configured");
+        }
+        return ResponseEntity.ok(statsRebuildService.replayOne(matchId, tier));
     }
 }

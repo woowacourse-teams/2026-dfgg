@@ -124,4 +124,33 @@ public interface StatsAggregationCompletionRepository
             @Param("tier") String tier,
             @Param("aggregationRevision") String aggregationRevision
     );
+
+    @Modifying
+    @Query(value = """
+            INSERT INTO stats_aggregation_completions (
+                match_id,
+                puuid,
+                queue_type,
+                tier,
+                aggregation_revision,
+                completed_at
+            )
+            VALUES (
+                :matchId,
+                :puuid,
+                :queueType,
+                :tier,
+                :aggregationRevision,
+                CURRENT_TIMESTAMP
+            )
+            ON CONFLICT (match_id, puuid, queue_type, tier, aggregation_revision)
+            DO UPDATE SET completed_at = EXCLUDED.completed_at
+            """, nativeQuery = true)
+    int markCompleted(
+            @Param("matchId") String matchId,
+            @Param("puuid") String puuid,
+            @Param("queueType") String queueType,
+            @Param("tier") String tier,
+            @Param("aggregationRevision") String aggregationRevision
+    );
 }

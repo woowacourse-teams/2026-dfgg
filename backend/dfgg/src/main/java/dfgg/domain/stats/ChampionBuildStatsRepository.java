@@ -85,6 +85,7 @@ public interface ChampionBuildStatsRepository extends JpaRepository<ChampionBuil
               AND b.tier = :tier
               AND b.champion_id = :championId
               AND b.position = :position
+              AND COALESCE(b.game_count, 0) > 0
               AND (b.enemy_tank_heavy IS NULL OR b.enemy_tank_heavy = :enemyTankHeavy)
               AND (b.enemy_ap_heavy IS NULL OR b.enemy_ap_heavy = :enemyApHeavy)
               AND (b.enemy_assassin_heavy IS NULL OR b.enemy_assassin_heavy = :enemyAssassinHeavy)
@@ -117,6 +118,7 @@ public interface ChampionBuildStatsRepository extends JpaRepository<ChampionBuil
             SELECT * FROM composition_stats b
             WHERE b.champion_id = :championId
               AND b.position = :position
+              AND COALESCE(b.game_count, 0) > 0
               AND (b.enemy_tank_heavy IS NULL OR b.enemy_tank_heavy = :enemyTankHeavy)
               AND (b.enemy_ap_heavy IS NULL OR b.enemy_ap_heavy = :enemyApHeavy)
               AND (b.enemy_assassin_heavy IS NULL OR b.enemy_assassin_heavy = :enemyAssassinHeavy)

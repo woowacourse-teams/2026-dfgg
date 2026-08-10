@@ -35,12 +35,24 @@ public class CompositionStatsSample {
     @Column(name = "puuid", nullable = false, length = 128)
     private String puuid;
 
+    @Column(name = "win")
+    private Boolean win;
+
     protected CompositionStatsSample() {
     }
 
     public CompositionStatsSample(ChampionBuildStats stats, String matchId, String puuid) {
+        this(stats, matchId, puuid, null);
+    }
+
+    public CompositionStatsSample(ChampionBuildStats stats, String matchId, String puuid, Boolean win) {
         this.stats = stats;
         this.matchId = matchId;
         this.puuid = puuid;
+        this.win = win;
+    }
+
+    public Boolean getWin() {
+        return win;
     }
 }

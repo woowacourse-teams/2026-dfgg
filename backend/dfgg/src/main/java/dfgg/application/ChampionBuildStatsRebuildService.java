@@ -2,13 +2,13 @@ package dfgg.application;
 
 import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
+import dfgg.domain.match.MatchParticipantCohortRepository;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
 import dfgg.domain.match.RawMatchTimelineRepository;
 import dfgg.domain.stats.StatsAggregationCompletionRepository;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +35,7 @@ public class ChampionBuildStatsRebuildService {
     private final ItemRepository itemRepository;
     private final ChampionBuildStatsMatchProcessor matchProcessor;
     private final StatsAggregationCompletionRepository completionRepository;
+    private final MatchParticipantCohortRepository cohortRepository;
     private final int batchSize;
 
     public ChampionBuildStatsRebuildService(
@@ -43,6 +44,7 @@ public class ChampionBuildStatsRebuildService {
             ItemRepository itemRepository,
             ChampionBuildStatsMatchProcessor matchProcessor,
             StatsAggregationCompletionRepository completionRepository,
+            MatchParticipantCohortRepository cohortRepository,
             @Value("${stats.rebuild.batch-size:100}") int batchSize
     ) {
         if (batchSize < 1) {
@@ -53,6 +55,7 @@ public class ChampionBuildStatsRebuildService {
         this.itemRepository = itemRepository;
         this.matchProcessor = matchProcessor;
         this.completionRepository = completionRepository;
+        this.cohortRepository = cohortRepository;
         this.batchSize = batchSize;
     }
 
@@ -181,14 +184,25 @@ public class ChampionBuildStatsRebuildService {
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public int rebuildOne(String matchId, String tier, Collection<String> cohortPuuids) {
+    public ChampionBuildStatsRebuildResult replayOne(String matchId, String tier) {
         Objects.requireNonNull(matchId, "matchId must not be null");
+        if (tier == null || tier.isBlank()) {
+            throw new IllegalArgumentException("tier must not be blank");
+        }
+        List<String> cohortPuuids = cohortRepository.findPuuidsByMatchIdAndQueueTypeAndTier(
+                matchId,
+                QUEUE_TYPE,
+                tier
+        );
+        if (cohortPuuids.isEmpty()) {
+            throw new IllegalArgumentException("stats cohort not found: " + matchId + "/" + tier);
+        }
         Set<Integer> coreItemIds = coreItemIds();
         RawMatch rawMatch = rawMatchRepository.findById(matchId)
                 .orElseThrow(() -> new IllegalArgumentException("raw match not found: " + matchId));
         RawMatchTimeline timeline = rawMatchTimelineRepository.findById(matchId)
                 .orElseThrow(() -> new IllegalStateException("raw match timeline not found: " + matchId));
-        return matchProcessor.rebuild(
+        ChampionBuildStatsMatchProcessor.ReplayResult replayResult = matchProcessor.replay(
                 rawMatch,
                 timeline,
                 QUEUE_TYPE,
@@ -196,7 +210,13 @@ public class ChampionBuildStatsRebuildService {
                 cohortPuuids,
                 coreItemIds,
                 AGGREGATION_REVISION
-        ).recordedSamples();
+        );
+        return new ChampionBuildStatsRebuildResult(
+                1,
+                replayResult.replayedParticipants() > 0 ? 1 : 0,
+                0,
+                replayResult.recordedSamples()
+        );
     }
 
     private List<PendingTarget> nextPendingTargets(String tier, PendingTarget cursor) {

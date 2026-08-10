@@ -95,4 +95,19 @@ class RiotMatchControllerTest {
                         .param("tier", "MASTER"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void 지정한_매치의_통계를_안전하게_재집계한다() throws Exception {
+        when(statsRebuildService.replayOne("KR_1", "PLATINUM"))
+                .thenReturn(new ChampionBuildStatsRebuildResult(1, 1, 0, 32));
+
+        mockMvc.perform(post("/admin/riot/matches/KR_1/stats/replay")
+                        .param("tier", "PLATINUM"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalMatches").value(1))
+                .andExpect(jsonPath("$.processedMatches").value(1))
+                .andExpect(jsonPath("$.recordedSamples").value(32));
+
+        verify(statsRebuildService).replayOne("KR_1", "PLATINUM");
+    }
 }

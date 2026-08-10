@@ -98,4 +98,37 @@ class ChampionBuildStatsRepositoryTest {
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class)
                 .hasMessageContaining("duplicate");
     }
+
+    @Test
+    void game_count가_0인_구체적_통계는_추천에서_제외하고_유효한_통계로_fallback한다() {
+        Champion champion = championRepository.save(new Champion(
+                266L,
+                "Aatrox",
+                "아트록스",
+                List.of(ChampionTag.FIGHTER)
+        ));
+        ChampionBuildStats emptySpecificStats = statsRepository.save(new ChampionBuildStats(
+                "16.15", 420, champion, ChampionPosition.TOP,
+                true, true, true, true, true,
+                "PLATINUM", "EMPTY", List.of(), 0, 0
+        ));
+        ChampionBuildStats validFallbackStats = statsRepository.save(new ChampionBuildStats(
+                "16.15", 420, champion, ChampionPosition.TOP,
+                null, null, null, null, null,
+                "PLATINUM", "VALID", List.of(), 2, 3
+        ));
+        statsRepository.flush();
+
+        assertThat(statsRepository.findBestMatchingStatsForScope(
+                "16.15", 420, "PLATINUM", 266L, "TOP",
+                true, true, true, true, true
+        )).contains(validFallbackStats);
+        assertThat(statsRepository.findBestMatchingStats(
+                266L, "TOP", true, true, true, true, true
+        )).contains(validFallbackStats);
+        assertThat(statsRepository.findById(emptySpecificStats.getId()))
+                .get()
+                .extracting(ChampionBuildStats::getGameCount)
+                .isEqualTo(0);
+    }
 }

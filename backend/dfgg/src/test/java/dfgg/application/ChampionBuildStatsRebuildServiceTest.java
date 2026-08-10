@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
+import dfgg.domain.match.MatchParticipantCohortRepository;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
@@ -45,6 +46,9 @@ class ChampionBuildStatsRebuildServiceTest {
     @Mock
     private StatsAggregationCompletionRepository completionRepository;
 
+    @Mock
+    private MatchParticipantCohortRepository cohortRepository;
+
     private ChampionBuildStatsRebuildService rebuildService;
 
     @BeforeEach
@@ -55,6 +59,7 @@ class ChampionBuildStatsRebuildServiceTest {
                 itemRepository,
                 matchProcessor,
                 completionRepository,
+                cohortRepository,
                 100
         );
     }
@@ -69,13 +74,16 @@ class ChampionBuildStatsRebuildServiceTest {
     }
 
     @Test
-    void 원본_매치와_Timeline을_정규화하고_통계를_집계한다() {
+    void 지정한_매치의_기존_통계_기여분을_다시_집계한다() {
         RawMatch rawMatch = new RawMatch("KR_1", "{\"info\":{}}");
         RawMatchTimeline timeline = new RawMatchTimeline("KR_1", "{\"info\":{}}");
+        when(cohortRepository.findPuuidsByMatchIdAndQueueTypeAndTier(
+                "KR_1", "RANKED_SOLO_5x5", "PLATINUM"
+        )).thenReturn(List.of("p-1"));
         when(itemRepository.findAll()).thenReturn(List.of(new Item(3071L, "아이템 A")));
         when(rawMatchRepository.findById("KR_1")).thenReturn(Optional.of(rawMatch));
         when(rawMatchTimelineRepository.findById("KR_1")).thenReturn(Optional.of(timeline));
-        when(matchProcessor.rebuild(
+        when(matchProcessor.replay(
                 any(),
                 any(),
                 anyString(),
@@ -83,12 +91,12 @@ class ChampionBuildStatsRebuildServiceTest {
                 anyCollection(),
                 anySet(),
                 anyString()
-        )).thenReturn(new ChampionBuildStatsMatchProcessor.Result(1, 32));
+        )).thenReturn(new ChampionBuildStatsMatchProcessor.ReplayResult(1, 32));
 
-        int recorded = rebuildService.rebuildOne("KR_1", "PLATINUM", List.of("p-1"));
+        ChampionBuildStatsRebuildResult result = rebuildService.replayOne("KR_1", "PLATINUM");
 
-        assertThat(recorded).isEqualTo(32);
-        verify(matchProcessor).rebuild(
+        assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 32));
+        verify(matchProcessor).replay(
                 rawMatch,
                 timeline,
                 "RANKED_SOLO_5x5",
