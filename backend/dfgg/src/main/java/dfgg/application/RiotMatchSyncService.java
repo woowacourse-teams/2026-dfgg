@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +80,14 @@ public class RiotMatchSyncService {
                 "count must be between 1 and 100"
         );
 
+        long startedAtNanos = System.nanoTime();
+        log.info(
+                "Riot match sync started: playerPage={}, playerCount={}, matchStart={}, matchCount={}",
+                playerPage,
+                playerCount,
+                matchStart,
+                matchCount
+        );
         List<Failure> failures = new ArrayList<>();
         MatchCollection matchCollection = collectMatchIds(
                 playerPage,
@@ -88,8 +97,17 @@ public class RiotMatchSyncService {
                 failures
         );
         LinkedHashSet<String> matchIds = matchCollection.matchIds();
+        log.info(
+                "Riot match IDs collected: playerPage={}, scannedPlayers={}, uniqueMatchIds={}, failures={}",
+                playerPage,
+                matchCollection.scannedPlayers(),
+                matchIds.size(),
+                failures.size()
+        );
         if (matchIds.isEmpty()) {
-            return SyncResult.empty(matchCollection.scannedPlayers(), failures);
+            SyncResult result = SyncResult.empty(matchCollection.scannedPlayers(), failures);
+            logSyncCompleted(playerPage, result, startedAtNanos);
+            return result;
         }
 
         Set<String> existingMatchIds = rawMatchRepository.findExistingMatchIds(matchIds);
@@ -98,6 +116,8 @@ public class RiotMatchSyncService {
         int newMatches = 0;
         int newTimelines = 0;
         int skippedItems = 0;
+        int processedMatchIds = 0;
+        int progressLogInterval = Math.max(1, (matchIds.size() + 9) / 10);
         for (String matchId : matchIds) {
             ItemCollectionResult result = fetchAndPersist(
                     matchId,
@@ -109,14 +129,30 @@ public class RiotMatchSyncService {
             newMatches += result.newMatches();
             newTimelines += result.newTimelines();
             skippedItems += result.skippedItems();
+            processedMatchIds++;
+            if (processedMatchIds % progressLogInterval == 0 || processedMatchIds == matchIds.size()) {
+                log.info(
+                        "Riot match sync progress: playerPage={}, processedMatchIds={}/{}, "
+                                + "newMatches={}, newTimelines={}, skippedItems={}, failures={}",
+                        playerPage,
+                        processedMatchIds,
+                        matchIds.size(),
+                        newMatches,
+                        newTimelines,
+                        skippedItems,
+                        failures.size()
+                );
+            }
         }
-        return new SyncResult(
+        SyncResult result = new SyncResult(
                 matchCollection.scannedPlayers(),
                 newMatches,
                 newTimelines,
                 skippedItems,
                 failures
         );
+        logSyncCompleted(playerPage, result, startedAtNanos);
+        return result;
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -126,8 +162,12 @@ public class RiotMatchSyncService {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public SyncResult syncMissingTimelinesWithResult() {
+        long startedAtNanos = System.nanoTime();
+        log.info("Missing Riot timeline sync started: batchSize={}", TIMELINE_BATCH_SIZE);
         int persistedCount = 0;
         int skippedItems = 0;
+        int scannedMatchIds = 0;
+        int batchNumber = 0;
         List<Failure> failures = new ArrayList<>();
         String cursor = "";
         while (true) {
@@ -138,6 +178,7 @@ public class RiotMatchSyncService {
             if (matchIds.isEmpty()) {
                 break;
             }
+            batchNumber++;
             for (String matchId : matchIds) {
                 try {
                     String rawData = riotClient.getRawMatchTimeline(matchId);
@@ -150,9 +191,45 @@ public class RiotMatchSyncService {
                     recordFailure(failures, "TIMELINE", matchId, exception);
                 }
             }
+            scannedMatchIds += matchIds.size();
             cursor = matchIds.getLast();
+            log.info(
+                    "Missing Riot timeline sync progress: batch={}, scannedMatchIds={}, "
+                            + "newTimelines={}, skippedItems={}, failures={}, cursor={}",
+                    batchNumber,
+                    scannedMatchIds,
+                    persistedCount,
+                    skippedItems,
+                    failures.size(),
+                    cursor
+            );
         }
-        return new SyncResult(0, 0, persistedCount, skippedItems, failures);
+        SyncResult result = new SyncResult(0, 0, persistedCount, skippedItems, failures);
+        log.info(
+                "Missing Riot timeline sync completed: batches={}, scannedMatchIds={}, "
+                        + "newTimelines={}, skippedItems={}, failures={}, durationMs={}",
+                batchNumber,
+                scannedMatchIds,
+                persistedCount,
+                skippedItems,
+                failures.size(),
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos)
+        );
+        return result;
+    }
+
+    private void logSyncCompleted(int playerPage, SyncResult result, long startedAtNanos) {
+        log.info(
+                "Riot match sync completed: playerPage={}, scannedPlayers={}, newMatches={}, "
+                        + "newTimelines={}, skippedItems={}, failures={}, durationMs={}",
+                playerPage,
+                result.scannedPlayers(),
+                result.newMatches(),
+                result.newTimelines(),
+                result.skippedItems(),
+                result.failures().size(),
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos)
+        );
     }
 
     private MatchCollection collectMatchIds(

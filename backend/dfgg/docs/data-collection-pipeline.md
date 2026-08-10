@@ -16,6 +16,96 @@ Match-v5 상세 원본 + Timeline 원본 저장
 ChampionBuildStats 집계
 ```
 
+## 자동 파이프라인 빠른 실행
+
+### 1. 사전 준비
+
+- PostgreSQL의 `dfgg` 데이터베이스를 실행합니다.
+- Riot Developer Portal에서 발급받은 API Key를 준비합니다.
+- 프로젝트 루트에 `.env`가 없다면 예제 파일을 복사합니다.
+
+```bash
+cp .env.example .env
+```
+
+기존 `.env`가 있다면 덮어쓰지 말고 필요한 항목만 추가합니다.
+
+### 2. 환경변수 설정
+
+`.env`에 데이터베이스 접속 정보, Riot API Key, 스케줄러 설정을 입력합니다.
+
+```properties
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+RIOT_API_KEY=발급받은_Riot_API_Key
+
+COLLECTION_SCHEDULER_ENABLED=true
+COLLECTION_SCHEDULER_CRON=0 */5 * * * *
+COLLECTION_SCHEDULER_ZONE=Asia/Seoul
+COLLECTION_SCHEDULER_TIERS=PLATINUM
+COLLECTION_SCHEDULER_DIVISIONS=IV
+COLLECTION_SCHEDULER_LEAGUE_PAGE_COUNT=1
+COLLECTION_SCHEDULER_PLAYER_PAGE_SIZE=100
+COLLECTION_SCHEDULER_MATCH_START=0
+COLLECTION_SCHEDULER_MATCH_COUNT=20
+```
+
+각 환경변수는 한 번만 선언해야 합니다. 같은 키가 여러 번 선언되면 뒤에 있는 값이 적용되어
+예상과 다른 주기로 실행될 수 있습니다.
+
+### 3. 애플리케이션 실행
+
+```bash
+./gradlew bootRun
+```
+
+`COLLECTION_SCHEDULER_ENABLED=true`이면 애플리케이션 시작 후 다음 cron 시각에 자동 파이프라인이
+실행됩니다. `0 */5 * * * *`는 매시 `0, 5, 10, 15 ...`분의 0초에 실행한다는 뜻입니다.
+
+자동 실행 순서:
+
+1. 챔피언 메타데이터 수집
+2. 코어 아이템 메타데이터 수집
+3. 플레이어 PUUID와 티어·디비전 cohort 수집
+4. 플레이어별 Match ID 조회
+5. Match 상세 원본과 Timeline 원본 저장
+6. 누락 Timeline 보완
+7. 신규 매치 정규화 및 통계 집계
+
+### 4. 실행 확인
+
+파이프라인이 시작되면 다음 형태의 로그가 출력됩니다.
+
+```text
+Riot collection scheduler started: ...
+```
+
+정상적으로 끝나면 다음 완료 로그가 출력됩니다.
+
+```text
+Riot collection scheduler completed: status=COMPLETED, ...
+```
+
+일부 항목이 실패해도 나머지 단계는 계속 실행되며 완료 상태는
+`COMPLETED_WITH_FAILURES`로 기록됩니다. 실패한 범위는 다음 스케줄에서 다시 시도합니다.
+
+### 5. 자동 실행 중지
+
+`.env`에서 스케줄러를 비활성화한 뒤 애플리케이션을 재시작합니다.
+
+```properties
+COLLECTION_SCHEDULER_ENABLED=false
+```
+
+### 실행 시 주의사항
+
+- 기본 권장 주기는 5분입니다. 수집 작업보다 짧은 주기를 사용하지 않습니다.
+- 현재 스케줄러는 단일 애플리케이션 인스턴스 실행을 전제로 합니다.
+- 여러 서버 인스턴스를 동시에 실행하면 각 인스턴스에서 같은 스케줄이 실행됩니다.
+- 진행 위치는 메모리에 있으므로 애플리케이션을 재시작하면 설정된 시작 범위부터 다시 시작합니다.
+- 이미 저장된 Match와 Timeline, 이미 완료된 통계는 중복 저장·집계되지 않습니다.
+- 전체 파이프라인을 기다리지 않고 단계별로 확인하려면 아래의 관리자 API 실행 방법을 사용합니다.
+
 ## 사전 조건
 
 애플리케이션을 먼저 실행합니다.

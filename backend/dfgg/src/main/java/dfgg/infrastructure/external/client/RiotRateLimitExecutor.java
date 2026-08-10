@@ -4,12 +4,15 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.HttpClientErrorException;
 
 final class RiotRateLimitExecutor {
 
+    private static final Logger log = LoggerFactory.getLogger(RiotRateLimitExecutor.class);
     private static final int MAX_ATTEMPTS = 3;
 
     private final Clock clock;
@@ -40,6 +43,12 @@ final class RiotRateLimitExecutor {
             } catch (HttpClientErrorException.TooManyRequests exception) {
                 Duration retryAfter = retryAfter(exception);
                 blockRequests(retryAfter);
+                log.warn(
+                        "Riot API rate limit reached: attempt={}/{}, retryAfterMs={}",
+                        attempt,
+                        MAX_ATTEMPTS,
+                        retryAfter.toMillis()
+                );
 
                 if (attempt == MAX_ATTEMPTS) {
                     throw exception;

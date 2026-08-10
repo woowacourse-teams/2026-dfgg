@@ -7,10 +7,16 @@ import dfgg.infrastructure.external.dto.ItemData;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ItemSyncService {
+
+    private static final Logger log = LoggerFactory.getLogger(ItemSyncService.class);
+
     private final DataDragonClient dataDragonClient;
     private final ItemRepository itemRepository;
 
@@ -20,6 +26,8 @@ public class ItemSyncService {
     }
 
     public void syncCoreItem() {
+        long startedAtNanos = System.nanoTime();
+        log.info("Core item metadata sync started");
         ItemResponse response = dataDragonClient.getItems();
 
         List<Item> coreItems = response.data()
@@ -34,6 +42,11 @@ public class ItemSyncService {
                 }).toList();
 
         itemRepository.saveAll(coreItems);
+        log.info(
+                "Core item metadata sync completed: savedItems={}, durationMs={}",
+                coreItems.size(),
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos)
+        );
     }
 
     private boolean isCoreItem(ItemData data) {
