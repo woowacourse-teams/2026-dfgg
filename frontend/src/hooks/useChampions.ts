@@ -65,11 +65,21 @@ interface DDragonChampion {
 }
 
 /**
+ * 아이템 아이콘 URL. 버전은 useChampions가 받아온 값을 그대로 넘긴다.
+ * 아이템은 id만 알면 URL이 조립되므로 760KB짜리 item.json은 받지 않는다.
+ */
+export function itemImageUrl(version: string, id: number): string {
+  return `${DDRAGON}/cdn/${version}/img/item/${id}.png`;
+}
+
+/**
  * Data Dragon 챔피언 목록을 한 번만 받아온다.
  * 버전은 하드코딩하지 않고 versions.json의 최신값을 쓴다.
  */
 export function useChampions() {
   const [champions, setChampions] = useState<ChampionInfo[]>([]);
+  // 아이템 아이콘 URL을 만들 때도 같은 버전을 써야 해서 밖으로 내보낸다.
+  const [version, setVersion] = useState('');
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -81,11 +91,14 @@ export function useChampions() {
           signal: controller.signal,
         });
         if (!versionRes.ok) throw new Error(String(versionRes.status));
-        const [version]: string[] = await versionRes.json();
+        const [latestVersion]: string[] = await versionRes.json();
 
-        const listRes = await fetch(`${DDRAGON}/cdn/${version}/data/${LOCALE}/champion.json`, {
-          signal: controller.signal,
-        });
+        const listRes = await fetch(
+          `${DDRAGON}/cdn/${latestVersion}/data/${LOCALE}/champion.json`,
+          {
+            signal: controller.signal,
+          },
+        );
         if (!listRes.ok) throw new Error(String(listRes.status));
         const { data }: { data: Record<string, DDragonChampion> } = await listRes.json();
 
@@ -98,7 +111,7 @@ export function useChampions() {
               return {
                 id,
                 name,
-                imageUrl: `${DDRAGON}/cdn/${version}/img/champion/${id}.png`,
+                imageUrl: `${DDRAGON}/cdn/${latestVersion}/img/champion/${id}.png`,
                 // 공백을 지운 형태로도 찾을 수 있게 한다. ("리신" → "리 신")
                 searchKey: `${name} ${name.replace(/\s/g, '')} ${id}`.toLowerCase(),
                 chosung: toChosung(name.replace(/\s/g, '')),
@@ -106,6 +119,7 @@ export function useChampions() {
             })
             .sort((a, b) => a.name.localeCompare(b.name, 'ko')),
         );
+        setVersion(latestVersion);
       } catch (error) {
         if (controller.signal.aborted) return;
         console.error(error);
@@ -117,7 +131,7 @@ export function useChampions() {
     return () => controller.abort();
   }, []);
 
-  return { champions, failed };
+  return { champions, version, failed };
 }
 
 /** 값이 delay 동안 안정될 때까지 갱신을 미룬다. */
