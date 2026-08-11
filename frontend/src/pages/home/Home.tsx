@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import banner from '../../assets/dfgg.png';
 
 const ENTRIES = [
-  {
-    to: '/nickname',
-    title: '닉네임으로 추천받기',
-    description: '소환사 이름을 입력하면 최근 전적을 바탕으로 아이템을 추천해드려요.',
-  },
+  // {
+  //   to: '/nickname',
+  //   title: '닉네임으로 추천받기',
+  //   description: '소환사 이름을 입력하면 최근 전적을 바탕으로 아이템을 추천해드려요.',
+  // },
   {
     to: '/champion-select',
     title: '챔피언 조합으로 추천받기',
