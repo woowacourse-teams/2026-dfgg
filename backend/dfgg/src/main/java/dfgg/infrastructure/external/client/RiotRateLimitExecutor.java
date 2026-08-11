@@ -2,6 +2,7 @@ package dfgg.infrastructure.external.client;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -17,42 +18,55 @@ final class RiotRateLimitExecutor {
 
     private final Clock clock;
     private final Sleeper sleeper;
+    private final RiotApiKeyRotator keyRotator;
 
-    private long blockedUntilMillis;
-
-    RiotRateLimitExecutor() {
+    RiotRateLimitExecutor(List<String> apiKeys) {
         this(
                 Clock.systemUTC(),
-                duration -> Thread.sleep(duration.toMillis())
+                duration -> Thread.sleep(duration.toMillis()),
+                new RiotApiKeyRotator(apiKeys)
         );
     }
 
-    RiotRateLimitExecutor(Clock clock, Sleeper sleeper) {
+    RiotRateLimitExecutor(Clock clock, Sleeper sleeper, List<String> apiKeys) {
+        this(clock, sleeper, new RiotApiKeyRotator(apiKeys));
+    }
+
+    private RiotRateLimitExecutor(Clock clock, Sleeper sleeper, RiotApiKeyRotator keyRotator) {
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.sleeper = Objects.requireNonNull(sleeper, "sleeper must not be null");
+        this.keyRotator = Objects.requireNonNull(keyRotator, "keyRotator must not be null");
+    }
+
+    String currentApiKey() {
+        return keyRotator.currentKey();
     }
 
     synchronized <T> T execute(Supplier<T> request) {
         Objects.requireNonNull(request, "request must not be null");
 
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-            awaitAvailable();
-
             try {
                 return request.get();
             } catch (HttpClientErrorException.TooManyRequests exception) {
                 Duration retryAfter = retryAfter(exception);
-                blockRequests(retryAfter);
-                log.warn(
-                        "Riot API rate limit reached: attempt={}/{}, retryAfterMs={}",
-                        attempt,
-                        MAX_ATTEMPTS,
-                        retryAfter.toMillis()
-                );
+                keyRotator.blockCurrentUntil(clock.millis() + retryAfter.toMillis());
 
                 if (attempt == MAX_ATTEMPTS) {
                     throw exception;
                 }
+
+                boolean rotated = keyRotator.rotateToNextAvailable(clock.millis());
+                if (!rotated) {
+                    awaitNextAvailableKey();
+                }
+                log.warn(
+                        "Riot API rate limit reached: attempt={}/{}, retryAfterMs={}, rotatedToAnotherKey={}",
+                        attempt,
+                        MAX_ATTEMPTS,
+                        retryAfter.toMillis(),
+                        rotated
+                );
             }
         }
 
@@ -81,13 +95,8 @@ final class RiotRateLimitExecutor {
         }
     }
 
-    private void blockRequests(Duration retryAfter) {
-        long deadline = clock.millis() + retryAfter.toMillis();
-        blockedUntilMillis = Math.max(blockedUntilMillis, deadline);
-    }
-
-    private void awaitAvailable() {
-        long waitMillis = blockedUntilMillis - clock.millis();
+    private void awaitNextAvailableKey() {
+        long waitMillis = keyRotator.millisUntilEarliestAvailable(clock.millis());
         if (waitMillis <= 0) {
             return;
         }

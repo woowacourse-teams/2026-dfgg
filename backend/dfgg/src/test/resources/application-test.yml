@@ -14,7 +14,11 @@ spring:
       replace: none
 riot:
   api:
-    key: "test-riot-api-key"
+    keys:
+      - "test-riot-api-key-tr"
+      - "test-riot-api-key-rw"
+      - "test-riot-api-key-zo"
+      - "test-riot-api-key-bz"
     platform-base-url: "https://kr.api.riotgames.com"
     regional-base-url: "https://asia.api.riotgames.com"
 collection:

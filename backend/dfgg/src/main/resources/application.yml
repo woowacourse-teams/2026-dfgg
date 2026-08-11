@@ -17,7 +17,11 @@ spring:
 
 riot:
   api:
-    key: "${RIOT_API_KEY:}"
+    keys:
+      - "${RIOT_API_KEY_TR:}"
+      - "${RIOT_API_KEY_RW:}"
+      - "${RIOT_API_KEY_ZO:}"
+      - "${RIOT_API_KEY_BZ:}"
     platform-base-url: "${RIOT_PLATFORM_BASE_URL:https://kr.api.riotgames.com}"
     regional-base-url: "${RIOT_REGIONAL_BASE_URL:https://asia.api.riotgames.com}"
 

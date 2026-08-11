@@ -20,6 +20,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -45,14 +46,15 @@ class RiotClientTest {
         server = MockRestServiceServer.bindTo(builder).build();
 
         RiotApiProperties properties = new RiotApiProperties(
-                API_KEY,
+                List.of(API_KEY),
                 URI.create(PLATFORM_BASE_URL),
                 URI.create(REGIONAL_BASE_URL)
         );
         retryDelays = new ArrayList<>();
         RiotRateLimitExecutor rateLimitExecutor = new RiotRateLimitExecutor(
                 Clock.fixed(Instant.parse("2026-08-06T08:00:00Z"), ZoneOffset.UTC),
-                retryDelays::add
+                retryDelays::add,
+                properties.keys()
         );
         client = new RiotClient(builder, properties, rateLimitExecutor);
     }
@@ -413,6 +415,82 @@ class RiotClientTest {
         assertThat(retryDelays).containsExactly(Duration.ofSeconds(7));
 
         server.verify();
+    }
+
+    @Test
+    @DisplayName("여러 API 키가 등록되어 있으면 429 응답 시 다음 키로 회전해 즉시 재시도한다")
+    void getLeagueEntries_WhenMultipleApiKeysRegistered_RotatesToNextAvailableKeyWithoutWaiting() {
+        String secondKey = "test-api-key-2";
+        RestClient.Builder multiKeyBuilder = RestClient.builder();
+        MockRestServiceServer multiKeyServer = MockRestServiceServer.bindTo(multiKeyBuilder).build();
+        RiotApiProperties multiKeyProperties = new RiotApiProperties(
+                List.of(API_KEY, secondKey),
+                URI.create(PLATFORM_BASE_URL),
+                URI.create(REGIONAL_BASE_URL)
+        );
+        List<Duration> multiKeyRetryDelays = new ArrayList<>();
+        RiotClient multiKeyClient = new RiotClient(multiKeyBuilder, multiKeyProperties, new RiotRateLimitExecutor(
+                Clock.fixed(Instant.parse("2026-08-06T08:00:00Z"), ZoneOffset.UTC),
+                multiKeyRetryDelays::add,
+                multiKeyProperties.keys()
+        ));
+
+        String requestUrl = PLATFORM_BASE_URL + "/lol/league/v4/entries/RANKED_SOLO_5x5/EMERALD/III?page=1";
+        multiKeyServer.expect(requestTo(requestUrl))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
+                        .header(HttpHeaders.RETRY_AFTER, "5"));
+        multiKeyServer.expect(requestTo(requestUrl))
+                .andExpect(header("X-Riot-Token", secondKey))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        List<LeagueEntryResponse> entries = multiKeyClient.getLeagueEntries(
+                "RANKED_SOLO_5x5", "EMERALD", "III", 1
+        );
+
+        assertThat(entries).isEmpty();
+        assertThat(multiKeyRetryDelays).isEmpty();
+        multiKeyServer.verify();
+    }
+
+    @Test
+    @DisplayName("등록된 API 키가 모두 차단되면 가장 빨리 풀리는 키까지 대기한 후 그 키로 재시도한다")
+    void getLeagueEntries_WhenAllApiKeysBlocked_WaitsForEarliestAvailableKeyThenRetries() {
+        String secondKey = "test-api-key-2";
+        RestClient.Builder multiKeyBuilder = RestClient.builder();
+        MockRestServiceServer multiKeyServer = MockRestServiceServer.bindTo(multiKeyBuilder).build();
+        RiotApiProperties multiKeyProperties = new RiotApiProperties(
+                List.of(API_KEY, secondKey),
+                URI.create(PLATFORM_BASE_URL),
+                URI.create(REGIONAL_BASE_URL)
+        );
+        List<Duration> multiKeyRetryDelays = new ArrayList<>();
+        RiotClient multiKeyClient = new RiotClient(multiKeyBuilder, multiKeyProperties, new RiotRateLimitExecutor(
+                Clock.fixed(Instant.parse("2026-08-06T08:00:00Z"), ZoneOffset.UTC),
+                multiKeyRetryDelays::add,
+                multiKeyProperties.keys()
+        ));
+
+        String requestUrl = PLATFORM_BASE_URL + "/lol/league/v4/entries/RANKED_SOLO_5x5/EMERALD/III?page=1";
+        multiKeyServer.expect(requestTo(requestUrl))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
+                        .header(HttpHeaders.RETRY_AFTER, "5"));
+        multiKeyServer.expect(requestTo(requestUrl))
+                .andExpect(header("X-Riot-Token", secondKey))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
+                        .header(HttpHeaders.RETRY_AFTER, "2"));
+        multiKeyServer.expect(requestTo(requestUrl))
+                .andExpect(header("X-Riot-Token", secondKey))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        List<LeagueEntryResponse> entries = multiKeyClient.getLeagueEntries(
+                "RANKED_SOLO_5x5", "EMERALD", "III", 1
+        );
+
+        assertThat(entries).isEmpty();
+        assertThat(multiKeyRetryDelays).containsExactly(Duration.ofSeconds(2));
+        multiKeyServer.verify();
     }
 
     @Test
