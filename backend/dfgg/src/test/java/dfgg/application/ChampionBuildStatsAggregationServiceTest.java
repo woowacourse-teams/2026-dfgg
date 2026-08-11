@@ -22,6 +22,8 @@ import dfgg.domain.stats.CompositionStatsSampleRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -116,6 +118,53 @@ class ChampionBuildStatsAggregationServiceTest {
                 .hasSize(32)
                 .allMatch(statsKey -> statsKey.startsWith("16.15|420|1|TOP|"))
                 .allMatch(statsKey -> statsKey.endsWith("|PLATINUM|3071>6610"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "MIDDLE, MID",
+            "UTILITY, SUPPORT"
+    })
+    void Riot_포지션을_서비스_포지션으로_변환해_집계한다(
+            String riotPosition,
+            String servicePosition
+    ) {
+        Champion focal = champion(1L, "FIGHTER");
+        Champion ally = champion(2L, "MARKSMAN");
+        Champion enemy = champion(3L, "TANK");
+        when(championRepository.findAllById(any())).thenReturn(List.of(focal, ally, enemy));
+        when(itemRepository.findAllById(any())).thenReturn(List.of(
+                new Item(3071L, "아이템 A"),
+                new Item(6610L, "아이템 B")
+        ));
+
+        NormalizedMatch match = new NormalizedMatch(
+                "KR_1",
+                "16.15",
+                420,
+                List.of(
+                        participant("p-focal", 1, 1, 100, riotPosition, true),
+                        participant("p-ally", 2, 2, 100, "JUNGLE", false),
+                        participant("p-enemy", 3, 3, 200, "TOP", false)
+                )
+        );
+
+        aggregationService.aggregate(match, "PLATINUM", List.of("p-focal"));
+
+        verify(statsRepository, times(32)).insertIfAbsent(
+                eq("16.15"),
+                eq(420),
+                eq(1L),
+                eq(servicePosition),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq("PLATINUM"),
+                eq("3071>6610"),
+                anyString()
+        );
     }
 
     private Champion champion(Long id, String tag) {

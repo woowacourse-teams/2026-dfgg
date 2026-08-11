@@ -179,11 +179,19 @@ public class ChampionBuildStatsAggregationService {
         if (position == null || position.isBlank()) {
             return Optional.empty();
         }
-        try {
-            return Optional.of(ChampionPosition.valueOf(position.trim().toUpperCase(Locale.ROOT)));
-        } catch (IllegalArgumentException exception) {
-            return Optional.empty();
-        }
+
+        String normalizedPosition = position.trim().toUpperCase(Locale.ROOT);
+        return switch (normalizedPosition) {
+            case "MIDDLE" -> Optional.of(ChampionPosition.MID);
+            case "UTILITY" -> Optional.of(ChampionPosition.SUPPORT);
+            default -> {
+                try {
+                    yield Optional.of(ChampionPosition.valueOf(normalizedPosition));
+                } catch (IllegalArgumentException exception) {
+                    yield Optional.empty();
+                }
+            }
+        };
     }
 
     private List<Item> itemList(List<Integer> itemIds, Map<Long, Item> items) {
