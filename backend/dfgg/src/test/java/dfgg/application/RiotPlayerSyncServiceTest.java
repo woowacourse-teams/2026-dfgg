@@ -47,7 +47,7 @@ class RiotPlayerSyncServiceTest {
         when(persistenceService.persist(eq("KR"), eq(entries), any(Instant.class))).thenReturn(1);
         Instant beforeSync = Instant.now();
 
-        int newPlayers = riotPlayerSyncService.syncLeagueEntries(
+        RiotPlayerSyncService.SyncResult result = riotPlayerSyncService.syncLeagueEntries(
                 "RANKED_SOLO_5x5", "PLATINUM", "I", 1
         );
 
@@ -59,7 +59,8 @@ class RiotPlayerSyncServiceTest {
                 collectedAtCaptor.capture()
         );
         assertThat(collectedAtCaptor.getValue()).isBetween(beforeSync, afterSync);
-        assertThat(newPlayers).isEqualTo(1);
+        assertThat(result.newPlayers()).isEqualTo(1);
+        assertThat(result.puuids()).containsExactly("puuid-1");
     }
 
     @Test

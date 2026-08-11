@@ -1,9 +1,19 @@
 package dfgg.infrastructure.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import dfgg.application.RiotCollectionOrchestrator;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -14,6 +24,7 @@ class RiotSchedulingConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withBean(RiotCollectionOrchestrator.class, () -> mock(RiotCollectionOrchestrator.class))
+            .withBean(DataSource.class, () -> mock(DataSource.class))
             .withUserConfiguration(
                     RiotSchedulingConfiguration.class,
                     RiotCollectionScheduler.class
@@ -65,6 +76,99 @@ class RiotSchedulingConfigurationTest {
                     assertThat(properties.getDivisions()).containsExactly("I", "II");
                     assertThat(properties.getMatchCount()).isEqualTo(50);
                 });
+    }
+
+    @Test
+    void 분산_락을_획득한_인스턴스만_수집한다() throws Exception {
+        RiotCollectionOrchestrator orchestrator = mock(RiotCollectionOrchestrator.class);
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        PreparedStatement lockStatement = mock(PreparedStatement.class);
+        PreparedStatement unlockStatement = mock(PreparedStatement.class);
+        ResultSet lockResult = result(true);
+        ResultSet unlockResult = result(true);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement("SELECT pg_try_advisory_lock(?)"))
+                .thenReturn(lockStatement);
+        when(connection.prepareStatement("SELECT pg_advisory_unlock(?)"))
+                .thenReturn(unlockStatement);
+        when(lockStatement.executeQuery()).thenReturn(lockResult);
+        when(unlockStatement.executeQuery()).thenReturn(unlockResult);
+
+        new RiotCollectionScheduler(orchestrator, dataSource).collect();
+
+        verify(orchestrator).runOnce();
+        verify(connection).prepareStatement("SELECT pg_advisory_unlock(?)");
+    }
+
+    @Test
+    void 다른_인스턴스가_분산_락을_보유하면_수집하지_않는다() throws Exception {
+        RiotCollectionOrchestrator orchestrator = mock(RiotCollectionOrchestrator.class);
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        PreparedStatement lockStatement = mock(PreparedStatement.class);
+        ResultSet lockResult = result(false);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement("SELECT pg_try_advisory_lock(?)"))
+                .thenReturn(lockStatement);
+        when(lockStatement.executeQuery()).thenReturn(lockResult);
+
+        new RiotCollectionScheduler(orchestrator, dataSource).collect();
+
+        verifyNoInteractions(orchestrator);
+    }
+
+    @Test
+    void 수집이_실패해도_분산_락을_해제한다() throws Exception {
+        RiotCollectionOrchestrator orchestrator = mock(RiotCollectionOrchestrator.class);
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        PreparedStatement lockStatement = mock(PreparedStatement.class);
+        PreparedStatement unlockStatement = mock(PreparedStatement.class);
+        ResultSet lockResult = result(true);
+        ResultSet unlockResult = result(true);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement("SELECT pg_try_advisory_lock(?)"))
+                .thenReturn(lockStatement);
+        when(connection.prepareStatement("SELECT pg_advisory_unlock(?)"))
+                .thenReturn(unlockStatement);
+        when(lockStatement.executeQuery()).thenReturn(lockResult);
+        when(unlockStatement.executeQuery()).thenReturn(unlockResult);
+        IllegalStateException failure = new IllegalStateException("collection failed");
+        doThrow(failure).when(orchestrator).runOnce();
+
+        assertThatThrownBy(() -> new RiotCollectionScheduler(orchestrator, dataSource).collect())
+                .isSameAs(failure);
+
+        verify(connection).prepareStatement("SELECT pg_advisory_unlock(?)");
+    }
+
+    @Test
+    void 분산_락_해제에_실패하면_연결을_폐기한다() throws Exception {
+        RiotCollectionOrchestrator orchestrator = mock(RiotCollectionOrchestrator.class);
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        PreparedStatement lockStatement = mock(PreparedStatement.class);
+        PreparedStatement unlockStatement = mock(PreparedStatement.class);
+        ResultSet lockResult = result(true);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement("SELECT pg_try_advisory_lock(?)"))
+                .thenReturn(lockStatement);
+        when(connection.prepareStatement("SELECT pg_advisory_unlock(?)"))
+                .thenReturn(unlockStatement);
+        when(lockStatement.executeQuery()).thenReturn(lockResult);
+        when(unlockStatement.executeQuery()).thenThrow(new java.sql.SQLException("unlock failed"));
+
+        new RiotCollectionScheduler(orchestrator, dataSource).collect();
+
+        verify(connection).abort(any());
+    }
+
+    private ResultSet result(boolean value) throws Exception {
+        ResultSet resultSet = mock(ResultSet.class);
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getBoolean(1)).thenReturn(value);
+        return resultSet;
     }
 
     @Configuration(proxyBeanMethods = false)

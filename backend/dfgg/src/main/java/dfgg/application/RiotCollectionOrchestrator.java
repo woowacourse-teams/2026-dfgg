@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -19,32 +20,26 @@ public class RiotCollectionOrchestrator {
     private static final List<String> DIVISION_ORDER = List.of("IV", "III", "II", "I");
 
     private final RiotSchedulerProperties properties;
-    private final ChampionSyncService championSyncService;
-    private final ItemSyncService itemSyncService;
     private final RiotPlayerSyncService playerSyncService;
     private final RiotMatchSyncService matchSyncService;
     private final ChampionBuildStatsRebuildService statsRebuildService;
     private int nextLeaguePage;
     private int nextDivisionIndex;
-    private int nextMatchStart;
+    private boolean currentLeagueRangeHasPlayers;
 
     public RiotCollectionOrchestrator(
             RiotSchedulerProperties properties,
-            ChampionSyncService championSyncService,
-            ItemSyncService itemSyncService,
             RiotPlayerSyncService playerSyncService,
             RiotMatchSyncService matchSyncService,
             ChampionBuildStatsRebuildService statsRebuildService
     ) {
         this.properties = properties;
-        this.championSyncService = championSyncService;
-        this.itemSyncService = itemSyncService;
         this.playerSyncService = playerSyncService;
         this.matchSyncService = matchSyncService;
         this.statsRebuildService = statsRebuildService;
         this.nextLeaguePage = 1;
         this.nextDivisionIndex = 0;
-        this.nextMatchStart = properties.getMatchStart();
+        this.currentLeagueRangeHasPlayers = false;
     }
 
     public void runOnce() {
@@ -61,18 +56,15 @@ public class RiotCollectionOrchestrator {
 
         log.info(
                 "Riot collection scheduler started: startedAt={}, queue={}, tiers={}, division={}, "
-                        + "leaguePageStart={}, matchStart={}",
+                        + "leaguePageStart={}",
                 startedAt,
                 QUEUE_TYPE,
                 properties.getTiers(),
                 currentDivision(),
-                nextLeaguePage,
-                nextMatchStart
+                nextLeaguePage
         );
-        runStage("CHAMPION_METADATA", "champions", summary.failures, championSyncService::syncChampions);
-        runStage("ITEM_METADATA", "core-items", summary.failures, itemSyncService::syncCoreItem);
-        collectPlayers(summary);
-        collectMatches(summary);
+        List<String> collectedPuuids = collectPlayers(summary);
+        collectMatches(collectedPuuids, summary);
         collectMissingTimelines(summary);
         rebuildStats(summary);
 
@@ -86,33 +78,43 @@ public class RiotCollectionOrchestrator {
         );
     }
 
-    private void collectPlayers(RunSummary summary) {
+    private List<String> collectPlayers(RunSummary summary) {
         boolean completed = true;
+        LinkedHashSet<String> collectedPuuids = new LinkedHashSet<>();
         String division = currentDivision();
         for (String tier : properties.getTiers()) {
             int pageEnd = nextLeaguePage + properties.getLeaguePageCount();
             for (int page = nextLeaguePage; page < pageEnd; page++) {
                 String target = tier + "/" + division + "/page-" + page;
                 try {
-                    summary.newPlayers += playerSyncService.syncLeagueEntries(
+                    RiotPlayerSyncService.SyncResult syncResult = playerSyncService.syncLeagueEntries(
                             QUEUE_TYPE, tier, division, page
                     );
+                    summary.newPlayers += syncResult.newPlayers();
+                    collectedPuuids.addAll(syncResult.puuids());
                 } catch (RuntimeException exception) {
                     completed = false;
                     summary.failures.add(Failure.from("PLAYERS", target, exception));
                 }
             }
         }
+        currentLeagueRangeHasPlayers |= !collectedPuuids.isEmpty();
         if (completed) {
             moveToNextLeagueRange();
         }
+        return List.copyOf(collectedPuuids);
     }
 
     private void moveToNextLeagueRange() {
         nextDivisionIndex++;
         if (nextDivisionIndex >= progressiveDivisions().size()) {
             nextDivisionIndex = 0;
-            nextLeaguePage += properties.getLeaguePageCount();
+            if (currentLeagueRangeHasPlayers) {
+                nextLeaguePage += properties.getLeaguePageCount();
+            } else {
+                nextLeaguePage = 1;
+            }
+            currentLeagueRangeHasPlayers = false;
         }
     }
 
@@ -133,33 +135,22 @@ public class RiotCollectionOrchestrator {
         return DIVISION_ORDER.subList(startIndex, DIVISION_ORDER.size());
     }
 
-    private void collectMatches(RunSummary summary) {
-        int playerPage = 0;
-        boolean completed = true;
-        while (true) {
-            RiotMatchSyncService.SyncResult syncResult;
+    private void collectMatches(List<String> puuids, RunSummary summary) {
+        int playerCount = properties.getPlayerPageSize();
+        for (int fromIndex = 0; fromIndex < puuids.size(); fromIndex += playerCount) {
+            List<String> targets = puuids.subList(
+                    fromIndex,
+                    Math.min(fromIndex + playerCount, puuids.size())
+            );
             try {
-                syncResult = matchSyncService.syncMatches(
-                        playerPage,
-                        properties.getPlayerPageSize(),
-                        nextMatchStart,
-                        properties.getMatchCount()
-                );
+                merge(summary, matchSyncService.syncMatches(targets, properties.getMatchCount()));
             } catch (RuntimeException exception) {
-                summary.failures.add(Failure.from("MATCH_PAGE", Integer.toString(playerPage), exception));
-                return;
+                summary.failures.add(Failure.from(
+                        "MATCH_BATCH",
+                        Integer.toString(fromIndex / playerCount),
+                        exception
+                ));
             }
-            merge(summary, syncResult);
-            if (!syncResult.failures().isEmpty()) {
-                completed = false;
-            }
-            if (syncResult.scannedPlayers() < properties.getPlayerPageSize()) {
-                break;
-            }
-            playerPage++;
-        }
-        if (completed) {
-            nextMatchStart += properties.getMatchCount();
         }
     }
 
@@ -200,14 +191,6 @@ public class RiotCollectionOrchestrator {
         )));
     }
 
-    private void runStage(String stage, String target, List<Failure> failures, Runnable action) {
-        try {
-            action.run();
-        } catch (RuntimeException exception) {
-            failures.add(Failure.from(stage, target, exception));
-        }
-    }
-
     private void validateProperties() {
         if (properties.getTiers().isEmpty()) {
             throw new IllegalArgumentException("collection scheduler tiers must not be empty");
@@ -223,9 +206,6 @@ public class RiotCollectionOrchestrator {
         }
         if (properties.getPlayerPageSize() < 1 || properties.getPlayerPageSize() > 100) {
             throw new IllegalArgumentException("collection scheduler player page size must be between 1 and 100");
-        }
-        if (properties.getMatchStart() < 0) {
-            throw new IllegalArgumentException("collection scheduler match start must not be negative");
         }
         if (properties.getMatchCount() < 1 || properties.getMatchCount() > 100) {
             throw new IllegalArgumentException("collection scheduler match count must be between 1 and 100");

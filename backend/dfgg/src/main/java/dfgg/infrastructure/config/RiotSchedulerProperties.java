@@ -14,7 +14,6 @@ public class RiotSchedulerProperties {
     private List<String> divisions = new ArrayList<>(List.of("I"));
     private int leaguePageCount = 1;
     private int playerPageSize = 100;
-    private int matchStart;
     private int matchCount = 20;
 
     public boolean isEnabled() {
@@ -71,14 +70,6 @@ public class RiotSchedulerProperties {
 
     public void setPlayerPageSize(int playerPageSize) {
         this.playerPageSize = playerPageSize;
-    }
-
-    public int getMatchStart() {
-        return matchStart;
-    }
-
-    public void setMatchStart(int matchStart) {
-        this.matchStart = matchStart;
     }
 
     public int getMatchCount() {
