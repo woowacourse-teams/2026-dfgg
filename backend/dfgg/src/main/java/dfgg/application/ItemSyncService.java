@@ -50,7 +50,11 @@ public class ItemSyncService {
     }
 
     private boolean isCoreItem(ItemData data) {
-        if (data.into() != null && !data.into().isEmpty()) {
+        if (isStartingItem(data)) {
+            return false;
+        }
+        // Boots still list an enchant upgrade in `into` even at their finished tier, so they're exempt from this check.
+        if (!hasTag(data, "boots") && hasRemainingUpgrade(data)) {
             return false;
         }
         if (data.depth() != null && data.depth() <= 1) {
@@ -59,11 +63,23 @@ public class ItemSyncService {
         if (Boolean.TRUE.equals(data.consumed())) {
             return false;
         }
-        if (data.tags() != null && data.tags().stream()
-                .map(tag -> tag.toLowerCase(Locale.ROOT))
-                .anyMatch(tag -> tag.equals("consumable") || tag.equals("trinket"))) {
+        if (hasTag(data, "consumable") || hasTag(data, "trinket")) {
             return false;
         }
         return data.maps() == null || !Boolean.FALSE.equals(data.maps().get("11"));
+    }
+
+    private boolean isStartingItem(ItemData data) {
+        return data.from() == null || data.from().isEmpty();
+    }
+
+    private boolean hasRemainingUpgrade(ItemData data) {
+        return data.into() != null && !data.into().isEmpty();
+    }
+
+    private boolean hasTag(ItemData data, String tagName) {
+        return data.tags() != null && data.tags().stream()
+                .map(tag -> tag.toLowerCase(Locale.ROOT))
+                .anyMatch(tag -> tag.equals(tagName));
     }
 }

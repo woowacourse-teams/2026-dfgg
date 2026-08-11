@@ -7,6 +7,7 @@ import java.util.Map;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ItemData(
         String name,
+        List<String> from,
         List<String> into,
         List<String> tags,
         Map<String, Boolean> maps,
@@ -14,17 +15,18 @@ public record ItemData(
         Integer depth
 ) {
 
-    public ItemData(String name, List<String> into) {
-        this(name, into, null, null, null, null);
+    public ItemData(String name, List<String> from, List<String> into) {
+        this(name, from, into, null, null, null, null);
     }
 
     public ItemData(
             String name,
+            List<String> from,
             List<String> into,
             List<String> tags,
             Map<String, Boolean> maps,
             Boolean consumed
     ) {
-        this(name, into, tags, maps, consumed, null);
+        this(name, from, into, tags, maps, consumed, null);
     }
 }
