@@ -13,6 +13,7 @@ import dfgg.domain.stats.ChampionBuildStats;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -97,6 +98,91 @@ class ChampionBuildStatsRepositoryTest {
         assertThatThrownBy(() -> statsRepository.save(duplicate))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class)
                 .hasMessageContaining("duplicate");
+    }
+
+    @Test
+    @DisplayName("조건에 맞는 모든 buildKey row를 반환한다")
+    void findAllMatchingStats_WhenMultipleBuildKeysMatchCondition_ReturnAllRows() {
+        Champion champion = championRepository.save(new Champion(
+                266L,
+                "Aatrox",
+                "아트록스",
+                List.of(ChampionTag.FIGHTER)
+        ));
+        ChampionBuildStats shortBuild = statsRepository.save(new ChampionBuildStats(
+                "16.15", 420, champion, ChampionPosition.TOP,
+                false, false, false, false, false,
+                "PLATINUM", "SHORT", List.of(), 50, 100
+        ));
+        ChampionBuildStats longBuild = statsRepository.save(new ChampionBuildStats(
+                "16.15", 420, champion, ChampionPosition.TOP,
+                null, null, null, null, null,
+                "PLATINUM", "LONG", List.of(), 1, 2
+        ));
+        statsRepository.flush();
+
+        List<ChampionBuildStats> matched = statsRepository.findAllMatchingStats(
+                266L, "TOP", false, false, false, false, false
+        );
+
+        assertThat(matched).containsExactlyInAnyOrder(shortBuild, longBuild);
+    }
+
+    @Test
+    @DisplayName("game_count가 0인 row는 제외한다")
+    void findAllMatchingStats_WhenGameCountIsZero_ExcludeRow() {
+        Champion champion = championRepository.save(new Champion(
+                266L,
+                "Aatrox",
+                "아트록스",
+                List.of(ChampionTag.FIGHTER)
+        ));
+        ChampionBuildStats emptyBuild = statsRepository.save(new ChampionBuildStats(
+                "16.15", 420, champion, ChampionPosition.TOP,
+                false, false, false, false, false,
+                "PLATINUM", "EMPTY", List.of(), 0, 0
+        ));
+        ChampionBuildStats validBuild = statsRepository.save(new ChampionBuildStats(
+                "16.15", 420, champion, ChampionPosition.TOP,
+                false, false, false, false, false,
+                "PLATINUM", "VALID", List.of(), 1, 2
+        ));
+        statsRepository.flush();
+
+        List<ChampionBuildStats> matched = statsRepository.findAllMatchingStats(
+                266L, "TOP", false, false, false, false, false
+        );
+
+        assertThat(matched).containsExactly(validBuild);
+        assertThat(matched).doesNotContain(emptyBuild);
+    }
+
+    @Test
+    @DisplayName("챔피언 또는 포지션이 다르면 제외한다")
+    void findAllMatchingStats_WhenChampionOrPositionDiffers_ExcludeRow() {
+        Champion aatrox = championRepository.save(new Champion(
+                266L, "Aatrox", "아트록스", List.of(ChampionTag.FIGHTER)
+        ));
+        Champion ahri = championRepository.save(new Champion(
+                103L, "Ahri", "아리", List.of(ChampionTag.MAGE)
+        ));
+        ChampionBuildStats otherChampion = statsRepository.save(new ChampionBuildStats(
+                "16.15", 420, ahri, ChampionPosition.TOP,
+                false, false, false, false, false,
+                "PLATINUM", "OTHER_CHAMP", List.of(), 1, 2
+        ));
+        ChampionBuildStats otherPosition = statsRepository.save(new ChampionBuildStats(
+                "16.15", 420, aatrox, ChampionPosition.JUNGLE,
+                false, false, false, false, false,
+                "PLATINUM", "OTHER_POSITION", List.of(), 1, 2
+        ));
+        statsRepository.flush();
+
+        List<ChampionBuildStats> matched = statsRepository.findAllMatchingStats(
+                266L, "TOP", false, false, false, false, false
+        );
+
+        assertThat(matched).doesNotContain(otherChampion, otherPosition);
     }
 
     @Test

@@ -3,6 +3,7 @@ package dfgg.application;
 import dfgg.common.CompositionStatsNotFoundException;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.champion.Champion;
+import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
@@ -17,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,13 +36,15 @@ class RecommendationServiceTest {
     @Mock
     private ChampionBuildStatsRepository statsRepository;
 
+    private final RecommendationBuildComposer buildComposer = new RecommendationBuildComposer();
+
     @BeforeEach
     void setUp() {
-        recommendationService = new RecommendationService(championNameNormalizer, statsRepository);
+        recommendationService = new RecommendationService(championNameNormalizer, statsRepository, buildComposer);
     }
 
     @Test
-    @DisplayName("아이템 빌드를 정상 추천한다")
+    @DisplayName("여러 buildKey의 통계를 슬롯별로 병합해 하나의 buildKey보다 많은 아이템을 추천한다")
     void recommend_success() {
         // given
         RecommendationRequest request = new RecommendationRequest(
@@ -65,16 +67,25 @@ class RecommendationServiceTest {
         when(championNameNormalizer.normalize("쓰레쉬")).thenReturn(thresh);
         when(championNameNormalizer.normalize("케이틀린")).thenReturn(caitlyn);
 
-        Item item1 = mock(Item.class);
-        Item item2 = mock(Item.class);
+        Item item1 = new Item(1L, "아이템1");
+        Item item2 = new Item(2L, "아이템2");
+        Item item3 = new Item(3L, "아이템3");
 
-        ChampionBuildStats bestStats = mock(ChampionBuildStats.class);
-        when(bestStats.getItems()).thenReturn(List.of(item1, item2));
+        ChampionBuildStats shortPopularStats = new ChampionBuildStats(
+                "16.15", 420, myChampion, ChampionPosition.BOTTOM,
+                null, null, null, null, null,
+                "PLATINUM", "SHORT", List.of(item1, item2), 30, 50
+        );
+        ChampionBuildStats longRareStats = new ChampionBuildStats(
+                "16.15", 420, myChampion, ChampionPosition.BOTTOM,
+                null, null, null, null, null,
+                "PLATINUM", "LONG", List.of(item1, item2, item3), 2, 3
+        );
 
-        when(statsRepository.findBestMatchingStats(
+        when(statsRepository.findAllMatchingStats(
                 eq(1L), eq("BOTTOM"),
                 anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean()
-        )).thenReturn(Optional.of(bestStats));
+        )).thenReturn(List.of(shortPopularStats, longRareStats));
 
         // when
         RecommendationResponse response = recommendationService.recommend(request);
@@ -82,7 +93,7 @@ class RecommendationServiceTest {
         // then
         assertThat(response.champion()).isEqualTo("징크스");
         assertThat(response.position()).isEqualTo("BOTTOM");
-        assertThat(response.items()).hasSize(2);
+        assertThat(response.items()).hasSize(3);
     }
 
     @Test
@@ -101,10 +112,10 @@ class RecommendationServiceTest {
 
         when(championNameNormalizer.normalize(anyString())).thenReturn(myChampion);
 
-        when(statsRepository.findBestMatchingStats(
+        when(statsRepository.findAllMatchingStats(
                 anyLong(), anyString(),
                 anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean()
-        )).thenReturn(Optional.empty());
+        )).thenReturn(List.of());
 
         // when & then
         assertThatThrownBy(() -> recommendationService.recommend(request))

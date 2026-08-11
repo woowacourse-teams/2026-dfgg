@@ -1,5 +1,6 @@
 package dfgg.domain.stats;
 
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -135,6 +136,28 @@ public interface ChampionBuildStatsRepository extends JpaRepository<ChampionBuil
             LIMIT 1
             """, nativeQuery = true)
     Optional<ChampionBuildStats> findBestMatchingStats(
+            @Param("championId") Long championId,
+            @Param("position") String position,
+            @Param("enemyTankHeavy") boolean enemyTankHeavy,
+            @Param("enemyApHeavy") boolean enemyApHeavy,
+            @Param("enemyAssassinHeavy") boolean enemyAssassinHeavy,
+            @Param("allyHasMarksman") boolean allyHasMarksman,
+            @Param("allyTankHeavy") boolean allyTankHeavy
+    );
+
+    @Query(value = """
+            SELECT * FROM composition_stats b
+            WHERE b.champion_id = :championId
+              AND b.position = :position
+              AND COALESCE(b.game_count, 0) > 0
+              AND (b.enemy_tank_heavy IS NULL OR b.enemy_tank_heavy = :enemyTankHeavy)
+              AND (b.enemy_ap_heavy IS NULL OR b.enemy_ap_heavy = :enemyApHeavy)
+              AND (b.enemy_assassin_heavy IS NULL OR b.enemy_assassin_heavy = :enemyAssassinHeavy)
+              AND (b.ally_has_marksman IS NULL OR b.ally_has_marksman = :allyHasMarksman)
+              AND (b.ally_tank_heavy IS NULL OR b.ally_tank_heavy = :allyTankHeavy)
+            ORDER BY b.build_key
+            """, nativeQuery = true)
+    List<ChampionBuildStats> findAllMatchingStats(
             @Param("championId") Long championId,
             @Param("position") String position,
             @Param("enemyTankHeavy") boolean enemyTankHeavy,
