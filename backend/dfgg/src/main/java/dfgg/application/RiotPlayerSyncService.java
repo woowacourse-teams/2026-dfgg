@@ -4,6 +4,7 @@ import dfgg.infrastructure.external.client.RiotClient;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +27,7 @@ public class RiotPlayerSyncService {
         this.persistenceService = persistenceService;
     }
 
-    public int syncLeagueEntries(
+    public SyncResult syncLeagueEntries(
             String queue,
             String tier,
             String division,
@@ -63,6 +64,16 @@ public class RiotPlayerSyncService {
                 newPlayers,
                 TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos)
         );
-        return newPlayers;
+        return new SyncResult(
+                newPlayers,
+                entries.stream().map(LeagueEntryResponse::puuid).distinct().toList()
+        );
+    }
+
+    public record SyncResult(int newPlayers, List<String> puuids) {
+
+        public SyncResult {
+            puuids = List.copyOf(Objects.requireNonNull(puuids, "puuids must not be null"));
+        }
     }
 }

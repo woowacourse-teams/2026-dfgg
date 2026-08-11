@@ -264,6 +264,78 @@ class RiotMatchSyncServiceTest {
     }
 
     @Test
+    void 이번_리그_조회에서_전달한_PUUID만_최신_범위부터_수집한다() {
+        when(riotClient.getMatchIds("puuid-current", 0, 20)).thenReturn(List.of("KR_1"));
+        when(rawMatchRepository.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());
+        when(rawMatchTimelineRepository.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());
+        when(riotClient.getRawMatch("KR_1")).thenReturn("{\"match\":1}");
+        when(riotClient.getRawMatchTimeline("KR_1")).thenReturn("{\"timeline\":1}");
+        when(persistenceService.persist(any())).thenReturn(true);
+        when(timelinePersistenceService.persist(any())).thenReturn(true);
+
+        riotMatchSyncService.syncMatches(List.of("puuid-current"), 20);
+
+        verify(playerRepository, never()).findPuuidsByPlatform(any(), any());
+        verify(riotClient).getMatchIds("puuid-current", 0, 20);
+    }
+
+    @Test
+    void 한_PUUID의_실패가_다른_PUUID의_수집을_막지_않는다() {
+        when(riotClient.getMatchIds("puuid-failing", 0, 20))
+                .thenThrow(new IllegalStateException("temporary failure"));
+        when(riotClient.getMatchIds("puuid-succeeding", 0, 20)).thenReturn(List.of());
+
+        RiotMatchSyncService.SyncResult result = riotMatchSyncService.syncMatches(
+                List.of("puuid-failing", "puuid-succeeding"),
+                20
+        );
+
+        assertThat(result.failures())
+                .extracting(RiotMatchSyncService.Failure::stage, RiotMatchSyncService.Failure::targetId)
+                .containsExactly(tuple("MATCH_IDS", "puuid-failing"));
+        verify(riotClient).getMatchIds("puuid-succeeding", 0, 20);
+    }
+
+    @Test
+    void 같은_매치를_반환한_PUUID들은_원본과_Timeline을_한_번만_저장한다() {
+        when(riotClient.getMatchIds("puuid-1", 0, 20)).thenReturn(List.of("KR_SHARED"));
+        when(riotClient.getMatchIds("puuid-2", 0, 20)).thenReturn(List.of("KR_SHARED"));
+        when(rawMatchRepository.findExistingMatchIds(Set.of("KR_SHARED"))).thenReturn(Set.of());
+        when(rawMatchTimelineRepository.findExistingMatchIds(Set.of("KR_SHARED"))).thenReturn(Set.of());
+        when(riotClient.getRawMatch("KR_SHARED")).thenReturn("{\"match\":1}");
+        when(riotClient.getRawMatchTimeline("KR_SHARED")).thenReturn("{\"timeline\":1}");
+        when(persistenceService.persist(any())).thenReturn(true);
+        when(timelinePersistenceService.persist(any())).thenReturn(true);
+
+        riotMatchSyncService.syncMatches(List.of("puuid-1", "puuid-2"), 20);
+
+        verify(riotClient, times(1)).getRawMatch("KR_SHARED");
+        verify(riotClient, times(1)).getRawMatchTimeline("KR_SHARED");
+        verify(persistenceService, times(1)).persist(any());
+        verify(timelinePersistenceService, times(1)).persist(any());
+    }
+
+    @Test
+    void 다시_실행하면_최신_범위를_재조회하고_저장된_매치_상세는_건너뛴다() {
+        when(riotClient.getMatchIds("puuid-1", 0, 20)).thenReturn(List.of("KR_1"));
+        when(rawMatchRepository.findExistingMatchIds(Set.of("KR_1")))
+                .thenReturn(Set.of(), Set.of("KR_1"));
+        when(rawMatchTimelineRepository.findExistingMatchIds(Set.of("KR_1")))
+                .thenReturn(Set.of(), Set.of("KR_1"));
+        when(riotClient.getRawMatch("KR_1")).thenReturn("{\"match\":1}");
+        when(riotClient.getRawMatchTimeline("KR_1")).thenReturn("{\"timeline\":1}");
+        when(persistenceService.persist(any())).thenReturn(true);
+        when(timelinePersistenceService.persist(any())).thenReturn(true);
+
+        riotMatchSyncService.syncMatches(List.of("puuid-1"), 20);
+        riotMatchSyncService.syncMatches(List.of("puuid-1"), 20);
+
+        verify(riotClient, times(2)).getMatchIds("puuid-1", 0, 20);
+        verify(riotClient, times(1)).getRawMatch("KR_1");
+        verify(riotClient, times(1)).getRawMatchTimeline("KR_1");
+    }
+
+    @Test
     void 조회_범위를_검증한다() {
         assertThatThrownBy(() -> riotMatchSyncService.syncMatches(-1, 20, 0, 20))
                 .isInstanceOf(IllegalArgumentException.class)

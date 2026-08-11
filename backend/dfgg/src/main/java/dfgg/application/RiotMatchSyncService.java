@@ -80,33 +80,54 @@ public class RiotMatchSyncService {
                 "count must be between 1 and 100"
         );
 
+        List<String> puuids = playerRepository.findPuuidsByPlatform(
+                PLATFORM,
+                PageRequest.of(playerPage, playerCount)
+        );
+        return syncMatches(puuids, matchStart, matchCount, "manual-page-" + playerPage);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public SyncResult syncMatches(List<String> puuids, int matchCount) {
+        Objects.requireNonNull(puuids, "puuids must not be null");
+        puuids.forEach(puuid -> Assert.hasText(puuid, "puuid must not be blank"));
+        Assert.isTrue(
+                matchCount > 0 && matchCount <= 100,
+                "count must be between 1 and 100"
+        );
+        List<String> distinctPuuids = new ArrayList<>(new LinkedHashSet<>(puuids));
+        if (distinctPuuids.isEmpty()) {
+            return SyncResult.empty(0, List.of());
+        }
+        return syncMatches(distinctPuuids, 0, matchCount, "scheduled");
+    }
+
+    private SyncResult syncMatches(
+            List<String> puuids,
+            int matchStart,
+            int matchCount,
+            String batch
+    ) {
         long startedAtNanos = System.nanoTime();
         log.info(
-                "Riot match sync started: playerPage={}, playerCount={}, matchStart={}, matchCount={}",
-                playerPage,
-                playerCount,
-                matchStart,
+                "Riot match sync started: batch={}, playerCount={}, matchCount={}",
+                batch,
+                puuids.size(),
                 matchCount
         );
         List<Failure> failures = new ArrayList<>();
-        MatchCollection matchCollection = collectMatchIds(
-                playerPage,
-                playerCount,
-                matchStart,
-                matchCount,
-                failures
-        );
+        MatchCollection matchCollection = collectMatchIds(puuids, matchStart, matchCount, failures);
         LinkedHashSet<String> matchIds = matchCollection.matchIds();
         log.info(
-                "Riot match IDs collected: playerPage={}, scannedPlayers={}, uniqueMatchIds={}, failures={}",
-                playerPage,
+                "Riot match IDs collected: batch={}, scannedPlayers={}, uniqueMatchIds={}, failures={}",
+                batch,
                 matchCollection.scannedPlayers(),
                 matchIds.size(),
                 failures.size()
         );
         if (matchIds.isEmpty()) {
             SyncResult result = SyncResult.empty(matchCollection.scannedPlayers(), failures);
-            logSyncCompleted(playerPage, result, startedAtNanos);
+            logSyncCompleted(batch, result, startedAtNanos);
             return result;
         }
 
@@ -132,9 +153,9 @@ public class RiotMatchSyncService {
             processedMatchIds++;
             if (processedMatchIds % progressLogInterval == 0 || processedMatchIds == matchIds.size()) {
                 log.info(
-                        "Riot match sync progress: playerPage={}, processedMatchIds={}/{}, "
+                        "Riot match sync progress: batch={}, processedMatchIds={}/{}, "
                                 + "newMatches={}, newTimelines={}, skippedItems={}, failures={}",
-                        playerPage,
+                        batch,
                         processedMatchIds,
                         matchIds.size(),
                         newMatches,
@@ -151,7 +172,7 @@ public class RiotMatchSyncService {
                 skippedItems,
                 failures
         );
-        logSyncCompleted(playerPage, result, startedAtNanos);
+        logSyncCompleted(batch, result, startedAtNanos);
         return result;
     }
 
@@ -218,11 +239,11 @@ public class RiotMatchSyncService {
         return result;
     }
 
-    private void logSyncCompleted(int playerPage, SyncResult result, long startedAtNanos) {
+    private void logSyncCompleted(String batch, SyncResult result, long startedAtNanos) {
         log.info(
-                "Riot match sync completed: playerPage={}, scannedPlayers={}, newMatches={}, "
+                "Riot match sync completed: batch={}, scannedPlayers={}, newMatches={}, "
                         + "newTimelines={}, skippedItems={}, failures={}, durationMs={}",
-                playerPage,
+                batch,
                 result.scannedPlayers(),
                 result.newMatches(),
                 result.newTimelines(),
@@ -233,18 +254,13 @@ public class RiotMatchSyncService {
     }
 
     private MatchCollection collectMatchIds(
-            int playerPage,
-            int playerCount,
+            List<String> puuids,
             int matchStart,
             int matchCount,
             List<Failure> failures
     ) {
-        List<String> puuids = playerRepository.findPuuidsByPlatform(
-                PLATFORM,
-                PageRequest.of(playerPage, playerCount)
-        );
         if (puuids.isEmpty()) {
-            return new MatchCollection(0, new LinkedHashSet<>(), Map.of());
+            return MatchCollection.empty();
         }
 
         List<PlayerCohortRepository.Target> latestCohorts =
@@ -280,7 +296,11 @@ public class RiotMatchSyncService {
                     cohortsByMatchId.computeIfAbsent(matchId, ignored -> new ArrayList<>()).add(cohort)
             );
         }
-        return new MatchCollection(puuids.size(), matchIds, cohortsByMatchId);
+        return new MatchCollection(
+                puuids.size(),
+                matchIds,
+                cohortsByMatchId
+        );
     }
 
     private ItemCollectionResult fetchAndPersist(
@@ -370,6 +390,9 @@ public class RiotMatchSyncService {
             LinkedHashSet<String> matchIds,
             Map<String, List<PlayerCohortRepository.Target>> cohortsByMatchId
     ) {
+        private static MatchCollection empty() {
+            return new MatchCollection(0, new LinkedHashSet<>(), Map.of());
+        }
     }
 
     private record ItemCollectionResult(int newMatches, int newTimelines, int skippedItems) {
