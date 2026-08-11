@@ -2,7 +2,7 @@ import { type SubmitEvent, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import ChampionCombobox from '../../components/ChampionCombobox';
-import { useChampions } from '../../hooks/useChampions';
+import { itemImageUrl, useChampions } from '../../hooks/useChampions';
 import { type Position, POSITIONS, type RecommendationResponse } from '../../types/recommendation';
 
 const POSITION_LABEL: Record<Position, string> = {
@@ -25,7 +25,7 @@ export default function ChampionSelect() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const { champions, failed } = useChampions();
+  const { champions, version, failed } = useChampions();
 
   const knownNames = useMemo(() => champions.map((champion) => champion.name), [champions]);
 
@@ -210,10 +210,11 @@ export default function ChampionSelect() {
                 <li key={item.id} className="text-center">
                   <div className="chamfer-sm relative bg-surface-2">
                     <img
-                      src={`/${item.imageUrl}`}
+                      src={version ? itemImageUrl(version, item.id) : undefined}
                       alt={item.name}
                       width={64}
                       height={64}
+                      loading="lazy"
                       className="w-full"
                     />
                     <span className="absolute top-0 left-0 bg-ground/80 px-1 font-display text-[10px] text-hextech">
