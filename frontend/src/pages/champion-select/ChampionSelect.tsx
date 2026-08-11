@@ -52,10 +52,13 @@ export default function ChampionSelect() {
       return;
     }
 
-    const toChampion = (position: Position, lineup: Lineup) => ({
-      name: lineup[position].trim(),
-      position,
-    });
+    // 화면에는 한글로 두되, 백엔드에는 Data Dragon 영문 id로 보낸다.
+    // 목록을 못 받아온 경우엔 매칭할 대상이 없으므로 입력값을 그대로 쓴다.
+    const toChampion = (position: Position, lineup: Lineup) => {
+      const typed = lineup[position].trim();
+      const matched = champions.find((champion) => champion.name === typed);
+      return { name: matched ? matched.id : typed, position };
+    };
 
     const body = {
       myChampion: toChampion(myPosition, allyLineup),
@@ -196,7 +199,8 @@ export default function ChampionSelect() {
         {result && !loading && (
           <section className="mt-6" aria-live="polite">
             <h2 className="font-display text-lg font-bold">
-              {result.champion}
+              {champions.find((champion) => champion.id === result.champion)?.name ??
+                result.champion}
               <span className="ml-2 text-sm font-normal text-ink-3">
                 {POSITION_LABEL[result.position] ?? result.position}
               </span>
