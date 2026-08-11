@@ -33,7 +33,7 @@ public class RiotClient {
 
     @Autowired
     public RiotClient(RestClient.Builder builder, RiotApiProperties properties) {
-        this(builder, properties, new RiotRateLimitExecutor(properties.keys()));
+        this(builder, properties, new RiotRateLimitExecutor());
     }
 
     RiotClient(
@@ -41,14 +41,23 @@ public class RiotClient {
             RiotApiProperties properties,
             RiotRateLimitExecutor rateLimitExecutor
     ) {
-        this.platformRestClient = createRestClient(builder.clone(), properties.platformBaseUrl().toString());
-        this.regionalRestClient = createRestClient(builder.clone(), properties.regionalBaseUrl().toString());
+        this.platformRestClient = createRestClient(
+                builder.clone(),
+                properties.platformBaseUrl().toString(),
+                properties.key()
+        );
+        this.regionalRestClient = createRestClient(
+                builder.clone(),
+                properties.regionalBaseUrl().toString(),
+                properties.key()
+        );
         this.rateLimitExecutor = rateLimitExecutor;
     }
 
-    private RestClient createRestClient(RestClient.Builder builder, String baseUrl) {
+    private RestClient createRestClient(RestClient.Builder builder, String baseUrl, String apiKey) {
         return builder
                 .baseUrl(baseUrl)
+                .defaultHeader(RIOT_TOKEN_HEADER, apiKey)
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                 .build();
     }
@@ -70,7 +79,6 @@ public class RiotClient {
                                 .path("/lol/league/v4/entries/{queue}/{tier}/{division}")
                                 .queryParam("page", page)
                                 .build(queue, tier, division))
-                        .header(RIOT_TOKEN_HEADER, rateLimitExecutor.currentApiKey())
                         .retrieve()
                         .body(LEAGUE_ENTRY_LIST_TYPE)
         );
@@ -98,7 +106,6 @@ public class RiotClient {
                                 .queryParam("start", start)
                                 .queryParam("count", count)
                                 .build(puuid))
-                        .header(RIOT_TOKEN_HEADER, rateLimitExecutor.currentApiKey())
                         .retrieve()
                         .body(STRING_LIST_TYPE)
         );
@@ -117,7 +124,6 @@ public class RiotClient {
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/match/v5/matches/{matchId}")
                                 .build(matchId))
-                        .header(RIOT_TOKEN_HEADER, rateLimitExecutor.currentApiKey())
                         .retrieve()
                         .body(MatchResponse.class)
         );
@@ -136,7 +142,6 @@ public class RiotClient {
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/match/v5/matches/{matchId}")
                                 .build(matchId))
-                        .header(RIOT_TOKEN_HEADER, rateLimitExecutor.currentApiKey())
                         .retrieve()
                         .body(String.class)
         );
@@ -155,7 +160,6 @@ public class RiotClient {
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/match/v5/matches/{matchId}/timeline")
                                 .build(matchId))
-                        .header(RIOT_TOKEN_HEADER, rateLimitExecutor.currentApiKey())
                         .retrieve()
                         .body(String.class)
         );
@@ -174,7 +178,6 @@ public class RiotClient {
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/match/v5/matches/{matchId}/timeline")
                                 .build(matchId))
-                        .header(RIOT_TOKEN_HEADER, rateLimitExecutor.currentApiKey())
                         .retrieve()
                         .body(MatchTimelineResponse.class)
         );
