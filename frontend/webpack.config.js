@@ -2,15 +2,16 @@ const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
-module.exports = (_env, argv) => {
+module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
+  const isDesktop = env.target === 'desktop';
 
   return {
     entry: './apps/web/src/main.tsx',
     output: {
-      path: path.resolve(__dirname, 'dist'),
+      path: path.resolve(__dirname, isDesktop ? 'dist-desktop' : 'dist'),
       filename: 'bundle.js',
-      publicPath: '/',
+      publicPath: isDesktop ? './' : '/',
       clean: true,
     },
     module: {
