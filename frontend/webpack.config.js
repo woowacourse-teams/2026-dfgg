@@ -6,7 +6,7 @@ module.exports = (_env, argv) => {
   const isProduction = argv.mode === 'production';
 
   return {
-    entry: './src/main.tsx',
+    entry: './apps/web/src/main.tsx',
     output: {
       path: path.resolve(__dirname, 'dist'),
       filename: 'bundle.js',
@@ -52,7 +52,7 @@ module.exports = (_env, argv) => {
     },
     plugins: [
       new HtmlWebpackPlugin({
-        template: './index.html',
+        template: './apps/web/index.html',
         filename: 'index.html',
         inject: true,
       }),
