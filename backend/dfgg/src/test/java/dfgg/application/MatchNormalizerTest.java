@@ -116,6 +116,68 @@ class MatchNormalizerTest {
     }
 
     @Test
+    void BOTTOM_퀘스트_완료로_이동한_신발을_최종_빌드에_포함한다() {
+        NormalizedMatch normalized = normalizer.normalize(
+                "KR_1",
+                """
+                        {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
+                          {"puuid":"bottom-puuid","participantId":1,"championId":222,"teamId":100,
+                           "teamPosition":"BOTTOM","item0":3071,"item1":6610,"item2":3053,
+                           "item3":6333,"item4":6676,"item5":3031,"roleBoundItem":3006,"win":true}
+                        ]}}
+                        """,
+                """
+                        {"metadata":{"participants":["bottom-puuid"]},"info":{"frames":[
+                          {"events":[
+                            {"timestamp":100,"type":"ITEM_PURCHASED","participantId":1,"itemId":3006},
+                            {"timestamp":200,"type":"ITEM_PURCHASED","participantId":1,"itemId":3071},
+                            {"timestamp":300,"type":"ITEM_PURCHASED","participantId":1,"itemId":6610},
+                            {"timestamp":400,"type":"ITEM_PURCHASED","participantId":1,"itemId":3053},
+                            {"timestamp":500,"type":"ITEM_PURCHASED","participantId":1,"itemId":6333},
+                            {"timestamp":600,"type":"ITEM_PURCHASED","participantId":1,"itemId":6676},
+                            {"timestamp":700,"type":"ITEM_PURCHASED","participantId":1,"itemId":3031}
+                          ]}
+                        ]}}
+                        """,
+                List.of(3071, 6610, 3053, 6333, 6676, 3031, 3006)
+        );
+
+        assertThat(normalized.participants()).singleElement().satisfies(participant -> {
+            assertThat(participant.finalCoreItemIds())
+                    .containsExactly(3071, 6610, 3053, 6333, 6676, 3031, 3006);
+            assertThat(participant.coreItemPurchaseOrder())
+                    .containsExactly(3006, 3071, 6610, 3053, 6333, 6676, 3031);
+            assertThat(participant.coreItemPurchaseOrderComplete()).isTrue();
+        });
+    }
+
+    @Test
+    void BOTTOM이_아닌_포지션의_roleBoundItem은_최종_빌드에서_제외한다() {
+        NormalizedMatch normalized = normalizer.normalize(
+                "KR_1",
+                """
+                        {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
+                          {"puuid":"top-puuid","participantId":1,"championId":266,"teamId":100,
+                           "teamPosition":"TOP","item0":3071,"roleBoundItem":3006,"win":true}
+                        ]}}
+                        """,
+                """
+                        {"metadata":{"participants":["top-puuid"]},"info":{"frames":[
+                          {"events":[
+                            {"timestamp":100,"type":"ITEM_PURCHASED","participantId":1,"itemId":3071},
+                            {"timestamp":200,"type":"ITEM_PURCHASED","participantId":1,"itemId":3006}
+                          ]}
+                        ]}}
+                        """,
+                List.of(3071, 3006)
+        );
+
+        assertThat(normalized.participants()).singleElement().satisfies(participant ->
+                assertThat(participant.finalCoreItemIds()).containsExactly(3071)
+        );
+    }
+
+    @Test
     void 패치_정보가_없으면_정규화하지_않는다() {
         assertThatThrownBy(() -> normalizer.normalize(
                 "KR_1",

@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class MatchNormalizer {
 
+    private static final String BOTTOM_POSITION = "BOTTOM";
+
     private final ObjectMapper objectMapper;
     private final CoreItemPurchaseOrderCalculator purchaseOrderCalculator;
 
@@ -97,14 +99,20 @@ public class MatchNormalizer {
     }
 
     private Stream<Integer> itemIds(MatchParticipant participant) {
-        return Stream.of(
+        Stream<Integer> inventoryItemIds = Stream.of(
                 participant.item0(),
                 participant.item1(),
                 participant.item2(),
                 participant.item3(),
                 participant.item4(),
                 participant.item5()
-        ).filter(Predicate.not(Objects::isNull)).filter(itemId -> itemId > 0);
+        );
+        Stream<Integer> roleBoundItemIds = BOTTOM_POSITION.equals(participant.teamPosition())
+                ? Stream.of(participant.roleBoundItem())
+                : Stream.empty();
+        return Stream.concat(inventoryItemIds, roleBoundItemIds)
+                .filter(Predicate.not(Objects::isNull))
+                .filter(itemId -> itemId > 0);
     }
 
     private String normalizePatch(String gameVersion) {

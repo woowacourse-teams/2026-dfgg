@@ -159,6 +159,7 @@ class RiotClientTest {
                                 "item4": 6333,
                                 "item5": 0,
                                 "item6": 3364,
+                                "roleBoundItem": 3006,
                                 "win": true
                               }
                             ],
@@ -176,6 +177,7 @@ class RiotClientTest {
             assertThat(participant.teamId()).isEqualTo(100);
             assertThat(participant.teamPosition()).isEqualTo("TOP");
             assertThat(participant.item0()).isEqualTo(3071);
+            assertThat(participant.roleBoundItem()).isEqualTo(3006);
             assertThat(participant.win()).isTrue();
         });
         assertThat(match.info().gameVersion()).isNull();
