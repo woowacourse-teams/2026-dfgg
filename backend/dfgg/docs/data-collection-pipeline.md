@@ -197,6 +197,9 @@ curl -X POST \
 
 `composition_stats`에는 패치, 큐, 티어, 챔피언, 포지션, 조합 조건, 코어 아이템 구매 순서가 저장됩니다.
 
+2026 역할 퀘스트로 인해 Match의 최종 신발과 Timeline의 구매 이벤트가 다르게 표현되는 경우에는
+[역할 퀘스트 신발 정규화 결정 기록](./role-quest-boots-normalization.md)의 규칙을 적용합니다.
+
 응답에는 전체 원본 매치 수, 처리한 매치 수, Timeline 누락 수, 실패 수와 사유, 새로 기록한 sample 수가 포함됩니다.
 
 ```json

@@ -9,6 +9,7 @@ import dfgg.infrastructure.external.dto.MatchResponse;
 import dfgg.infrastructure.external.dto.MatchTimelineResponse;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -19,6 +20,16 @@ import org.springframework.stereotype.Service;
 public class MatchNormalizer {
 
     private static final String BOTTOM_POSITION = "BOTTOM";
+    private static final Map<Integer, Integer> PURCHASED_BOOT_BY_TIER_THREE_BOOT = Map.of(
+            3168, 3008,
+            3170, 3009,
+            3171, 3158,
+            3172, 3006,
+            3173, 3111,
+            3174, 3047,
+            3175, 3020,
+            3176, 3010
+    );
 
     private final ObjectMapper objectMapper;
     private final CoreItemPurchaseOrderCalculator purchaseOrderCalculator;
@@ -112,7 +123,12 @@ public class MatchNormalizer {
                 : Stream.empty();
         return Stream.concat(inventoryItemIds, roleBoundItemIds)
                 .filter(Predicate.not(Objects::isNull))
-                .filter(itemId -> itemId > 0);
+                .filter(itemId -> itemId > 0)
+                .map(MatchNormalizer::normalizeTierThreeBoot);
+    }
+
+    private static int normalizeTierThreeBoot(int itemId) {
+        return PURCHASED_BOOT_BY_TIER_THREE_BOOT.getOrDefault(itemId, itemId);
     }
 
     private String normalizePatch(String gameVersion) {

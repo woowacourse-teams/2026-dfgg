@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.domain.match.NormalizedMatch;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class MatchNormalizerTest {
@@ -175,6 +176,50 @@ class MatchNormalizerTest {
         assertThat(normalized.participants()).singleElement().satisfies(participant ->
                 assertThat(participant.finalCoreItemIds()).containsExactly(3071)
         );
+    }
+
+    @Test
+    void 모든_3티어_신발을_실제로_구매한_신발로_보정한다() {
+        Map<Integer, Integer> expectedPurchasedBoots = Map.of(
+                3168, 3008,
+                3170, 3009,
+                3171, 3158,
+                3172, 3006,
+                3173, 3111,
+                3174, 3047,
+                3175, 3020,
+                3176, 3010
+        );
+
+        expectedPurchasedBoots.forEach((tierThreeBoot, purchasedBoot) -> {
+            NormalizedMatch normalized = normalizer.normalize(
+                    "KR_" + tierThreeBoot,
+                    """
+                            {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
+                              {"puuid":"puuid-1","participantId":1,"championId":1,"teamId":100,
+                               "teamPosition":"TOP","item0":%d,"win":true}
+                            ]}}
+                            """.formatted(tierThreeBoot),
+                    """
+                            {"metadata":{"participants":["puuid-1"]},"info":{"frames":[
+                              {"events":[
+                                {"timestamp":100,"type":"ITEM_PURCHASED","participantId":1,"itemId":%d}
+                              ]}
+                            ]}}
+                            """.formatted(purchasedBoot),
+                    List.of(purchasedBoot)
+            );
+
+            assertThat(normalized.participants()).singleElement().satisfies(participant -> {
+                assertThat(participant.finalCoreItemIds())
+                        .as("tier-three boot %s", tierThreeBoot)
+                        .containsExactly(purchasedBoot);
+                assertThat(participant.coreItemPurchaseOrder())
+                        .as("tier-three boot %s", tierThreeBoot)
+                        .containsExactly(purchasedBoot);
+                assertThat(participant.coreItemPurchaseOrderComplete()).isTrue();
+            });
+        });
     }
 
     @Test
