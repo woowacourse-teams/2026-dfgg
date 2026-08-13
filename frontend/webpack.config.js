@@ -2,16 +2,17 @@ const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
-module.exports = (_env, argv) => {
+module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
+  const isDesktop = env.target === 'desktop';
 
   return {
-    entry: './src/main.tsx',
+    entry: isDesktop ? './apps/desktop/main-window/src/main.tsx' : './apps/web/src/main.tsx',
     output: {
-      path: path.resolve(__dirname, 'dist'),
+      path: path.resolve(__dirname, isDesktop ? 'dist-desktop' : 'dist'),
       filename: 'bundle.js',
-      publicPath: '/',
-      clean: true,
+      publicPath: isDesktop ? './' : '/',
+      clean: isDesktop ? { keep: /^electron\// } : true,
     },
     module: {
       rules: [
@@ -52,15 +53,13 @@ module.exports = (_env, argv) => {
     },
     plugins: [
       new HtmlWebpackPlugin({
-        template: './index.html',
-        filename: 'index.html',
+        template: isDesktop ? './apps/desktop/main-window/index.html' : './apps/web/index.html',
+        filename: isDesktop ? 'main-window.html' : 'index.html',
         inject: true,
       }),
-      // public/ 아래 파일은 가공 없이 dist/ 루트로 복사한다. (riot.txt 등)
-      // 배포는 rsync --delete라, 여기 없으면 서버에 둬도 다음 배포에 지워진다.
-      new CopyPlugin({
-        patterns: [{ from: 'public', to: '.', noErrorOnMissing: true }],
-      }),
+      ...(isDesktop
+        ? []
+        : [new CopyPlugin({ patterns: [{ from: 'public', to: '.', noErrorOnMissing: true }] })]),
     ],
     devServer: {
       port: 3000,

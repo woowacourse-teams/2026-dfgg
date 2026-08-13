@@ -1,3 +1,4 @@
 dist
+dist-desktop
 node_modules
 pnpm-lock.yaml
