@@ -2,12 +2,18 @@ package dfgg.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dfgg.application.ChampionItemEmbeddingTrainer.TeamComposition;
-import dfgg.application.ChampionItemEmbeddingTrainer.TrainingConfig;
-import dfgg.application.ChampionItemEmbeddingTrainer.Window;
+import dfgg.application.embedding.ChampionItemEmbeddingTrainer;
+import dfgg.domain.embedding.ContentContext;
+import dfgg.domain.embedding.CounterContext;
+import dfgg.domain.embedding.ParticipantBuild;
+import dfgg.domain.embedding.TeamComposition;
+import dfgg.domain.embedding.Window;
+import dfgg.domain.embedding.TrainingConfig;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +50,44 @@ class ChampionItemEmbeddingTrainerTest {
                 new Window(allyTeam.championTokens()),
                 new Window(enemyTeam.championTokens())
         );
+    }
+
+    @Test
+    @DisplayName("참가자-빌드 문맥은 챔피언과 구매한 아이템들을 하나의 윈도우로 만든다")
+    void participantBuildWindow_ReturnsChampionAndItemsAsOneWindow() {
+        ParticipantBuild build = new ParticipantBuild("Ahri", List.of("RabadonsDeathcap", "VoidStaff"));
+
+        Window window = trainer.participantBuildWindow(build);
+
+        assertThat(window.tokens()).containsExactly("Ahri", "RabadonsDeathcap", "VoidStaff");
+    }
+
+    @Test
+    @DisplayName("대응(카운터) 문맥은 마주한 적 챔피언 5명과 구매한 아이템들을 하나의 윈도우로 만든다")
+    void counterContextWindow_ReturnsEnemyChampionsAndItemsAsOneWindow() {
+        CounterContext counterContext = new CounterContext(
+                List.of("Garen", "Darius", "Braum", "Ashe", "Sett"),
+                List.of("FrozenHeart")
+        );
+
+        Window window = trainer.counterContextWindow(counterContext);
+
+        assertThat(window.tokens()).containsExactly(
+                "Garen", "Darius", "Braum", "Ashe", "Sett", "FrozenHeart"
+        );
+    }
+
+    @Test
+    @DisplayName("콘텐츠 문맥은 아이템과 그 아이템의 태그들을 하나의 윈도우로 만든다")
+    void contentContextWindow_ReturnsItemAndTagsAsOneWindow() {
+        ContentContext contentContext = new ContentContext(
+                "FrozenHeart",
+                List.of("Armor", "Mana", "Aura")
+        );
+
+        Window window = trainer.contentContextWindow(contentContext);
+
+        assertThat(window.tokens()).containsExactly("FrozenHeart", "Armor", "Mana", "Aura");
     }
 
     private double cosineSimilarity(double[] a, double[] b) {

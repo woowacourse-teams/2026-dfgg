@@ -28,6 +28,27 @@ public class ChampionItemEmbeddingTrainer {
         );
     }
 
+    public Window participantBuildWindow(ParticipantBuild build) {
+        List<String> tokens = new ArrayList<>();
+        tokens.add(build.championToken());
+        tokens.addAll(build.itemTokens());
+        return new Window(tokens);
+    }
+
+    public Window counterContextWindow(CounterContext counterContext) {
+        List<String> tokens = new ArrayList<>();
+        tokens.addAll(counterContext.enemyChampionTokens());
+        tokens.addAll(counterContext.itemTokens());
+        return new Window(tokens);
+    }
+
+    public Window contentContextWindow(ContentContext contentContext) {
+        List<String> tokens = new ArrayList<>();
+        tokens.add(contentContext.itemToken());
+        tokens.addAll(contentContext.tagTokens());
+        return new Window(tokens);
+    }
+
     public Map<String, double[]> train(List<Window> windows, TrainingConfig config) {
         List<String> vocabulary = extractVocabulary(windows);
         Random random = new Random(config.randomSeed());
