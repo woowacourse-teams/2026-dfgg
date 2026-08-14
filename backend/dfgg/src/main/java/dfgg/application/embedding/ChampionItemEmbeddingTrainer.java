@@ -1,4 +1,4 @@
-package dfgg.application;
+package dfgg.application.embedding;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -7,6 +7,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+
+import dfgg.domain.embedding.CounterContext;
+import dfgg.domain.embedding.ContentContext;
+import dfgg.domain.embedding.ParticipantBuild;
+import dfgg.domain.embedding.TeamComposition;
+import dfgg.domain.embedding.Window;
+import dfgg.domain.embedding.TrainingConfig;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -119,20 +126,5 @@ public class ChampionItemEmbeddingTrainer {
     private double sigmoid(double x) {
         double clipped = Math.max(-6.0, Math.min(6.0, x));
         return 1.0 / (1.0 + Math.exp(-clipped));
-    }
-
-    public record Window(List<String> tokens) {
-    }
-
-    public record TeamComposition(List<String> championTokens) {
-    }
-
-    public record TrainingConfig(
-            int dimensions,
-            int negativeSamples,
-            int epochs,
-            double learningRate,
-            long randomSeed
-    ) {
     }
 }
