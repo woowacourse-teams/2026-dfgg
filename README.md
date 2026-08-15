@@ -2,7 +2,7 @@
 
 **Item build recommendations for the game you're actually in.**
 
-Live service: [http://3.39.39.73/](https://www.dfgg.pro/)
+Live service: [dfgg.pro](https://www.dfgg.pro/)
 
 dfgg recommends League of Legends item builds based on the specific ten champions in your
 match — not on a fixed, statistics-averaged build path.
