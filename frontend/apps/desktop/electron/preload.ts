@@ -9,6 +9,9 @@ import type { Lineup, LcuStatus } from './types';
 const lcuApi = {
   getLineup: (): Promise<Lineup | null> => ipcRenderer.invoke('lcu:getLineup'),
 
+  /** 구독을 걸기 전에 이미 정해진 상태를 놓치지 않도록 직접 조회한다. */
+  getStatus: (): Promise<LcuStatus> => ipcRenderer.invoke('lcu:getStatus'),
+
   onLineup: (callback: (lineup: Lineup | null) => void) => {
     const handler = (_event: unknown, lineup: Lineup | null) => callback(lineup);
     ipcRenderer.on('lcu:lineup', handler);
@@ -24,9 +27,6 @@ const lcuApi = {
       ipcRenderer.removeListener('lcu:status', handler);
     };
   },
-
-  /** 롤 창 모드를 테두리 없음으로 바꾼다. 사용자가 직접 눌렀을 때만 호출한다. */
-  setBorderless: (): Promise<boolean> => ipcRenderer.invoke('lcu:setBorderless'),
 
   /**
    * 백엔드에 추천을 요청한다. 메인 프로세스가 대신 호출하므로

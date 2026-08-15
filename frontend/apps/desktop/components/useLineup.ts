@@ -23,8 +23,10 @@ export function useLineup() {
     const api = window.lcu;
     if (!api) return;
 
-    // 창이 늦게 떴을 때를 대비해 현재 상태를 한 번 당겨온다.
+    // 창이 늦게 떴을 때를 대비해 현재 값을 한 번 당겨온다.
+    // 리스너를 걸기 전에 이미 지나간 이벤트는 다시 오지 않는다.
     void api.getLineup().then(setLineup);
+    void api.getStatus().then(setStatus);
 
     const offLineup = api.onLineup(setLineup);
     const offStatus = api.onStatus(setStatus);

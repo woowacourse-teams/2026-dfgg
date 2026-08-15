@@ -67,7 +67,18 @@ export default function OverlayControls() {
         ))}
       </div>
 
-      <span className="text-[11px] text-neutral-500">단축키 Alt+D 로도 켜고 끌 수 있어요</span>
+      {/*
+        전체 화면 배너는 실제로 그 모드일 때만 뜬다. 아직 클라이언트에 연결되지
+        않았거나 모드를 못 읽은 동안에도 알 수 있도록 여기에 항상 적어둔다.
+      */}
+      <div className="w-full space-y-1 text-[11px] text-neutral-500">
+        <p>단축키 Alt+D 로도 켜고 끌 수 있어요</p>
+        <p>
+          롤이 <strong className="text-neutral-400">전체 화면</strong>이면 오버레이가 게임에
+          가려집니다. <strong className="text-neutral-400">테두리 없음</strong> 또는{' '}
+          <strong className="text-neutral-400">창 모드</strong>로 두세요.
+        </p>
+      </div>
     </section>
   );
 }

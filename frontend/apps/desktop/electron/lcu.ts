@@ -137,42 +137,11 @@ export async function fetchWindowMode(credentials: LcuCredentials): Promise<numb
   }
 }
 
-/**
- * 창 모드를 바꾼다. 전체 화면(0)에서는 어떤 오버레이도 뜨지 못하므로
- * 테두리 없음(1)으로 옮겨줄 때 쓴다. 사용자 설정을 건드리는 동작이라
- * 반드시 사용자가 직접 누른 경우에만 호출해야 한다.
- */
-export function setWindowMode(credentials: LcuCredentials, mode: number): Promise<void> {
-  const body = JSON.stringify({ General: { WindowMode: mode } });
-
-  return new Promise((resolve, reject) => {
-    const request = https.request(
-      {
-        host: '127.0.0.1',
-        port: credentials.port,
-        path: '/lol-game-settings/v1/game-settings',
-        method: 'PATCH',
-        headers: {
-          Authorization: authHeader(credentials),
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body),
-        },
-        rejectUnauthorized: false,
-      },
-      (response) => {
-        response.resume();
-        response.on('end', () => {
-          const status = response.statusCode ?? 0;
-          if (status >= 200 && status < 300) resolve();
-          else reject(new Error(`창 모드 변경 실패 ${status}`));
-        });
-      },
-    );
-
-    request.on('error', reject);
-    request.end(body);
-  });
-}
+// 창 모드를 대신 바꿔주는 기능은 없다.
+//
+// PATCH /lol-game-settings/v1/game-settings 로 구현할 수 있지만, Riot 의 LCU 정책은
+// 승인된 엔드포인트만 쓰도록 제한한다. 나머지 호출이 전부 읽기인데 여기만 쓰기라
+// 심사에서 걸릴 소지가 크다. 창 모드는 사용자가 직접 바꾸도록 안내만 한다.
 
 /**
  * 한 판이 진행 중이라고 볼 단계들.
