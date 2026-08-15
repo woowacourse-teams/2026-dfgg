@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "League of Legends item build recommendations from the ten champions in your match",
   "main": "dist-desktop/electron/main.js",
   "scripts": {
@@ -17,7 +17,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "start:desktop:plain": "electron .",
-    "package:desktop": "pnpm build:desktop && pnpm build:electron && electron-builder --win"
+    "package:renderer": "pnpm build:desktop && pnpm build:electron",
+    "package:desktop": "pnpm package:renderer && electron-builder --win portable",
+    "package:store": "pnpm package:renderer && electron-builder --win appx",
+    "package:all": "pnpm package:renderer && electron-builder --win portable appx"
   },
   "keywords": [],
   "author": {
@@ -82,16 +85,24 @@
     "appId": "gg.dfgg.desktop",
     "productName": "dfgg",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "apps/desktop/build-resources"
     },
     "files": [
       "dist-desktop/**/*",
       "package.json"
     ],
     "win": {
+      "icon": "apps/desktop/assets/icon.ico",
       "target": [
         {
           "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "appx",
           "arch": [
             "x64"
           ]
@@ -99,6 +110,17 @@
       ]
     },
     "forceCodeSigning": false,
-    "artifactName": "dfgg-${version}.exe"
+    "artifactName": "dfgg-${version}.${ext}",
+    "appx": {
+      "identityName": "DFGG.DFGG",
+      "publisher": "CN=9DD9FAAE-E9F4-42B1-B663-BF31249E9AB8",
+      "publisherDisplayName": "DFGG",
+      "applicationId": "dfgg",
+      "displayName": "dfgg",
+      "backgroundColor": "#0e1428",
+      "languages": [
+        "ko-KR"
+      ]
+    }
   }
 }
