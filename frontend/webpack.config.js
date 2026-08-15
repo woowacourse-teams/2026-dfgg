@@ -96,7 +96,7 @@ module.exports = (env, argv) => {
           context: ['/recommendations'],
           // 기본은 배포된 백엔드. 로컬 서버로 붙이려면 API_TARGET 을 지정한다.
           //   $env:API_TARGET = "http://localhost:8080"
-          target: process.env.API_TARGET ?? 'http://3.39.39.73',
+          target: process.env.API_TARGET ?? 'https://dfgg.pro',
           changeOrigin: true,
         },
       ],

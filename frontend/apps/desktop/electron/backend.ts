@@ -5,7 +5,7 @@
  * null 이라 서버 CORS 허용이 필요하고, HTML 의 CSP connect-src 도 열어야 한다.
  * 메인 프로세스의 fetch 는 Node 쪽이라 둘 다 적용받지 않는다.
  */
-const DEFAULT_API_BASE = 'http://3.39.39.73';
+const DEFAULT_API_BASE = 'https://dfgg.pro';
 
 /** 로컬 백엔드로 붙이려면 DFGG_API_BASE 를 지정한다. */
 const API_BASE = process.env.DFGG_API_BASE ?? DEFAULT_API_BASE;
