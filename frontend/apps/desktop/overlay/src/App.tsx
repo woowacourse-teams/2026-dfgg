@@ -22,31 +22,36 @@ export default function App() {
 
   return (
     <div className="p-2">
-      <div className="rounded-lg bg-neutral-950/90 p-2.5 shadow-lg ring-1 ring-white/10">
+      {/*
+        게임 화면이 그대로 비치도록 배경을 흰색 반투명으로만 얹는다.
+        어두운 판이 없어졌으므로 글자는 전부 흰색으로 올리고, 밝은 장면
+        위에서도 읽히도록 그림자로 윤곽을 만든다.
+      */}
+      <div className="rounded-lg bg-white/10 p-2.5 ring-1 ring-white/20 [text-shadow:0_1px_2px_rgb(0_0_0/0.95),0_0_6px_rgb(0_0_0/0.8)]">
         <header className="flex items-baseline justify-between gap-2">
-          <h1 className="truncate text-xs font-bold text-neutral-100">
+          <h1 className="truncate text-xs font-bold text-white">
             {myChampion?.name ?? 'dfgg'}
             {result && (
-              <span className="ml-1 text-[11px] font-normal text-neutral-400">
+              <span className="ml-1 text-[11px] font-normal text-white/80">
                 {POSITION_LABEL[result.position] ?? result.position}
               </span>
             )}
           </h1>
-          <span className="shrink-0 text-[10px] text-neutral-500">
+          <span className="shrink-0 text-[10px] text-white/70">
             {allyPicked}/5 · {enemyPicked}/5
           </span>
         </header>
 
-        {loading && <p className="mt-1.5 text-[11px] text-neutral-400">분석 중...</p>}
+        {loading && <p className="mt-1.5 text-[11px] text-white/80">분석 중...</p>}
 
         {error && (
-          <p className="mt-1.5 text-[11px] text-rose-400" role="alert">
+          <p className="mt-1.5 text-[11px] font-medium text-rose-300" role="alert">
             {error}
           </p>
         )}
 
         {!result && !loading && !error && (
-          <p className="mt-1.5 text-[11px] text-neutral-400">
+          <p className="mt-1.5 text-[11px] text-white/80">
             {!lineup
               ? '밴픽이나 게임이 시작되면 표시돼요'
               : enemyPicked < 5
