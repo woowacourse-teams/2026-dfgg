@@ -4,7 +4,8 @@ import java.util.List;
 
 public record CounterContext(
         List<String> enemyChampionTokens,
-        List<String> itemTokens
+        List<String> itemTokens,
+        boolean win
 ) {
 
 }

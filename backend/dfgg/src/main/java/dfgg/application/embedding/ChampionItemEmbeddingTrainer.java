@@ -8,10 +8,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-import dfgg.domain.embedding.CounterContext;
-import dfgg.domain.embedding.ContentContext;
-import dfgg.domain.embedding.ParticipantBuild;
-import dfgg.domain.embedding.TeamComposition;
 import dfgg.domain.embedding.Window;
 import dfgg.domain.embedding.TrainingConfig;
 import org.springframework.stereotype.Component;
@@ -20,34 +16,6 @@ import org.springframework.stereotype.Component;
 public class ChampionItemEmbeddingTrainer {
 
     private static final double INIT_RANGE = 0.5;
-
-    public List<Window> teamCompositionWindows(TeamComposition allyTeam, TeamComposition enemyTeam) {
-        return List.of(
-                new Window(allyTeam.championTokens()),
-                new Window(enemyTeam.championTokens())
-        );
-    }
-
-    public Window participantBuildWindow(ParticipantBuild build) {
-        List<String> tokens = new ArrayList<>();
-        tokens.add(build.championToken());
-        tokens.addAll(build.itemTokens());
-        return new Window(tokens);
-    }
-
-    public Window counterContextWindow(CounterContext counterContext) {
-        List<String> tokens = new ArrayList<>();
-        tokens.addAll(counterContext.enemyChampionTokens());
-        tokens.addAll(counterContext.itemTokens());
-        return new Window(tokens);
-    }
-
-    public Window contentContextWindow(ContentContext contentContext) {
-        List<String> tokens = new ArrayList<>();
-        tokens.add(contentContext.itemToken());
-        tokens.addAll(contentContext.tagTokens());
-        return new Window(tokens);
-    }
 
     public Map<String, double[]> train(List<Window> windows, TrainingConfig config) {
         List<String> vocabulary = extractVocabulary(windows);

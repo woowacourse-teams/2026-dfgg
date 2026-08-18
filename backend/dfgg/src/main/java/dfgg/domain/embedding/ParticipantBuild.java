@@ -4,7 +4,8 @@ import java.util.List;
 
 public record ParticipantBuild(
         String championToken,
-        List<String> itemTokens
+        List<String> itemTokens,
+        boolean win
 ) {
 
 }

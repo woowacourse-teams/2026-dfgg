@@ -3,7 +3,8 @@ package dfgg.domain.embedding;
 import java.util.List;
 
 public record TeamComposition(
-        List<String> championTokens
+        List<String> championTokens,
+        boolean win
 ) {
 
 }
