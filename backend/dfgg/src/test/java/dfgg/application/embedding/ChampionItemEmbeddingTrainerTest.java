@@ -13,7 +13,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ChampionItemEmbeddingTrainerTest {
 
-    private final WindowFactory windowFactory = new WindowFactory();
     private final ChampionItemEmbeddingTrainer trainer = new ChampionItemEmbeddingTrainer();
 
     @Test
