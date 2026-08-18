@@ -1,5 +1,8 @@
 package dfgg.application.embedding;
 
+import dfgg.domain.embedding.ContentContext;
+import dfgg.domain.embedding.CounterContext;
+import dfgg.domain.embedding.ParticipantBuild;
 import dfgg.domain.embedding.TrainingConfig;
 import dfgg.domain.embedding.Window;
 import org.junit.jupiter.api.DisplayName;
@@ -14,10 +17,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ChampionItemEmbeddingTrainerTest {
 
     private final ChampionItemEmbeddingTrainer trainer = new ChampionItemEmbeddingTrainer();
+    private final WindowFactory windowFactory = new WindowFactory();
 
     @Test
-    @DisplayName("같은 윈도우에 자주 함께 등장한 토큰끼리 임베딩 공간에서 더 가깝다")
-    void train_WhenTokensFrequentlyCoOccurInWindows_EmbeddingsAreCloser() {
+    @DisplayName("같은 윈도우에 자주 함께 등장한 챔피언끼리 임베딩 공간에서 더 가깝다")
+    void train_WhenChampionsFrequentlyCoOccurInWindows_EmbeddingsAreCloser() {
         List<Window> windows = new ArrayList<>();
         for (int i = 0; i < 30; i++) {
             windows.add(new Window(List.of("Ahri", "Zed", "Leona", "Jinx", "Nautilus")));
@@ -30,6 +34,80 @@ class ChampionItemEmbeddingTrainerTest {
         double ahriZed = cosineSimilarity(embeddings.get("Ahri"), embeddings.get("Zed"));
         double ahriGaren = cosineSimilarity(embeddings.get("Ahri"), embeddings.get("Garen"));
         assertThat(ahriZed).isGreaterThan(ahriGaren);
+    }
+
+    @Test
+    @DisplayName("참가자-빌드 문맥으로 학습하면 챔피언과 그 챔피언이 자주 산 아이템이 임베딩 공간에서 더 가깝다")
+    void train_WhenChampionFrequentlyBuysItem_ChampionAndItemEmbeddingsAreCloser() {
+        List<Window> windows = new ArrayList<>();
+        for (int i = 0; i < 30; i++) {
+            windows.add(windowFactory.createParticipantBuildWindow(
+                    new ParticipantBuild("Ahri", List.of("RabadonsDeathcap", "VoidStaff"), true), 1.0
+            ));
+            windows.add(windowFactory.createParticipantBuildWindow(
+                    new ParticipantBuild("Garen", List.of("Thornmail"), false), 1.0
+            ));
+        }
+        TrainingConfig config = new TrainingConfig(8, 4, 60, 0.05, 42L);
+
+        Map<String, double[]> embeddings = trainer.train(windows, config);
+
+        double ahriRabadons = cosineSimilarity(embeddings.get("Ahri"), embeddings.get("RabadonsDeathcap"));
+        double ahriThornmail = cosineSimilarity(embeddings.get("Ahri"), embeddings.get("Thornmail"));
+        assertThat(ahriRabadons).isGreaterThan(ahriThornmail);
+    }
+
+    @Test
+    @DisplayName("카운터 문맥으로 학습하면 적 챔피언과 그 적을 상대로 자주 구매된 아이템이, 그 적을 상대로 산 적 없는 아이템보다 임베딩 공간에서 더 가깝다")
+    void train_WhenItemFrequentlyBoughtAgainstEnemy_EnemyAndItemEmbeddingsAreCloser() {
+        List<Window> windows = new ArrayList<>();
+        for (int i = 0; i < 30; i++) {
+            windows.add(windowFactory.createCounterContextWindow(
+                    new CounterContext(
+                            List.of("Ezreal", "Lucian", "Kaisa", "Thresh", "Braum"),
+                            List.of("FrozenHeart"),
+                            true
+                    ), 1.0
+            ));
+            windows.add(windowFactory.createCounterContextWindow(
+                    new CounterContext(
+                            List.of("Yasuo", "Zed", "Yone", "Leona", "Nautilus"),
+                            List.of("InfinityEdge"),
+                            true
+                    ), 1.0
+            ));
+        }
+        TrainingConfig config = new TrainingConfig(8, 4, 60, 0.05, 42L);
+
+        Map<String, double[]> embeddings = trainer.train(windows, config);
+
+        double ezrealFrozenHeart = cosineSimilarity(embeddings.get("Ezreal"), embeddings.get("FrozenHeart"));
+        double yasuoFrozenHeart = cosineSimilarity(embeddings.get("Yasuo"), embeddings.get("FrozenHeart"));
+        assertThat(ezrealFrozenHeart).isGreaterThan(yasuoFrozenHeart);
+    }
+
+    @Test
+    @DisplayName("콘텐츠 문맥으로 학습하면 같은 Data Dragon 태그를 공유하는 아이템끼리 임베딩 공간에서 더 가깝다")
+    void train_WhenItemsShareTags_ItemEmbeddingsAreCloser() {
+        List<Window> windows = new ArrayList<>();
+        for (int i = 0; i < 30; i++) {
+            windows.add(windowFactory.createContentContextWindow(
+                    new ContentContext("FrozenHeart", List.of("Armor", "Mana", "Aura"))
+            ));
+            windows.add(windowFactory.createContentContextWindow(
+                    new ContentContext("Thornmail", List.of("Armor", "Health", "Aura"))
+            ));
+            windows.add(windowFactory.createContentContextWindow(
+                    new ContentContext("InfinityEdge", List.of("AttackDamage", "CriticalStrike"))
+            ));
+        }
+        TrainingConfig config = new TrainingConfig(8, 4, 60, 0.05, 42L);
+
+        Map<String, double[]> embeddings = trainer.train(windows, config);
+
+        double frozenHeartThornmail = cosineSimilarity(embeddings.get("FrozenHeart"), embeddings.get("Thornmail"));
+        double frozenHeartInfinityEdge = cosineSimilarity(embeddings.get("FrozenHeart"), embeddings.get("InfinityEdge"));
+        assertThat(frozenHeartThornmail).isGreaterThan(frozenHeartInfinityEdge);
     }
 
     private double cosineSimilarity(double[] a, double[] b) {
