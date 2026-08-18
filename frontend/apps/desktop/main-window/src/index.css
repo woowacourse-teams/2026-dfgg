@@ -1,1 +1,21 @@
 @import 'tailwindcss';
+
+/*
+ * 제목 표시줄을 숨겼으므로(titleBarStyle: 'hidden') 창 배경이 그대로 드러난다.
+ * 메인 프로세스의 TITLE_BAR.color 와 같은 값이어야 창 버튼 영역과 이어진다.
+ */
+@layer base {
+  html,
+  body {
+    background-color: #0a0a0a;
+  }
+
+  /*
+   * 기본 스크롤바는 밝은 회색이라 어두운 화면에서 혼자 튄다.
+   * 표준 속성이라 Chromium 121+ 가 필요한데, Electron 43 은 훨씬 위라 문제없다.
+   */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3f3f46 transparent;
+  }
+}

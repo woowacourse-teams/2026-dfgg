@@ -1,6 +1,19 @@
 import { Link } from 'react-router-dom';
 
 import banner from '../../assets/dfgg.png';
+import SiteFooter from '../../components/SiteFooter';
+
+/**
+ * 릴리스 에셋을 직접 가리킨다. GitHub 이 Content-Disposition: attachment 로
+ * 내려주므로 페이지 이동 없이 바로 다운로드가 시작된다.
+ *
+ * Riot 심사에 소스 저장소로 팀 저장소를 적었으므로 배포도 같은 곳에서 한다.
+ * 파일명에 버전이 들어 있어 릴리스를 올릴 때마다 이 상수를 바꿔야 한다.
+ * 고정 링크를 원하면 에셋 이름을 dfgg.exe 처럼 버전 없이 올리고
+ * .../releases/latest/download/dfgg.exe 를 쓰면 된다.
+ */
+const DOWNLOAD_VERSION = 'v1.1.0';
+const DOWNLOAD_URL = `https://github.com/woowacourse-teams/2026-dfgg/releases/download/${DOWNLOAD_VERSION}/dfgg-1.1.0.exe`;
 
 const ENTRIES = [
   // {
@@ -49,6 +62,46 @@ export default function Home() {
             </Link>
           ))}
         </nav>
+
+        <section className="chamfer mt-8 bg-surface-2 p-6 text-left shadow-[inset_0_0_0_1px_var(--color-line)]">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="font-display text-xl font-bold">데스크톱 앱</h2>
+              <p className="mt-2 max-w-[46ch] text-sm text-ink-2">
+                열 명을 직접 입력하지 않아도 됩니다. 롤 클라이언트에서 조합을 자동으로 읽어 게임
+                위에 추천 아이템을 띄워줍니다.
+              </p>
+            </div>
+
+            {/* 같은 탭에서 열어야 새 창이 떴다 사라지지 않고 다운로드만 시작된다. */}
+            <a
+              href={DOWNLOAD_URL}
+              className="chamfer-sm shrink-0 bg-hextech px-5 py-3 font-display text-sm font-bold tracking-[0.12em] text-[#04231f] uppercase transition-colors hover:bg-hextech-bright"
+            >
+              Windows 다운로드
+              <span className="ml-2 font-body text-[11px] font-normal tracking-normal normal-case opacity-70">
+                {DOWNLOAD_VERSION}
+              </span>
+            </a>
+          </div>
+
+          <ul className="mt-5 space-y-1.5 text-xs text-ink-3">
+            <li>
+              설치 없이 실행됩니다. 처음 실행하면 Windows 보안 경고가 뜨는데{' '}
+              <strong className="text-ink-2">추가 정보 → 실행</strong>을 눌러주세요. 코드 서명
+              인증서를 준비 중입니다.
+            </li>
+            <li>
+              롤이 <strong className="text-ink-2">전체 화면</strong>이면 오버레이가 게임에
+              가려집니다. 롤 설정 → 그래픽 → 창 모드를{' '}
+              <strong className="text-ink-2">테두리 없음</strong>이나{' '}
+              <strong className="text-ink-2">창 모드</strong>로 두세요.
+            </li>
+            <li>롤 클라이언트가 실행 중이어야 밴픽·게임 조합을 읽어옵니다.</li>
+          </ul>
+        </section>
+
+        <SiteFooter />
       </div>
     </div>
   );

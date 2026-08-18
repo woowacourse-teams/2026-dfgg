@@ -17,6 +17,9 @@ export default tseslint.config(
       'apps/web/src/**/*.{ts,tsx}',
       'apps/desktop/main-window/**/*.{ts,tsx}',
       'apps/desktop/overlay/**/*.{ts,tsx}',
+      // 두 창이 함께 쓰는 렌더러 코드와 웹·앱 공용 코드도 브라우저에서 돈다.
+      'apps/desktop/components/**/*.{ts,tsx}',
+      'packages/**/*.{ts,tsx}',
     ],
     languageOptions: {
       globals: globals.browser,

@@ -2,6 +2,7 @@ import { type SubmitEvent, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import ChampionCombobox from '../../components/ChampionCombobox';
+import SiteFooter from '../../components/SiteFooter';
 import { itemImageUrl, useChampions } from '../../hooks/useChampions';
 import { type Position, POSITIONS, type RecommendationResponse } from '../../types/recommendation';
 
@@ -229,6 +230,8 @@ export default function ChampionSelect() {
             </ol>
           </section>
         )}
+
+        <SiteFooter />
       </div>
     </div>
   );
