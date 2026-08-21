@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type { Lineup, LcuStatus } from './types';
+import type { UpdateState } from './updater';
 
 /**
  * 렌더러에 노출하는 창구. 메인 프로세스의 Node 권한은 넘기지 않고
@@ -48,6 +49,20 @@ const lcuApi = {
       ipcRenderer.on('overlay:state', handler);
       return () => {
         ipcRenderer.removeListener('overlay:state', handler);
+      };
+    },
+  },
+
+  /** 자동 업데이트. 스토어 버전과 개발 모드에서는 항상 idle 로 남는다. */
+  update: {
+    getState: (): Promise<UpdateState> => ipcRenderer.invoke('update:getState'),
+    /** 받아둔 업데이트를 지금 적용한다. 앱이 꺼졌다 다시 켜진다. */
+    install: (): Promise<boolean> => ipcRenderer.invoke('update:install'),
+    onState: (callback: (state: UpdateState) => void) => {
+      const handler = (_event: unknown, state: UpdateState) => callback(state);
+      ipcRenderer.on('update:state', handler);
+      return () => {
+        ipcRenderer.removeListener('update:state', handler);
       };
     },
   },
