@@ -3,16 +3,9 @@ import { Link } from 'react-router-dom';
 
 import { PRIVACY_URL } from '../../components/SiteFooter';
 
-/**
- * Riot 프로덕션 API 키 심사에 제출하는 개인정보처리방침.
- * 웹과 데스크톱 앱이 같은 제품이라 방침도 하나로 두고, 앱에서는 이 주소를
- * 외부 브라우저로 연다.
- *
- * 내용을 고칠 때는 반드시 아래 날짜도 함께 올린다.
- */
 const LAST_UPDATED = '2026년 8월 15일';
 
-const CONTACT_EMAIL = 'wkdwngud963@gmail.com';
+const CONTACT_EMAIL = 'dfgg0821@gmail.com';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
