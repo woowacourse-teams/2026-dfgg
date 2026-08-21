@@ -26,7 +26,11 @@ class ItemRepositoryTest {
     @Test
     void 아이템을_저장하고_조회한다() {
         // given
-        Item item = new Item(3071L, "칠흑의 양날 도끼");
+        Item item = new Item(
+                3071L,
+                "칠흑의 양날 도끼",
+                List.of("Damage", "Health", "FutureTag")
+        );
 
         // when
         itemRepository.save(item);
@@ -37,6 +41,9 @@ class ItemRepositoryTest {
         Item saved = itemRepository.findById(3071L).orElseThrow();
         assertThat(saved.getItemId()).isEqualTo(3071L);
         assertThat(saved.getName()).isEqualTo("칠흑의 양날 도끼");
+        assertThat(saved.getTags())
+                .containsExactly("Damage", "Health", "FutureTag");
+        assertThat(saved.hasTag("Health")).isTrue();
     }
 
     @Test
