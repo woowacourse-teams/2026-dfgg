@@ -81,7 +81,7 @@ class ItemSyncServiceTest {
                         "광전사의 군화",
                         List.of("1001"),
                         List.of("3172"),
-                        List.of("Boots", "AttackSpeed"),
+                        List.of("Boots", "AttackSpeed", "FutureTag"),
                         Map.of("11", true),
                         false
                 )
@@ -99,6 +99,8 @@ class ItemSyncServiceTest {
         assertThat(captor.getValue())
                 .extracting(Item::getItemId, Item::getName)
                 .containsExactly(tuple(3006L, "광전사의 군화"));
+        assertThat(captor.getValue().getFirst().getTags())
+                .containsExactly("Boots", "AttackSpeed", "FutureTag");
     }
 
     @Test

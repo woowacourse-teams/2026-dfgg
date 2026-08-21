@@ -6,7 +6,6 @@ import dfgg.infrastructure.external.client.DataDragonClient;
 import dfgg.infrastructure.external.dto.ItemData;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +15,9 @@ import org.springframework.stereotype.Service;
 public class ItemSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(ItemSyncService.class);
+    private static final String BOOTS_TAG = "Boots";
+    private static final String CONSUMABLE_TAG = "Consumable";
+    private static final String TRINKET_TAG = "Trinket";
 
     private final DataDragonClient dataDragonClient;
     private final ItemRepository itemRepository;
@@ -37,8 +39,11 @@ public class ItemSyncService {
                 .map(entry -> {
                     Long itemId = Long.parseLong(entry.getKey());
                     ItemData data = entry.getValue();
-                    return new Item(itemId,
-                            data.name());
+                    return new Item(
+                            itemId,
+                            data.name(),
+                            data.tags()
+                    );
                 }).toList();
 
         itemRepository.saveAll(coreItems);
@@ -53,8 +58,8 @@ public class ItemSyncService {
         if (isStartingItem(data)) {
             return false;
         }
-        // Boots still list an enchant upgrade in `into` even at their finished tier, so they're exempt from this check.
-        if (!hasTag(data, "boots") && hasRemainingUpgrade(data)) {
+        List<String> tags = tagsOf(data);
+        if (!tags.contains(BOOTS_TAG) && hasRemainingUpgrade(data)) {
             return false;
         }
         if (data.depth() != null && data.depth() <= 1) {
@@ -63,7 +68,7 @@ public class ItemSyncService {
         if (Boolean.TRUE.equals(data.consumed())) {
             return false;
         }
-        if (hasTag(data, "consumable") || hasTag(data, "trinket")) {
+        if (tags.contains(CONSUMABLE_TAG) || tags.contains(TRINKET_TAG)) {
             return false;
         }
         return data.maps() == null || !Boolean.FALSE.equals(data.maps().get("11"));
@@ -77,9 +82,10 @@ public class ItemSyncService {
         return data.into() != null && !data.into().isEmpty();
     }
 
-    private boolean hasTag(ItemData data, String tagName) {
-        return data.tags() != null && data.tags().stream()
-                .map(tag -> tag.toLowerCase(Locale.ROOT))
-                .anyMatch(tag -> tag.equals(tagName));
+    private List<String> tagsOf(ItemData data) {
+        if (data.tags() == null) {
+            return List.of();
+        }
+        return data.tags();
     }
 }
