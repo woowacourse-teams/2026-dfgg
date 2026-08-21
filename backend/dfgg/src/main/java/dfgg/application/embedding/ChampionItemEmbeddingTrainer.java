@@ -61,6 +61,7 @@ public class ChampionItemEmbeddingTrainer {
             Random random
     ) {
         List<String> tokens = window.tokens();
+        double weightedLearningRate = config.learningRate() * window.weight();
         for (int i = 0; i < tokens.size(); i++) {
             String target = tokens.get(i);
             for (int j = 0; j < tokens.size(); j++) {
@@ -68,7 +69,7 @@ public class ChampionItemEmbeddingTrainer {
                     continue;
                 }
                 String context = tokens.get(j);
-                updatePair(inputVectors.get(target), outputVectors.get(context), 1.0, config.learningRate());
+                updatePair(inputVectors.get(target), outputVectors.get(context), 1.0, weightedLearningRate);
 
                 Set<String> exclude = Set.of(target, context);
                 for (int k = 0; k < config.negativeSamples(); k++) {
@@ -76,7 +77,7 @@ public class ChampionItemEmbeddingTrainer {
                     if (negative == null) {
                         continue;
                     }
-                    updatePair(inputVectors.get(target), outputVectors.get(negative), 0.0, config.learningRate());
+                    updatePair(inputVectors.get(target), outputVectors.get(negative), 0.0, weightedLearningRate);
                 }
             }
         }

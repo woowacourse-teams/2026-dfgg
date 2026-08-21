@@ -110,6 +110,28 @@ class ChampionItemEmbeddingTrainerTest {
         assertThat(frozenHeartThornmail).isGreaterThan(frozenHeartInfinityEdge);
     }
 
+    @Test
+    @DisplayName("같은 쌍이라도 윈도우 가중치가 높을수록 같은 학습 횟수 안에서 임베딩이 더 가까워진다")
+    void train_WhenWindowWeightIsHigher_SamePairConvergesCloserWithinSameEpochs() {
+        TrainingConfig config = new TrainingConfig(8, 4, 15, 0.05, 42L);
+
+        List<Window> lowWeightWindows = new ArrayList<>();
+        List<Window> highWeightWindows = new ArrayList<>();
+        for (int i = 0; i < 30; i++) {
+            lowWeightWindows.add(new Window(List.of("Ahri", "Thornmail"), 1.0));
+            highWeightWindows.add(new Window(List.of("Ahri", "Thornmail"), 5.0));
+        }
+
+        Map<String, double[]> lowWeightEmbeddings = trainer.train(lowWeightWindows, config);
+        Map<String, double[]> highWeightEmbeddings = trainer.train(highWeightWindows, config);
+
+        double lowWeightSimilarity = cosineSimilarity(
+                lowWeightEmbeddings.get("Ahri"), lowWeightEmbeddings.get("Thornmail"));
+        double highWeightSimilarity = cosineSimilarity(
+                highWeightEmbeddings.get("Ahri"), highWeightEmbeddings.get("Thornmail"));
+        assertThat(highWeightSimilarity).isGreaterThan(lowWeightSimilarity);
+    }
+
     private double cosineSimilarity(double[] a, double[] b) {
         double dot = 0;
         double normA = 0;
