@@ -15,6 +15,7 @@ import {
   subscribeChampSelect,
 } from './lcu';
 import { createGameOverlay } from './overlay';
+import { setupAutoUpdate, stopAutoUpdate } from './updater';
 import type { LcuStatus, Lineup } from './types';
 
 const isDev = !app.isPackaged;
@@ -621,6 +622,9 @@ app.whenReady().then(() => {
   pollTimer = setInterval(() => void refreshSession(), POLL_MS);
   void refreshSession();
 
+  // 두 창 모두에 상태를 보낸다. 메인 창이 닫혀 있어도 오버레이는 살아 있다.
+  setupAutoUpdate(() => [mainWindow, overlayWindow].filter((w): w is BrowserWindow => w !== null));
+
   const registered = globalShortcut.register(TOGGLE_OVERLAY, () => {
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
     setOverlayVisible(!overlayWindow.isVisible());
@@ -641,6 +645,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  stopAutoUpdate();
   unsubscribe?.();
   // 감시용 PowerShell 이 남으면 앱을 꺼도 프로세스가 계속 돈다.
   unwatchClient?.();
