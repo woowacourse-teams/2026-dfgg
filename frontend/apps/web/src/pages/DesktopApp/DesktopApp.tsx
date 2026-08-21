@@ -2,8 +2,12 @@ import StoreSlides from '../../components/StoreSlides';
 
 const MS_STORE_URL = 'https://apps.microsoft.com/detail/9nxl98m7xc82?hl=ko-KR&gl=KR';
 
-const DOWNLOAD_VERSION = 'v1.1.0';
-const DOWNLOAD_URL = `https://github.com/woowacourse-teams/2026-dfgg/releases/download/${DOWNLOAD_VERSION}/dfgg-1.1.0.exe`;
+/**
+ * 최신 릴리스를 항상 가리킨다. 파일 이름에서 버전을 뺐기 때문에(artifactName)
+ * 새 버전을 올려도 이 주소는 그대로다 — 릴리스마다 웹을 다시 배포할 필요가 없다.
+ */
+const DOWNLOAD_URL =
+  'https://github.com/woowacourse-teams/2026-dfgg/releases/latest/download/dfgg-setup.exe';
 
 export default function DesktopApp() {
   return (
@@ -24,14 +28,14 @@ export default function DesktopApp() {
             className='chamfer-sm shrink-0 bg-accent-strong px-5 py-3 font-display text-sm font-bold tracking-[0.12em] text-white uppercase transition-colors hover:bg-accent'
           >
             Windows 다운로드
-            <span className='ml-2 font-body text-[11px] font-normal tracking-normal normal-case opacity-70'>
-              {DOWNLOAD_VERSION}
-            </span>
           </a>
         </div>
 
         <ul className='mt-5 space-y-1.5 text-xs text-ink-3'>
-          <li>설치 과정 없이 내려받은 파일을 두 번 누르면 바로 실행됩니다.</li>
+          <li>
+            내려받은 파일을 두 번 누르면 설치되고 바로 실행됩니다. 이후 새 버전이 나오면 앱이 알아서
+            받아두고, 다시 시작할 때 적용됩니다.
+          </li>
           <li>
             롤이 <strong className='text-ink-2'>전체 화면</strong>이면 오버레이가 게임에 가려집니다.
             롤 설정 → 그래픽 → 창 모드를 <strong className='text-ink-2'>테두리 없음</strong>이나{' '}
