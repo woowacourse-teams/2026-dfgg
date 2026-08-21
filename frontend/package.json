@@ -20,7 +20,8 @@
     "package:renderer": "pnpm build:desktop && pnpm build:electron",
     "package:desktop": "pnpm package:renderer && electron-builder --win nsis",
     "package:store": "pnpm package:renderer && electron-builder --win appx",
-    "package:all": "pnpm package:renderer && electron-builder --win portable appx"
+    "package:all": "pnpm package:renderer && electron-builder --win nsis appx",
+    "package:publish": "pnpm package:renderer && electron-builder --win nsis --publish always"
   },
   "keywords": [],
   "author": {
