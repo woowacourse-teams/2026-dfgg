@@ -1,12 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 
 import Logo from '../assets/icon.png';
+import DesktopAppButton from './DesktopAppButton';
 
 export default function TopBar() {
   const navigate = useNavigate();
 
   return (
-    <header className='flex flex-row items-center justify-between gap-2 m-2 p-2'>
+    <header className='fixed-header flex flex-row items-center justify-between gap-2'>
       <div
         onClick={() => navigate('/')}
         className='flex flex-row items-center justify-center gap-2 cursor-pointer'
@@ -17,13 +18,14 @@ export default function TopBar() {
           <span className='px-1 font-display text-xs font-semibold text-red-300'>Beta</span>
         </div>
       </div>
-      <div>
+      <div className='flex flex-row items-center gap-8'>
         <h2
           onClick={() => navigate('/feedback')}
-          className='font-semibold text-lg font-display cursor-pointer'
+          className='font-semibold text-base font-display cursor-pointer'
         >
           피드백
         </h2>
+        <DesktopAppButton className='px-4 py-2' />
       </div>
     </header>
   );
