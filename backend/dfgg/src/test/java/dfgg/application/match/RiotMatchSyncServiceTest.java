@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -12,8 +11,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import dfgg.application.MatchParticipantCohortPersistenceService;
-import dfgg.domain.player.PlayerCohortRepository;
+import dfgg.domain.player.Player;
+import dfgg.domain.player.PlayerRepository;
 import dfgg.infrastructure.external.client.RiotClient;
+import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -36,7 +37,7 @@ class RiotMatchSyncServiceTest {
     private RawMatchTimelineService rawMatchTimelineService;
 
     @Mock
-    private PlayerCohortRepository playerCohortRepository;
+    private PlayerRepository playerRepository;
 
     @Mock
     private MatchParticipantCohortPersistenceService cohortPersistenceService;
@@ -170,14 +171,14 @@ class RiotMatchSyncServiceTest {
 
     @Test
     void 매치_수집_당시_PUUID와_티어를_매치에_연결한다() {
-        PlayerCohortRepository.Target cohort = mock(PlayerCohortRepository.Target.class);
-        when(cohort.getPuuid()).thenReturn("puuid-1");
-        when(cohort.getQueueType()).thenReturn("RANKED_SOLO_5x5");
-        when(cohort.getTier()).thenReturn("PLATINUM");
-        when(cohort.getDivision()).thenReturn("I");
-        when(playerCohortRepository.findTargetsByPuuidsAndQueueType(
-                List.of("puuid-1"), "RANKED_SOLO_5x5"))
-                .thenReturn(List.of(cohort));
+        Player player = new Player(
+                "puuid-1",
+                "KR",
+                "PLATINUM",
+                "I",
+                Instant.parse("2026-08-22T00:00:00Z")
+        );
+        when(playerRepository.findAllById(List.of("puuid-1"))).thenReturn(List.of(player));
         when(riotClient.getMatchIds("puuid-1", 0, 1)).thenReturn(List.of("KR_1"));
         when(rawMatchService.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());
         when(rawMatchTimelineService.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());

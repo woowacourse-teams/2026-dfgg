@@ -1,6 +1,7 @@
 package dfgg.application;
 
 import dfgg.application.match.RiotMatchSyncService;
+import dfgg.application.player.RiotPlayerSyncService;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
 import java.time.Duration;
 import java.time.Instant;

@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import dfgg.application.match.RiotMatchSyncService;
+import dfgg.application.player.RiotPlayerSyncService;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

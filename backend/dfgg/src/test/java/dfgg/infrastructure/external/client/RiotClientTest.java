@@ -77,6 +77,33 @@ class RiotClientTest {
     }
 
     @Test
+    void PUUID로_리그_엔트리를_조회한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/entries/by-puuid/encrypted-puuid"))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andRespond(withSuccess("""
+                        [{
+                          "puuid": "encrypted-puuid",
+                          "queueType": "RANKED_SOLO_5x5",
+                          "tier": "PLATINUM",
+                          "rank": "I",
+                          "leaguePoints": 50,
+                          "wins": 20,
+                          "losses": 10
+                        }]
+                        """, MediaType.APPLICATION_JSON));
+
+        List<LeagueEntryResponse> entries = client.getLeagueEntriesByPuuid("encrypted-puuid");
+
+        assertThat(entries).singleElement().satisfies(entry -> {
+            assertThat(entry.queueType()).isEqualTo("RANKED_SOLO_5x5");
+            assertThat(entry.tier()).isEqualTo("PLATINUM");
+            assertThat(entry.rank()).isEqualTo("I");
+        });
+        server.verify();
+    }
+
+    @Test
     void 매치_ID_호출이_제한되면_Retry_After_이후에_재시도한다() {
         String requestUrl = REGIONAL_BASE_URL
                 + "/lol/match/v5/matches/by-puuid/encrypted-puuid/ids?queue=420&start=0&count=20";

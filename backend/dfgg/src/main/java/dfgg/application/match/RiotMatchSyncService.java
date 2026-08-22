@@ -1,7 +1,9 @@
 package dfgg.application.match;
 
 import dfgg.application.MatchParticipantCohortPersistenceService;
-import dfgg.domain.player.PlayerCohortRepository;
+import dfgg.domain.match.MatchParticipantCohort;
+import dfgg.domain.player.Player;
+import dfgg.domain.player.PlayerRepository;
 import dfgg.infrastructure.external.client.RiotClient;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -11,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,20 +25,20 @@ public class RiotMatchSyncService {
     private final RiotClient riotClient;
     private final RawMatchService rawMatchService;
     private final RawMatchTimelineService rawMatchTimelineService;
-    private final PlayerCohortRepository playerCohortRepository;
+    private final PlayerRepository playerRepository;
     private final MatchParticipantCohortPersistenceService cohortPersistenceService;
 
     public RiotMatchSyncService(
             RiotClient riotClient,
             RawMatchService rawMatchService,
             RawMatchTimelineService rawMatchTimelineService,
-            PlayerCohortRepository playerCohortRepository,
+            PlayerRepository playerRepository,
             MatchParticipantCohortPersistenceService cohortPersistenceService
     ) {
         this.riotClient = riotClient;
         this.rawMatchService = rawMatchService;
         this.rawMatchTimelineService = rawMatchTimelineService;
-        this.playerCohortRepository = playerCohortRepository;
+        this.playerRepository = playerRepository;
         this.cohortPersistenceService = cohortPersistenceService;
     }
 
@@ -77,7 +78,7 @@ public class RiotMatchSyncService {
                     matchId,
                     existingMatchIds.contains(matchId),
                     existingTimelineIds.contains(matchId),
-                    matchCollection.cohortsByMatchId().getOrDefault(matchId, List.of()),
+                    matchCollection.playersByMatchId().getOrDefault(matchId, List.of()),
                     failures
             );
             newMatches += result.newMatches();
@@ -108,21 +109,12 @@ public class RiotMatchSyncService {
             return MatchCollection.empty();
         }
 
-        List<PlayerCohortRepository.Target> latestCohorts =
-                playerCohortRepository.findTargetsByPuuidsAndQueueType(puuids, QUEUE_TYPE);
-        if (latestCohorts == null) {
-            latestCohorts = List.of();
+        Map<String, Player> playersByPuuid = new HashMap<>();
+        for (Player player : playerRepository.findAllById(puuids)) {
+            playersByPuuid.putIfAbsent(player.getPuuid(), player);
         }
-        Map<String, PlayerCohortRepository.Target> cohortsByPuuid =
-                latestCohorts
-                        .stream()
-                        .collect(Collectors.toMap(
-                                PlayerCohortRepository.Target::getPuuid,
-                                cohort -> cohort,
-                                (first, ignored) -> first
-                        ));
         LinkedHashSet<String> matchIds = new LinkedHashSet<>();
-        Map<String, List<PlayerCohortRepository.Target>> cohortsByMatchId = new HashMap<>();
+        Map<String, List<Player>> playersByMatchId = new HashMap<>();
 
         for (String puuid : puuids) {
             List<String> puuidMatchIds;
@@ -133,18 +125,18 @@ public class RiotMatchSyncService {
                 continue;
             }
             matchIds.addAll(puuidMatchIds);
-            PlayerCohortRepository.Target cohort = cohortsByPuuid.get(puuid);
-            if (cohort == null) {
+            Player player = playersByPuuid.get(puuid);
+            if (player == null) {
                 continue;
             }
             puuidMatchIds.forEach(matchId ->
-                    cohortsByMatchId.computeIfAbsent(matchId, ignored -> new ArrayList<>()).add(cohort)
+                    playersByMatchId.computeIfAbsent(matchId, ignored -> new ArrayList<>()).add(player)
             );
         }
         return new MatchCollection(
                 puuids.size(),
                 matchIds,
-                cohortsByMatchId
+                playersByMatchId
         );
     }
 
@@ -152,7 +144,7 @@ public class RiotMatchSyncService {
             String matchId,
             boolean matchAlreadyPersisted,
             boolean timelineAlreadyPersisted,
-            List<PlayerCohortRepository.Target> cohorts,
+            List<Player> players,
             List<Failure> failures
     ) {
         int newMatches = 0;
@@ -186,25 +178,24 @@ public class RiotMatchSyncService {
             skippedItems++;
         }
         Instant matchCollectedAt = Instant.now();
-        for (PlayerCohortRepository.Target cohort : cohorts) {
+        for (Player player : players) {
+            MatchParticipantCohort matchCohort = new MatchParticipantCohort(
+                    matchId,
+                    player.getPuuid(),
+                    QUEUE_TYPE,
+                    player.getTier(),
+                    player.getDivision(),
+                    matchCollectedAt
+            );
             try {
-                if (!cohortPersistenceService.persist(
-                        new dfgg.domain.match.MatchParticipantCohort(
-                                matchId,
-                                cohort.getPuuid(),
-                                cohort.getQueueType(),
-                                cohort.getTier(),
-                                cohort.getDivision(),
-                                matchCollectedAt
-                        )
-                )) {
+                if (!cohortPersistenceService.persist(matchCohort)) {
                     skippedItems++;
                 }
             } catch (RuntimeException exception) {
                 recordFailure(
                         failures,
                         "MATCH_COHORT",
-                        matchId + "/" + cohort.getPuuid(),
+                        matchId + "/" + player.getPuuid(),
                         exception
                 );
             }
@@ -225,7 +216,7 @@ public class RiotMatchSyncService {
     private record MatchCollection(
             int scannedPlayers,
             LinkedHashSet<String> matchIds,
-            Map<String, List<PlayerCohortRepository.Target>> cohortsByMatchId
+            Map<String, List<Player>> playersByMatchId
     ) {
         private static MatchCollection empty() {
             return new MatchCollection(0, new LinkedHashSet<>(), Map.of());

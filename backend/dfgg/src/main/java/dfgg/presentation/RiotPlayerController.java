@@ -1,6 +1,6 @@
 package dfgg.presentation;
 
-import dfgg.application.RiotPlayerSyncService;
+import dfgg.application.player.RiotPlayerSyncService;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import org.springframework.http.ResponseEntity;
