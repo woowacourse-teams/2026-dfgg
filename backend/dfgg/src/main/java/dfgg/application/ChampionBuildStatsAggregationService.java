@@ -1,10 +1,10 @@
 package dfgg.application;
 
+import dfgg.application.item.ItemService;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.item.Item;
-import dfgg.domain.item.ItemRepository;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.domain.match.NormalizedParticipant;
 import dfgg.domain.stats.ChampionBuildStats;
@@ -31,18 +31,18 @@ public class ChampionBuildStatsAggregationService {
     private final ChampionBuildStatsRepository statsRepository;
     private final CompositionStatsSampleRepository sampleRepository;
     private final ChampionRepository championRepository;
-    private final ItemRepository itemRepository;
+    private final ItemService itemService;
 
     public ChampionBuildStatsAggregationService(
             ChampionBuildStatsRepository statsRepository,
             CompositionStatsSampleRepository sampleRepository,
             ChampionRepository championRepository,
-            ItemRepository itemRepository
+            ItemService itemService
     ) {
         this.statsRepository = statsRepository;
         this.sampleRepository = sampleRepository;
         this.championRepository = championRepository;
-        this.itemRepository = itemRepository;
+        this.itemService = itemService;
     }
 
     @Transactional
@@ -167,7 +167,7 @@ public class ChampionBuildStatsAggregationService {
                 .distinct()
                 .map(Integer::longValue)
                 .toList();
-        return itemRepository.findAllById(itemIds).stream()
+        return itemService.findItemsByIds(itemIds).stream()
                 .collect(Collectors.toMap(Item::getItemId, item -> item));
     }
 

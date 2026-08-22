@@ -1,7 +1,6 @@
 package dfgg.application;
 
-import dfgg.domain.item.Item;
-import dfgg.domain.item.ItemRepository;
+import dfgg.application.item.ItemService;
 import dfgg.domain.match.MatchParticipantCohortRepository;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
@@ -32,7 +31,7 @@ public class ChampionBuildStatsRebuildService {
 
     private final RawMatchRepository rawMatchRepository;
     private final RawMatchTimelineRepository rawMatchTimelineRepository;
-    private final ItemRepository itemRepository;
+    private final ItemService itemService;
     private final ChampionBuildStatsMatchProcessor matchProcessor;
     private final StatsAggregationCompletionRepository completionRepository;
     private final MatchParticipantCohortRepository cohortRepository;
@@ -41,7 +40,7 @@ public class ChampionBuildStatsRebuildService {
     public ChampionBuildStatsRebuildService(
             RawMatchRepository rawMatchRepository,
             RawMatchTimelineRepository rawMatchTimelineRepository,
-            ItemRepository itemRepository,
+            ItemService itemService,
             ChampionBuildStatsMatchProcessor matchProcessor,
             StatsAggregationCompletionRepository completionRepository,
             MatchParticipantCohortRepository cohortRepository,
@@ -52,7 +51,7 @@ public class ChampionBuildStatsRebuildService {
         }
         this.rawMatchRepository = rawMatchRepository;
         this.rawMatchTimelineRepository = rawMatchTimelineRepository;
-        this.itemRepository = itemRepository;
+        this.itemService = itemService;
         this.matchProcessor = matchProcessor;
         this.completionRepository = completionRepository;
         this.cohortRepository = cohortRepository;
@@ -82,7 +81,7 @@ public class ChampionBuildStatsRebuildService {
             return result;
         }
 
-        Set<Integer> coreItemIds = coreItemIds();
+        Set<Integer> coreItemIds = itemService.findCoreItemIds();
         int processedMatches = 0;
         int recordedSamples = 0;
         int skippedMatches = 0;
@@ -197,7 +196,7 @@ public class ChampionBuildStatsRebuildService {
         if (cohortPuuids.isEmpty()) {
             throw new IllegalArgumentException("stats cohort not found: " + matchId + "/" + tier);
         }
-        Set<Integer> coreItemIds = coreItemIds();
+        Set<Integer> coreItemIds = itemService.findCoreItemIds();
         RawMatch rawMatch = rawMatchRepository.findById(matchId)
                 .orElseThrow(() -> new IllegalArgumentException("raw match not found: " + matchId));
         RawMatchTimeline timeline = rawMatchTimelineRepository.findById(matchId)
@@ -254,13 +253,6 @@ public class ChampionBuildStatsRebuildService {
                     .add(target.puuid());
         }
         return grouped;
-    }
-
-    private Set<Integer> coreItemIds() {
-        return itemRepository.findAll().stream()
-                .map(Item::getItemId)
-                .map(Math::toIntExact)
-                .collect(Collectors.toUnmodifiableSet());
     }
 
     private void logSkippedMatches(int skippedMatches) {

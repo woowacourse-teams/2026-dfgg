@@ -2,6 +2,7 @@ package dfgg.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dfgg.application.item.ItemService;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.champion.ChampionTag;
@@ -12,6 +13,7 @@ import dfgg.domain.match.NormalizedParticipant;
 import dfgg.domain.stats.ChampionBuildStats;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.stats.CompositionStatsSampleRepository;
+import dfgg.infrastructure.external.client.DataDragonClient;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -26,13 +28,14 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(ChampionBuildStatsAggregationService.class)
+@Import({ChampionBuildStatsAggregationService.class, ItemService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ChampionBuildStatsAggregationServiceIntegrationTest {
 
@@ -50,6 +53,9 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
 
     @Autowired
     private ItemRepository itemRepository;
+
+    @MockitoBean
+    private DataDragonClient dataDragonClient;
 
     @BeforeEach
     @AfterEach

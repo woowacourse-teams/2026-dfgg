@@ -9,8 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import dfgg.domain.item.Item;
-import dfgg.domain.item.ItemRepository;
+import dfgg.application.item.ItemService;
 import dfgg.domain.match.MatchParticipantCohortRepository;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
@@ -38,7 +37,7 @@ class ChampionBuildStatsRebuildServiceTest {
     private RawMatchTimelineRepository rawMatchTimelineRepository;
 
     @Mock
-    private ItemRepository itemRepository;
+    private ItemService itemService;
 
     @Mock
     private ChampionBuildStatsMatchProcessor matchProcessor;
@@ -56,7 +55,7 @@ class ChampionBuildStatsRebuildServiceTest {
         rebuildService = new ChampionBuildStatsRebuildService(
                 rawMatchRepository,
                 rawMatchTimelineRepository,
-                itemRepository,
+                itemService,
                 matchProcessor,
                 completionRepository,
                 cohortRepository,
@@ -70,7 +69,7 @@ class ChampionBuildStatsRebuildServiceTest {
 
         assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
         verify(completionRepository).countPendingMatches("RANKED_SOLO_5x5", "PLATINUM", "v1");
-        verifyNoInteractions(rawMatchRepository, rawMatchTimelineRepository, itemRepository, matchProcessor);
+        verifyNoInteractions(rawMatchRepository, rawMatchTimelineRepository, itemService, matchProcessor);
     }
 
     @Test
@@ -80,7 +79,7 @@ class ChampionBuildStatsRebuildServiceTest {
         when(cohortRepository.findPuuidsByMatchIdAndQueueTypeAndTier(
                 "KR_1", "RANKED_SOLO_5x5", "PLATINUM"
         )).thenReturn(List.of("p-1"));
-        when(itemRepository.findAll()).thenReturn(List.of(new Item(3071L, "아이템 A")));
+        when(itemService.findCoreItemIds()).thenReturn(Set.of(3071));
         when(rawMatchRepository.findById("KR_1")).thenReturn(Optional.of(rawMatch));
         when(rawMatchTimelineRepository.findById("KR_1")).thenReturn(Optional.of(timeline));
         when(matchProcessor.replay(
@@ -115,7 +114,7 @@ class ChampionBuildStatsRebuildServiceTest {
         when(completionRepository.findPendingTargetsAfter(
                 "RANKED_SOLO_5x5", "PLATINUM", "v1", "", "", 100
         )).thenReturn(List.of(target("KR_1", "p-1")));
-        when(itemRepository.findAll()).thenReturn(List.of());
+        when(itemService.findCoreItemIds()).thenReturn(Set.of());
         when(rawMatchRepository.findById("KR_1")).thenReturn(Optional.of(rawMatch));
         when(rawMatchTimelineRepository.findById("KR_1")).thenReturn(Optional.empty());
 
@@ -144,7 +143,7 @@ class ChampionBuildStatsRebuildServiceTest {
                 target("KR_FAILED", "p-failed"),
                 target("KR_SUCCEEDED", "p-succeeded")
         ));
-        when(itemRepository.findAll()).thenReturn(List.of());
+        when(itemService.findCoreItemIds()).thenReturn(Set.of());
         when(rawMatchRepository.findById("KR_FAILED")).thenReturn(Optional.of(failedMatch));
         when(rawMatchRepository.findById("KR_SUCCEEDED")).thenReturn(Optional.of(succeededMatch));
         when(rawMatchTimelineRepository.findById("KR_FAILED")).thenReturn(Optional.of(failedTimeline));

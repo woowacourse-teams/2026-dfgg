@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
+import dfgg.application.item.ItemService;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionRepository;
@@ -28,6 +29,7 @@ import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.stats.CompositionStatsSample;
 import dfgg.domain.stats.CompositionStatsSampleRepository;
 import dfgg.domain.stats.StatsAggregationCompletionRepository;
+import dfgg.infrastructure.external.client.DataDragonClient;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -45,6 +47,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -59,6 +62,7 @@ import org.springframework.transaction.support.TransactionTemplate;
         ChampionBuildStatsRebuildService.class,
         ChampionBuildStatsMatchProcessor.class,
         ChampionBuildStatsAggregationService.class,
+        ItemService.class,
         NormalizedMatchPersistenceService.class,
         MatchNormalizer.class,
         CoreItemPurchaseOrderCalculator.class
@@ -80,6 +84,9 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
 
     @Autowired
     private ItemRepository itemRepository;
+
+    @MockitoBean
+    private DataDragonClient dataDragonClient;
 
     @Autowired
     private MatchParticipantCohortRepository cohortRepository;

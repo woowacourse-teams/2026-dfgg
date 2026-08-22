@@ -1,20 +1,19 @@
-package dfgg.application;
+package dfgg.application.item;
 
 import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
 import dfgg.infrastructure.external.client.DataDragonClient;
 import dfgg.infrastructure.external.dto.ItemData;
 import dfgg.infrastructure.external.dto.ItemResponse;
+import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 @Service
-public class ItemSyncService {
+public class ItemService {
 
-    private static final Logger log = LoggerFactory.getLogger(ItemSyncService.class);
     private static final String BOOTS_TAG = "Boots";
     private static final String CONSUMABLE_TAG = "Consumable";
     private static final String TRINKET_TAG = "Trinket";
@@ -22,16 +21,13 @@ public class ItemSyncService {
     private final DataDragonClient dataDragonClient;
     private final ItemRepository itemRepository;
 
-    public ItemSyncService(DataDragonClient dataDragonClient, ItemRepository itemRepository) {
+    public ItemService(DataDragonClient dataDragonClient, ItemRepository itemRepository) {
         this.dataDragonClient = dataDragonClient;
         this.itemRepository = itemRepository;
     }
 
-    public void syncCoreItem() {
-        long startedAtNanos = System.nanoTime();
-        log.info("Core item metadata sync started");
+    public void syncCoreItems() {
         ItemResponse response = dataDragonClient.getItems();
-
         List<Item> coreItems = response.data()
                 .entrySet()
                 .stream()
@@ -47,11 +43,17 @@ public class ItemSyncService {
                 }).toList();
 
         itemRepository.saveAll(coreItems);
-        log.info(
-                "Core item metadata sync completed: savedItems={}, durationMs={}",
-                coreItems.size(),
-                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos)
-        );
+    }
+
+    public List<Item> findItemsByIds(Collection<Long> itemIds) {
+        return itemRepository.findAllById(itemIds);
+    }
+
+    public Set<Integer> findCoreItemIds() {
+        return itemRepository.findAll().stream()
+                .map(Item::getItemId)
+                .map(Math::toIntExact)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private boolean isCoreItem(ItemData data) {

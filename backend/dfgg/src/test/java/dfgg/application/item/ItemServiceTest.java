@@ -1,4 +1,4 @@
-package dfgg.application;
+package dfgg.application.item;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -14,6 +14,7 @@ import dfgg.infrastructure.external.dto.ItemData;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class ItemSyncServiceTest {
+class ItemServiceTest {
 
     @Mock
     private DataDragonClient dataDragonClient;
@@ -32,7 +33,7 @@ class ItemSyncServiceTest {
     private ItemRepository itemRepository;
 
     @InjectMocks
-    private ItemSyncService itemSyncService;
+    private ItemService itemService;
 
     @Test
     void 상위_아이템이_없는_최종_아이템만_저장한다() {
@@ -57,7 +58,7 @@ class ItemSyncServiceTest {
         when(dataDragonClient.getItems()).thenReturn(response);
 
         // when
-        itemSyncService.syncCoreItem();
+        itemService.syncCoreItems();
 
         // then
         @SuppressWarnings("unchecked")
@@ -74,7 +75,7 @@ class ItemSyncServiceTest {
 
     @Test
     @DisplayName("신발은 마법 부여 업그레이드 경로가 남아있어도 코어 아이템으로 저장한다")
-    void syncCoreItem_WhenBootsHaveEnchantUpgradePath_TreatAsCoreItem() {
+    void syncCoreItems_WhenBootsHaveEnchantUpgradePath_TreatAsCoreItem() {
         // given
         ItemResponse response = new ItemResponse(Map.of(
                 "3006", new ItemData(
@@ -89,7 +90,7 @@ class ItemSyncServiceTest {
         when(dataDragonClient.getItems()).thenReturn(response);
 
         // when
-        itemSyncService.syncCoreItem();
+        itemService.syncCoreItems();
 
         // then
         @SuppressWarnings("unchecked")
@@ -105,7 +106,7 @@ class ItemSyncServiceTest {
 
     @Test
     @DisplayName("컴포넌트(from)가 없는 시작 아이템은 업그레이드 경로가 없어도 코어 아이템으로 저장하지 않는다")
-    void syncCoreItem_WhenItemHasNoFromComponents_ExcludeAsStartingItem() {
+    void syncCoreItems_WhenItemHasNoFromComponents_ExcludeAsStartingItem() {
         // given
         ItemResponse response = new ItemResponse(Map.of(
                 "1055", new ItemData(
@@ -115,7 +116,7 @@ class ItemSyncServiceTest {
         when(dataDragonClient.getItems()).thenReturn(response);
 
         // when
-        itemSyncService.syncCoreItem();
+        itemService.syncCoreItems();
 
         // then
         @SuppressWarnings("unchecked")
@@ -127,7 +128,7 @@ class ItemSyncServiceTest {
 
     @Test
     @DisplayName("컴포넌트(from)가 없는 기본 장화는 신발이어도 코어 아이템으로 저장하지 않는다")
-    void syncCoreItem_WhenBaseBootsHaveNoFromComponents_ExcludeAsStartingItem() {
+    void syncCoreItems_WhenBaseBootsHaveNoFromComponents_ExcludeAsStartingItem() {
         // given
         ItemResponse response = new ItemResponse(Map.of(
                 "1001", new ItemData(
@@ -137,7 +138,7 @@ class ItemSyncServiceTest {
         when(dataDragonClient.getItems()).thenReturn(response);
 
         // when
-        itemSyncService.syncCoreItem();
+        itemService.syncCoreItems();
 
         // then
         @SuppressWarnings("unchecked")
@@ -154,7 +155,7 @@ class ItemSyncServiceTest {
         when(dataDragonClient.getItems()).thenThrow(exception);
 
         // when & then
-        assertThatThrownBy(itemSyncService::syncCoreItem)
+        assertThatThrownBy(itemService::syncCoreItems)
                 .isSameAs(exception);
         verifyNoInteractions(itemRepository);
     }
@@ -168,8 +169,40 @@ class ItemSyncServiceTest {
         when(dataDragonClient.getItems()).thenReturn(response);
 
         // when & then
-        assertThatThrownBy(itemSyncService::syncCoreItem)
+        assertThatThrownBy(itemService::syncCoreItems)
                 .isInstanceOf(NumberFormatException.class);
         verifyNoInteractions(itemRepository);
+    }
+
+    @Test
+    void ID로_아이템을_조회한다() {
+        // given
+        List<Long> itemIds = List.of(3071L, 6610L);
+        List<Item> items = List.of(
+                new Item(3071L, "아이템 A"),
+                new Item(6610L, "아이템 B")
+        );
+        when(itemRepository.findAllById(itemIds)).thenReturn(items);
+
+        // when
+        List<Item> foundItems = itemService.findItemsByIds(itemIds);
+
+        // then
+        assertThat(foundItems).containsExactlyElementsOf(items);
+    }
+
+    @Test
+    void 코어_아이템_ID를_조회한다() {
+        // given
+        when(itemRepository.findAll()).thenReturn(List.of(
+                new Item(3071L, "아이템 A"),
+                new Item(6610L, "아이템 B")
+        ));
+
+        // when
+        Set<Integer> coreItemIds = itemService.findCoreItemIds();
+
+        // then
+        assertThat(coreItemIds).containsExactlyInAnyOrder(3071, 6610);
     }
 }

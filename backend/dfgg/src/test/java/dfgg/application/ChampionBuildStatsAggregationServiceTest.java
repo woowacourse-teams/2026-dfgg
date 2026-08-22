@@ -10,11 +10,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import dfgg.application.item.ItemService;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
-import dfgg.domain.item.ItemRepository;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.domain.match.NormalizedParticipant;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
@@ -42,7 +42,7 @@ class ChampionBuildStatsAggregationServiceTest {
     private ChampionRepository championRepository;
 
     @Mock
-    private ItemRepository itemRepository;
+    private ItemService itemService;
 
     @InjectMocks
     private ChampionBuildStatsAggregationService aggregationService;
@@ -53,7 +53,7 @@ class ChampionBuildStatsAggregationServiceTest {
         Champion ally = champion(2L, "MARKSMAN");
         Champion enemy = champion(3L, "TANK");
         when(championRepository.findAllById(any())).thenReturn(List.of(focal, ally, enemy));
-        when(itemRepository.findAllById(any())).thenReturn(List.of(
+        when(itemService.findItemsByIds(any())).thenReturn(List.of(
                 new Item(3071L, "아이템 A"),
                 new Item(6610L, "아이템 B")
         ));
@@ -133,7 +133,7 @@ class ChampionBuildStatsAggregationServiceTest {
         Champion ally = champion(2L, "MARKSMAN");
         Champion enemy = champion(3L, "TANK");
         when(championRepository.findAllById(any())).thenReturn(List.of(focal, ally, enemy));
-        when(itemRepository.findAllById(any())).thenReturn(List.of(
+        when(itemService.findItemsByIds(any())).thenReturn(List.of(
                 new Item(3071L, "아이템 A"),
                 new Item(6610L, "아이템 B")
         ));
