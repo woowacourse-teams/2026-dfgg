@@ -47,6 +47,21 @@ class ItemRepositoryTest {
     }
 
     @Test
+    void 아이템을_태그와_함께_저장하고_조회한다() {
+        // given
+        Item item = new Item(3071L, "칠흑의 양날 도끼", List.of("Damage", "ArmorPenetration"));
+
+        // when
+        itemRepository.save(item);
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        Item saved = itemRepository.findById(3071L).orElseThrow();
+        assertThat(saved.getTags()).containsExactlyInAnyOrder("Damage", "ArmorPenetration");
+    }
+
+    @Test
     void 같은_ID의_아이템을_다시_저장하면_기존_데이터를_갱신한다() {
         // given
         itemRepository.save(new Item(3071L, "이전 이름"));

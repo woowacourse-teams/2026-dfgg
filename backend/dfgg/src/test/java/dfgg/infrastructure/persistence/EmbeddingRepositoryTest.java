@@ -15,6 +15,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -48,16 +49,9 @@ class EmbeddingRepositoryTest {
     }
 
     @Test
+    @Sql("/sql/embedding-repository-test-data.sql")
     void entityType으로_구분해_조회한다() {
-        // given
-        embeddingRepository.save(new Embedding(
-                EmbeddingEntityType.CHAMPION, 266L, "v1", List.of(0.1, 0.2), LocalDateTime.now()
-        ));
-        embeddingRepository.save(new Embedding(
-                EmbeddingEntityType.ITEM, 3071L, "v1", List.of(0.3, 0.4), LocalDateTime.now()
-        ));
-        entityManager.flush();
-        entityManager.clear();
+        // given: data.sql이 CHAMPION 임베딩 1건, ITEM 임베딩 1건을 미리 적재해둔다
 
         // when
         List<Embedding> championEmbeddings = embeddingRepository.findByEntityType(EmbeddingEntityType.CHAMPION);

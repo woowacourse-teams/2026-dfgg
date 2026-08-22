@@ -22,6 +22,7 @@ class ChampionItemEmbeddingTrainerTest {
     @Test
     @DisplayName("같은 윈도우에 자주 함께 등장한 챔피언끼리 임베딩 공간에서 더 가깝다")
     void train_WhenChampionsFrequentlyCoOccurInWindows_EmbeddingsAreCloser() {
+        // given
         List<Window> windows = new ArrayList<>();
         for (int i = 0; i < 30; i++) {
             windows.add(new Window(List.of("Ahri", "Zed", "Leona", "Jinx", "Nautilus")));
@@ -29,8 +30,10 @@ class ChampionItemEmbeddingTrainerTest {
         }
         TrainingConfig config = new TrainingConfig(8, 4, 60, 0.05, 42L);
 
+        // when
         Map<String, double[]> embeddings = trainer.train(windows, config);
 
+        // then
         double ahriZed = cosineSimilarity(embeddings.get("Ahri"), embeddings.get("Zed"));
         double ahriGaren = cosineSimilarity(embeddings.get("Ahri"), embeddings.get("Garen"));
         assertThat(ahriZed).isGreaterThan(ahriGaren);
@@ -39,6 +42,7 @@ class ChampionItemEmbeddingTrainerTest {
     @Test
     @DisplayName("참가자-빌드 문맥으로 학습하면 챔피언과 그 챔피언이 자주 산 아이템이 임베딩 공간에서 더 가깝다")
     void train_WhenChampionFrequentlyBuysItem_ChampionAndItemEmbeddingsAreCloser() {
+        // given
         List<Window> windows = new ArrayList<>();
         for (int i = 0; i < 30; i++) {
             windows.add(windowFactory.createParticipantBuildWindow(
@@ -50,8 +54,10 @@ class ChampionItemEmbeddingTrainerTest {
         }
         TrainingConfig config = new TrainingConfig(8, 4, 60, 0.05, 42L);
 
+        // when
         Map<String, double[]> embeddings = trainer.train(windows, config);
 
+        // then
         double ahriRabadons = cosineSimilarity(embeddings.get("Ahri"), embeddings.get("RabadonsDeathcap"));
         double ahriThornmail = cosineSimilarity(embeddings.get("Ahri"), embeddings.get("Thornmail"));
         assertThat(ahriRabadons).isGreaterThan(ahriThornmail);
@@ -60,6 +66,7 @@ class ChampionItemEmbeddingTrainerTest {
     @Test
     @DisplayName("카운터 문맥으로 학습하면 적 챔피언과 그 적을 상대로 자주 구매된 아이템이, 그 적을 상대로 산 적 없는 아이템보다 임베딩 공간에서 더 가깝다")
     void train_WhenItemFrequentlyBoughtAgainstEnemy_EnemyAndItemEmbeddingsAreCloser() {
+        // given
         List<Window> windows = new ArrayList<>();
         for (int i = 0; i < 30; i++) {
             windows.add(windowFactory.createCounterContextWindow(
@@ -79,8 +86,10 @@ class ChampionItemEmbeddingTrainerTest {
         }
         TrainingConfig config = new TrainingConfig(8, 4, 60, 0.05, 42L);
 
+        // when
         Map<String, double[]> embeddings = trainer.train(windows, config);
 
+        // then
         double ezrealFrozenHeart = cosineSimilarity(embeddings.get("Ezreal"), embeddings.get("FrozenHeart"));
         double yasuoFrozenHeart = cosineSimilarity(embeddings.get("Yasuo"), embeddings.get("FrozenHeart"));
         assertThat(ezrealFrozenHeart).isGreaterThan(yasuoFrozenHeart);
@@ -89,6 +98,7 @@ class ChampionItemEmbeddingTrainerTest {
     @Test
     @DisplayName("콘텐츠 문맥으로 학습하면 같은 Data Dragon 태그를 공유하는 아이템끼리 임베딩 공간에서 더 가깝다")
     void train_WhenItemsShareTags_ItemEmbeddingsAreCloser() {
+        // given
         List<Window> windows = new ArrayList<>();
         for (int i = 0; i < 30; i++) {
             windows.add(windowFactory.createContentContextWindow(
@@ -103,8 +113,10 @@ class ChampionItemEmbeddingTrainerTest {
         }
         TrainingConfig config = new TrainingConfig(8, 4, 60, 0.05, 42L);
 
+        // when
         Map<String, double[]> embeddings = trainer.train(windows, config);
 
+        // then
         double frozenHeartThornmail = cosineSimilarity(embeddings.get("FrozenHeart"), embeddings.get("Thornmail"));
         double frozenHeartInfinityEdge = cosineSimilarity(embeddings.get("FrozenHeart"), embeddings.get("InfinityEdge"));
         assertThat(frozenHeartThornmail).isGreaterThan(frozenHeartInfinityEdge);
@@ -113,6 +125,7 @@ class ChampionItemEmbeddingTrainerTest {
     @Test
     @DisplayName("같은 쌍이라도 윈도우 가중치가 높을수록 같은 학습 횟수 안에서 임베딩이 더 가까워진다")
     void train_WhenWindowWeightIsHigher_SamePairConvergesCloserWithinSameEpochs() {
+        // given
         TrainingConfig config = new TrainingConfig(8, 4, 15, 0.05, 42L);
 
         List<Window> lowWeightWindows = new ArrayList<>();
@@ -122,9 +135,11 @@ class ChampionItemEmbeddingTrainerTest {
             highWeightWindows.add(new Window(List.of("Ahri", "Thornmail"), 5.0));
         }
 
+        // when
         Map<String, double[]> lowWeightEmbeddings = trainer.train(lowWeightWindows, config);
         Map<String, double[]> highWeightEmbeddings = trainer.train(highWeightWindows, config);
 
+        // then
         double lowWeightSimilarity = cosineSimilarity(
                 lowWeightEmbeddings.get("Ahri"), lowWeightEmbeddings.get("Thornmail"));
         double highWeightSimilarity = cosineSimilarity(
