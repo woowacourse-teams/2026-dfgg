@@ -1,5 +1,6 @@
 package dfgg.application;
 
+import dfgg.application.champion.ChampionService;
 import dfgg.common.CompositionStatsNotFoundException;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.stats.CombinationContext;
@@ -20,29 +21,29 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class RecommendationService {
 
-    private final ChampionNameNormalizer championNameNormalizer;
+    private final ChampionService championService;
     private final ChampionBuildStatsRepository statsRepository;
     private final RecommendationBuildComposer buildComposer;
 
     public RecommendationService(
-            ChampionNameNormalizer championNameNormalizer,
+            ChampionService championService,
             ChampionBuildStatsRepository statsRepository,
             RecommendationBuildComposer buildComposer
     ) {
-        this.championNameNormalizer = championNameNormalizer;
+        this.championService = championService;
         this.statsRepository = statsRepository;
         this.buildComposer = buildComposer;
     }
 
     public RecommendationResponse recommend(RecommendationRequest request) {
-        Champion myChampion = championNameNormalizer.normalize(request.myChampion().name());
+        Champion myChampion = championService.findChampionByName(request.myChampion().name());
         ChampionPosition position = ChampionPosition.valueOf(request.myChampion().position());
 
         Team allies = new Team(request.allies().stream()
-                .map(info -> championNameNormalizer.normalize(info.name()))
+                .map(info -> championService.findChampionByName(info.name()))
                 .toList());
         Team enemies = new Team(request.enemies().stream()
-                .map(info -> championNameNormalizer.normalize(info.name()))
+                .map(info -> championService.findChampionByName(info.name()))
                 .toList());
 
         CombinationContext combinationContext = CombinationContext.analyze(enemies, allies);

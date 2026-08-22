@@ -1,4 +1,4 @@
-package dfgg.application;
+package dfgg.application.champion;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import dfgg.common.ChampionNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.champion.ChampionTag;
@@ -14,6 +15,7 @@ import dfgg.infrastructure.external.dto.ChampionData;
 import dfgg.infrastructure.external.dto.ChampionResponse;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -22,7 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class ChampionSyncServiceTest {
+class ChampionServiceTest {
 
     @Mock
     private DataDragonClient dataDragonClient;
@@ -31,7 +33,7 @@ class ChampionSyncServiceTest {
     private ChampionRepository championRepository;
 
     @InjectMocks
-    private ChampionSyncService championSyncService;
+    private ChampionService championService;
 
     @Test
     void 데이터_드래곤_응답을_챔피언으로_변환해_저장한다() {
@@ -46,7 +48,7 @@ class ChampionSyncServiceTest {
         when(dataDragonClient.getChampions()).thenReturn(response);
 
         // when
-        championSyncService.syncChampions();
+        championService.syncChampions();
 
         // then
         @SuppressWarnings("unchecked")
@@ -69,7 +71,7 @@ class ChampionSyncServiceTest {
         when(dataDragonClient.getChampions()).thenThrow(exception);
 
         // when & then
-        assertThatThrownBy(championSyncService::syncChampions)
+        assertThatThrownBy(championService::syncChampions)
                 .isSameAs(exception);
         verifyNoInteractions(championRepository);
     }
@@ -87,8 +89,43 @@ class ChampionSyncServiceTest {
         when(dataDragonClient.getChampions()).thenReturn(response);
 
         // when & then
-        assertThatThrownBy(championSyncService::syncChampions)
+        assertThatThrownBy(championService::syncChampions)
                 .isInstanceOf(NumberFormatException.class);
         verifyNoInteractions(championRepository);
+    }
+
+    @Test
+    void 라이엇_키로_챔피언을_찾는다() {
+        // given
+        Champion champion = new Champion(266L, "Aatrox", "아트록스", List.of(ChampionTag.FIGHTER));
+        when(championRepository.findByRiotKeyIgnoreCase("Aatrox"))
+                .thenReturn(Optional.of(champion));
+
+        // when
+        Champion foundChampion = championService.findChampionByName("  Aatrox  ");
+
+        // then
+        assertThat(foundChampion).isSameAs(champion);
+    }
+
+    @Test
+    void 챔피언_이름이_비어_있으면_예외가_발생한다() {
+        assertThatThrownBy(() -> championService.findChampionByName(" "))
+                .isInstanceOf(ChampionNotFoundException.class)
+                .hasMessageContaining("빈 이름");
+
+        verifyNoInteractions(championRepository, dataDragonClient);
+    }
+
+    @Test
+    void 챔피언을_찾을_수_없으면_예외가_발생한다() {
+        // given
+        when(championRepository.findByRiotKeyIgnoreCase("Unknown"))
+                .thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> championService.findChampionByName("Unknown"))
+                .isInstanceOf(ChampionNotFoundException.class)
+                .hasMessageContaining("Unknown");
     }
 }

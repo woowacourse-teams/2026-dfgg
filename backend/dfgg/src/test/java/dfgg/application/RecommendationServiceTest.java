@@ -1,5 +1,6 @@
 package dfgg.application;
 
+import dfgg.application.champion.ChampionService;
 import dfgg.common.CompositionStatsNotFoundException;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.champion.Champion;
@@ -31,7 +32,7 @@ class RecommendationServiceTest {
     private RecommendationService recommendationService;
 
     @Mock
-    private ChampionNameNormalizer championNameNormalizer;
+    private ChampionService championService;
 
     @Mock
     private ChampionBuildStatsRepository statsRepository;
@@ -40,7 +41,7 @@ class RecommendationServiceTest {
 
     @BeforeEach
     void setUp() {
-        recommendationService = new RecommendationService(championNameNormalizer, statsRepository, buildComposer);
+        recommendationService = new RecommendationService(championService, statsRepository, buildComposer);
     }
 
     @Test
@@ -63,9 +64,9 @@ class RecommendationServiceTest {
         Champion caitlyn = mock(Champion.class);
         when(caitlyn.getChampionTags()).thenReturn(List.of(ChampionTag.MARKSMAN));
 
-        when(championNameNormalizer.normalize("징크스")).thenReturn(myChampion);
-        when(championNameNormalizer.normalize("쓰레쉬")).thenReturn(thresh);
-        when(championNameNormalizer.normalize("케이틀린")).thenReturn(caitlyn);
+        when(championService.findChampionByName("징크스")).thenReturn(myChampion);
+        when(championService.findChampionByName("쓰레쉬")).thenReturn(thresh);
+        when(championService.findChampionByName("케이틀린")).thenReturn(caitlyn);
 
         Item item1 = new Item(1L, "아이템1");
         Item item2 = new Item(2L, "아이템2");
@@ -110,7 +111,7 @@ class RecommendationServiceTest {
         when(myChampion.getChampionId()).thenReturn(1L);
         when(myChampion.getName()).thenReturn("징크스");
 
-        when(championNameNormalizer.normalize(anyString())).thenReturn(myChampion);
+        when(championService.findChampionByName(anyString())).thenReturn(myChampion);
 
         when(statsRepository.findAllMatchingStats(
                 anyLong(), anyString(),
