@@ -33,9 +33,9 @@ public class SequentialPatternMiningBatchService {
     }
 
     @Transactional(readOnly = true)
-    public Map<MiningScope, List<SequentialPattern>> mineFromMatchData(int minSupport) {
+    public Map<MiningScope, List<SequentialPattern>> mineFromMatchData(String queueType, int minSupport) {
         List<NormalizedMatchParticipant> participants = participantRepository.findAll();
-        Map<String, String> tierByMatchAndPuuid = tierByMatchAndPuuid(participants);
+        Map<String, String> tierByMatchAndPuuid = tierByMatchAndPuuid(participants, queueType);
 
         Map<MiningScope, List<List<Long>>> sequencesByScope = new LinkedHashMap<>();
         for (NormalizedMatchParticipant participant : participants) {
@@ -62,18 +62,17 @@ public class SequentialPatternMiningBatchService {
         return patternsByScope;
     }
 
-    private Map<String, String> tierByMatchAndPuuid(List<NormalizedMatchParticipant> participants) {
+    private Map<String, String> tierByMatchAndPuuid(List<NormalizedMatchParticipant> participants, String queueType) {
         Set<String> matchIds = participants.stream()
                 .map(NormalizedMatchParticipant::getMatchId)
                 .collect(Collectors.toSet());
         if (matchIds.isEmpty()) {
             return Map.of();
         }
-        return cohortRepository.findByMatchIdIn(matchIds).stream()
+        return cohortRepository.findByMatchIdInAndQueueType(matchIds, queueType).stream()
                 .collect(Collectors.toMap(
                         cohort -> cohortLookupKey(cohort.getMatchId(), cohort.getPuuid()),
-                        MatchParticipantCohort::getTier,
-                        (first, second) -> first
+                        MatchParticipantCohort::getTier
                 ));
     }
 

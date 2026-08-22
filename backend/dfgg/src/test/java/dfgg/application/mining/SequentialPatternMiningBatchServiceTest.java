@@ -53,7 +53,8 @@ class SequentialPatternMiningBatchServiceTest {
         }
 
         // when
-        Map<MiningScope, List<SequentialPattern>> patternsByScope = miningBatchService.mineFromMatchData(5);
+        Map<MiningScope, List<SequentialPattern>> patternsByScope =
+                miningBatchService.mineFromMatchData("RANKED_SOLO_5x5", 5);
 
         // then
         MiningScope goldTopScope = new MiningScope(1L, "TOP", "GOLD", "14.1");
@@ -83,10 +84,43 @@ class SequentialPatternMiningBatchServiceTest {
         )));
 
         // when
-        Map<MiningScope, List<SequentialPattern>> patternsByScope = miningBatchService.mineFromMatchData(1);
+        Map<MiningScope, List<SequentialPattern>> patternsByScope =
+                miningBatchService.mineFromMatchData("RANKED_SOLO_5x5", 1);
 
         // then
         assertThat(patternsByScope).isEmpty();
+    }
+
+    @Test
+    void 같은_매치와_puuid라도_요청한_큐_타입의_코호트만_사용해_티어를_판단한다() {
+        // given
+        NormalizedMatch match = new NormalizedMatch("KR_MULTI_QUEUE", "14.1", 420, List.of());
+        String puuid = "puuid-multi-queue";
+        participantRepository.save(new NormalizedMatchParticipant(match, new NormalizedParticipant(
+                puuid,
+                1,
+                1,
+                100,
+                "TOP",
+                true,
+                List.of(3071, 6653),
+                List.of(3071, 6653),
+                true
+        )));
+        cohortRepository.save(new MatchParticipantCohort(
+                "KR_MULTI_QUEUE", puuid, "RANKED_SOLO_5x5", "GOLD", "II", Instant.now()
+        ));
+        cohortRepository.save(new MatchParticipantCohort(
+                "KR_MULTI_QUEUE", puuid, "RANKED_FLEX_SR", "PLATINUM", "IV", Instant.now()
+        ));
+
+        // when
+        Map<MiningScope, List<SequentialPattern>> patternsByScope =
+                miningBatchService.mineFromMatchData("RANKED_SOLO_5x5", 1);
+
+        // then
+        assertThat(patternsByScope).containsKey(new MiningScope(1L, "TOP", "GOLD", "14.1"));
+        assertThat(patternsByScope).doesNotContainKey(new MiningScope(1L, "TOP", "PLATINUM", "14.1"));
     }
 
     private void seedParticipantWithCohort(String matchId, String tier) {
