@@ -1,4 +1,4 @@
-package dfgg.application;
+package dfgg.application.feedback;
 
 import dfgg.domain.feedback.Feedback;
 import dfgg.domain.feedback.FeedbackRepository;
@@ -15,8 +15,8 @@ public class FeedbackService {
     }
 
     public FeedbackResponse save(FeedbackRequest request) {
-        Feedback feedback = new Feedback(null, request.date(), request.content());
-        feedbackRepository.save(feedback);
-        return new FeedbackResponse(request.date(), request.content());
+        Feedback feedback = Feedback.create(request.date(), request.content());
+        Feedback saveFeedback = feedbackRepository.save(feedback);
+        return FeedbackResponse.from(saveFeedback);
     }
 }
