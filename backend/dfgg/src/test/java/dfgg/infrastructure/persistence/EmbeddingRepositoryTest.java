@@ -9,6 +9,7 @@ import dfgg.domain.embedding.EmbeddingRepository;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -59,6 +60,23 @@ class EmbeddingRepositoryTest {
         // then
         assertThat(championEmbeddings).hasSize(1);
         assertThat(championEmbeddings.get(0).getEntityId()).isEqualTo(266L);
+    }
+
+    @Test
+    @DisplayName("algorithmVersion이 일치하는 임베딩만 삭제한다")
+    @Sql("/sql/embedding-repository-test-data.sql")
+    void deleteByAlgorithmVersion_WhenVersionMatches_DeletesOnlyThatVersion() {
+        // given: data.sql이 v1 임베딩 2건, v2 임베딩 1건을 적재해둔다
+
+        // when
+        embeddingRepository.deleteByAlgorithmVersion("v1");
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        List<Embedding> remaining = embeddingRepository.findAll();
+        assertThat(remaining).hasSize(1);
+        assertThat(remaining.get(0).getAlgorithmVersion()).isEqualTo("v2");
     }
 
     @Test

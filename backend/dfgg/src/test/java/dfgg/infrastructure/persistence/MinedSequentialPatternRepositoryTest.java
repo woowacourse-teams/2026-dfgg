@@ -7,11 +7,13 @@ import dfgg.domain.sequence.MinedSequentialPattern;
 import dfgg.domain.sequence.MinedSequentialPatternRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -56,5 +58,22 @@ class MinedSequentialPatternRepositoryTest {
         assertThat(found.getScopeTotalCount()).isEqualTo(100);
         assertThat(found.getWinCount()).isEqualTo(25);
         assertThat(found.getAlgorithmVersion()).isEqualTo("v1");
+    }
+
+    @Test
+    @DisplayName("algorithmVersion이 일치하는 패턴만 삭제한다")
+    @Sql("/sql/mined-sequential-pattern-repository-test-data.sql")
+    void deleteByAlgorithmVersion_WhenVersionMatches_DeletesOnlyThatVersion() {
+        // given: data.sql이 v1 패턴 2건, v2 패턴 1건을 적재해둔다
+
+        // when
+        minedSequentialPatternRepository.deleteByAlgorithmVersion("v1");
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        List<MinedSequentialPattern> remaining = minedSequentialPatternRepository.findAll();
+        assertThat(remaining).hasSize(1);
+        assertThat(remaining.get(0).getAlgorithmVersion()).isEqualTo("v2");
     }
 }

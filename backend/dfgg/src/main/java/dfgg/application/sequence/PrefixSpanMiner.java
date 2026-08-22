@@ -17,6 +17,18 @@ public class PrefixSpanMiner {
         return patterns;
     }
 
+    public boolean matches(List<Long> sequence, List<Long> patternItems) {
+        int cursor = 0;
+        for (Long item : patternItems) {
+            int index = sequence.subList(cursor, sequence.size()).indexOf(item);
+            if (index < 0) {
+                return false;
+            }
+            cursor += index + 1;
+        }
+        return true;
+    }
+
     private void mine(
             List<Long> prefix,
             List<List<Long>> projectedDatabase,

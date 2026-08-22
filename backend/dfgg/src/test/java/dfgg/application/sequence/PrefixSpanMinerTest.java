@@ -65,4 +65,60 @@ class PrefixSpanMinerTest {
         assertThat(patterns).extracting(SequentialPattern::items)
                 .doesNotContain(List.of(2L), List.of(4L), List.of(5L));
     }
+
+    @Test
+    @DisplayName("패턴이 시퀀스 안에 순서대로(gap 허용) 나타나면 매칭된 것으로 본다")
+    void matches_WhenPatternIsGapAllowedSubsequenceOfSequence_ReturnsTrue() {
+        // given
+        List<Long> sequence = List.of(1L, 2L, 3L, 4L);
+        List<Long> pattern = List.of(1L, 3L);
+
+        // when
+        boolean matched = miner.matches(sequence, pattern);
+
+        // then
+        assertThat(matched).isTrue();
+    }
+
+    @Test
+    @DisplayName("패턴의 순서가 시퀀스와 다르면 매칭되지 않는다")
+    void matches_WhenPatternOrderDiffersFromSequence_ReturnsFalse() {
+        // given
+        List<Long> sequence = List.of(1L, 2L, 3L, 4L);
+        List<Long> pattern = List.of(3L, 1L);
+
+        // when
+        boolean matched = miner.matches(sequence, pattern);
+
+        // then
+        assertThat(matched).isFalse();
+    }
+
+    @Test
+    @DisplayName("패턴의 아이템이 시퀀스에 없으면 매칭되지 않는다")
+    void matches_WhenPatternItemIsMissingFromSequence_ReturnsFalse() {
+        // given
+        List<Long> sequence = List.of(1L, 2L, 3L);
+        List<Long> pattern = List.of(1L, 9L);
+
+        // when
+        boolean matched = miner.matches(sequence, pattern);
+
+        // then
+        assertThat(matched).isFalse();
+    }
+
+    @Test
+    @DisplayName("빈 패턴은 모든 시퀀스와 매칭된 것으로 본다")
+    void matches_WhenPatternIsEmpty_ReturnsTrue() {
+        // given
+        List<Long> sequence = List.of(1L, 2L, 3L);
+        List<Long> pattern = List.of();
+
+        // when
+        boolean matched = miner.matches(sequence, pattern);
+
+        // then
+        assertThat(matched).isTrue();
+    }
 }
