@@ -1,12 +1,14 @@
 package dfgg.presentation;
 
-import dfgg.application.RiotMatchSyncService;
-import dfgg.application.ChampionBuildStatsRebuildService;
 import dfgg.application.ChampionBuildStatsRebuildResult;
+import dfgg.application.ChampionBuildStatsRebuildService;
+import dfgg.application.match.RiotMatchSyncService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
+import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,12 +38,11 @@ public class RiotMatchController {
 
     @PostMapping("/riot/matches")
     public ResponseEntity<Void> syncMatches(
-            @RequestParam(defaultValue = "0") @PositiveOrZero int playerPage,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int playerCount,
+            @RequestParam List<@NotBlank String> puuids,
             @RequestParam(defaultValue = "0") @PositiveOrZero int start,
             @RequestParam(defaultValue = "1") @Min(1) @Max(100) int count
     ) {
-        riotMatchSyncService.syncMatches(playerPage, playerCount, start, count);
+        riotMatchSyncService.syncMatches(puuids, start, count);
         return ResponseEntity.noContent().build();
     }
 

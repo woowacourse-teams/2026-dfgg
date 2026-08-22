@@ -11,6 +11,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import dfgg.application.match.RiotMatchSyncService;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,10 +52,8 @@ class RiotCollectionOrchestratorTest {
                         2,
                         List.of("puuid-1", "puuid-2")
                 ));
-        when(matchSyncService.syncMatches(List.of("puuid-1", "puuid-2"), 20))
+        when(matchSyncService.syncMatches(List.of("puuid-1", "puuid-2"), 0, 20))
                 .thenReturn(new RiotMatchSyncService.SyncResult(1, 2, 1, 3, List.of()));
-        when(matchSyncService.syncMissingTimelinesWithResult())
-                .thenReturn(new RiotMatchSyncService.SyncResult(0, 0, 1, 0, List.of()));
         when(statsRebuildService.rebuildAll("PLATINUM"))
                 .thenReturn(new ChampionBuildStatsRebuildResult(2, 2, 0, 64));
 
@@ -67,8 +66,8 @@ class RiotCollectionOrchestratorTest {
         );
         order.verify(playerSyncService)
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
-        order.verify(matchSyncService).syncMatches(List.of("puuid-1", "puuid-2"), 20);
-        order.verify(matchSyncService).syncMissingTimelinesWithResult();
+        order.verify(matchSyncService).syncMatches(List.of("puuid-1", "puuid-2"), 0, 20);
+        order.verify(matchSyncService).syncMissingTimelines();
         order.verify(statsRebuildService).rebuildAll("PLATINUM");
     }
 
@@ -76,14 +75,12 @@ class RiotCollectionOrchestratorTest {
     void 한_단계가_실패해도_후속_단계를_계속한다() {
         when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
                 .thenThrow(new IllegalStateException("league unavailable"));
-        when(matchSyncService.syncMissingTimelinesWithResult())
-                .thenReturn(new RiotMatchSyncService.SyncResult(0, 0, 0, 0, List.of()));
         when(statsRebuildService.rebuildAll("PLATINUM"))
                 .thenReturn(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
 
         orchestrator.runOnce();
-        verify(matchSyncService, never()).syncMatches(anyList(), eq(20));
-        verify(matchSyncService).syncMissingTimelinesWithResult();
+        verify(matchSyncService, never()).syncMatches(anyList(), eq(0), eq(20));
+        verify(matchSyncService).syncMissingTimelines();
         verify(statsRebuildService).rebuildAll("PLATINUM");
     }
 
@@ -93,10 +90,8 @@ class RiotCollectionOrchestratorTest {
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
         when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 2))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-2")));
-        when(matchSyncService.syncMatches(anyList(), eq(20)))
+        when(matchSyncService.syncMatches(anyList(), eq(0), eq(20)))
                 .thenReturn(new RiotMatchSyncService.SyncResult(1, 0, 0, 0, List.of()));
-        when(matchSyncService.syncMissingTimelinesWithResult())
-                .thenReturn(new RiotMatchSyncService.SyncResult(0, 0, 0, 0, List.of()));
         when(statsRebuildService.rebuildAll("PLATINUM"))
                 .thenReturn(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
 
@@ -107,16 +102,14 @@ class RiotCollectionOrchestratorTest {
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
         verify(playerSyncService)
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 2);
-        verify(matchSyncService).syncMatches(List.of("puuid-1"), 20);
-        verify(matchSyncService).syncMatches(List.of("puuid-2"), 20);
+        verify(matchSyncService).syncMatches(List.of("puuid-1"), 0, 20);
+        verify(matchSyncService).syncMatches(List.of("puuid-2"), 0, 20);
     }
 
     @Test
     void 수집이_실패하면_해당_범위를_다음_스케줄에서_다시_시도한다() {
         when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
                 .thenThrow(new IllegalStateException("league unavailable"));
-        when(matchSyncService.syncMissingTimelinesWithResult())
-                .thenReturn(new RiotMatchSyncService.SyncResult(0, 0, 0, 0, List.of()));
         when(statsRebuildService.rebuildAll("PLATINUM"))
                 .thenReturn(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
 
@@ -125,7 +118,7 @@ class RiotCollectionOrchestratorTest {
 
         verify(playerSyncService, times(2))
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
-        verify(matchSyncService, never()).syncMatches(anyList(), eq(20));
+        verify(matchSyncService, never()).syncMatches(anyList(), eq(0), eq(20));
     }
 
     @Test
@@ -134,10 +127,8 @@ class RiotCollectionOrchestratorTest {
         when(playerSyncService.syncLeagueEntries(
                 anyString(), anyString(), anyString(), anyInt()
         )).thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of("puuid-1")));
-        when(matchSyncService.syncMatches(anyList(), eq(20)))
+        when(matchSyncService.syncMatches(anyList(), eq(0), eq(20)))
                 .thenReturn(new RiotMatchSyncService.SyncResult(1, 0, 0, 0, List.of()));
-        when(matchSyncService.syncMissingTimelinesWithResult())
-                .thenReturn(new RiotMatchSyncService.SyncResult(0, 0, 0, 0, List.of()));
         when(statsRebuildService.rebuildAll("PLATINUM"))
                 .thenReturn(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
 
@@ -162,8 +153,6 @@ class RiotCollectionOrchestratorTest {
     @Test
     void 모든_디비전의_현재_페이지가_비어_있으면_첫_페이지로_돌아간다() {
         properties.setDivisions(List.of("IV"));
-        when(matchSyncService.syncMissingTimelinesWithResult())
-                .thenReturn(new RiotMatchSyncService.SyncResult(0, 0, 0, 0, List.of()));
         when(statsRebuildService.rebuildAll("PLATINUM"))
                 .thenReturn(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
 

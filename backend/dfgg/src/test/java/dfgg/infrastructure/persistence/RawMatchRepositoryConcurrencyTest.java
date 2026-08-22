@@ -1,8 +1,7 @@
-package dfgg.application;
+package dfgg.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -16,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,12 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(RawMatchPersistenceService.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class RawMatchPersistenceConcurrencyTest {
-
-    @Autowired
-    private RawMatchPersistenceService persistenceService;
+class RawMatchRepositoryConcurrencyTest {
 
     @Autowired
     private RawMatchRepository rawMatchRepository;
@@ -41,31 +35,31 @@ class RawMatchPersistenceConcurrencyTest {
     }
 
     @Test
-    void 같은_매치를_동시에_저장해도_한_건만_저장한다() throws Exception {
+    void 같은_매치를_동시에_삽입해도_한_건만_저장한다() throws Exception {
         CountDownLatch startSignal = new CountDownLatch(1);
 
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
-            Future<Boolean> first = executor.submit(() -> persistAfterSignal(startSignal));
-            Future<Boolean> second = executor.submit(() -> persistAfterSignal(startSignal));
+            Future<Integer> first = executor.submit(() -> insertAfterSignal(startSignal));
+            Future<Integer> second = executor.submit(() -> insertAfterSignal(startSignal));
 
             startSignal.countDown();
 
             assertThat(List.of(
                     first.get(5, TimeUnit.SECONDS),
                     second.get(5, TimeUnit.SECONDS)
-            )).containsExactlyInAnyOrder(true, false);
+            )).containsExactlyInAnyOrder(1, 0);
         }
 
         assertThat(rawMatchRepository.count()).isEqualTo(1);
     }
 
-    private boolean persistAfterSignal(CountDownLatch startSignal) {
+    private int insertAfterSignal(CountDownLatch startSignal) {
         try {
             startSignal.await();
-            return persistenceService.persist(new RawMatch(
+            return rawMatchRepository.insertIfAbsent(
                     "KR_1234567890",
                     "{\"info\":{}}"
-            ));
+            );
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Concurrent persistence test was interrupted", exception);

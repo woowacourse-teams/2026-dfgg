@@ -73,6 +73,28 @@ class RawMatchRepositoryTest {
     }
 
     @Test
+    void 매치_원본은_한_번만_삽입한다() {
+        int firstInsertedCount = rawMatchRepository.insertIfAbsent(MATCH_ID, RAW_DATA);
+        int secondInsertedCount = rawMatchRepository.insertIfAbsent(MATCH_ID, RAW_DATA);
+        entityManager.clear();
+
+        assertThat(firstInsertedCount).isEqualTo(1);
+        assertThat(secondInsertedCount).isZero();
+        assertThat(rawMatchRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void 매치_Timeline_원본은_한_번만_삽입한다() {
+        int firstInsertedCount = timelineRepository.insertIfAbsent(MATCH_ID, RAW_DATA);
+        int secondInsertedCount = timelineRepository.insertIfAbsent(MATCH_ID, RAW_DATA);
+        entityManager.clear();
+
+        assertThat(firstInsertedCount).isEqualTo(1);
+        assertThat(secondInsertedCount).isZero();
+        assertThat(timelineRepository.count()).isEqualTo(1);
+    }
+
+    @Test
     void Timeline이_없는_매치_ID를_cursor_다음부터_조회한다() {
         rawMatchRepository.save(new RawMatch("KR_1", RAW_DATA));
         rawMatchRepository.save(new RawMatch("KR_2", RAW_DATA));

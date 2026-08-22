@@ -2,14 +2,15 @@ package dfgg.presentation;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dfgg.application.ChampionBuildStatsRebuildResult;
-import dfgg.application.RiotMatchSyncService;
 import dfgg.application.ChampionBuildStatsRebuildService;
+import dfgg.application.match.RiotMatchSyncService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,23 +33,35 @@ class RiotMatchControllerTest {
     }
 
     @Test
-    void 기본_플레이어_배치와_매치_범위를_동기화한다() throws Exception {
-        mockMvc.perform(post("/admin/riot/matches"))
+    void 전달받은_플레이어와_기본_매치_범위를_동기화한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches")
+                        .param("puuids", "puuid-1"))
                 .andExpect(status().isNoContent());
 
-        verify(riotMatchSyncService).syncMatches(0, 20, 0, 1);
+        verify(riotMatchSyncService).syncMatches(List.of("puuid-1"), 0, 1);
     }
 
     @Test
-    void 요청_파라미터로_플레이어_배치와_매치_조회_범위를_지정한다() throws Exception {
+    void 요청_파라미터로_플레이어와_매치_조회_범위를_지정한다() throws Exception {
         mockMvc.perform(post("/admin/riot/matches")
-                        .param("playerPage", "1")
-                        .param("playerCount", "10")
+                        .param("puuids", "puuid-1", "puuid-2")
                         .param("start", "20")
                         .param("count", "50"))
                 .andExpect(status().isNoContent());
 
-        verify(riotMatchSyncService).syncMatches(1, 10, 20, 50);
+        verify(riotMatchSyncService).syncMatches(
+                List.of("puuid-1", "puuid-2"),
+                20,
+                50
+        );
+    }
+
+    @Test
+    void 수집할_플레이어를_전달하지_않으면_요청을_거부한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(riotMatchSyncService);
     }
 
     @Test

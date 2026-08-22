@@ -1,5 +1,6 @@
 package dfgg.application;
 
+import dfgg.application.match.RiotMatchSyncService;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
 import java.time.Duration;
 import java.time.Instant;
@@ -143,7 +144,11 @@ public class RiotCollectionOrchestrator {
                     Math.min(fromIndex + playerCount, puuids.size())
             );
             try {
-                merge(summary, matchSyncService.syncMatches(targets, properties.getMatchCount()));
+                merge(summary, matchSyncService.syncMatches(
+                        targets,
+                        0,
+                        properties.getMatchCount()
+                ));
             } catch (RuntimeException exception) {
                 summary.failures.add(Failure.from(
                         "MATCH_BATCH",
@@ -156,7 +161,7 @@ public class RiotCollectionOrchestrator {
 
     private void collectMissingTimelines(RunSummary summary) {
         try {
-            merge(summary, matchSyncService.syncMissingTimelinesWithResult());
+            matchSyncService.syncMissingTimelines();
         } catch (RuntimeException exception) {
             summary.failures.add(Failure.from("TIMELINE_PAGE", "all-missing", exception));
         }
