@@ -16,46 +16,25 @@ public interface StatsAggregationCompletionRepository
         String getPuuid();
     }
 
+    /**
+     * 커서 이후의 미완료 정규화 참가자를 매치와 PUUID 순으로 조회한다.
+     */
     @Query(value = """
-            SELECT COUNT(DISTINCT cohort.match_id)
-            FROM match_participant_cohorts cohort
-            JOIN raw_matches raw_match
-              ON raw_match.match_id = cohort.match_id
+            SELECT participant.match_id AS "matchId", participant.puuid AS "puuid"
+            FROM normalized_match_participants participant
             LEFT JOIN stats_aggregation_completions completion
-              ON completion.match_id = cohort.match_id
-             AND completion.puuid = cohort.puuid
-             AND completion.queue_type = cohort.queue_type
-             AND completion.tier = cohort.tier
+              ON completion.match_id = participant.match_id
+             AND completion.puuid = participant.puuid
+             AND completion.queue_type = :queueType
+             AND completion.tier = participant.tier
              AND completion.aggregation_revision = :aggregationRevision
-            WHERE cohort.queue_type = :queueType
-              AND cohort.tier = :tier
-              AND completion.id IS NULL
-            """, nativeQuery = true)
-    long countPendingMatches(
-            @Param("queueType") String queueType,
-            @Param("tier") String tier,
-            @Param("aggregationRevision") String aggregationRevision
-    );
-
-    @Query(value = """
-            SELECT cohort.match_id AS "matchId", cohort.puuid AS "puuid"
-            FROM match_participant_cohorts cohort
-            JOIN raw_matches raw_match
-              ON raw_match.match_id = cohort.match_id
-            LEFT JOIN stats_aggregation_completions completion
-              ON completion.match_id = cohort.match_id
-             AND completion.puuid = cohort.puuid
-             AND completion.queue_type = cohort.queue_type
-             AND completion.tier = cohort.tier
-             AND completion.aggregation_revision = :aggregationRevision
-            WHERE cohort.queue_type = :queueType
-              AND cohort.tier = :tier
+            WHERE participant.tier = :tier
               AND completion.id IS NULL
               AND (
-                    cohort.match_id > :afterMatchId
-                 OR (cohort.match_id = :afterMatchId AND cohort.puuid > :afterPuuid)
+                    participant.match_id > :afterMatchId
+                 OR (participant.match_id = :afterMatchId AND participant.puuid > :afterPuuid)
               )
-            ORDER BY cohort.match_id, cohort.puuid
+            ORDER BY participant.match_id, participant.puuid
             LIMIT :batchSize
             """, nativeQuery = true)
     List<PendingTarget> findPendingTargetsAfter(
@@ -67,21 +46,23 @@ public interface StatsAggregationCompletionRepository
             @Param("batchSize") int batchSize
     );
 
+    /**
+     * 배치 마지막 매치에 남은 미완료 참가자를 조회해 한 매치가 배치에서 나뉘지 않게 한다.
+     */
     @Query(value = """
-            SELECT cohort.match_id AS "matchId", cohort.puuid AS "puuid"
-            FROM match_participant_cohorts cohort
+            SELECT participant.match_id AS "matchId", participant.puuid AS "puuid"
+            FROM normalized_match_participants participant
             LEFT JOIN stats_aggregation_completions completion
-              ON completion.match_id = cohort.match_id
-             AND completion.puuid = cohort.puuid
-             AND completion.queue_type = cohort.queue_type
-             AND completion.tier = cohort.tier
+              ON completion.match_id = participant.match_id
+             AND completion.puuid = participant.puuid
+             AND completion.queue_type = :queueType
+             AND completion.tier = participant.tier
              AND completion.aggregation_revision = :aggregationRevision
-            WHERE cohort.match_id = :matchId
-              AND cohort.queue_type = :queueType
-              AND cohort.tier = :tier
-              AND cohort.puuid > :afterPuuid
+            WHERE participant.match_id = :matchId
+              AND participant.tier = :tier
+              AND participant.puuid > :afterPuuid
               AND completion.id IS NULL
-            ORDER BY cohort.puuid
+            ORDER BY participant.puuid
             """, nativeQuery = true)
     List<PendingTarget> findRemainingTargetsForMatch(
             @Param("matchId") String matchId,
@@ -91,12 +72,9 @@ public interface StatsAggregationCompletionRepository
             @Param("afterPuuid") String afterPuuid
     );
 
-    @Query(value = """
-            SELECT true
-            FROM pg_advisory_xact_lock(hashtextextended(CAST(:matchId AS text), 0))
-            """, nativeQuery = true)
-    boolean acquireMatchLock(@Param("matchId") String matchId);
-
+    /**
+     * 통계 집계 시작 전에 참가자 completion을 선점하고, 이미 존재하면 아무 작업도 하지 않는다.
+     */
     @Modifying
     @Query(value = """
             INSERT INTO stats_aggregation_completions (
@@ -125,6 +103,9 @@ public interface StatsAggregationCompletionRepository
             @Param("aggregationRevision") String aggregationRevision
     );
 
+    /**
+     * 재집계가 끝난 참가자의 completion 시각을 새로 기록한다.
+     */
     @Modifying
     @Query(value = """
             INSERT INTO stats_aggregation_completions (

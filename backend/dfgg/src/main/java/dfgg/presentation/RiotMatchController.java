@@ -1,8 +1,8 @@
 package dfgg.presentation;
 
-import dfgg.application.ChampionBuildStatsRebuildResult;
-import dfgg.application.ChampionBuildStatsRebuildService;
+import dfgg.application.RiotCollectionOrchestrator;
 import dfgg.application.match.RiotMatchSyncService;
+import dfgg.application.stats.ChampionBuildStatsRebuildMatchService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -21,18 +21,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class RiotMatchController {
 
     private final RiotMatchSyncService riotMatchSyncService;
-    private final ChampionBuildStatsRebuildService statsRebuildService;
+    private final RiotCollectionOrchestrator collectionOrchestrator;
+    private final ChampionBuildStatsRebuildMatchService statsRebuildService;
 
-    public RiotMatchController(RiotMatchSyncService riotMatchSyncService) {
-        this(riotMatchSyncService, null);
-    }
-
-    @org.springframework.beans.factory.annotation.Autowired
     public RiotMatchController(
             RiotMatchSyncService riotMatchSyncService,
-            ChampionBuildStatsRebuildService statsRebuildService
+            RiotCollectionOrchestrator collectionOrchestrator,
+            ChampionBuildStatsRebuildMatchService statsRebuildService
     ) {
         this.riotMatchSyncService = riotMatchSyncService;
+        this.collectionOrchestrator = collectionOrchestrator;
         this.statsRebuildService = statsRebuildService;
     }
 
@@ -53,28 +51,29 @@ public class RiotMatchController {
     }
 
     @PostMapping("/riot/matches/stats")
-    public ResponseEntity<ChampionBuildStatsRebuildResult> rebuildStats(
+    public ResponseEntity<Void> rebuildStats(
             @RequestParam
             @Pattern(regexp = "IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND")
             String tier
     ) {
-        if (statsRebuildService == null) {
-            throw new IllegalStateException("stats rebuild service is not configured");
+        // 신규 매치는 정규화 객체를 바로 집계하고, 과거 미완료 데이터는 DB에서 찾아 복구한다.
+        try {
+            collectionOrchestrator.normalizeAndAggregatePendingMatches(tier);
+        } finally {
+            // 신규 처리에서 실패해도 기존 정규화 데이터의 복구·백필은 실행한다.
+            statsRebuildService.rebuildAll(tier);
         }
-        ChampionBuildStatsRebuildResult result = statsRebuildService.rebuildAll(tier);
-        return ResponseEntity.ok(result);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/riot/matches/{matchId}/stats/replay")
-    public ResponseEntity<ChampionBuildStatsRebuildResult> replayStats(
+    public ResponseEntity<Void> replayStats(
             @PathVariable String matchId,
             @RequestParam
             @Pattern(regexp = "IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND")
             String tier
     ) {
-        if (statsRebuildService == null) {
-            throw new IllegalStateException("stats rebuild service is not configured");
-        }
-        return ResponseEntity.ok(statsRebuildService.replayOne(matchId, tier));
+        statsRebuildService.replayOne(matchId, tier);
+        return ResponseEntity.noContent().build();
     }
 }

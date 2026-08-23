@@ -1,4 +1,4 @@
-package dfgg.application;
+package dfgg.application.stats;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -71,13 +71,6 @@ class ChampionBuildStatsAggregationServiceTest {
                 anyString(),
                 anyString()
         )).thenReturn(1);
-        when(sampleRepository.insertAndIncrementIfAbsent(
-                anyString(),
-                anyString(),
-                anyString(),
-                eq(true)
-        )).thenReturn(1);
-
         NormalizedMatch match = new NormalizedMatch(
                 "KR_1",
                 "16.15",
@@ -89,9 +82,8 @@ class ChampionBuildStatsAggregationServiceTest {
                 )
         );
 
-        int recorded = aggregationService.aggregate(match, "PLATINUM", List.of("p-focal"));
+        aggregationService.aggregate(match, "PLATINUM", List.of("p-focal"));
 
-        assertThat(recorded).isEqualTo(32);
         verify(statsRepository, times(32)).insertIfAbsent(
                 eq("16.15"),
                 eq(420),

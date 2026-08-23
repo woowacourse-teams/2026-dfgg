@@ -41,10 +41,16 @@ public class CompositionStatsSample {
     protected CompositionStatsSample() {
     }
 
+    /**
+     * 승패를 아직 알 수 없는 기존 표본을 만든다.
+     */
     public CompositionStatsSample(ChampionBuildStats stats, String matchId, String puuid) {
         this(stats, matchId, puuid, null);
     }
 
+    /**
+     * 특정 통계·매치·참가자의 표본과 승패를 함께 만든다.
+     */
     public CompositionStatsSample(ChampionBuildStats stats, String matchId, String puuid, Boolean win) {
         this.stats = stats;
         this.matchId = matchId;
@@ -52,6 +58,9 @@ public class CompositionStatsSample {
         this.win = win;
     }
 
+    /**
+     * 표본에 저장된 승패를 반환한다.
+     */
     public Boolean getWin() {
         return win;
     }

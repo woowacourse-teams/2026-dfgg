@@ -1,45 +1,35 @@
 package dfgg.application.match;
 
-import dfgg.application.MatchParticipantCohortPersistenceService;
-import dfgg.domain.match.MatchParticipantCohort;
-import dfgg.domain.player.Player;
-import dfgg.domain.player.PlayerRepository;
 import dfgg.infrastructure.external.client.RiotClient;
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 수집할 플레이어의 매치 ID를 찾고 Raw Match와 Raw Timeline 수집 순서를 조율한다.
+ * 정규화와 통계 집계는 이 서비스의 책임이 아니며
+ * {@link dfgg.application.RiotCollectionOrchestrator}가 후속 단계로 호출한다.
+ */
 @Service
 public class RiotMatchSyncService {
-
-    private static final String QUEUE_TYPE = "RANKED_SOLO_5x5";
 
     private final RiotClient riotClient;
     private final RawMatchService rawMatchService;
     private final RawMatchTimelineService rawMatchTimelineService;
-    private final PlayerRepository playerRepository;
-    private final MatchParticipantCohortPersistenceService cohortPersistenceService;
 
     public RiotMatchSyncService(
             RiotClient riotClient,
             RawMatchService rawMatchService,
-            RawMatchTimelineService rawMatchTimelineService,
-            PlayerRepository playerRepository,
-            MatchParticipantCohortPersistenceService cohortPersistenceService
+            RawMatchTimelineService rawMatchTimelineService
     ) {
         this.riotClient = riotClient;
         this.rawMatchService = rawMatchService;
         this.rawMatchTimelineService = rawMatchTimelineService;
-        this.playerRepository = playerRepository;
-        this.cohortPersistenceService = cohortPersistenceService;
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -78,7 +68,6 @@ public class RiotMatchSyncService {
                     matchId,
                     existingMatchIds.contains(matchId),
                     existingTimelineIds.contains(matchId),
-                    matchCollection.playersByMatchId().getOrDefault(matchId, List.of()),
                     failures
             );
             newMatches += result.newMatches();
@@ -95,8 +84,19 @@ public class RiotMatchSyncService {
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public int syncMissingTimelines() {
-        return rawMatchTimelineService.collectMissingTimelines().newTimelines();
+    public SyncResult syncMissingTimelines() {
+        RawMatchTimelineService.MissingTimelineSyncResult result =
+                rawMatchTimelineService.collectMissingTimelines();
+        List<Failure> failures = result.failures().stream()
+                .map(failure -> new Failure("TIMELINE", failure.matchId(), failure.reason()))
+                .toList();
+        return new SyncResult(
+                0,
+                0,
+                result.newTimelines(),
+                result.skippedItems(),
+                failures
+        );
     }
 
     private MatchCollection collectMatchIds(
@@ -109,12 +109,7 @@ public class RiotMatchSyncService {
             return MatchCollection.empty();
         }
 
-        Map<String, Player> playersByPuuid = new HashMap<>();
-        for (Player player : playerRepository.findAllById(puuids)) {
-            playersByPuuid.putIfAbsent(player.getPuuid(), player);
-        }
         LinkedHashSet<String> matchIds = new LinkedHashSet<>();
-        Map<String, List<Player>> playersByMatchId = new HashMap<>();
 
         for (String puuid : puuids) {
             List<String> puuidMatchIds;
@@ -125,18 +120,10 @@ public class RiotMatchSyncService {
                 continue;
             }
             matchIds.addAll(puuidMatchIds);
-            Player player = playersByPuuid.get(puuid);
-            if (player == null) {
-                continue;
-            }
-            puuidMatchIds.forEach(matchId ->
-                    playersByMatchId.computeIfAbsent(matchId, ignored -> new ArrayList<>()).add(player)
-            );
         }
         return new MatchCollection(
                 puuids.size(),
-                matchIds,
-                playersByMatchId
+                matchIds
         );
     }
 
@@ -144,12 +131,13 @@ public class RiotMatchSyncService {
             String matchId,
             boolean matchAlreadyPersisted,
             boolean timelineAlreadyPersisted,
-            List<Player> players,
             List<Failure> failures
     ) {
         int newMatches = 0;
         int newTimelines = 0;
         int skippedItems = 0;
+
+        // Timeline보다 Match 원본을 먼저 저장한다. Match 수집이 실패하면 이 매치의 Timeline은 수집하지 않는다.
         if (!matchAlreadyPersisted) {
             try {
                 if (rawMatchService.collectRawMatch(matchId)) {
@@ -177,29 +165,6 @@ public class RiotMatchSyncService {
         } else {
             skippedItems++;
         }
-        Instant matchCollectedAt = Instant.now();
-        for (Player player : players) {
-            MatchParticipantCohort matchCohort = new MatchParticipantCohort(
-                    matchId,
-                    player.getPuuid(),
-                    QUEUE_TYPE,
-                    player.getTier(),
-                    player.getDivision(),
-                    matchCollectedAt
-            );
-            try {
-                if (!cohortPersistenceService.persist(matchCohort)) {
-                    skippedItems++;
-                }
-            } catch (RuntimeException exception) {
-                recordFailure(
-                        failures,
-                        "MATCH_COHORT",
-                        matchId + "/" + player.getPuuid(),
-                        exception
-                );
-            }
-        }
         return new MatchCollectResult(newMatches, newTimelines, skippedItems);
     }
 
@@ -215,11 +180,10 @@ public class RiotMatchSyncService {
 
     private record MatchCollection(
             int scannedPlayers,
-            LinkedHashSet<String> matchIds,
-            Map<String, List<Player>> playersByMatchId
+            LinkedHashSet<String> matchIds
     ) {
         private static MatchCollection empty() {
-            return new MatchCollection(0, new LinkedHashSet<>(), Map.of());
+            return new MatchCollection(0, new LinkedHashSet<>());
         }
     }
 

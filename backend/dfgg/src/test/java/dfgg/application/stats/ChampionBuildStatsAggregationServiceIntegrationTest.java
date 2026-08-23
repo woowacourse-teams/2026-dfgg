@@ -1,4 +1,4 @@
-package dfgg.application;
+package dfgg.application.stats;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -88,9 +88,8 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
         prepareReferenceData();
         NormalizedMatch match = match("KR_1", true);
 
-        List<Integer> recordedSamples = aggregateConcurrently(match, match);
+        aggregateConcurrently(match, match);
 
-        assertThat(recordedSamples).containsExactlyInAnyOrder(32, 0);
         assertThat(statsRepository.count()).isEqualTo(32);
         assertThat(sampleRepository.count()).isEqualTo(32);
         assertThat(statsRepository.findAll())
@@ -106,9 +105,8 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
         NormalizedMatch winningMatch = match("KR_WIN", true);
         NormalizedMatch losingMatch = match("KR_LOSE", false);
 
-        List<Integer> recordedSamples = aggregateConcurrently(winningMatch, losingMatch);
+        aggregateConcurrently(winningMatch, losingMatch);
 
-        assertThat(recordedSamples).containsExactlyInAnyOrder(32, 32);
         assertThat(statsRepository.count()).isEqualTo(32);
         assertThat(sampleRepository.count()).isEqualTo(64);
         assertThat(statsRepository.findAll())
@@ -143,7 +141,7 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
         );
     }
 
-    private List<Integer> aggregateConcurrently(
+    private void aggregateConcurrently(
             NormalizedMatch firstMatch,
             NormalizedMatch secondMatch
     ) throws Exception {
@@ -151,12 +149,12 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
         CountDownLatch startSignal = new CountDownLatch(1);
 
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
-            Future<Integer> first = executor.submit(() -> aggregateAfterSignal(
+            Future<?> first = executor.submit(() -> aggregateAfterSignal(
                     firstMatch,
                     readySignal,
                     startSignal
             ));
-            Future<Integer> second = executor.submit(() -> aggregateAfterSignal(
+            Future<?> second = executor.submit(() -> aggregateAfterSignal(
                     secondMatch,
                     readySignal,
                     startSignal
@@ -164,14 +162,12 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
 
             assertThat(readySignal.await(5, TimeUnit.SECONDS)).isTrue();
             startSignal.countDown();
-            return List.of(
-                    first.get(15, TimeUnit.SECONDS),
-                    second.get(15, TimeUnit.SECONDS)
-            );
+            first.get(15, TimeUnit.SECONDS);
+            second.get(15, TimeUnit.SECONDS);
         }
     }
 
-    private int aggregateAfterSignal(
+    private void aggregateAfterSignal(
             NormalizedMatch match,
             CountDownLatch readySignal,
             CountDownLatch startSignal
@@ -179,7 +175,7 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
         readySignal.countDown();
         try {
             startSignal.await();
-            return aggregationService.aggregate(match, "PLATINUM", List.of("p-focal"));
+            aggregationService.aggregate(match, "PLATINUM", List.of("p-focal"));
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Concurrent aggregation test was interrupted", exception);

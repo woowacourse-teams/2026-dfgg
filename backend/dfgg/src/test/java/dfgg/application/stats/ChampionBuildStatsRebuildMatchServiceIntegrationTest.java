@@ -1,4 +1,4 @@
-package dfgg.application;
+package dfgg.application.stats;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -17,8 +17,6 @@ import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
-import dfgg.domain.match.MatchParticipantCohort;
-import dfgg.domain.match.MatchParticipantCohortRepository;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
@@ -27,12 +25,15 @@ import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
 import dfgg.domain.match.RawMatchTimelineRepository;
+import dfgg.domain.player.Player;
+import dfgg.domain.player.PlayerRepository;
 import dfgg.domain.stats.ChampionBuildStats;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.stats.CompositionStatsSample;
 import dfgg.domain.stats.CompositionStatsSampleRepository;
 import dfgg.domain.stats.StatsAggregationCompletionRepository;
 import dfgg.infrastructure.external.client.DataDragonClient;
+import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -41,7 +42,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,18 +62,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestPropertySource(properties = "stats.rebuild.batch-size=1")
 @Import({
-        ChampionBuildStatsRebuildService.class,
-        ChampionBuildStatsMatchProcessor.class,
+        ChampionBuildStatsRebuildMatchService.class,
+        ChampionBuildStatsMatchService.class,
         ChampionBuildStatsAggregationService.class,
         ItemService.class,
         MatchNormalizationService.class,
         CoreItemPurchaseOrderCalculator.class
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class ChampionBuildStatsRebuildServiceIntegrationTest {
+class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
 
     @Autowired
-    private ChampionBuildStatsRebuildService rebuildService;
+    private ChampionBuildStatsRebuildMatchService rebuildService;
 
     @Autowired
     private RawMatchRepository rawMatchRepository;
@@ -90,11 +90,8 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
     @MockitoBean
     private DataDragonClient dataDragonClient;
 
-    @MockitoBean
-    private RiotPlayerSyncService riotPlayerSyncService;
-
     @Autowired
-    private MatchParticipantCohortRepository cohortRepository;
+    private PlayerRepository playerRepository;
 
     @Autowired
     private NormalizedMatchParticipantRepository normalizedRepository;
@@ -109,7 +106,13 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
     private StatsAggregationCompletionRepository completionRepository;
 
     @Autowired
-    private ChampionBuildStatsMatchProcessor matchProcessor;
+    private ChampionBuildStatsMatchService matchService;
+
+    @Autowired
+    private MatchNormalizationService matchNormalizationService;
+
+    @MockitoBean
+    private RiotPlayerSyncService riotPlayerSyncService;
 
     @Autowired
     private EntityManager entityManager;
@@ -126,11 +129,62 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
         sampleRepository.deleteAllInBatch();
         statsRepository.deleteAll();
         normalizedRepository.deleteAllInBatch();
-        cohortRepository.deleteAllInBatch();
         rawMatchTimelineRepository.deleteAllInBatch();
         rawMatchRepository.deleteAllInBatch();
+        playerRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
         championRepository.deleteAllInBatch();
+    }
+
+    @Test
+    void 정규화_교체_저장이_실패하면_기존_참가자_행을_보존한다() {
+        NormalizedParticipant existingParticipant = new NormalizedParticipant(
+                "same-puuid",
+                1,
+                1,
+                100,
+                "TOP",
+                "PLATINUM",
+                true,
+                List.of(3071),
+                List.of(3071),
+                true
+        );
+        matchNormalizationService.save(new NormalizedMatch(
+                "KR_ATOMIC",
+                "16.15",
+                420,
+                List.of(existingParticipant)
+        ));
+
+        NormalizedParticipant duplicateParticipant = new NormalizedParticipant(
+                "same-puuid",
+                2,
+                2,
+                200,
+                "JUNGLE",
+                "PLATINUM",
+                false,
+                List.of(6610),
+                List.of(6610),
+                true
+        );
+        NormalizedMatch invalidReplacement = new NormalizedMatch(
+                "KR_ATOMIC",
+                "16.16",
+                420,
+                List.of(existingParticipant, duplicateParticipant)
+        );
+
+        assertThatThrownBy(() -> matchNormalizationService.save(invalidReplacement))
+                .isInstanceOf(RuntimeException.class);
+        assertThat(normalizedRepository.findByMatchId("KR_ATOMIC"))
+                .singleElement()
+                .satisfies(saved -> {
+                    assertThat(saved.getPatch()).isEqualTo("16.15");
+                    assertThat(saved.getChampionId()).isEqualTo(1);
+                    assertThat(saved.getFinalCoreItemIds()).containsExactly(3071);
+                });
     }
 
     @Test
@@ -186,9 +240,8 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
         ));
         Long existingStatsId = existingStats.getId();
 
-        ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM");
+        rebuildService.rebuildAll("PLATINUM");
 
-        assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
         assertThat(normalizedRepository.findByMatchId("KR_EXISTING")).hasSize(1);
         assertThat(statsRepository.findById(existingStatsId))
                 .get()
@@ -211,14 +264,7 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
                 new Item(3071L, "아이템 A"),
                 new Item(6610L, "아이템 B")
         ));
-        cohortRepository.save(new MatchParticipantCohort(
-                "KR_1",
-                "p-focal",
-                "RANKED_SOLO_5x5",
-                "PLATINUM",
-                "I",
-                java.time.Instant.parse("2026-08-06T08:00:00Z")
-        ));
+        savePlatinumPlayer("KR_1", "p-focal");
         rawMatchRepository.save(new RawMatch("KR_1", """
                 {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
                   {"puuid":"p-focal","participantId":1,"championId":1,"teamId":100,
@@ -235,15 +281,14 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
                   ]}
                 ]}}
                 """));
+        normalizeSavedMatch("KR_1");
 
-        ChampionBuildStatsRebuildResult firstResult = rebuildService.rebuildAll("PLATINUM");
-        assertThat(firstResult).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 32));
+        rebuildService.rebuildAll("PLATINUM");
         assertThat(normalizedRepository.count()).isEqualTo(3);
         assertThat(statsRepository.count()).isEqualTo(32);
         assertThat(sampleRepository.count()).isEqualTo(32);
 
-        ChampionBuildStatsRebuildResult secondResult = rebuildService.rebuildAll("PLATINUM");
-        assertThat(secondResult).isEqualTo(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
+        rebuildService.rebuildAll("PLATINUM");
         assertThat(normalizedRepository.count()).isEqualTo(3);
         assertThat(statsRepository.count()).isEqualTo(32);
         assertThat(sampleRepository.count()).isEqualTo(32);
@@ -253,6 +298,22 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
                     assertThat(stats.getGameCount()).isEqualTo(1);
                     assertThat(stats.getWinCount()).isEqualTo(1);
                 });
+    }
+
+    @Test
+    void 정규화_객체를_직접_전달하면_저장된_정규화_행을_다시_읽지_않고_집계한다() {
+        prepareReferenceData();
+        saveCompleteMatch("KR_DIRECT");
+        savePlatinumPlayer("KR_DIRECT", "p-focal");
+        NormalizedMatch normalized = normalizeSavedMatch("KR_DIRECT");
+
+        // 정상 경로가 전달받은 객체만 사용하는지 확인하기 위해 저장된 정규화 행을 비운다.
+        normalizedRepository.deleteAllInBatch();
+        matchService.registerMatchStats(normalized, "PLATINUM");
+
+        assertThat(statsRepository.count()).isEqualTo(32);
+        assertThat(sampleRepository.count()).isEqualTo(32);
+        assertThat(completionRepository.count()).isEqualTo(1);
     }
 
     @Test
@@ -266,22 +327,8 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
                 new Item(3071L, "아이템 A"),
                 new Item(6610L, "아이템 B")
         ));
-        cohortRepository.save(new MatchParticipantCohort(
-                "KR_VALID",
-                "p-focal",
-                "RANKED_SOLO_5x5",
-                "PLATINUM",
-                "I",
-                java.time.Instant.parse("2026-08-06T08:00:00Z")
-        ));
-        cohortRepository.save(new MatchParticipantCohort(
-                "KR_INVALID",
-                "p-focal",
-                "RANKED_SOLO_5x5",
-                "PLATINUM",
-                "I",
-                java.time.Instant.parse("2026-08-06T08:00:00Z")
-        ));
+        savePlatinumPlayer("KR_VALID", "p-focal");
+        savePlatinumPlayer("KR_INVALID", "p-focal");
         String rawMatchData = """
                 {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
                   {"puuid":"p-focal","participantId":1,"championId":1,"teamId":100,
@@ -306,6 +353,8 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
                 new RawMatchTimeline("KR_VALID", timelineData),
                 new RawMatchTimeline("KR_INVALID", timelineData)
         ));
+        normalizeSavedMatch("KR_VALID");
+        normalizeSavedMatch("KR_INVALID");
         AtomicBoolean failInvalidOnce = new AtomicBoolean(true);
         doAnswer(invocation -> {
             NormalizedMatch match = invocation.getArgument(0);
@@ -315,29 +364,18 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
             return invocation.callRealMethod();
         }).when(aggregationService).aggregate(any(NormalizedMatch.class), anyString(), anyCollection());
 
-        ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM");
-
-        assertThat(result.totalMatches()).isEqualTo(2);
-        assertThat(result.processedMatches()).isEqualTo(1);
-        assertThat(result.skippedMissingTimeline()).isZero();
-        assertThat(result.failedMatches()).isEqualTo(1);
-        assertThat(result.recordedSamples()).isEqualTo(32);
-        assertThat(result.failures())
-                .singleElement()
-                .satisfies(failure -> {
-                    assertThat(failure.matchId()).isEqualTo("KR_INVALID");
-                    assertThat(failure.reason())
-                            .isEqualTo("IllegalStateException: forced aggregation failure");
-                });
+        assertThatThrownBy(() -> rebuildService.rebuildAll("PLATINUM"))
+                .isInstanceOf(IllegalStateException.class);
         assertThat(normalizedRepository.findByMatchId("KR_VALID")).hasSize(3);
-        assertThat(normalizedRepository.findByMatchId("KR_INVALID")).isEmpty();
+        assertThat(normalizedRepository.findByMatchId("KR_INVALID"))
+                .extracting(NormalizedMatchParticipant::getPuuid)
+                .containsExactlyInAnyOrder("p-focal", "p-ally", "p-enemy");
         assertThat(statsRepository.count()).isEqualTo(32);
         assertThat(sampleRepository.count()).isEqualTo(32);
         assertThat(completionRepository.count()).isEqualTo(1);
 
-        ChampionBuildStatsRebuildResult retryResult = rebuildService.rebuildAll("PLATINUM");
+        rebuildService.rebuildAll("PLATINUM");
 
-        assertThat(retryResult).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 32));
         assertThat(normalizedRepository.findByMatchId("KR_INVALID")).hasSize(3);
         assertThat(sampleRepository.count()).isEqualTo(64);
         assertThat(completionRepository.count()).isEqualTo(2);
@@ -345,7 +383,7 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
 
     @Test
     void sample이_없는_정상_대상도_완료로_기록해서_재처리하지_않는다() {
-        saveCohort("KR_EMPTY", "p-empty");
+        savePlatinumPlayer("KR_EMPTY", "p-empty");
         rawMatchRepository.save(new RawMatch("KR_EMPTY", """
                 {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
                   {"puuid":"p-empty","participantId":1,"championId":1,"teamId":100,
@@ -355,12 +393,11 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
         rawMatchTimelineRepository.save(new RawMatchTimeline("KR_EMPTY", """
                 {"metadata":{"participants":["p-empty"]},"info":{"frames":[{"events":[]}]}}
                 """));
+        normalizeSavedMatch("KR_EMPTY");
 
-        ChampionBuildStatsRebuildResult firstResult = rebuildService.rebuildAll("PLATINUM");
-        ChampionBuildStatsRebuildResult secondResult = rebuildService.rebuildAll("PLATINUM");
+        rebuildService.rebuildAll("PLATINUM");
+        rebuildService.rebuildAll("PLATINUM");
 
-        assertThat(firstResult).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 0));
-        assertThat(secondResult).isEqualTo(new ChampionBuildStatsRebuildResult(0, 0, 0, 0));
         assertThat(completionRepository.count()).isEqualTo(1);
         assertThat(sampleRepository.count()).isZero();
     }
@@ -369,29 +406,29 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
     void batch_경계에_같은_매치의_참가자가_걸려도_한_매치로_모두_처리한다() {
         prepareReferenceData();
         saveCompleteMatch("KR_BATCH");
-        saveCohort("KR_BATCH", "p-focal");
-        saveCohort("KR_BATCH", "p-ally");
+        savePlatinumPlayer("KR_BATCH", "p-focal");
+        savePlatinumPlayer("KR_BATCH", "p-ally");
+        normalizeSavedMatch("KR_BATCH");
 
-        ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM");
+        rebuildService.rebuildAll("PLATINUM");
 
-        assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 64));
         assertThat(completionRepository.count()).isEqualTo(2);
         assertThat(sampleRepository.count()).isEqualTo(64);
         assertThat(normalizedRepository.findByMatchId("KR_BATCH")).hasSize(3);
     }
 
     @Test
-    void 완료된_매치에_새_cohort_참가자가_추가되면_그_참가자만_집계한다() {
+    void 완료된_매치에_새_정규화_참가자가_추가되면_그_참가자만_집계한다() {
         prepareReferenceData();
         saveCompleteMatch("KR_NEW_COHORT");
-        saveCohort("KR_NEW_COHORT", "p-focal");
+        savePlatinumPlayer("KR_NEW_COHORT", "p-focal");
+        normalizeSavedMatch("KR_NEW_COHORT");
 
-        ChampionBuildStatsRebuildResult firstResult = rebuildService.rebuildAll("PLATINUM");
-        saveCohort("KR_NEW_COHORT", "p-ally");
-        ChampionBuildStatsRebuildResult secondResult = rebuildService.rebuildAll("PLATINUM");
+        rebuildService.rebuildAll("PLATINUM");
+        savePlatinumPlayer("KR_NEW_COHORT", "p-ally");
+        normalizeSavedMatch("KR_NEW_COHORT");
+        rebuildService.rebuildAll("PLATINUM");
 
-        assertThat(firstResult).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 32));
-        assertThat(secondResult).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 32));
         assertThat(completionRepository.count()).isEqualTo(2);
         assertThat(sampleRepository.count()).isEqualTo(64);
         assertThat(statsRepository.findAll())
@@ -402,7 +439,8 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
     void 기존_sample이_일부만_있으면_중복_count_없이_나머지를_채우고_완료로_기록한다() {
         prepareReferenceData();
         saveCompleteMatch("KR_LEGACY");
-        saveCohort("KR_LEGACY", "p-focal");
+        savePlatinumPlayer("KR_LEGACY", "p-focal");
+        normalizeSavedMatch("KR_LEGACY");
         Champion champion = championRepository.findById(1L).orElseThrow();
         List<Item> buildItems = itemRepository.findAllById(List.of(3071L, 6610L));
         ChampionBuildStats existingStats = statsRepository.saveAndFlush(new ChampionBuildStats(
@@ -427,9 +465,8 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
                 "p-focal"
         ));
 
-        ChampionBuildStatsRebuildResult result = rebuildService.rebuildAll("PLATINUM");
+        rebuildService.rebuildAll("PLATINUM");
 
-        assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 31));
         assertThat(completionRepository.count()).isEqualTo(1);
         assertThat(statsRepository.count()).isEqualTo(32);
         assertThat(sampleRepository.count()).isEqualTo(32);
@@ -441,36 +478,30 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
     }
 
     @Test
-    void 같은_대상을_동시에_claim해도_한_트랜잭션만_집계한다() throws Exception {
+    void 같은_대상을_동시에_집계해도_completion_선점으로_한_번만_반영한다() throws Exception {
         prepareReferenceData();
         saveCompleteMatch("KR_CONCURRENT");
-        RawMatch rawMatch = rawMatchRepository.findById("KR_CONCURRENT").orElseThrow();
-        RawMatchTimeline timeline = rawMatchTimelineRepository.findById("KR_CONCURRENT").orElseThrow();
+        savePlatinumPlayer("KR_CONCURRENT", "p-focal");
+        NormalizedMatch normalized = normalizeSavedMatch("KR_CONCURRENT");
         CountDownLatch readySignal = new CountDownLatch(2);
         CountDownLatch startSignal = new CountDownLatch(1);
 
-        List<ChampionBuildStatsMatchProcessor.Result> results;
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
-            Future<ChampionBuildStatsMatchProcessor.Result> first = executor.submit(() -> processAfterSignal(
-                    rawMatch, timeline, readySignal, startSignal
+            Future<?> first = executor.submit(() -> processAfterSignal(
+                    normalized, readySignal, startSignal
             ));
-            Future<ChampionBuildStatsMatchProcessor.Result> second = executor.submit(() -> processAfterSignal(
-                    rawMatch, timeline, readySignal, startSignal
+            Future<?> second = executor.submit(() -> processAfterSignal(
+                    normalized, readySignal, startSignal
             ));
 
             assertThat(readySignal.await(5, TimeUnit.SECONDS)).isTrue();
             startSignal.countDown();
-            results = List.of(
-                    first.get(15, TimeUnit.SECONDS),
-                    second.get(15, TimeUnit.SECONDS)
-            );
+            first.get(15, TimeUnit.SECONDS);
+            second.get(15, TimeUnit.SECONDS);
         }
 
-        assertThat(results).extracting(ChampionBuildStatsMatchProcessor.Result::claimedParticipants)
-                .containsExactlyInAnyOrder(1, 0);
-        assertThat(results).extracting(ChampionBuildStatsMatchProcessor.Result::recordedSamples)
-                .containsExactlyInAnyOrder(32, 0);
         assertThat(completionRepository.count()).isEqualTo(1);
+        assertThat(statsRepository.count()).isEqualTo(32);
         assertThat(sampleRepository.count()).isEqualTo(32);
     }
 
@@ -478,15 +509,14 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
     void 변경된_매치를_replay하면_이전_기여를_빼고_새_기여만_남긴다() {
         prepareReferenceData();
         saveCompleteMatch("KR_REPLAY");
-        saveCohort("KR_REPLAY", "p-focal");
+        savePlatinumPlayer("KR_REPLAY", "p-focal");
+        normalizeSavedMatch("KR_REPLAY");
         rebuildService.rebuildAll("PLATINUM");
 
         replaceFocalBuildAndWin("KR_REPLAY");
-        ChampionBuildStatsRebuildResult firstReplay = rebuildService.replayOne("KR_REPLAY", "PLATINUM");
-        ChampionBuildStatsRebuildResult secondReplay = rebuildService.replayOne("KR_REPLAY", "PLATINUM");
+        rebuildService.replayOne("KR_REPLAY", "PLATINUM");
+        rebuildService.replayOne("KR_REPLAY", "PLATINUM");
 
-        assertThat(firstReplay).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 32));
-        assertThat(secondReplay).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 32));
         assertThat(sampleRepository.count()).isEqualTo(32);
         assertThat(sampleRepository.findAll()).allSatisfy(sample -> assertThat(sample.getWin()).isFalse());
         assertThat(statsRepository.findAll().stream()
@@ -507,16 +537,56 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
     }
 
     @Test
+    void replay의_새_통계_집계가_실패하면_정규화와_기존_통계를_함께_롤백한다() {
+        prepareReferenceData();
+        saveCompleteMatch("KR_REPLAY_ROLLBACK");
+        savePlatinumPlayer("KR_REPLAY_ROLLBACK", "p-focal");
+        normalizeSavedMatch("KR_REPLAY_ROLLBACK");
+        rebuildService.rebuildAll("PLATINUM");
+        replaceFocalBuildAndWin("KR_REPLAY_ROLLBACK");
+        doAnswer(invocation -> {
+            NormalizedMatch match = invocation.getArgument(0);
+            if (match.matchId().equals("KR_REPLAY_ROLLBACK")) {
+                throw new IllegalStateException("forced replay aggregation failure");
+            }
+            return invocation.callRealMethod();
+        }).when(aggregationService).aggregate(any(NormalizedMatch.class), anyString(), anyCollection());
+
+        assertThatThrownBy(() -> rebuildService.replayOne("KR_REPLAY_ROLLBACK", "PLATINUM"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("forced replay aggregation failure");
+
+        assertThat(normalizedRepository.findByMatchId("KR_REPLAY_ROLLBACK").stream()
+                .filter(participant -> participant.getPuuid().equals("p-focal")))
+                .singleElement()
+                .satisfies(participant -> {
+                    assertThat(participant.getCoreItemPurchaseOrder()).containsExactly(3071, 6610);
+                    assertThat(participant.getWin()).isTrue();
+                });
+        assertThat(sampleRepository.findAll())
+                .hasSize(32)
+                .allSatisfy(sample -> assertThat(sample.getWin()).isTrue());
+        assertThat(statsRepository.findAll())
+                .hasSize(32)
+                .allSatisfy(stats -> {
+                    assertThat(stats.getBuildKey()).isEqualTo("3071>6610");
+                    assertThat(stats.getGameCount()).isEqualTo(1);
+                    assertThat(stats.getWinCount()).isEqualTo(1);
+                });
+        assertThat(completionRepository.count()).isEqualTo(1);
+    }
+
+    @Test
     void 기존_sample의_win이_null이면_저장된_정규화_승패로_보완한_뒤_replay한다() {
         prepareReferenceData();
         saveCompleteMatch("KR_BACKFILL");
-        saveCohort("KR_BACKFILL", "p-focal");
+        savePlatinumPlayer("KR_BACKFILL", "p-focal");
+        normalizeSavedMatch("KR_BACKFILL");
         rebuildService.rebuildAll("PLATINUM");
         setSampleWinToNull("KR_BACKFILL", "p-focal");
 
-        ChampionBuildStatsRebuildResult result = rebuildService.replayOne("KR_BACKFILL", "PLATINUM");
+        rebuildService.replayOne("KR_BACKFILL", "PLATINUM");
 
-        assertThat(result).isEqualTo(new ChampionBuildStatsRebuildResult(1, 1, 0, 32));
         assertThat(sampleRepository.findAll())
                 .hasSize(32)
                 .allSatisfy(sample -> assertThat(sample.getWin()).isTrue());
@@ -527,17 +597,18 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
     }
 
     @Test
-    void 기존_승패를_복원할_수_없으면_replay를_중단하고_통계를_보존한다() {
+    void 정규화_참가자가_없으면_replay를_중단하고_통계를_보존한다() {
         prepareReferenceData();
         saveCompleteMatch("KR_UNKNOWN_WIN");
-        saveCohort("KR_UNKNOWN_WIN", "p-focal");
+        savePlatinumPlayer("KR_UNKNOWN_WIN", "p-focal");
+        normalizeSavedMatch("KR_UNKNOWN_WIN");
         rebuildService.rebuildAll("PLATINUM");
         setSampleWinToNull("KR_UNKNOWN_WIN", "p-focal");
         normalizedRepository.deleteAllInBatch();
 
         assertThatThrownBy(() -> rebuildService.replayOne("KR_UNKNOWN_WIN", "PLATINUM"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("previous win contributions are unknown");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("normalized participants not found");
         assertThat(sampleRepository.count()).isEqualTo(32);
         assertThat(sampleRepository.findAll()).allSatisfy(sample -> assertThat(sample.getWin()).isNull());
         assertThat(statsRepository.findAll()).allSatisfy(stats -> {
@@ -546,22 +617,19 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
         });
     }
 
-    private ChampionBuildStatsMatchProcessor.Result processAfterSignal(
-            RawMatch rawMatch,
-            RawMatchTimeline timeline,
+    private void processAfterSignal(
+            NormalizedMatch normalized,
             CountDownLatch readySignal,
             CountDownLatch startSignal
     ) {
         readySignal.countDown();
         try {
             startSignal.await();
-            return matchProcessor.rebuild(
-                    rawMatch,
-                    timeline,
+            rebuildService.registerPendingMatchStats(
+                    normalized,
                     "RANKED_SOLO_5x5",
                     "PLATINUM",
                     List.of("p-focal"),
-                    Set.of(3071, 6610),
                     "v1"
             );
         } catch (InterruptedException exception) {
@@ -629,11 +697,11 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
     private void setSampleWinToNull(String matchId, String puuid) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status ->
                 entityManager.createNativeQuery("""
-                        UPDATE composition_stats_samples
-                        SET win = NULL
-                        WHERE match_id = :matchId
-                          AND puuid = :puuid
-                        """)
+                                UPDATE composition_stats_samples
+                                SET win = NULL
+                                WHERE match_id = :matchId
+                                  AND puuid = :puuid
+                                """)
                         .setParameter("matchId", matchId)
                         .setParameter("puuid", puuid)
                         .executeUpdate()
@@ -641,15 +709,27 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
         entityManager.clear();
     }
 
-    private void saveCohort(String matchId, String puuid) {
-        cohortRepository.save(new MatchParticipantCohort(
-                matchId,
+    private void savePlatinumPlayer(String matchId, String puuid) {
+        playerRepository.save(new Player(
                 puuid,
-                "RANKED_SOLO_5x5",
+                "KR",
                 "PLATINUM",
                 "I",
                 java.time.Instant.parse("2026-08-06T08:00:00Z")
         ));
+    }
+
+    private NormalizedMatch normalizeSavedMatch(String matchId) {
+        RawMatch rawMatch = rawMatchRepository.findById(matchId).orElseThrow();
+        RawMatchTimeline timeline = rawMatchTimelineRepository.findById(matchId).orElseThrow();
+        NormalizedMatch normalized = matchNormalizationService.normalize(
+                matchId,
+                rawMatch.getRawData(),
+                timeline.getRawData(),
+                Set.of(3071, 6610)
+        );
+        matchNormalizationService.save(normalized);
+        return normalized;
     }
 
 }
