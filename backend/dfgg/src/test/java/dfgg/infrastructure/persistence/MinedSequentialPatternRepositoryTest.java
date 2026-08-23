@@ -76,4 +76,16 @@ class MinedSequentialPatternRepositoryTest {
         assertThat(remaining).hasSize(1);
         assertThat(remaining.get(0).getAlgorithmVersion()).isEqualTo("v2");
     }
+
+    @Test
+    @DisplayName("algorithmVersion이 일치하는 패턴 개수만 센다")
+    @Sql("/sql/mined-sequential-pattern-repository-test-data.sql")
+    void countByAlgorithmVersion_WhenVersionMatches_CountsOnlyThatVersion() {
+        // given: data.sql이 v1 패턴 2건, v2 패턴 1건을 적재해둔다
+
+        // when & then
+        assertThat(minedSequentialPatternRepository.countByAlgorithmVersion("v1")).isEqualTo(2);
+        assertThat(minedSequentialPatternRepository.countByAlgorithmVersion("v2")).isEqualTo(1);
+        assertThat(minedSequentialPatternRepository.countByAlgorithmVersion("v3")).isEqualTo(0);
+    }
 }

@@ -80,6 +80,18 @@ class EmbeddingRepositoryTest {
     }
 
     @Test
+    @DisplayName("algorithmVersion이 일치하는 임베딩 개수만 센다")
+    @Sql("/sql/embedding-repository-test-data.sql")
+    void countByAlgorithmVersion_WhenVersionMatches_CountsOnlyThatVersion() {
+        // given: data.sql이 v1 임베딩 2건, v2 임베딩 1건을 적재해둔다
+
+        // when & then
+        assertThat(embeddingRepository.countByAlgorithmVersion("v1")).isEqualTo(2);
+        assertThat(embeddingRepository.countByAlgorithmVersion("v2")).isEqualTo(1);
+        assertThat(embeddingRepository.countByAlgorithmVersion("v3")).isEqualTo(0);
+    }
+
+    @Test
     void 같은_entityType_entityId_algorithmVersion_조합은_중복_저장할_수_없다() {
         // given
         embeddingRepository.save(new Embedding(

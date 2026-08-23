@@ -8,4 +8,6 @@ public interface EmbeddingRepository extends JpaRepository<Embedding, Long> {
     List<Embedding> findByEntityType(EmbeddingEntityType entityType);
 
     void deleteByAlgorithmVersion(String algorithmVersion);
+
+    long countByAlgorithmVersion(String algorithmVersion);
 }
