@@ -36,8 +36,9 @@ class EmbeddingTrainingBatchServiceTest {
     private EmbeddingRepository embeddingRepository;
 
     @Test
+    @DisplayName("실 매치 데이터를 읽어 공유 임베딩을 학습한다")
     @Sql("/sql/embedding-training-batch-service-test-data.sql")
-    void 실_매치_데이터를_읽어_공유_임베딩을_학습한다() {
+    void trainFromMatchData_WhenGivenRealMatchData_LearnsSharedChampionAndItemEmbeddings() {
         // given: data.sql이 30개 매치(아군 챔피언 1~5번은 항상 승리해 3071 아이템을 구매하고,
         // 적군 챔피언 6~10번은 항상 패배해 3020 아이템을 구매하는 구성)와 태그가 있는 아이템 3071을 적재해둔다
         TrainingConfig config = new TrainingConfig(8, 4, 30, 0.05, 42L);

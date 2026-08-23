@@ -84,6 +84,7 @@ class MiningControllerTest {
     @Test
     @DisplayName("algorithmVersion이 없으면 요청을 거부한다")
     void trainEmbeddings_WhenAlgorithmVersionMissing_RejectsRequest() {
+        // when & then
         given()
                 .when().post("/admin/mining/embeddings")
                 .then()
@@ -133,6 +134,7 @@ class MiningControllerTest {
     @Test
     @DisplayName("algorithmVersion이 없으면 마이닝 요청도 거부한다")
     void minePatterns_WhenAlgorithmVersionMissing_RejectsRequest() {
+        // when & then
         given()
                 .when().post("/admin/mining/patterns")
                 .then()

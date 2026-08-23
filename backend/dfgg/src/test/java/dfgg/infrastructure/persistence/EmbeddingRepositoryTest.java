@@ -30,7 +30,8 @@ class EmbeddingRepositoryTest {
     private EntityManager entityManager;
 
     @Test
-    void 임베딩을_저장하고_조회한다() {
+    @DisplayName("임베딩을 저장하고 조회한다")
+    void save_WhenEmbeddingIsSaved_CanBeFoundById() {
         // given
         Embedding embedding = new Embedding(
                 EmbeddingEntityType.CHAMPION, 266L, "v1", List.of(0.1, 0.2, 0.3), LocalDateTime.now()
@@ -50,8 +51,9 @@ class EmbeddingRepositoryTest {
     }
 
     @Test
+    @DisplayName("entityType으로 구분해 조회한다")
     @Sql("/sql/embedding-repository-test-data.sql")
-    void entityType으로_구분해_조회한다() {
+    void findByEntityType_WhenEntityTypeGiven_ReturnsOnlyMatchingEmbeddings() {
         // given: data.sql이 CHAMPION 임베딩 1건, ITEM 임베딩 1건을 미리 적재해둔다
 
         // when
@@ -92,7 +94,8 @@ class EmbeddingRepositoryTest {
     }
 
     @Test
-    void 같은_entityType_entityId_algorithmVersion_조합은_중복_저장할_수_없다() {
+    @DisplayName("같은 entityType, entityId, algorithmVersion 조합은 중복 저장할 수 없다")
+    void save_WhenEntityTypeAndEntityIdAndAlgorithmVersionDuplicate_ThrowsDataIntegrityViolationException() {
         // given
         embeddingRepository.save(new Embedding(
                 EmbeddingEntityType.CHAMPION, 266L, "v1", List.of(0.1, 0.2), LocalDateTime.now()

@@ -27,7 +27,8 @@ class MinedSequentialPatternRepositoryTest {
     private EntityManager entityManager;
 
     @Test
-    void 마이닝된_순차_패턴을_저장하고_조회한다() {
+    @DisplayName("마이닝된 순차 패턴을 저장하고 조회한다")
+    void save_WhenMinedSequentialPatternIsSaved_CanBeFoundById() {
         // given
         MinedSequentialPattern pattern = new MinedSequentialPattern(
                 266L,

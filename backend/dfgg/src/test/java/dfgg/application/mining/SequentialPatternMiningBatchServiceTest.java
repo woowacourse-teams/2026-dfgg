@@ -55,7 +55,8 @@ class SequentialPatternMiningBatchServiceTest {
     }
 
     @Test
-    void 실_매치_데이터와_코호트를_조인해_챔피언_포지션_티어_패치_스코프별로_시퀀스를_마이닝한다() {
+    @DisplayName("실 매치 데이터와 코호트를 조인해 챔피언/포지션/티어/패치 스코프별로 시퀀스를 마이닝한다")
+    void mineFromMatchData_WhenGivenRealMatchDataAndCohorts_MinesSequencesPerScope() {
         // given
         for (int i = 0; i < 10; i++) {
             seedParticipantWithCohort("KR_MATCH_" + i, "GOLD", true);
@@ -80,7 +81,8 @@ class SequentialPatternMiningBatchServiceTest {
     }
 
     @Test
-    void 코호트_정보가_없는_참가자는_마이닝에서_제외한다() {
+    @DisplayName("코호트 정보가 없는 참가자는 마이닝에서 제외한다")
+    void mineFromMatchData_WhenParticipantHasNoCohort_ExcludesParticipantFromMining() {
         // given
         NormalizedMatch match = new NormalizedMatch("KR_NO_COHORT", "14.1", 420, List.of());
         participantRepository.save(new NormalizedMatchParticipant(match, new NormalizedParticipant(
@@ -104,7 +106,8 @@ class SequentialPatternMiningBatchServiceTest {
     }
 
     @Test
-    void 같은_매치와_puuid라도_요청한_큐_타입의_코호트만_사용해_티어를_판단한다() {
+    @DisplayName("같은 매치와 puuid라도 요청한 큐 타입의 코호트만 사용해 티어를 판단한다")
+    void mineFromMatchData_WhenSameMatchAndPuuidHasMultipleQueueTypes_UsesOnlyRequestedQueueTypeCohort() {
         // given
         NormalizedMatch match = new NormalizedMatch("KR_MULTI_QUEUE", "14.1", 420, List.of());
         String puuid = "puuid-multi-queue";
