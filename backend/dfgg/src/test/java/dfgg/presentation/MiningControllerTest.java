@@ -1,145 +1,164 @@
 package dfgg.presentation;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.equalTo;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.mining.EmbeddingTrainingResult;
-import dfgg.application.mining.MiningTriggerService;
 import dfgg.application.mining.SequentialPatternMiningResult;
-import dfgg.domain.embedding.TrainingConfig;
+import dfgg.domain.champion.ChampionPosition;
+import dfgg.domain.embedding.Embedding;
+import dfgg.domain.embedding.EmbeddingEntityType;
+import dfgg.domain.embedding.EmbeddingRepository;
+import dfgg.domain.sequence.MinedSequentialPattern;
+import dfgg.domain.sequence.MinedSequentialPatternRepository;
 import io.restassured.RestAssured;
+import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.jdbc.Sql;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@Sql("/sql/mining-controller-test-data.sql")
 class MiningControllerTest {
 
     @LocalServerPort
     private int port;
 
-    @MockitoBean
-    private MiningTriggerService miningTriggerService;
+    @Autowired
+    private EmbeddingRepository embeddingRepository;
+
+    @Autowired
+    private MinedSequentialPatternRepository minedSequentialPatternRepository;
 
     @BeforeEach
-    void setUp() {
+    @AfterEach
+    void cleanUp() {
         RestAssured.port = port;
+        embeddingRepository.deleteAllInBatch();
+        minedSequentialPatternRepository.deleteAllInBatch();
     }
 
     @Test
-    @DisplayName("기본 하이퍼파라미터로 임베딩 학습을 트리거한다")
-    void trainEmbeddings_WhenCalledWithDefaults_TriggersTrainingWithDefaultHyperparameters() {
-        // given
-        when(miningTriggerService.trainEmbeddings(eq(2.0), any(TrainingConfig.class), eq("sgns-v1")))
-                .thenReturn(new EmbeddingTrainingResult(11L, "sgns-v1"));
-
-        // when & then
-        given().queryParam("algorithmVersion", "sgns-v1")
+    @DisplayName("기본 하이퍼파라미터로 호출하면 기본 차원 수(64)로 학습한 임베딩이 저장된다")
+    void trainEmbeddings_WhenCalledWithDefaults_PersistsEmbeddingsWithDefaultDimensions() {
+        // given & when
+        EmbeddingTrainingResult result = given()
+                .queryParam("algorithmVersion", "sgns-default")
                 .when().post("/admin/mining/embeddings")
                 .then()
                 .statusCode(200)
-                .body("persistedEmbeddingCount", equalTo(11))
-                .body("algorithmVersion", equalTo("sgns-v1"));
+                .extract().as(EmbeddingTrainingResult.class);
 
-        verify(miningTriggerService).trainEmbeddings(
-                eq(2.0), eq(new TrainingConfig(64, 5, 20, 0.025, 42L)), eq("sgns-v1")
-        );
+        // then
+        assertThat(result.algorithmVersion()).isEqualTo("sgns-default");
+        assertThat(result.persistedEmbeddingCount()).isGreaterThan(0);
+
+        List<Embedding> saved = embeddingRepository.findAll();
+        assertThat(saved).hasSize((int) result.persistedEmbeddingCount());
+        assertThat(saved).allSatisfy(embedding -> assertThat(embedding.getVector()).hasSize(64));
+        assertThat(saved).anySatisfy(embedding -> {
+            assertThat(embedding.getEntityType()).isEqualTo(EmbeddingEntityType.CHAMPION);
+            assertThat(embedding.getEntityId()).isEqualTo(1L);
+        });
+        assertThat(saved).anySatisfy(embedding -> {
+            assertThat(embedding.getEntityType()).isEqualTo(EmbeddingEntityType.ITEM);
+            assertThat(embedding.getEntityId()).isEqualTo(3071L);
+        });
     }
 
     @Test
-    @DisplayName("요청 파라미터로 하이퍼파라미터를 지정한다")
-    void trainEmbeddings_WhenParamsProvided_OverridesHyperparameters() {
-        // given
-        when(miningTriggerService.trainEmbeddings(eq(3.5), any(TrainingConfig.class), eq("sgns-v2")))
-                .thenReturn(new EmbeddingTrainingResult(20L, "sgns-v2"));
-
-        // when & then
+    @DisplayName("요청 파라미터로 차원 수를 지정하면 기본값 대신 지정한 차원 수로 학습한다")
+    void trainEmbeddings_WhenDimensionsProvided_OverridesDefaultDimensions() {
+        // given & when
         given()
-                .queryParam("algorithmVersion", "sgns-v2")
-                .queryParam("winWeight", "3.5")
-                .queryParam("dimensions", "16")
-                .queryParam("negativeSamples", "8")
-                .queryParam("epochs", "50")
-                .queryParam("learningRate", "0.01")
-                .queryParam("randomSeed", "7")
+                .queryParam("algorithmVersion", "sgns-override")
+                .queryParam("dimensions", "4")
+                .queryParam("epochs", "3")
                 .when().post("/admin/mining/embeddings")
                 .then()
                 .statusCode(200);
 
-        verify(miningTriggerService).trainEmbeddings(
-                eq(3.5), eq(new TrainingConfig(16, 8, 50, 0.01, 7L)), eq("sgns-v2")
-        );
+        // then
+        List<Embedding> saved = embeddingRepository.findAll();
+        assertThat(saved).isNotEmpty();
+        assertThat(saved).allSatisfy(embedding -> assertThat(embedding.getVector()).hasSize(4));
     }
 
     @Test
-    @DisplayName("algorithmVersion이 없으면 요청을 거부한다")
-    void trainEmbeddings_WhenAlgorithmVersionMissing_RejectsRequest() {
-        // when & then
+    @DisplayName("algorithmVersion이 없으면 요청을 거부하고 아무것도 저장하지 않는다")
+    void trainEmbeddings_WhenAlgorithmVersionMissing_RejectsRequestAndPersistsNothing() {
+        // given & when
         given()
                 .when().post("/admin/mining/embeddings")
                 .then()
                 .statusCode(400);
 
-        verifyNoInteractions(miningTriggerService);
+        // then
+        assertThat(embeddingRepository.findAll()).isEmpty();
     }
 
     @Test
-    @DisplayName("기본 큐 타입과 최소 지지도로 순차 패턴 마이닝을 트리거한다")
-    void minePatterns_WhenCalledWithDefaults_TriggersMiningWithDefaultQueueTypeAndMinSupport() {
-        // given
-        when(miningTriggerService.mineSequentialPatterns("RANKED_SOLO_5x5", 10, "prefixspan-v1"))
-                .thenReturn(new SequentialPatternMiningResult(5, 42L, "prefixspan-v1"));
-
-        // when & then
-        given().queryParam("algorithmVersion", "prefixspan-v1")
+    @DisplayName("기본 최소 지지도(10)를 만족하는 패턴이 저장된다")
+    void minePatterns_WhenCalledWithDefaults_PersistsPatternsMeetingDefaultMinSupport() {
+        // given & when: 시드 데이터는 GOLD 스코프에서 [3071, 6653] 시퀀스를 정확히 10명이 만든다(기본 minSupport=10과 동일)
+        SequentialPatternMiningResult result = given()
+                .queryParam("algorithmVersion", "prefixspan-default")
                 .when().post("/admin/mining/patterns")
                 .then()
                 .statusCode(200)
-                .body("scopeCount", equalTo(5))
-                .body("persistedPatternCount", equalTo(42))
-                .body("algorithmVersion", equalTo("prefixspan-v1"));
+                .extract().as(SequentialPatternMiningResult.class);
 
-        verify(miningTriggerService).mineSequentialPatterns("RANKED_SOLO_5x5", 10, "prefixspan-v1");
+        // then
+        assertThat(result.algorithmVersion()).isEqualTo("prefixspan-default");
+        assertThat(result.persistedPatternCount()).isGreaterThan(0);
+
+        List<MinedSequentialPattern> saved = minedSequentialPatternRepository.findAll();
+        assertThat(saved).hasSize((int) result.persistedPatternCount());
+        assertThat(saved).anySatisfy(pattern -> {
+            assertThat(pattern.getChampionId()).isEqualTo(1L);
+            assertThat(pattern.getPosition()).isEqualTo(ChampionPosition.TOP);
+            assertThat(pattern.getTier()).isEqualTo("GOLD");
+            assertThat(pattern.getPatch()).isEqualTo("14.1");
+            assertThat(pattern.getItems()).containsExactly(3071L, 6653L);
+            assertThat(pattern.getSupportCount()).isEqualTo(10);
+            assertThat(pattern.getScopeTotalCount()).isEqualTo(10);
+            assertThat(pattern.getWinCount()).isEqualTo(10);
+        });
     }
 
     @Test
-    @DisplayName("요청 파라미터로 큐 타입과 최소 지지도를 지정한다")
-    void minePatterns_WhenParamsProvided_OverridesQueueTypeAndMinSupport() {
-        // given
-        when(miningTriggerService.mineSequentialPatterns("RANKED_FLEX_SR", 3, "prefixspan-v2"))
-                .thenReturn(new SequentialPatternMiningResult(2, 9L, "prefixspan-v2"));
-
-        // when & then
+    @DisplayName("요청 파라미터로 최소 지지도를 실제 지지도보다 높게 지정하면 그 패턴은 저장되지 않는다")
+    void minePatterns_WhenMinSupportProvidedAboveActualSupport_ExcludesPatternFromPersistence() {
+        // given & when: 시드 데이터의 [3071, 6653] 시퀀스 지지도는 10 — minSupport=11이면 기본값(10)과 달리 제외되어야 한다
         given()
-                .queryParam("algorithmVersion", "prefixspan-v2")
-                .queryParam("queueType", "RANKED_FLEX_SR")
-                .queryParam("minSupport", "3")
+                .queryParam("algorithmVersion", "prefixspan-override")
+                .queryParam("minSupport", "11")
                 .when().post("/admin/mining/patterns")
                 .then()
                 .statusCode(200);
 
-        verify(miningTriggerService).mineSequentialPatterns("RANKED_FLEX_SR", 3, "prefixspan-v2");
+        // then
+        List<MinedSequentialPattern> saved = minedSequentialPatternRepository.findAll();
+        assertThat(saved).noneMatch(pattern -> pattern.getItems().equals(List.of(3071L, 6653L)));
     }
 
     @Test
-    @DisplayName("algorithmVersion이 없으면 마이닝 요청도 거부한다")
-    void minePatterns_WhenAlgorithmVersionMissing_RejectsRequest() {
-        // when & then
+    @DisplayName("algorithmVersion이 없으면 마이닝 요청도 거부하고 아무것도 저장하지 않는다")
+    void minePatterns_WhenAlgorithmVersionMissing_RejectsRequestAndPersistsNothing() {
+        // given & when
         given()
                 .when().post("/admin/mining/patterns")
                 .then()
                 .statusCode(400);
 
-        verifyNoInteractions(miningTriggerService);
+        // then
+        assertThat(minedSequentialPatternRepository.findAll()).isEmpty();
     }
 }
