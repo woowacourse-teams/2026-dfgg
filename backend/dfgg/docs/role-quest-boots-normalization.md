@@ -140,13 +140,13 @@ BOTTOM은 3티어 정규화를 적용하지 않는다.
 
 ## 5. 구현 경계
 
-정규화 책임은 외부 DTO나 Raw 데이터 저장 단계가 아니라 `MatchNormalizer`에 둔다.
+정규화 책임은 외부 DTO나 Raw 데이터 저장 단계가 아니라 `MatchNormalizationService`에 둔다.
 
 ```text
 Raw Match 저장                        변경 없음
 Raw Timeline 저장                     변경 없음
 MatchParticipant DTO 파싱              roleBoundItem 포함
-MatchNormalizer 최종 아이템 추출       역할별 보정 적용
+MatchNormalizationService 최종 아이템 추출  역할별 보정 적용
 CoreItemPurchaseOrderCalculator        정규화된 2티어 ID로 비교
 ChampionBuildStats                     2티어 신발 기준 집계
 ```

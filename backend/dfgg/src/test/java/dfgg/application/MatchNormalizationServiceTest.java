@@ -2,22 +2,125 @@ package dfgg.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dfgg.application.item.ItemService;
+import dfgg.application.match.CoreItemPurchaseOrderCalculator;
+import dfgg.application.match.MatchNormalizationService;
+import dfgg.application.player.RiotPlayerSyncService;
 import dfgg.domain.match.NormalizedMatch;
+import dfgg.domain.match.NormalizedMatchParticipant;
+import dfgg.domain.match.NormalizedMatchParticipantRepository;
+import dfgg.domain.match.RawMatch;
+import dfgg.domain.match.RawMatchRepository;
+import dfgg.domain.match.RawMatchTimeline;
+import dfgg.domain.match.RawMatchTimelineRepository;
+import dfgg.domain.player.Player;
+import dfgg.domain.player.PlayerRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
-class MatchNormalizerTest {
+class MatchNormalizationServiceTest {
 
-    private final MatchNormalizer normalizer = new MatchNormalizer(
+    private final PlayerRepository playerRepository = mock(PlayerRepository.class);
+    private final NormalizedMatchParticipantRepository participantRepository =
+            mock(NormalizedMatchParticipantRepository.class);
+    private final RawMatchRepository rawMatchRepository = mock(RawMatchRepository.class);
+    private final RawMatchTimelineRepository rawMatchTimelineRepository =
+            mock(RawMatchTimelineRepository.class);
+    private final ItemService itemService = mock(ItemService.class);
+    private final RiotPlayerSyncService riotPlayerSyncService = mock(RiotPlayerSyncService.class);
+    private final MatchNormalizationService normalizer = new MatchNormalizationService(
             new ObjectMapper(),
-            new CoreItemPurchaseOrderCalculator()
+            new CoreItemPurchaseOrderCalculator(),
+            playerRepository,
+            participantRepository,
+            rawMatchRepository,
+            rawMatchTimelineRepository,
+            itemService,
+            riotPlayerSyncService
     );
+
+    @BeforeEach
+    void setUp() {
+        when(playerRepository.findAllById(any())).thenReturn(List.of());
+    }
+
+    @Test
+    void 저장된_원본을_조회하고_참가자_티어를_갱신한_뒤_정규화한다() {
+        String rawMatchData = """
+                {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
+                  {"puuid":"puuid-1","participantId":1,"championId":1,"teamId":100,
+                   "teamPosition":"TOP","item0":3071,"win":true}
+                ]}}
+                """;
+        String rawTimelineData = """
+                {"metadata":{"participants":["puuid-1"]},"info":{"frames":[
+                  {"events":[
+                    {"timestamp":100,"type":"ITEM_PURCHASED","participantId":1,"itemId":3071}
+                  ]}
+                ]}}
+                """;
+        when(rawMatchRepository.findById("KR_1"))
+                .thenReturn(Optional.of(new RawMatch("KR_1", rawMatchData)));
+        when(rawMatchTimelineRepository.findById("KR_1"))
+                .thenReturn(Optional.of(new RawMatchTimeline("KR_1", rawTimelineData)));
+        when(itemService.findCoreItemIds()).thenReturn(Set.of(3071));
+        when(playerRepository.findAllById(List.of("puuid-1"))).thenReturn(List.of(
+                new Player(
+                        "puuid-1",
+                        "KR",
+                        "PLATINUM",
+                        "I",
+                        Instant.parse("2026-08-23T00:00:00Z")
+                )
+        ));
+
+        NormalizedMatch normalized = normalizer.normalize("KR_1");
+
+        InOrder order = inOrder(
+                rawMatchRepository,
+                rawMatchTimelineRepository,
+                riotPlayerSyncService,
+                itemService,
+                playerRepository
+        );
+        order.verify(rawMatchRepository).findById("KR_1");
+        order.verify(rawMatchTimelineRepository).findById("KR_1");
+        order.verify(riotPlayerSyncService).syncPlayerTiers(List.of("puuid-1"));
+        order.verify(itemService).findCoreItemIds();
+        order.verify(playerRepository).findAllById(List.of("puuid-1"));
+        assertThat(normalized.participants()).singleElement().satisfies(participant -> {
+            assertThat(participant.puuid()).isEqualTo("puuid-1");
+            assertThat(participant.tier()).isEqualTo("PLATINUM");
+            assertThat(participant.finalCoreItemIds()).containsExactly(3071);
+        });
+    }
 
     @Test
     void 매치_상세와_Timeline을_정규화한다() {
+        when(playerRepository.findAllById(List.of("blue-puuid"))).thenReturn(List.of(
+                new Player(
+                        "blue-puuid",
+                        "KR",
+                        "PLATINUM",
+                        "I",
+                        Instant.parse("2026-08-22T00:00:00Z")
+                )
+        ));
+
         NormalizedMatch normalized = normalizer.normalize(
                 "KR_1234567890",
                 """
@@ -63,10 +166,60 @@ class MatchNormalizerTest {
         assertThat(normalized.participants()).singleElement().satisfies(participant -> {
             assertThat(participant.puuid()).isEqualTo("blue-puuid");
             assertThat(participant.participantId()).isEqualTo(1);
+            assertThat(participant.tier()).isEqualTo("PLATINUM");
             assertThat(participant.finalCoreItemIds()).containsExactly(3071, 6610);
             assertThat(participant.coreItemPurchaseOrder()).containsExactly(3071, 6610);
             assertThat(participant.coreItemPurchaseOrderComplete()).isTrue();
         });
+    }
+
+    @Test
+    void 매치를_정규화한_뒤_참가자_전체를_한번에_교체한다() {
+        NormalizedMatch normalized = normalizer.normalize(
+                "KR_1",
+                """
+                        {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
+                          {"puuid":"puuid-1","participantId":1,"championId":1,"teamId":100,"win":true},
+                          {"puuid":"puuid-2","participantId":2,"championId":2,"teamId":200,"win":false}
+                        ]}}
+                        """,
+                """
+                        {"metadata":{"participants":["puuid-1","puuid-2"]},"info":{"frames":[]}}
+                """,
+                List.of()
+        );
+        normalizer.save(normalized);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Iterable<NormalizedMatchParticipant>> rows =
+                ArgumentCaptor.forClass(Iterable.class);
+        InOrder order = inOrder(participantRepository);
+        order.verify(participantRepository).deleteByMatchId("KR_1");
+        order.verify(participantRepository).flush();
+        order.verify(participantRepository).saveAll(rows.capture());
+        assertThat(rows.getValue())
+                .extracting(NormalizedMatchParticipant::getPuuid)
+                .containsExactly("puuid-1", "puuid-2");
+    }
+
+    @Test
+    void 티어를_찾을_수_없는_참가자는_UNRANKED로_정규화한다() {
+        NormalizedMatch normalized = normalizer.normalize(
+                "KR_1",
+                """
+                        {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
+                          {"puuid":"unranked-puuid","participantId":1,"championId":1,"teamId":100,"win":true}
+                        ]}}
+                        """,
+                """
+                        {"metadata":{"participants":["unranked-puuid"]},"info":{"frames":[]}}
+                        """,
+                List.of()
+        );
+
+        assertThat(normalized.participants()).singleElement()
+                .extracting(participant -> participant.tier())
+                .isEqualTo("UNRANKED");
     }
 
     @Test
@@ -223,7 +376,7 @@ class MatchNormalizerTest {
     }
 
     @Test
-    void 패치_정보가_없으면_정규화하지_않는다() {
+    void 참가자가_없으면_정규화하지_않는다() {
         assertThatThrownBy(() -> normalizer.normalize(
                 "KR_1",
                 "{\"info\":{\"queueId\":420,\"participants\":[]}}",
@@ -231,5 +384,20 @@ class MatchNormalizerTest {
                 List.of()
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("match participants must not be empty");
+    }
+
+    @Test
+    void 외부_응답의_참가자_목록에_null이_있으면_변환하기_전에_거부한다() {
+        assertThatThrownBy(() -> normalizer.normalize(
+                "KR_1",
+                """
+                        {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[null]}}
+                        """,
+                """
+                        {"metadata":{"participants":[]},"info":{"frames":[]}}
+                        """,
+                List.of()
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("match participant must not be null");
     }
 }

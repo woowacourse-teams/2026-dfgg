@@ -49,6 +49,9 @@ public class NormalizedMatchParticipant {
     @Column(name = "position", length = 32)
     private String position;
 
+    @Column(name = "tier", length = 32)
+    private String tier;
+
     @Column(name = "win", nullable = false)
     private Boolean win;
 
@@ -78,6 +81,7 @@ public class NormalizedMatchParticipant {
         this.championId = participant.championId();
         this.teamId = participant.teamId();
         this.position = participant.position();
+        this.tier = participant.tier();
         this.win = participant.win();
         this.finalCoreItemIds = participant.finalCoreItemIds();
         this.coreItemPurchaseOrder = participant.coreItemPurchaseOrder();
@@ -118,6 +122,10 @@ public class NormalizedMatchParticipant {
 
     public String getPosition() {
         return position;
+    }
+
+    public String getTier() {
+        return tier;
     }
 
     public Boolean getWin() {

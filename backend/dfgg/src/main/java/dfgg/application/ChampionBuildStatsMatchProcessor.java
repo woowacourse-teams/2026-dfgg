@@ -1,5 +1,6 @@
 package dfgg.application;
 
+import dfgg.application.match.MatchNormalizationService;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.domain.match.NormalizedParticipant;
 import dfgg.domain.match.RawMatch;
@@ -18,21 +19,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ChampionBuildStatsMatchProcessor {
 
-    private final MatchNormalizer matchNormalizer;
-    private final NormalizedMatchPersistenceService normalizedPersistenceService;
+    private final MatchNormalizationService matchNormalizationService;
     private final ChampionBuildStatsAggregationService aggregationService;
     private final StatsAggregationCompletionRepository completionRepository;
     private final CompositionStatsSampleRepository sampleRepository;
 
     public ChampionBuildStatsMatchProcessor(
-            MatchNormalizer matchNormalizer,
-            NormalizedMatchPersistenceService normalizedPersistenceService,
+            MatchNormalizationService matchNormalizationService,
             ChampionBuildStatsAggregationService aggregationService,
             StatsAggregationCompletionRepository completionRepository,
             CompositionStatsSampleRepository sampleRepository
     ) {
-        this.matchNormalizer = matchNormalizer;
-        this.normalizedPersistenceService = normalizedPersistenceService;
+        this.matchNormalizationService = matchNormalizationService;
         this.aggregationService = aggregationService;
         this.completionRepository = completionRepository;
         this.sampleRepository = sampleRepository;
@@ -64,13 +62,13 @@ public class ChampionBuildStatsMatchProcessor {
             return new Result(0, 0);
         }
 
-        var normalized = matchNormalizer.normalize(
+        var normalized = matchNormalizationService.normalize(
                 rawMatch.getMatchId(),
                 rawMatch.getRawData(),
                 timeline.getRawData(),
                 coreItemIds
         );
-        normalizedPersistenceService.replace(normalized);
+        matchNormalizationService.save(normalized);
         int recordedSamples = aggregationService.aggregate(normalized, tier, claimedPuuids);
         return new Result(claimedPuuids.size(), recordedSamples);
     }
@@ -94,7 +92,7 @@ public class ChampionBuildStatsMatchProcessor {
             throw new IllegalArgumentException("cohortPuuids must not be empty");
         }
         completionRepository.acquireMatchLock(rawMatch.getMatchId());
-        NormalizedMatch normalized = matchNormalizer.normalize(
+        NormalizedMatch normalized = matchNormalizationService.normalize(
                 rawMatch.getMatchId(),
                 rawMatch.getRawData(),
                 timeline.getRawData(),
@@ -105,7 +103,7 @@ public class ChampionBuildStatsMatchProcessor {
         for (String puuid : targetPuuids) {
             removePreviousContribution(rawMatch.getMatchId(), puuid);
         }
-        normalizedPersistenceService.replace(normalized);
+        matchNormalizationService.save(normalized);
         int recordedSamples = aggregationService.aggregate(normalized, tier, targetPuuids);
         for (String puuid : targetPuuids) {
             completionRepository.markCompleted(

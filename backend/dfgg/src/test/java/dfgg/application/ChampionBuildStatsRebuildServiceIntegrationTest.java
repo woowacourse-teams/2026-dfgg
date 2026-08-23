@@ -8,6 +8,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
 import dfgg.application.item.ItemService;
+import dfgg.application.match.CoreItemPurchaseOrderCalculator;
+import dfgg.application.match.MatchNormalizationService;
+import dfgg.application.player.RiotPlayerSyncService;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionRepository;
@@ -63,8 +66,7 @@ import org.springframework.transaction.support.TransactionTemplate;
         ChampionBuildStatsMatchProcessor.class,
         ChampionBuildStatsAggregationService.class,
         ItemService.class,
-        NormalizedMatchPersistenceService.class,
-        MatchNormalizer.class,
+        MatchNormalizationService.class,
         CoreItemPurchaseOrderCalculator.class
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -87,6 +89,9 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
 
     @MockitoBean
     private DataDragonClient dataDragonClient;
+
+    @MockitoBean
+    private RiotPlayerSyncService riotPlayerSyncService;
 
     @Autowired
     private MatchParticipantCohortRepository cohortRepository;
@@ -147,6 +152,7 @@ class ChampionBuildStatsRebuildServiceIntegrationTest {
                         1,
                         100,
                         "TOP",
+                        "GOLD",
                         true,
                         List.of(3071),
                         List.of(3071),

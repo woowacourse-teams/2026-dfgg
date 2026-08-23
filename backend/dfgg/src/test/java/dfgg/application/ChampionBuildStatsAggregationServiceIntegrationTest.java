@@ -200,6 +200,7 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
                 championId,
                 teamId,
                 position,
+                "PLATINUM",
                 win,
                 List.of(3071, 6610),
                 List.of(3071, 6610),

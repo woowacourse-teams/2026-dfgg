@@ -1,7 +1,9 @@
 package dfgg.application;
 
+import dfgg.application.match.MatchNormalizationService;
 import dfgg.application.match.RiotMatchSyncService;
 import dfgg.application.player.RiotPlayerSyncService;
+import dfgg.domain.match.NormalizedMatch;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
 import java.time.Duration;
 import java.time.Instant;
@@ -24,6 +26,7 @@ public class RiotCollectionOrchestrator {
     private final RiotSchedulerProperties properties;
     private final RiotPlayerSyncService playerSyncService;
     private final RiotMatchSyncService matchSyncService;
+    private final MatchNormalizationService matchNormalizationService;
     private final ChampionBuildStatsRebuildService statsRebuildService;
     private int nextLeaguePage;
     private int nextDivisionIndex;
@@ -33,11 +36,13 @@ public class RiotCollectionOrchestrator {
             RiotSchedulerProperties properties,
             RiotPlayerSyncService playerSyncService,
             RiotMatchSyncService matchSyncService,
+            MatchNormalizationService matchNormalizationService,
             ChampionBuildStatsRebuildService statsRebuildService
     ) {
         this.properties = properties;
         this.playerSyncService = playerSyncService;
         this.matchSyncService = matchSyncService;
+        this.matchNormalizationService = matchNormalizationService;
         this.statsRebuildService = statsRebuildService;
         this.nextLeaguePage = 1;
         this.nextDivisionIndex = 0;
@@ -68,6 +73,7 @@ public class RiotCollectionOrchestrator {
         List<String> collectedPuuids = collectPlayers(summary);
         collectMatches(collectedPuuids, summary);
         collectMissingTimelines(summary);
+        normalizePendingMatches(summary);
         rebuildStats(summary);
 
         Instant finishedAt = Instant.now();
@@ -168,6 +174,40 @@ public class RiotCollectionOrchestrator {
         }
     }
 
+    private void normalizePendingMatches(RunSummary summary) {
+        try {
+            normalizeMatches(summary);
+        } catch (RuntimeException exception) {
+            // 대상 페이지 조회 자체가 실패해도 전체 수집 작업은 다음 단계로 진행한다.
+            summary.failures.add(Failure.from("NORMALIZATION_PAGE", "all-pending", exception));
+        }
+    }
+
+    private void normalizeMatches(RunSummary summary) {
+        String cursor = "";
+
+        while (true) {
+            // Raw Match와 Timeline이 모두 준비됐고 아직 정규화하지 않은 매치만 조회한다.
+            List<String> matchIds = matchNormalizationService.findPendingMatchIdsAfter(cursor);
+            if (matchIds.isEmpty()) {
+                return;
+            }
+
+            for (String matchId : matchIds) {
+                try {
+                    // 외부 티어 조회와 변환을 먼저 끝낸 뒤 저장만 짧은 트랜잭션으로 실행한다.
+                    NormalizedMatch normalized = matchNormalizationService.normalize(matchId);
+                    matchNormalizationService.save(normalized);
+                    summary.normalizedMatches++;
+                } catch (RuntimeException exception) {
+                    // 한 매치가 실패해도 다음 매치를 처리하고, 실패한 매치는 다음 실행에서 재시도한다.
+                    summary.failures.add(Failure.from("NORMALIZE", matchId, exception));
+                }
+            }
+            cursor = matchIds.getLast();
+        }
+    }
+
     private void rebuildStats(RunSummary summary) {
         for (String tier : properties.getTiers()) {
             try {
@@ -230,7 +270,7 @@ public class RiotCollectionOrchestrator {
     private void logCompleted(String status, Instant startedAt, Instant finishedAt, RunSummary summary) {
         log.info(
                 "Riot collection scheduler completed: status={}, startedAt={}, finishedAt={}, durationMs={}, "
-                        + "newPlayers={}, newMatches={}, newTimelines={}, processedMatches={}, "
+                        + "newPlayers={}, newMatches={}, newTimelines={}, normalizedMatches={}, processedMatches={}, "
                         + "recordedSamples={}, skippedItems={}, failureCounts={}",
                 status,
                 startedAt,
@@ -239,6 +279,7 @@ public class RiotCollectionOrchestrator {
                 summary.newPlayers,
                 summary.newMatches,
                 summary.newTimelines,
+                summary.normalizedMatches,
                 summary.processedMatches,
                 summary.recordedSamples,
                 summary.skippedItems,
@@ -256,6 +297,7 @@ public class RiotCollectionOrchestrator {
         private int newPlayers;
         private int newMatches;
         private int newTimelines;
+        private int normalizedMatches;
         private int processedMatches;
         private int recordedSamples;
         private int skippedItems;

@@ -11,8 +11,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import dfgg.application.match.MatchNormalizationService;
 import dfgg.application.match.RiotMatchSyncService;
 import dfgg.application.player.RiotPlayerSyncService;
+import dfgg.domain.match.NormalizedMatch;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +25,7 @@ class RiotCollectionOrchestratorTest {
 
     private RiotPlayerSyncService playerSyncService;
     private RiotMatchSyncService matchSyncService;
+    private MatchNormalizationService matchNormalizationService;
     private ChampionBuildStatsRebuildService statsRebuildService;
     private RiotSchedulerProperties properties;
     private RiotCollectionOrchestrator orchestrator;
@@ -31,17 +34,21 @@ class RiotCollectionOrchestratorTest {
     void setUp() {
         playerSyncService = mock(RiotPlayerSyncService.class);
         matchSyncService = mock(RiotMatchSyncService.class);
+        matchNormalizationService = mock(MatchNormalizationService.class);
         statsRebuildService = mock(ChampionBuildStatsRebuildService.class);
         properties = new RiotSchedulerProperties();
         properties.setPlayerPageSize(2);
         when(playerSyncService.syncLeagueEntries(
                 anyString(), anyString(), anyString(), anyInt()
         )).thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of()));
+        when(matchNormalizationService.findPendingMatchIdsAfter(anyString()))
+                .thenReturn(List.of());
 
         orchestrator = new RiotCollectionOrchestrator(
                 properties,
                 playerSyncService,
                 matchSyncService,
+                matchNormalizationService,
                 statsRebuildService
         );
     }
@@ -55,6 +62,12 @@ class RiotCollectionOrchestratorTest {
                 ));
         when(matchSyncService.syncMatches(List.of("puuid-1", "puuid-2"), 0, 20))
                 .thenReturn(new RiotMatchSyncService.SyncResult(1, 2, 1, 3, List.of()));
+        NormalizedMatch normalized = mock(NormalizedMatch.class);
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of("KR_1"));
+        when(matchNormalizationService.findPendingMatchIdsAfter("KR_1"))
+                .thenReturn(List.of());
+        when(matchNormalizationService.normalize("KR_1")).thenReturn(normalized);
         when(statsRebuildService.rebuildAll("PLATINUM"))
                 .thenReturn(new ChampionBuildStatsRebuildResult(2, 2, 0, 64));
 
@@ -63,12 +76,17 @@ class RiotCollectionOrchestratorTest {
         InOrder order = inOrder(
                 playerSyncService,
                 matchSyncService,
+                matchNormalizationService,
                 statsRebuildService
         );
         order.verify(playerSyncService)
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
         order.verify(matchSyncService).syncMatches(List.of("puuid-1", "puuid-2"), 0, 20);
         order.verify(matchSyncService).syncMissingTimelines();
+        order.verify(matchNormalizationService).findPendingMatchIdsAfter("");
+        order.verify(matchNormalizationService).normalize("KR_1");
+        order.verify(matchNormalizationService).save(normalized);
+        order.verify(matchNormalizationService).findPendingMatchIdsAfter("KR_1");
         order.verify(statsRebuildService).rebuildAll("PLATINUM");
     }
 

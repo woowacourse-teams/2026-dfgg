@@ -3,12 +3,17 @@ package dfgg.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dfgg.domain.match.NormalizedMatch;
+import dfgg.domain.match.NormalizedMatchParticipant;
+import dfgg.domain.match.NormalizedMatchParticipantRepository;
+import dfgg.domain.match.NormalizedParticipant;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
 import dfgg.domain.match.RawMatchTimelineRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;
+import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +49,9 @@ class RawMatchRepositoryTest {
 
     @Autowired
     private RawMatchTimelineRepository timelineRepository;
+
+    @Autowired
+    private NormalizedMatchParticipantRepository normalizedRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -109,5 +117,82 @@ class RawMatchRepositoryTest {
         assertThat(rawMatchRepository.findMatchIdsMissingTimelineAfter(
                 "KR_1", PageRequest.of(0, 100)
         )).containsExactly("KR_3");
+    }
+
+    @Test
+    void Raw와_Timeline은_있지만_아직_정규화하지_않은_매치만_조회한다() {
+        rawMatchRepository.save(new RawMatch("KR_1", RAW_DATA));
+        rawMatchRepository.save(new RawMatch("KR_2", RAW_DATA));
+        rawMatchRepository.save(new RawMatch("KR_3", RAW_DATA));
+        timelineRepository.save(new RawMatchTimeline("KR_2", "{}"));
+        timelineRepository.save(new RawMatchTimeline("KR_3", "{}"));
+
+        NormalizedMatch normalized = new NormalizedMatch(
+                "KR_3",
+                "16.15",
+                420,
+                List.of(new NormalizedParticipant(
+                        "puuid-3",
+                        1,
+                        1,
+                        100,
+                        "TOP",
+                        "PLATINUM",
+                        true,
+                        List.of(),
+                        List.of(),
+                        false
+                ))
+        );
+        normalizedRepository.save(new NormalizedMatchParticipant(
+                normalized,
+                normalized.participants().getFirst()
+        ));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(rawMatchRepository.findMatchIdsReadyForNormalizationAfter(
+                "", PageRequest.of(0, 100)
+        )).containsExactly("KR_2");
+    }
+
+    @Test
+    void 티어가_없는_기존_정규화_행은_다시_정규화_대상으로_조회한다() {
+        rawMatchRepository.save(new RawMatch("KR_LEGACY", RAW_DATA));
+        timelineRepository.save(new RawMatchTimeline("KR_LEGACY", "{}"));
+        NormalizedMatch normalized = new NormalizedMatch(
+                "KR_LEGACY",
+                "16.15",
+                420,
+                List.of(new NormalizedParticipant(
+                        "legacy-puuid",
+                        1,
+                        1,
+                        100,
+                        "TOP",
+                        "PLATINUM",
+                        true,
+                        List.of(),
+                        List.of(),
+                        false
+                ))
+        );
+        normalizedRepository.save(new NormalizedMatchParticipant(
+                normalized,
+                normalized.participants().getFirst()
+        ));
+        entityManager.flush();
+        entityManager.createNativeQuery("""
+                        UPDATE normalized_match_participants
+                        SET tier = NULL
+                        WHERE match_id = :matchId
+                        """)
+                .setParameter("matchId", "KR_LEGACY")
+                .executeUpdate();
+        entityManager.clear();
+
+        assertThat(rawMatchRepository.findMatchIdsReadyForNormalizationAfter(
+                "", PageRequest.of(0, 100)
+        )).containsExactly("KR_LEGACY");
     }
 }

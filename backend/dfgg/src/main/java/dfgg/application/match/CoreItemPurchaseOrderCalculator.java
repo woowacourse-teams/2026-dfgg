@@ -1,4 +1,4 @@
-package dfgg.application;
+package dfgg.application.match;
 
 import dfgg.infrastructure.external.dto.MatchTimelineResponse;
 import java.util.ArrayList;

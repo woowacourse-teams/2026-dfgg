@@ -9,6 +9,7 @@ public record NormalizedParticipant(
         Integer championId,
         Integer teamId,
         String position,
+        String tier,
         Boolean win,
         List<Integer> finalCoreItemIds,
         List<Integer> coreItemPurchaseOrder,
@@ -22,6 +23,9 @@ public record NormalizedParticipant(
         Objects.requireNonNull(participantId, "participantId must not be null");
         Objects.requireNonNull(championId, "championId must not be null");
         Objects.requireNonNull(teamId, "teamId must not be null");
+        if (tier == null || tier.isBlank()) {
+            throw new IllegalArgumentException("tier must not be blank");
+        }
         Objects.requireNonNull(win, "win must not be null");
         finalCoreItemIds = List.copyOf(Objects.requireNonNull(finalCoreItemIds, "finalCoreItemIds must not be null"));
         coreItemPurchaseOrder = List.copyOf(
