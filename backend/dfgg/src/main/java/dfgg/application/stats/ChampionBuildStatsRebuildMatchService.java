@@ -12,17 +12,20 @@ import dfgg.domain.match.RawMatchTimelineRepository;
 import dfgg.domain.stats.CompositionStatsSampleRepository;
 import dfgg.domain.stats.StatsAggregationCompletionRepository;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 장애 복구나 백필이 필요할 때 저장된 정규화 데이터에서 통계 미완료 대상을 찾아 다시 처리한다.
@@ -42,6 +45,7 @@ public class ChampionBuildStatsRebuildMatchService {
     private final CompositionStatsSampleRepository sampleRepository;
     private final NormalizedMatchParticipantRepository participantRepository;
     private final int batchSize;
+    private TransactionTemplate transactionTemplate;
 
     public ChampionBuildStatsRebuildMatchService(
             RawMatchRepository rawMatchRepository,
@@ -66,6 +70,16 @@ public class ChampionBuildStatsRebuildMatchService {
         this.sampleRepository = sampleRepository;
         this.participantRepository = participantRepository;
         this.batchSize = batchSize;
+    }
+
+    /**
+     * 매치 단위 복구 작업이 completion 선점부터 통계 반영까지 하나의 새 트랜잭션으로 실행되도록 설정한다.
+     */
+    @Autowired
+    void setTransactionManager(PlatformTransactionManager transactionManager) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(Propagation.REQUIRES_NEW.value());
+        this.transactionTemplate = template;
     }
 
     /**
@@ -186,6 +200,25 @@ public class ChampionBuildStatsRebuildMatchService {
             Collection<String> participantPuuids,
             String aggregationRevision
     ) {
+        runInNewTransaction(() -> registerPendingMatchStatsInternal(
+                normalized,
+                queueType,
+                tier,
+                participantPuuids,
+                aggregationRevision
+        ));
+    }
+
+    /**
+     * 미완료 참가자 선점과 통계 등록을 현재 트랜잭션 안에서 수행한다.
+     */
+    private void registerPendingMatchStatsInternal(
+            NormalizedMatch normalized,
+            String queueType,
+            String tier,
+            Collection<String> participantPuuids,
+            String aggregationRevision
+    ) {
         validateScope(queueType, tier, participantPuuids, aggregationRevision);
 
         // 참가자별 completion 유니크 제약으로 재집계 대상의 중복 선점을 막는다.
@@ -207,6 +240,29 @@ public class ChampionBuildStatsRebuildMatchService {
      * 원본 매치에서 정규화 데이터를 다시 만들고 기존 기여를 제거한 뒤 새 통계를 반영한다.
      */
     public void replaceMatchStats(
+            RawMatch rawMatch,
+            RawMatchTimeline timeline,
+            String queueType,
+            String tier,
+            Collection<String> participantPuuids,
+            Set<Integer> coreItemIds,
+            String aggregationRevision
+    ) {
+        runInNewTransaction(() -> replaceMatchStatsInternal(
+                rawMatch,
+                timeline,
+                queueType,
+                tier,
+                participantPuuids,
+                coreItemIds,
+                aggregationRevision
+        ));
+    }
+
+    /**
+     * 기존 기여 제거부터 새 통계 반영까지를 하나의 매치 작업으로 수행한다.
+     */
+    private void replaceMatchStatsInternal(
             RawMatch rawMatch,
             RawMatchTimeline timeline,
             String queueType,
@@ -245,6 +301,17 @@ public class ChampionBuildStatsRebuildMatchService {
                     aggregationRevision
             );
         }
+    }
+
+    /**
+     * Spring 컨테이너에서 실행될 때는 매치별 새 트랜잭션을 열고, 단위 테스트에서는 주입된 작업을 그대로 실행한다.
+     */
+    private void runInNewTransaction(Runnable action) {
+        if (transactionTemplate == null) {
+            action.run();
+            return;
+        }
+        transactionTemplate.executeWithoutResult(status -> action.run());
     }
 
     /**
