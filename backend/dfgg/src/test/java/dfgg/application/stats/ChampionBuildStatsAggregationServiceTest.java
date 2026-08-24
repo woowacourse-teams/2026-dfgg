@@ -16,7 +16,7 @@ import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
 import dfgg.domain.match.NormalizedMatch;
-import dfgg.domain.match.NormalizedParticipant;
+import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.stats.CompositionStatsSampleRepository;
 import java.util.List;
@@ -163,7 +163,7 @@ class ChampionBuildStatsAggregationServiceTest {
         return new Champion(id, "champion-" + id, "챔피언" + id, List.of(ChampionTag.valueOf(tag)));
     }
 
-    private NormalizedParticipant participant(
+    private NormalizedMatchParticipant participant(
             String puuid,
             int participantId,
             int championId,
@@ -171,7 +171,7 @@ class ChampionBuildStatsAggregationServiceTest {
             String position,
             boolean win
     ) {
-        return new NormalizedParticipant(
+        return new NormalizedMatchParticipant(
                 puuid,
                 participantId,
                 championId,

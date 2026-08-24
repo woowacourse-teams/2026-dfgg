@@ -70,22 +70,36 @@ public class NormalizedMatchParticipant {
     }
 
     public NormalizedMatchParticipant(
-            NormalizedMatch match,
-            dfgg.domain.match.NormalizedParticipant participant
+            String puuid,
+            Integer participantId,
+            Integer championId,
+            Integer teamId,
+            String position,
+            String tier,
+            Boolean win,
+            List<Integer> finalCoreItemIds,
+            List<Integer> coreItemPurchaseOrder,
+            boolean coreItemPurchaseOrderComplete
     ) {
-        this.matchId = match.matchId();
-        this.patch = match.patch();
-        this.queueId = match.queueId();
-        this.puuid = participant.puuid();
-        this.participantId = participant.participantId();
-        this.championId = participant.championId();
-        this.teamId = participant.teamId();
-        this.position = participant.position();
-        this.tier = participant.tier();
-        this.win = participant.win();
-        this.finalCoreItemIds = participant.finalCoreItemIds();
-        this.coreItemPurchaseOrder = participant.coreItemPurchaseOrder();
-        this.coreItemPurchaseOrderComplete = participant.coreItemPurchaseOrderComplete();
+        this.puuid = puuid;
+        this.participantId = participantId;
+        this.championId = championId;
+        this.teamId = teamId;
+        this.position = position;
+        this.tier = tier;
+        this.win = win;
+        this.finalCoreItemIds = List.copyOf(finalCoreItemIds);
+        this.coreItemPurchaseOrder = List.copyOf(coreItemPurchaseOrder);
+        this.coreItemPurchaseOrderComplete = coreItemPurchaseOrderComplete;
+    }
+
+    /**
+     * 매치 집계 객체에 참가자를 연결할 때 저장에 필요한 매치 공통 정보를 채운다.
+     */
+    void attachMatchContext(String matchId, String patch, Integer queueId) {
+        this.matchId = matchId;
+        this.patch = patch;
+        this.queueId = queueId;
     }
 
     public Long getId() {
@@ -96,7 +110,15 @@ public class NormalizedMatchParticipant {
         return matchId;
     }
 
+    public String matchId() {
+        return matchId;
+    }
+
     public String getPatch() {
+        return patch;
+    }
+
+    public String patch() {
         return patch;
     }
 
@@ -104,7 +126,15 @@ public class NormalizedMatchParticipant {
         return queueId;
     }
 
+    public Integer queueId() {
+        return queueId;
+    }
+
     public String getPuuid() {
+        return puuid;
+    }
+
+    public String puuid() {
         return puuid;
     }
 
@@ -112,7 +142,15 @@ public class NormalizedMatchParticipant {
         return participantId;
     }
 
+    public Integer participantId() {
+        return participantId;
+    }
+
     public Integer getChampionId() {
+        return championId;
+    }
+
+    public Integer championId() {
         return championId;
     }
 
@@ -120,7 +158,15 @@ public class NormalizedMatchParticipant {
         return teamId;
     }
 
+    public Integer teamId() {
+        return teamId;
+    }
+
     public String getPosition() {
+        return position;
+    }
+
+    public String position() {
         return position;
     }
 
@@ -128,7 +174,15 @@ public class NormalizedMatchParticipant {
         return tier;
     }
 
+    public String tier() {
+        return tier;
+    }
+
     public Boolean getWin() {
+        return win;
+    }
+
+    public Boolean win() {
         return win;
     }
 
@@ -136,11 +190,23 @@ public class NormalizedMatchParticipant {
         return List.copyOf(finalCoreItemIds);
     }
 
+    public List<Integer> finalCoreItemIds() {
+        return List.copyOf(finalCoreItemIds);
+    }
+
     public List<Integer> getCoreItemPurchaseOrder() {
         return List.copyOf(coreItemPurchaseOrder);
     }
 
+    public List<Integer> coreItemPurchaseOrder() {
+        return List.copyOf(coreItemPurchaseOrder);
+    }
+
     public boolean isCoreItemPurchaseOrderComplete() {
+        return coreItemPurchaseOrderComplete;
+    }
+
+    public boolean coreItemPurchaseOrderComplete() {
         return coreItemPurchaseOrderComplete;
     }
 }

@@ -5,7 +5,6 @@ import dfgg.application.match.MatchNormalizationService;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
-import dfgg.domain.match.NormalizedParticipant;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
@@ -138,25 +137,11 @@ public class ChampionBuildStatsRebuildMatchService {
         }
 
         NormalizedMatchParticipant first = rows.getFirst();
-        List<NormalizedParticipant> participants = rows.stream()
-                .map(row -> new NormalizedParticipant(
-                        row.getPuuid(),
-                        row.getParticipantId(),
-                        row.getChampionId(),
-                        row.getTeamId(),
-                        row.getPosition(),
-                        row.getTier(),
-                        row.getWin(),
-                        row.getFinalCoreItemIds(),
-                        row.getCoreItemPurchaseOrder(),
-                        row.isCoreItemPurchaseOrderComplete()
-                ))
-                .toList();
         return new NormalizedMatch(
                 first.getMatchId(),
                 first.getPatch(),
                 first.getQueueId(),
-                participants
+                rows
         );
     }
 
@@ -313,7 +298,7 @@ public class ChampionBuildStatsRebuildMatchService {
      */
     private void ensureParticipantsExist(NormalizedMatch normalized, List<String> targetPuuids) {
         Set<String> normalizedPuuids = normalized.participants().stream()
-                .map(NormalizedParticipant::puuid)
+                .map(NormalizedMatchParticipant::puuid)
                 .collect(Collectors.toSet());
         List<String> missingPuuids = targetPuuids.stream()
                 .filter(puuid -> !normalizedPuuids.contains(puuid))

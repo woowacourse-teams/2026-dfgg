@@ -20,7 +20,6 @@ import dfgg.domain.item.ItemRepository;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
-import dfgg.domain.match.NormalizedParticipant;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
@@ -138,7 +137,7 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
 
     @Test
     void 정규화_교체_저장이_실패하면_기존_참가자_행을_보존한다() {
-        NormalizedParticipant existingParticipant = new NormalizedParticipant(
+        NormalizedMatchParticipant existingParticipant = new NormalizedMatchParticipant(
                 "same-puuid",
                 1,
                 1,
@@ -157,7 +156,7 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
                 List.of(existingParticipant)
         ));
 
-        NormalizedParticipant duplicateParticipant = new NormalizedParticipant(
+        NormalizedMatchParticipant duplicateParticipant = new NormalizedMatchParticipant(
                 "same-puuid",
                 2,
                 2,
@@ -200,7 +199,7 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
                 "KR_EXISTING",
                 "16.15",
                 420,
-                List.of(new NormalizedParticipant(
+                List.of(new NormalizedMatchParticipant(
                         "p-existing",
                         1,
                         1,
@@ -213,10 +212,7 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
                         true
                 ))
         );
-        normalizedRepository.saveAndFlush(new NormalizedMatchParticipant(
-                existingMatch,
-                existingMatch.participants().getFirst()
-        ));
+        normalizedRepository.saveAndFlush(existingMatch.participants().getFirst());
         ChampionBuildStats existingStats = statsRepository.saveAndFlush(new ChampionBuildStats(
                 "16.15",
                 420,

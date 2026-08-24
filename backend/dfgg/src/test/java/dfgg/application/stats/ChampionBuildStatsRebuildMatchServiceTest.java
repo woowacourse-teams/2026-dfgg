@@ -9,9 +9,8 @@ import static org.mockito.Mockito.when;
 import dfgg.application.item.ItemService;
 import dfgg.application.match.MatchNormalizationService;
 import dfgg.domain.match.NormalizedMatch;
-import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
-import dfgg.domain.match.NormalizedParticipant;
+import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
@@ -119,8 +118,8 @@ class ChampionBuildStatsRebuildMatchServiceTest {
 
     @Test
     void 전체_집계에서는_저장된_정규화_행을_읽어_통계를_집계한다() {
-        NormalizedParticipant firstParticipant = normalizedParticipant("p-1", 1);
-        NormalizedParticipant secondParticipant = normalizedParticipant("p-2", 2);
+        NormalizedMatchParticipant firstParticipant = normalizedParticipant("p-1", 1);
+        NormalizedMatchParticipant secondParticipant = normalizedParticipant("p-2", 2);
         NormalizedMatch normalized = normalizedMatch(
                 "KR_1",
                 firstParticipant,
@@ -144,8 +143,8 @@ class ChampionBuildStatsRebuildMatchServiceTest {
 
     @Test
     void 한_매치가_실패해도_다음_매치를_계속_처리한다() {
-        NormalizedParticipant failedParticipant = normalizedParticipant("p-failed", 1);
-        NormalizedParticipant succeededParticipant = normalizedParticipant("p-succeeded", 1);
+        NormalizedMatchParticipant failedParticipant = normalizedParticipant("p-failed", 1);
+        NormalizedMatchParticipant succeededParticipant = normalizedParticipant("p-succeeded", 1);
         NormalizedMatch failedMatch = normalizedMatch("KR_FAILED", failedParticipant);
         NormalizedMatch succeededMatch = normalizedMatch("KR_SUCCEEDED", succeededParticipant);
         when(completionRepository.findPendingTargetsAfter(
@@ -181,13 +180,13 @@ class ChampionBuildStatsRebuildMatchServiceTest {
 
     private NormalizedMatch normalizedMatch(
             String matchId,
-            NormalizedParticipant... participants
+            NormalizedMatchParticipant... participants
     ) {
         return new NormalizedMatch(matchId, "16.15", 420, List.of(participants));
     }
 
-    private NormalizedParticipant normalizedParticipant(String puuid, int participantId) {
-        return new NormalizedParticipant(
+    private NormalizedMatchParticipant normalizedParticipant(String puuid, int participantId) {
+        return new NormalizedMatchParticipant(
                 puuid,
                 participantId,
                 participantId,
@@ -203,9 +202,9 @@ class ChampionBuildStatsRebuildMatchServiceTest {
 
     private NormalizedMatchParticipant normalizedRow(
             NormalizedMatch match,
-            NormalizedParticipant participant
+            NormalizedMatchParticipant participant
     ) {
-        return new NormalizedMatchParticipant(match, participant);
+        return participant;
     }
 
     private StatsAggregationCompletionRepository.PendingTarget target(String matchId, String puuid) {

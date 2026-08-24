@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
-import dfgg.domain.match.NormalizedParticipant;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
@@ -131,7 +130,7 @@ class RawMatchRepositoryTest {
                 "KR_3",
                 "16.15",
                 420,
-                List.of(new NormalizedParticipant(
+                List.of(new NormalizedMatchParticipant(
                         "puuid-3",
                         1,
                         1,
@@ -144,10 +143,7 @@ class RawMatchRepositoryTest {
                         false
                 ))
         );
-        normalizedRepository.save(new NormalizedMatchParticipant(
-                normalized,
-                normalized.participants().getFirst()
-        ));
+        normalizedRepository.save(normalized.participants().getFirst());
         entityManager.flush();
         entityManager.clear();
 
@@ -164,7 +160,7 @@ class RawMatchRepositoryTest {
                 "KR_LEGACY",
                 "16.15",
                 420,
-                List.of(new NormalizedParticipant(
+                List.of(new NormalizedMatchParticipant(
                         "legacy-puuid",
                         1,
                         1,
@@ -177,10 +173,7 @@ class RawMatchRepositoryTest {
                         false
                 ))
         );
-        normalizedRepository.save(new NormalizedMatchParticipant(
-                normalized,
-                normalized.participants().getFirst()
-        ));
+        normalizedRepository.save(normalized.participants().getFirst());
         entityManager.flush();
         entityManager.createNativeQuery("""
                         UPDATE normalized_match_participants

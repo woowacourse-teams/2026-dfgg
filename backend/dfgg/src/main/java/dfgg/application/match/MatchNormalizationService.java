@@ -7,7 +7,6 @@ import dfgg.application.player.RiotPlayerSyncService;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
-import dfgg.domain.match.NormalizedParticipant;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
@@ -139,9 +138,7 @@ public class MatchNormalizationService {
     public void save(NormalizedMatch match) {
         participantRepository.deleteByMatchId(match.matchId());
         participantRepository.flush();
-        participantRepository.saveAll(match.participants().stream()
-                .map(participant -> new NormalizedMatchParticipant(match, participant))
-                .toList());
+        participantRepository.saveAll(match.participants());
     }
 
     /**
@@ -175,7 +172,8 @@ public class MatchNormalizationService {
 
         // Match 참가자 배열의 순서를 유지한다.
         // 배열 위치(index + 1)는 participantId가 없을 때 사용하는 마지막 보완값이다.
-        List<NormalizedParticipant> participants = Stream.iterate(0, index -> index + 1)
+        String patch = normalizePatch(match.info().gameVersion());
+        List<NormalizedMatchParticipant> participants = Stream.iterate(0, index -> index + 1)
                 .limit(matchParticipants.size())
                 .map(index -> normalizeParticipant(
                         matchParticipants.get(index),
@@ -189,13 +187,13 @@ public class MatchNormalizationService {
         // 패치는 세부 빌드 버전을 버리고 major.minor까지만 통계 기준으로 사용한다.
         return new NormalizedMatch(
                 matchId,
-                normalizePatch(match.info().gameVersion()),
+                patch,
                 match.info().queueId(),
                 participants
         );
     }
 
-    private NormalizedParticipant normalizeParticipant(
+    private NormalizedMatchParticipant normalizeParticipant(
             MatchParticipant participant,
             int fallbackParticipantId,
             MatchTimelineResponse timeline,
@@ -224,7 +222,7 @@ public class MatchNormalizationService {
         // 하나라도 구매 이력을 확인할 수 없으면 Optional.empty()가 반환된다.
         var purchaseOrder = purchaseOrderCalculator.calculate(timeline, participantId, finalCoreItems, coreItemIds);
 
-        return new NormalizedParticipant(
+        return new NormalizedMatchParticipant(
                 participant.puuid(),
                 participantId,
                 participant.championId(),

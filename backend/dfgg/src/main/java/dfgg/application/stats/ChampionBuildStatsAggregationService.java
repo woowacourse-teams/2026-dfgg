@@ -6,7 +6,7 @@ import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.item.Item;
 import dfgg.domain.match.NormalizedMatch;
-import dfgg.domain.match.NormalizedParticipant;
+import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.stats.ChampionBuildStats;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.stats.CombinationContext;
@@ -67,7 +67,7 @@ public class ChampionBuildStatsAggregationService {
         Map<Long, Item> items = loadItems(match);
 
         // 구매 순서를 완전히 복원한 대상 참가자만 통계에 포함한다.
-        for (NormalizedParticipant participant : match.participants()) {
+        for (NormalizedMatchParticipant participant : match.participants()) {
             if (!isTargetParticipant(participant, targets)
                     || !participant.coreItemPurchaseOrderComplete()
                     || participant.coreItemPurchaseOrder().isEmpty()) {
@@ -109,7 +109,7 @@ public class ChampionBuildStatsAggregationService {
      */
     private void recordSample(
             NormalizedMatch match,
-            NormalizedParticipant participant,
+            NormalizedMatchParticipant participant,
             String tier,
             Champion champion,
             ChampionPosition position,
@@ -163,7 +163,7 @@ public class ChampionBuildStatsAggregationService {
      */
     private Map<Integer, Champion> loadChampions(NormalizedMatch match) {
         List<Long> championIds = match.participants().stream()
-                .map(NormalizedParticipant::championId)
+                .map(NormalizedMatchParticipant::championId)
                 .distinct()
                 .map(Integer::longValue)
                 .toList();
@@ -190,7 +190,7 @@ public class ChampionBuildStatsAggregationService {
     /**
      * 현재 참가자가 이번 집계 대상 PUUID에 포함되는지 확인한다.
      */
-    private boolean isTargetParticipant(NormalizedParticipant participant, Set<String> targets) {
+    private boolean isTargetParticipant(NormalizedMatchParticipant participant, Set<String> targets) {
         return targets.contains(participant.puuid());
     }
 
@@ -237,12 +237,12 @@ public class ChampionBuildStatsAggregationService {
      */
     private Optional<CombinationContext> combinationContext(
             NormalizedMatch match,
-            NormalizedParticipant participant,
+            NormalizedMatchParticipant participant,
             Map<Integer, Champion> champions
     ) {
         List<Champion> allies = new ArrayList<>();
         List<Champion> enemies = new ArrayList<>();
-        for (NormalizedParticipant other : match.participants()) {
+        for (NormalizedMatchParticipant other : match.participants()) {
             Champion otherChampion = champions.get(other.championId());
             if (otherChampion == null) {
                 return Optional.empty();

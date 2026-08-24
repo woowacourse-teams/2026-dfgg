@@ -6,7 +6,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import dfgg.domain.match.NormalizedMatch;
-import dfgg.domain.match.NormalizedParticipant;
+import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.stats.StatsAggregationCompletionRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -70,12 +70,12 @@ class ChampionBuildStatsMatchServiceTest {
         verifyNoInteractions(completionRepository, aggregationService);
     }
 
-    private NormalizedMatch normalizedMatch(NormalizedParticipant... participants) {
+    private NormalizedMatch normalizedMatch(NormalizedMatchParticipant... participants) {
         return new NormalizedMatch("KR_1", "16.15", 420, List.of(participants));
     }
 
-    private NormalizedParticipant participant(String puuid, int participantId, String tier) {
-        return new NormalizedParticipant(
+    private NormalizedMatchParticipant participant(String puuid, int participantId, String tier) {
+        return new NormalizedMatchParticipant(
                 puuid,
                 participantId,
                 participantId,

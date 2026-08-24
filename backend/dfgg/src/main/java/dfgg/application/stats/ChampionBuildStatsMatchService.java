@@ -1,7 +1,7 @@
 package dfgg.application.stats;
 
 import dfgg.domain.match.NormalizedMatch;
-import dfgg.domain.match.NormalizedParticipant;
+import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.stats.StatsAggregationCompletionRepository;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,7 +40,7 @@ public class ChampionBuildStatsMatchService {
         }
         List<String> participantPuuids = normalized.participants().stream()
                 .filter(participant -> tier.equals(participant.tier()))
-                .map(NormalizedParticipant::puuid)
+                .map(NormalizedMatchParticipant::puuid)
                 .toList();
         if (participantPuuids.isEmpty()) {
             return;
