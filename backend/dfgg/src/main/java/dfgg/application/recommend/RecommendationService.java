@@ -76,7 +76,7 @@ public class RecommendationService {
         }
 
         // 여러 통계 행을 슬롯별 후보로 합쳐 최종 추천 아이템 순서를 만든다.
-        List<Item> bestItems = buildComposer.compose(matchingStats);
+        List<Item> bestItems = buildComposer.compose(matchingStats, position);
         if (bestItems.isEmpty()) {
             // 통계 행은 존재하지만 실제 아이템 후보가 없는 경우도 추천 불가로 처리한다.
             throw new CompositionStatsNotFoundException(myChampion.getName(), position.name());
