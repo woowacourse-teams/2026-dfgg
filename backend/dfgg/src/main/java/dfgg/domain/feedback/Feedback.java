@@ -16,13 +16,28 @@ public class Feedback {
     private LocalDate date;
     private String content;
 
-    public Feedback(Long id, LocalDate date, String content) {
-        this.id = id;
+    public Feedback() {
+
+    }
+
+    private Feedback(LocalDate date, String content) {
         this.date = date;
         this.content = content;
     }
 
-    public Feedback() {
+    public static Feedback create(LocalDate date, String content) {
+        return new Feedback(date, content);
+    }
 
+    public Long getId() {
+        return id;
+    }
+
+    public LocalDate getDate() {
+        return date;
+    }
+
+    public String getContent() {
+        return content;
     }
 }

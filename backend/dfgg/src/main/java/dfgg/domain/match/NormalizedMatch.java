@@ -7,7 +7,7 @@ public record NormalizedMatch(
         String matchId,
         String patch,
         Integer queueId,
-        List<NormalizedParticipant> participants
+        List<NormalizedMatchParticipant> participants
 ) {
 
     public NormalizedMatch {
@@ -19,5 +19,6 @@ public record NormalizedMatch(
         }
         Objects.requireNonNull(queueId, "queueId must not be null");
         participants = List.copyOf(Objects.requireNonNull(participants, "participants must not be null"));
+        participants.forEach(participant -> participant.attachMatchContext(matchId, patch, queueId));
     }
 }

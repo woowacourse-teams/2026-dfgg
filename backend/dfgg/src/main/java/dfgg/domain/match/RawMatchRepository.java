@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface RawMatchRepository extends JpaRepository<RawMatch, String> {
 
@@ -30,10 +31,40 @@ public interface RawMatchRepository extends JpaRepository<RawMatch, String> {
     @Query("""
             SELECT rawMatch.matchId
             FROM RawMatch rawMatch
+            WHERE rawMatch.matchId > :cursor
+              AND EXISTS (
+                  SELECT timeline.matchId
+                  FROM RawMatchTimeline timeline
+                  WHERE timeline.matchId = rawMatch.matchId
+              )
+              AND (
+                  NOT EXISTS (
+                      SELECT participant.matchId
+                      FROM NormalizedMatchParticipant participant
+                      WHERE participant.matchId = rawMatch.matchId
+                  )
+                  OR EXISTS (
+                      SELECT legacyParticipant.matchId
+                      FROM NormalizedMatchParticipant legacyParticipant
+                      WHERE legacyParticipant.matchId = rawMatch.matchId
+                        AND (legacyParticipant.tier IS NULL OR legacyParticipant.tier = '')
+                  )
+              )
+            ORDER BY rawMatch.matchId
+            """)
+    List<String> findMatchIdsReadyForNormalizationAfter(
+            @Param("cursor") String cursor,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT rawMatch.matchId
+            FROM RawMatch rawMatch
             WHERE rawMatch.matchId IN :matchIds
             """)
     Set<String> findExistingMatchIds(@Param("matchIds") Collection<String> matchIds);
 
+    @Transactional
     @Modifying
     @Query(value = """
             INSERT INTO raw_matches (match_id, raw_data)

@@ -84,6 +84,9 @@ public class ChampionBuildStats {
     protected ChampionBuildStats() {
     }
 
+    /**
+     * 하나의 패치·조합 조건·빌드 조합을 나타내는 통계 객체를 생성한다.
+     */
     public ChampionBuildStats(
             String patch,
             Integer queueId,
@@ -139,6 +142,9 @@ public class ChampionBuildStats {
         this.gameCount = gameCount;
     }
 
+    /**
+     * 통계 조건과 빌드 순서를 조합해 중복을 판별할 고유 키를 만든다.
+     */
     public static String createStatsKey(
             String patch,
             Integer queueId,
@@ -168,6 +174,9 @@ public class ChampionBuildStats {
         );
     }
 
+    /**
+     * 해당 빌드가 사용된 게임 수를 늘리고, 승리한 게임이면 승리 수도 함께 늘린다.
+     */
     public void recordGame(boolean win) {
         this.gameCount = (this.gameCount == null ? 0 : this.gameCount) + 1;
         if (win) {

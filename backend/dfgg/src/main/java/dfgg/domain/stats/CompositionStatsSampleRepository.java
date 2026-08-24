@@ -7,6 +7,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface CompositionStatsSampleRepository extends JpaRepository<CompositionStatsSample, Long> {
 
+    /**
+     * 같은 통계·매치·참가자 표본이 처음 들어온 경우에만 표본을 만들고 통계 수를 증가시킨다.
+     */
     @Modifying
     @Query(value = """
             WITH inserted_sample AS (
@@ -30,10 +33,19 @@ public interface CompositionStatsSampleRepository extends JpaRepository<Composit
             @Param("win") boolean win
     );
 
+    /**
+     * 한 매치와 참가자가 기록된 표본 개수를 센다.
+     */
     long countByMatchIdAndPuuid(String matchId, String puuid);
 
+    /**
+     * 승패가 아직 채워지지 않은 표본 개수를 센다.
+     */
     long countByMatchIdAndPuuidAndWinIsNull(String matchId, String puuid);
 
+    /**
+     * 저장된 정규화 참가자 정보로 누락된 표본 승패를 보완한다.
+     */
     @Modifying
     @Query(value = """
             UPDATE composition_stats_samples sample
@@ -50,6 +62,9 @@ public interface CompositionStatsSampleRepository extends JpaRepository<Composit
             @Param("puuid") String puuid
     );
 
+    /**
+     * 참가자의 기존 표본을 삭제하고 각 통계의 게임 수와 승리 수를 함께 감소시킨다.
+     */
     @Modifying
     @Query(value = """
             WITH deleted_sample AS (

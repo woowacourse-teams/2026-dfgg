@@ -89,6 +89,22 @@ public class RiotClient {
         return List.copyOf(response);
     }
 
+    public List<LeagueEntryResponse> getLeagueEntriesByPuuid(String puuid) {
+        Assert.hasText(puuid, "puuid must not be blank");
+
+        List<LeagueEntryResponse> response = rateLimitExecutor.execute(() ->
+                platformRestClient.get()
+                        .uri("/lol/league/v4/entries/by-puuid/{puuid}", puuid)
+                        .retrieve()
+                        .body(LEAGUE_ENTRY_LIST_TYPE)
+        );
+
+        if (response == null) {
+            throw new IllegalStateException("[Error] Riot League entries response is empty");
+        }
+        return List.copyOf(response);
+    }
+
     public List<String> getMatchIds(String puuid) {
         return getMatchIds(puuid, DEFAULT_MATCH_START, DEFAULT_MATCH_COUNT);
     }

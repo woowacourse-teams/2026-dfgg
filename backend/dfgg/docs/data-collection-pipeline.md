@@ -11,9 +11,9 @@ Match ID 조회
         ↓
 Match-v5 상세 원본 + Timeline 원본 저장
         ↓
-정규화 데이터 생성
+정규화 데이터 생성·저장
         ↓
-ChampionBuildStats 집계
+생성한 정규화 객체로 ChampionBuildStats 즉시 집계
 ```
 
 ## 자동 파이프라인 빠른 실행
@@ -70,24 +70,16 @@ COLLECTION_SCHEDULER_MATCH_COUNT=20
 4. 플레이어별 Match ID 조회
 5. Match 상세 원본과 Timeline 원본 저장
 6. 누락 Timeline 보완
-7. 신규 매치 정규화 및 통계 집계
+7. 신규 매치 정규화 및 저장
+8. 방금 생성한 정규화 객체를 바로 전달해 통계 집계
+
+일반 스케줄은 8단계에서 `normalized_match_participants`를 다시 조회하지 않습니다.
+정규화 결과 객체를 즉시 통계 서비스에 넘겨 저장과 집계 사이의 중복 조회를 줄입니다.
 
 ### 4. 실행 확인
 
-파이프라인이 시작되면 다음 형태의 로그가 출력됩니다.
-
-```text
-Riot collection scheduler started: ...
-```
-
-정상적으로 끝나면 다음 완료 로그가 출력됩니다.
-
-```text
-Riot collection scheduler completed: status=COMPLETED, ...
-```
-
-일부 항목이 실패해도 나머지 단계는 계속 실행되며 완료 상태는
-`COMPLETED_WITH_FAILURES`로 기록됩니다. 실패한 범위는 다음 스케줄에서 다시 시도합니다.
+실행 결과는 아래 관리자 API와 저장 테이블을 조회해 확인합니다.
+일부 항목이 실패해도 처리할 수 있는 나머지 단계는 계속 실행합니다.
 
 ### 5. 자동 실행 중지
 
@@ -188,7 +180,9 @@ curl -X POST \
   "http://localhost:8080/admin/riot/matches/stats?tier=PLATINUM"
 ```
 
-이 API는 외부 API에서 새 데이터를 수집하지 않습니다. 저장된 원본 데이터를 읽어 다음 파생 데이터를 정규화하고, 기존 통계를 유지하면서 신규 sample을 반영합니다.
+이 API는 외부 API에서 새 데이터를 수집하지 않습니다. 먼저 저장된 원본 데이터를
+정규화하고, 생성한 정규화 객체를 바로 통계 서비스에 전달해 신규 sample을 반영합니다.
+그런 다음 DB에 저장되어 있지만 아직 집계되지 않은 정규화 행을 조회해 복구·백필합니다.
 
 - `normalized_match_participants`
 - `composition_stats`
@@ -200,22 +194,29 @@ curl -X POST \
 2026 역할 퀘스트로 인해 Match의 최종 신발과 Timeline의 구매 이벤트가 다르게 표현되는 경우에는
 [역할 퀘스트 신발 정규화 결정 기록](./role-quest-boots-normalization.md)의 규칙을 적용합니다.
 
-응답에는 전체 원본 매치 수, 처리한 매치 수, Timeline 누락 수, 실패 수와 사유, 새로 기록한 sample 수가 포함됩니다.
+관리자 API의 두 통계 경로는 역할이 다릅니다.
 
-```json
-{
-  "totalMatches": 1131,
-  "processedMatches": 1131,
-  "skippedMissingTimeline": 0,
-  "failedMatches": 0,
-  "recordedSamples": 32,
-  "failures": []
-}
-```
+- 신규 정규화 경로: 이번 요청에서 생성한 정규화 객체를 즉시 집계합니다.
+- 복구·백필 경로: 과거 실패나 배포 이전 데이터 때문에 DB에 남은 미집계 대상만 재조회합니다.
 
-각 매치는 독립 트랜잭션으로 처리됩니다. 한 매치가 실패하면 그 매치에서 변경한 정규화·통계 데이터만 롤백하고 다음 매치를 계속 처리합니다. 실패한 매치 ID와 사유는 `failures`에 포함되며, `processedMatches`에는 커밋까지 성공한 매치만 포함됩니다.
+일반 스케줄은 신규 정규화 경로만 사용하며, DB pending 재조회는 관리자의
+복구·백필 요청에서만 실행합니다. 모든 처리가 성공하면 응답 본문 없이
+`204 No Content`를 반환합니다.
 
-같은 데이터를 다시 집계하면 중복 sample은 추가되지 않으므로 `recordedSamples`는 `0`이 될 수 있습니다. 실행 중에는 애플리케이션 로그에서 시작, 약 10% 단위 진행 상황, 실패 건수, 완료 결과와 소요 시간을 확인할 수 있습니다.
+정규화 데이터 교체와 통계 집계의 매치 단위 트랜잭션 경계는 추후 고도화 대상으로 남겨둡니다.
+현재도 한 매치의 통계 집계가 실패하면 나머지 매치 처리는 계속 시도하며, 완료되지 않은 매치는
+다음 실행에서 관리자 복구·백필 API로 다시 시도할 수 있습니다.
+
+기존 `normalized_match_participants` 행에 티어가 비어 있으면 미완료 데이터로 판단하여 다음 실행에서 다시 정규화합니다.
+
+같은 데이터를 다시 집계해도 완료 기록을 확인하므로 중복 sample은 추가되지 않습니다.
+
+### 단일 매치 재집계 시 주의
+
+`POST /admin/riot/matches/{matchId}/stats/replay?tier=...`는 운영자가 동일 매치의 일반
+스케줄 집계가 끝난 뒤 수동으로 호출하는 것을 전제로 하며, 동시 실행을 지원하지 않습니다.
+재집계를 자동화하거나 동시 호출을 허용할 때는 `matchId` 기준으로 일반 집계와 재집계를
+직렬화해야 합니다.
 
 ## 처음부터 최소 단위로 테스트하기
 
@@ -266,7 +267,8 @@ SELECT 'composition_stats_samples', COUNT(*) FROM composition_stats_samples;
 1. `/admin/riot/players`로 PUUID와 수집 대상 cohort를 추가합니다.
 2. `/admin/riot/matches`를 플레이어 페이지와 매치 범위별로 호출합니다.
 3. 필요하면 `/admin/riot/matches/timelines`로 누락 Timeline을 보완합니다.
-4. 모든 매치 수집이 끝난 후 `/admin/riot/matches/stats?tier=...`로 정규화 데이터와 통계를 반영합니다.
+4. 모든 매치 수집이 끝난 후 `/admin/riot/matches/stats?tier=...`로 신규 정규화 결과를
+   즉시 집계하고, DB에 남은 미집계 데이터도 백필합니다.
 
 ## 스케줄러 자동 수집
 
@@ -318,10 +320,19 @@ COLLECTION_SCHEDULER_DIVISIONS=I,II,III,IV
 3. 설정된 티어·디비전의 플레이어와 cohort
 4. 저장된 플레이어의 미수집 raw match와 timeline
 5. 기존 raw match의 누락 timeline 보완
-6. 설정된 티어별 신규 매치 정규화와 통계 집계
+6. 신규 매치 정규화 및 저장
+7. 설정된 티어별로 방금 생성한 정규화 객체를 즉시 통계 집계
 
-스케줄 작업은 내부 HTTP API를 거치지 않고 관리자 API와 동일한 Application Service를 직접 호출합니다. 현재는 단일 애플리케이션 인스턴스 운영을 전제로 하며 별도의 분산 lock을 사용하지 않습니다. 다중 인스턴스로 확장할 때는 동일 cron이 각 인스턴스에서 실행되므로 ShedLock이나 PostgreSQL advisory lock 같은 실행 조정 장치를 추가해야 합니다.
+스케줄 경로는 새로 생성한 정규화 결과를 메모리에서 바로 전달하므로 DB pending을
+다시 훑지 않습니다. DB를 기준으로 한 미집계 복구·백필은
+`POST /admin/riot/matches/stats?tier=...` 관리자 API의 후속 단계에서만 실행합니다.
 
-raw match, timeline, cohort는 `ON CONFLICT DO NOTHING` 또는 upsert로 저장하고, 통계는 `matchId + puuid + queue + tier + revision` completion을 먼저 claim합니다. 따라서 실패 항목은 completion이 남지 않아 다음 실행에서 다시 대상이 되며, 이미 완료된 항목은 중복 집계되지 않습니다.
+스케줄 작업은 내부 HTTP API를 거치지 않고 정규화·통계 Application Service를 직접
+호출합니다. 관리자 API만 이 경로 뒤에 DB 복구·백필 단계를 추가로 실행합니다.
+현재는 단일 애플리케이션 인스턴스 운영을 전제로 하며 별도의 분산 lock을 사용하지
+않습니다. 다중 인스턴스로 확장할 때는 동일 cron이 각 인스턴스에서 실행되므로
+ShedLock이나 PostgreSQL advisory lock 같은 실행 조정 장치를 추가해야 합니다.
 
-완료 로그에는 시작·종료 시각, 소요 시간, 신규 플레이어/매치/timeline 수, 처리 매치 수, 기록 표본 수, 건너뛴 항목 수, 단계별 실패 수가 포함됩니다. 개별 실패 로그에는 `stage`, `targetId`, `reason`이 기록됩니다.
+raw match, timeline, cohort는 `ON CONFLICT DO NOTHING` 또는 upsert로 저장하고, 통계는
+`matchId + puuid + queue + tier + revision` completion을 먼저 claim합니다. 실패 항목은 completion이
+남지 않아 다음 관리자 복구·백필 실행에서 다시 대상이 되며, 이미 완료된 항목은 중복 집계되지 않습니다.

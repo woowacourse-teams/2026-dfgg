@@ -9,15 +9,12 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import dfgg.application.RiotMatchSyncService;
+import dfgg.application.match.RiotMatchSyncService;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
 import dfgg.domain.match.RawMatchTimelineRepository;
-import dfgg.domain.player.Player;
-import dfgg.domain.player.PlayerRepository;
 import dfgg.infrastructure.external.client.RiotClient;
-import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,8 +25,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -45,9 +42,6 @@ class RiotMatchControllerIntegrationTest {
 
     @MockitoBean
     private RiotClient riotClient;
-
-    @Autowired
-    private PlayerRepository playerRepository;
 
     @Autowired
     private RawMatchRepository rawMatchRepository;
@@ -66,21 +60,10 @@ class RiotMatchControllerIntegrationTest {
     void cleanUp() {
         rawMatchTimelineRepository.deleteAll();
         rawMatchRepository.deleteAll();
-        playerRepository.deleteAll();
     }
 
     @Test
     void 매치_원본을_중복_호출과_중복_저장_없이_동기화한다() throws Exception {
-        playerRepository.saveAndFlush(new Player(
-                "puuid-1",
-                "KR",
-                Instant.parse("2026-08-06T08:00:00Z")
-        ));
-        playerRepository.saveAndFlush(new Player(
-                "puuid-na",
-                "NA",
-                Instant.parse("2026-08-06T08:00:00Z")
-        ));
         when(riotClient.getMatchIds("puuid-1", 0, 1)).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
             return List.of(MATCH_ID);
@@ -94,9 +77,11 @@ class RiotMatchControllerIntegrationTest {
             return RAW_TIMELINE;
         });
 
-        mockMvc.perform(post("/admin/riot/matches"))
+        mockMvc.perform(post("/admin/riot/matches")
+                        .param("puuids", "puuid-1"))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(post("/admin/riot/matches"))
+        mockMvc.perform(post("/admin/riot/matches")
+                        .param("puuids", "puuid-1"))
                 .andExpect(status().isNoContent());
 
         RawMatch saved = rawMatchRepository.findById(MATCH_ID).orElseThrow();
@@ -106,7 +91,6 @@ class RiotMatchControllerIntegrationTest {
         assertThat(savedTimeline.getRawData()).isEqualTo(RAW_TIMELINE);
         assertThat(rawMatchTimelineRepository.count()).isEqualTo(1);
         verify(riotClient, times(2)).getMatchIds("puuid-1", 0, 1);
-        verify(riotClient, never()).getMatchIds("puuid-na", 0, 1);
         verify(riotClient).getRawMatch(MATCH_ID);
         verify(riotClient).getRawMatchTimeline(MATCH_ID);
     }
@@ -114,8 +98,7 @@ class RiotMatchControllerIntegrationTest {
     @Test
     void 잘못된_조회_범위는_요청을_거부한다() throws Exception {
         mockMvc.perform(post("/admin/riot/matches")
-                        .param("playerPage", "-1")
-                        .param("playerCount", "0")
+                        .param("puuids", "puuid-1")
                         .param("start", "-1")
                         .param("count", "0"))
                 .andExpect(status().isBadRequest());
@@ -125,11 +108,6 @@ class RiotMatchControllerIntegrationTest {
 
     @Test
     void 상위_트랜잭션이_있어도_Riot_API_호출_중에는_트랜잭션을_중단한다() {
-        playerRepository.saveAndFlush(new Player(
-                "puuid-1",
-                "KR",
-                Instant.parse("2026-08-06T08:00:00Z")
-        ));
         when(riotClient.getMatchIds("puuid-1", 0, 20)).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
             return List.of(MATCH_ID);
@@ -146,7 +124,7 @@ class RiotMatchControllerIntegrationTest {
         transactionTemplate.executeWithoutResult(status -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
 
-            riotMatchSyncService.syncMatches(0, 20, 0, 20);
+            riotMatchSyncService.syncMatches(List.of("puuid-1"), 0, 20);
 
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
         });
@@ -155,19 +133,13 @@ class RiotMatchControllerIntegrationTest {
     }
 
     @Test
-    void 지정한_플레이어_배치만_동기화한다() throws Exception {
-        playerRepository.saveAllAndFlush(List.of(
-                new Player("puuid-1", "KR", Instant.parse("2026-08-06T08:00:00Z")),
-                new Player("puuid-2", "KR", Instant.parse("2026-08-06T08:00:00Z")),
-                new Player("puuid-3", "KR", Instant.parse("2026-08-06T08:00:00Z"))
-        ));
+    void 지정한_플레이어만_동기화한다() throws Exception {
         when(riotClient.getMatchIds("puuid-2", 0, 1)).thenReturn(List.of(MATCH_ID));
         when(riotClient.getRawMatch(MATCH_ID)).thenReturn(RAW_DATA);
         when(riotClient.getRawMatchTimeline(MATCH_ID)).thenReturn(RAW_TIMELINE);
 
         mockMvc.perform(post("/admin/riot/matches")
-                        .param("playerPage", "1")
-                        .param("playerCount", "1"))
+                        .param("puuids", "puuid-2"))
                 .andExpect(status().isNoContent());
 
         verify(riotClient, never()).getMatchIds("puuid-1", 0, 1);

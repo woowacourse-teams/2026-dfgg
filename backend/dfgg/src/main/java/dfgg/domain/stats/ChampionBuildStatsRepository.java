@@ -9,8 +9,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface ChampionBuildStatsRepository extends JpaRepository<ChampionBuildStats, Long> {
 
+    /**
+     * 통계 식별자로 하나의 빌드 통계를 조회한다.
+     */
     Optional<ChampionBuildStats> findByStatsKey(String statsKey);
 
+    /**
+     * 동일한 통계 조건이 없을 때만 통계 기본 행을 만든다.
+     */
     @Modifying
     @Query(value = """
             INSERT INTO composition_stats (
@@ -62,6 +68,9 @@ public interface ChampionBuildStatsRepository extends JpaRepository<ChampionBuil
             @Param("statsKey") String statsKey
     );
 
+    /**
+     * 통계 행에 아이템과 구매 순서를 연결한다.
+     */
     @Modifying
     @Query(value = """
             INSERT INTO composition_stats_items (
@@ -79,6 +88,9 @@ public interface ChampionBuildStatsRepository extends JpaRepository<ChampionBuil
             @Param("itemOrder") int itemOrder
     );
 
+    /**
+     * 패치·큐·티어·챔피언·포지션과 조합 조건에 맞는 가장 적합한 통계를 조회한다.
+     */
     @Query(value = """
             SELECT * FROM composition_stats b
             WHERE b.patch = :patch
@@ -115,6 +127,9 @@ public interface ChampionBuildStatsRepository extends JpaRepository<ChampionBuil
             @Param("allyTankHeavy") boolean allyTankHeavy
     );
 
+    /**
+     * 패치와 티어를 제한하지 않고 챔피언·포지션·조합 조건에 맞는 대표 통계를 조회한다.
+     */
     @Query(value = """
             SELECT * FROM composition_stats b
             WHERE b.champion_id = :championId
@@ -145,6 +160,9 @@ public interface ChampionBuildStatsRepository extends JpaRepository<ChampionBuil
             @Param("allyTankHeavy") boolean allyTankHeavy
     );
 
+    /**
+     * 챔피언·포지션·조합 조건에 맞는 모든 빌드 통계를 빌드 키 순으로 조회한다.
+     */
     @Query(value = """
             SELECT * FROM composition_stats b
             WHERE b.champion_id = :championId

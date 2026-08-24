@@ -1,6 +1,6 @@
 package dfgg.presentation;
 
-import dfgg.application.FeedbackService;
+import dfgg.application.feedback.FeedbackService;
 import dfgg.presentation.dto.request.FeedbackRequest;
 import dfgg.presentation.dto.response.FeedbackResponse;
 import jakarta.validation.Valid;
