@@ -105,6 +105,111 @@ class MiningControllerTest {
     }
 
     @Test
+    @DisplayName("dimensions가 상한을 초과하면 요청을 거부하고 아무것도 저장하지 않는다")
+    void trainEmbeddings_WhenDimensionsExceedsMax_RejectsRequestAndPersistsNothing() {
+        // given & when
+        given()
+                .queryParam("algorithmVersion", "sgns-invalid")
+                .queryParam("dimensions", "257")
+                .when().post("/admin/mining/embeddings")
+                .then()
+                .statusCode(400);
+
+        // then
+        assertThat(embeddingRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("negativeSamples가 상한을 초과하면 요청을 거부하고 아무것도 저장하지 않는다")
+    void trainEmbeddings_WhenNegativeSamplesExceedsMax_RejectsRequestAndPersistsNothing() {
+        // given & when
+        given()
+                .queryParam("algorithmVersion", "sgns-invalid")
+                .queryParam("negativeSamples", "21")
+                .when().post("/admin/mining/embeddings")
+                .then()
+                .statusCode(400);
+
+        // then
+        assertThat(embeddingRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("epochs가 상한을 초과하면 요청을 거부하고 아무것도 저장하지 않는다")
+    void trainEmbeddings_WhenEpochsExceedsMax_RejectsRequestAndPersistsNothing() {
+        // given & when
+        given()
+                .queryParam("algorithmVersion", "sgns-invalid")
+                .queryParam("epochs", "101")
+                .when().post("/admin/mining/embeddings")
+                .then()
+                .statusCode(400);
+
+        // then
+        assertThat(embeddingRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("learningRate가 상한을 초과하면 요청을 거부하고 아무것도 저장하지 않는다")
+    void trainEmbeddings_WhenLearningRateExceedsMax_RejectsRequestAndPersistsNothing() {
+        // given & when
+        given()
+                .queryParam("algorithmVersion", "sgns-invalid")
+                .queryParam("learningRate", "1.1")
+                .when().post("/admin/mining/embeddings")
+                .then()
+                .statusCode(400);
+
+        // then
+        assertThat(embeddingRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("learningRate가 하한 미만이면 요청을 거부하고 아무것도 저장하지 않는다")
+    void trainEmbeddings_WhenLearningRateBelowMin_RejectsRequestAndPersistsNothing() {
+        // given & when
+        given()
+                .queryParam("algorithmVersion", "sgns-invalid")
+                .queryParam("learningRate", "0.0")
+                .when().post("/admin/mining/embeddings")
+                .then()
+                .statusCode(400);
+
+        // then
+        assertThat(embeddingRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("winWeight가 상한을 초과하면 요청을 거부하고 아무것도 저장하지 않는다")
+    void trainEmbeddings_WhenWinWeightExceedsMax_RejectsRequestAndPersistsNothing() {
+        // given & when
+        given()
+                .queryParam("algorithmVersion", "sgns-invalid")
+                .queryParam("winWeight", "10.1")
+                .when().post("/admin/mining/embeddings")
+                .then()
+                .statusCode(400);
+
+        // then
+        assertThat(embeddingRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("winWeight가 하한 미만이면 요청을 거부하고 아무것도 저장하지 않는다")
+    void trainEmbeddings_WhenWinWeightBelowMin_RejectsRequestAndPersistsNothing() {
+        // given & when
+        given()
+                .queryParam("algorithmVersion", "sgns-invalid")
+                .queryParam("winWeight", "0.0")
+                .when().post("/admin/mining/embeddings")
+                .then()
+                .statusCode(400);
+
+        // then
+        assertThat(embeddingRepository.findAll()).isEmpty();
+    }
+
+    @Test
     @DisplayName("기본 최소 지지도(10)를 만족하는 패턴이 저장된다")
     void minePatterns_WhenCalledWithDefaults_PersistsPatternsMeetingDefaultMinSupport() {
         // given & when: 시드 데이터는 GOLD 스코프에서 [3071, 6653] 시퀀스를 정확히 10명이 만든다(기본 minSupport=10과 동일)
