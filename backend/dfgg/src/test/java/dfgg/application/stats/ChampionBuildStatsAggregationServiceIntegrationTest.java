@@ -74,8 +74,8 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
         aggregationService.aggregate(match, "PLATINUM", List.of("p-focal"));
         aggregationService.aggregate(match, "PLATINUM", List.of("p-focal"));
 
-        assertThat(statsRepository.count()).isEqualTo(32);
-        assertThat(sampleRepository.count()).isEqualTo(32);
+        assertThat(statsRepository.count()).isEqualTo(1);
+        assertThat(sampleRepository.count()).isEqualTo(1);
         assertThat(statsRepository.findAll())
                 .allSatisfy(stats -> {
                     assertThat(stats.getGameCount()).isEqualTo(1);
@@ -90,8 +90,8 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
 
         aggregateConcurrently(match, match);
 
-        assertThat(statsRepository.count()).isEqualTo(32);
-        assertThat(sampleRepository.count()).isEqualTo(32);
+        assertThat(statsRepository.count()).isEqualTo(1);
+        assertThat(sampleRepository.count()).isEqualTo(1);
         assertThat(statsRepository.findAll())
                 .allSatisfy(stats -> {
                     assertThat(stats.getGameCount()).isEqualTo(1);
@@ -107,8 +107,8 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
 
         aggregateConcurrently(winningMatch, losingMatch);
 
-        assertThat(statsRepository.count()).isEqualTo(32);
-        assertThat(sampleRepository.count()).isEqualTo(64);
+        assertThat(statsRepository.count()).isEqualTo(1);
+        assertThat(sampleRepository.count()).isEqualTo(2);
         assertThat(statsRepository.findAll())
                 .allSatisfy(stats -> {
                     assertThat(stats.getGameCount()).isEqualTo(2);

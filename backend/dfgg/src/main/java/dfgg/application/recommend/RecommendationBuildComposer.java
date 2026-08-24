@@ -15,8 +15,8 @@ import org.springframework.stereotype.Component;
 /**
  * 조건에 맞는 통계 행들을 실제 추천 아이템 목록으로 조합한다.
  *
- * <p>통계는 같은 빌드라도 조합 조건의 구체성에 따라 여러 행으로 저장될 수 있으므로,
- * 추천 시에는 가장 구체적인 행을 먼저 선택한 뒤 슬롯별 후보를 합산한다.
+ * <p>같은 빌드가 여러 통계 범위에 존재할 수 있으므로 대표 행을 먼저 선택한 뒤
+ * 슬롯별 후보를 합산한다.
  */
 @Component
 public class RecommendationBuildComposer {
@@ -25,31 +25,28 @@ public class RecommendationBuildComposer {
      * 조회된 통계 행을 아이템 슬롯 순서의 추천 목록으로 변환한다.
      *
      * <ol>
-     *     <li>같은 빌드의 중복 통계를 제거하고 가장 구체적인 행을 선택한다.</li>
+     *     <li>같은 빌드의 중복 통계를 제거하고 표본이 가장 많은 대표 행을 선택한다.</li>
      *     <li>선택된 통계를 아이템 슬롯과 아이템 ID별 후보로 합산한다.</li>
      *     <li>각 슬롯에서 게임 수와 승리 수가 높은 아이템을 선택한다.</li>
      * </ol>
      */
     public List<Item> compose(List<ChampionBuildStats> matchingStats) {
-        List<ChampionBuildStats> mostSpecificPerBuildKey = pickMostSpecificPerBuildKey(matchingStats);
-        Map<Integer, Map<Long, SlotCandidate>> slots = accumulateBySlot(mostSpecificPerBuildKey);
+        List<ChampionBuildStats> representativePerBuildKey = pickRepresentativePerBuildKey(matchingStats);
+        Map<Integer, Map<Long, SlotCandidate>> slots = accumulateBySlot(representativePerBuildKey);
         return pickBestPerSlot(slots);
     }
 
     /**
-     * 같은 buildKey를 가진 통계 중 현재 조합을 가장 많이 설명하는 행 하나만 남긴다.
+     * 같은 buildKey를 가진 통계 중 표본이 가장 많은 행 하나만 남긴다.
      *
-     * <p>조건 값이 많이 채워진 행을 우선하고, 구체성이 같으면 더 많은 게임에서 관찰된
-     * 통계를 선택한다. 이렇게 하면 전체 상황 통계보다 현재 조합에 가까운 통계를 사용하면서도
-     * 같은 빌드를 여러 번 합산하는 문제를 피할 수 있다.
+     * <p>조회 범위가 다른 동일 빌드를 여러 번 합산하지 않으면서 가장 대표성 있는 행을 사용한다.
      */
-    private List<ChampionBuildStats> pickMostSpecificPerBuildKey(List<ChampionBuildStats> matchingStats) {
+    private List<ChampionBuildStats> pickRepresentativePerBuildKey(List<ChampionBuildStats> matchingStats) {
         return matchingStats.stream()
                 .collect(Collectors.groupingBy(ChampionBuildStats::getBuildKey))
                 .values().stream()
                 .map(group -> group.stream()
-                        .max(Comparator.comparingInt(this::specificity)
-                                .thenComparingInt(stats -> orZero(stats.getGameCount())))
+                        .max(Comparator.comparingInt(stats -> orZero(stats.getGameCount())))
                         .orElseThrow())
                 .toList();
     }
@@ -101,33 +98,6 @@ public class RecommendationBuildComposer {
                     });
         }
         return composed;
-    }
-
-    /**
-     * 통계 행에 저장된 조합 조건 중 null이 아닌 조건의 개수를 반환한다.
-     * 조건이 많이 채워진 행일수록 현재 조합을 더 구체적으로 설명한다고 본다.
-     */
-    private int specificity(ChampionBuildStats stats) {
-        return countNonNull(
-                stats.getEnemyTankHeavy(),
-                stats.getEnemyApHeavy(),
-                stats.getEnemyAssassinHeavy(),
-                stats.getAllyHasMarksman(),
-                stats.getAllyTankHeavy()
-        );
-    }
-
-    /**
-     * 조합 조건이 실제로 기록되어 있는지 확인하기 위해 null이 아닌 값의 개수를 센다.
-     */
-    private int countNonNull(Boolean... flags) {
-        int count = 0;
-        for (Boolean flag : flags) {
-            if (flag != null) {
-                count++;
-            }
-        }
-        return count;
     }
 
     /**

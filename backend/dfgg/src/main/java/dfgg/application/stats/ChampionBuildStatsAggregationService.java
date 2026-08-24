@@ -21,7 +21,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,7 +50,7 @@ public class ChampionBuildStatsAggregationService {
     /**
      * 매치의 대상 참가자별로 빌드 통계를 만들고, 실제 표본이 처음 들어오는 경우에만 집계 수를 증가시킨다.
      *
-     * <p>한 참가자는 조합 조건의 구체적인 값과 전체 조건을 함께 조회할 수 있도록 여러 통계 표본으로 확장된다.
+     * <p>한 참가자는 실제 조합 조건과 정확히 일치하는 하나의 통계 표본으로 집계된다.
      */
     @Transactional
     public void aggregate(
@@ -89,18 +88,16 @@ public class ChampionBuildStatsAggregationService {
             String buildKey = participant.coreItemPurchaseOrder().stream()
                     .map(String::valueOf)
                     .collect(Collectors.joining(">"));
-            for (ContextVariant variant : contextVariants(context)) {
-                recordSample(
-                        match,
-                        participant,
-                        tier,
-                        champion,
-                        position,
-                        variant,
-                        buildKey,
-                        buildItems
-                );
-            }
+            recordSample(
+                    match,
+                    participant,
+                    tier,
+                    champion,
+                    position,
+                    context,
+                    buildKey,
+                    buildItems
+            );
         }
     }
 
@@ -113,7 +110,7 @@ public class ChampionBuildStatsAggregationService {
             String tier,
             Champion champion,
             ChampionPosition position,
-            ContextVariant variant,
+            CombinationContext context,
             String buildKey,
             List<Item> buildItems
     ) {
@@ -122,11 +119,11 @@ public class ChampionBuildStatsAggregationService {
                 match.queueId(),
                 champion,
                 position,
-                variant.enemyTankHeavy(),
-                variant.enemyApHeavy(),
-                variant.enemyAssassinHeavy(),
-                variant.allyHasMarksman(),
-                variant.allyTankHeavy(),
+                context.enemyTankHeavy(),
+                context.enemyApHeavy(),
+                context.enemyAssassinHeavy(),
+                context.allyHasMarksman(),
+                context.allyTankHeavy(),
                 tier,
                 buildKey
         );
@@ -136,11 +133,11 @@ public class ChampionBuildStatsAggregationService {
                 match.queueId(),
                 champion.getChampionId(),
                 position.name(),
-                variant.enemyTankHeavy(),
-                variant.enemyApHeavy(),
-                variant.enemyAssassinHeavy(),
-                variant.allyHasMarksman(),
-                variant.allyTankHeavy(),
+                context.enemyTankHeavy(),
+                context.enemyApHeavy(),
+                context.enemyAssassinHeavy(),
+                context.allyHasMarksman(),
+                context.allyTankHeavy(),
                 tier,
                 buildKey,
                 statsKey
@@ -259,42 +256,4 @@ public class ChampionBuildStatsAggregationService {
         return Optional.of(CombinationContext.analyze(new Team(enemies), new Team(allies)));
     }
 
-    /**
-     * 실제 조합 조건에서 일부 조건을 전체 범위로 확장한 32개 검색 변형을 만든다.
-     */
-    private List<ContextVariant> contextVariants(CombinationContext context) {
-        // 다섯 조건을 실제 값 또는 전체 조건(null)으로 조합해 검색 범위별 통계를 함께 만든다.
-        boolean[] values = {
-                context.enemyTankHeavy(),
-                context.enemyApHeavy(),
-                context.enemyAssassinHeavy(),
-                context.allyHasMarksman(),
-                context.allyTankHeavy()
-        };
-        return IntStream.range(0, 1 << values.length)
-                .mapToObj(mask -> new ContextVariant(
-                        valueOrNull(values[0], mask, 0),
-                        valueOrNull(values[1], mask, 1),
-                        valueOrNull(values[2], mask, 2),
-                        valueOrNull(values[3], mask, 3),
-                        valueOrNull(values[4], mask, 4)
-                ))
-                .toList();
-    }
-
-    /**
-     * 비트 마스크가 해당 조건을 포함하면 실제 값을, 아니면 전체 조건을 뜻하는 null을 반환한다.
-     */
-    private Boolean valueOrNull(boolean value, int mask, int bit) {
-        return (mask & (1 << bit)) == 0 ? null : value;
-    }
-
-    private record ContextVariant(
-            Boolean enemyTankHeavy,
-            Boolean enemyApHeavy,
-            Boolean enemyAssassinHeavy,
-            Boolean allyHasMarksman,
-            Boolean allyTankHeavy
-    ) {
-    }
 }
