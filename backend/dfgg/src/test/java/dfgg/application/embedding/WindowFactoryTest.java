@@ -2,9 +2,8 @@ package dfgg.application.embedding;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dfgg.domain.embedding.BuildContext;
 import dfgg.domain.embedding.ContentContext;
-import dfgg.domain.embedding.CounterContext;
-import dfgg.domain.embedding.ParticipantBuild;
 import dfgg.domain.embedding.TeamComposition;
 import dfgg.domain.embedding.Window;
 import java.util.List;
@@ -33,63 +32,60 @@ class WindowFactoryTest {
     }
 
     @Test
-    @DisplayName("참가자-빌드 문맥에서 승리한 참가자의 윈도우에는 승패 가중치가 적용된다")
-    void createParticipantBuildWindow_WhenWin_AppliesWinWeight() {
+    @DisplayName("빌드 문맥에서 승리한 참가자의 윈도우에는 승패 가중치가 적용된다")
+    void createBuildContextWindow_WhenWin_AppliesWinWeight() {
         // given
-        ParticipantBuild build = new ParticipantBuild("Ahri", List.of("RabadonsDeathcap", "VoidStaff"), true);
-
-        // when
-        Window window = windowFactory.createParticipantBuildWindow(build, WIN_WEIGHT);
-
-        // then
-        assertThat(window.weight()).isEqualTo(WIN_WEIGHT);
-    }
-
-    @Test
-    @DisplayName("참가자-빌드 문맥에서 패배한 참가자의 윈도우에는 가중치 1.0이 적용된다")
-    void createParticipantBuildWindow_WhenLose_AppliesDefaultWeight() {
-        // given
-        ParticipantBuild build = new ParticipantBuild("Ahri", List.of("RabadonsDeathcap", "VoidStaff"), false);
-
-        // when
-        Window window = windowFactory.createParticipantBuildWindow(build, WIN_WEIGHT);
-
-        // then
-        assertThat(window.weight()).isEqualTo(1.0);
-    }
-
-    @Test
-    @DisplayName("대응(카운터) 문맥에서 승리한 참가자의 윈도우에는 승패 가중치가 적용된다")
-    void createCounterContextWindow_WhenWin_AppliesWinWeight() {
-        // given
-        CounterContext counterContext = new CounterContext(
+        BuildContext buildContext = new BuildContext(
+                "Ahri",
+                List.of("Zed", "Leona", "Jinx", "Nautilus"),
                 List.of("Garen", "Darius", "Braum", "Ashe", "Sett"),
-                List.of("FrozenHeart"),
+                List.of("RabadonsDeathcap", "VoidStaff"),
                 true
         );
 
         // when
-        Window window = windowFactory.createCounterContextWindow(counterContext, WIN_WEIGHT);
+        Window window = windowFactory.createBuildContextWindow(buildContext, WIN_WEIGHT);
 
         // then
         assertThat(window.weight()).isEqualTo(WIN_WEIGHT);
     }
 
     @Test
-    @DisplayName("대응(카운터) 문맥에서 패배한 참가자의 윈도우에는 가중치 1.0이 적용된다")
-    void createCounterContextWindow_WhenLose_AppliesDefaultWeight() {
+    @DisplayName("빌드 문맥에서 패배한 참가자의 윈도우에는 가중치 1.0이 적용된다")
+    void createBuildContextWindow_WhenLose_AppliesDefaultWeight() {
         // given
-        CounterContext counterContext = new CounterContext(
+        BuildContext buildContext = new BuildContext(
+                "Ahri",
+                List.of("Zed", "Leona", "Jinx", "Nautilus"),
                 List.of("Garen", "Darius", "Braum", "Ashe", "Sett"),
-                List.of("FrozenHeart"),
+                List.of("RabadonsDeathcap", "VoidStaff"),
                 false
         );
 
         // when
-        Window window = windowFactory.createCounterContextWindow(counterContext, WIN_WEIGHT);
+        Window window = windowFactory.createBuildContextWindow(buildContext, WIN_WEIGHT);
 
         // then
         assertThat(window.weight()).isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("빌드 문맥 윈도우는 내 챔피언, 아군, 적군, 아이템 토큰을 모두 포함한다")
+    void createBuildContextWindow_IncludesChampionAllyEnemyAndItemTokens() {
+        // given
+        BuildContext buildContext = new BuildContext(
+                "Ahri",
+                List.of("Zed"),
+                List.of("Garen"),
+                List.of("RabadonsDeathcap"),
+                true
+        );
+
+        // when
+        Window window = windowFactory.createBuildContextWindow(buildContext, WIN_WEIGHT);
+
+        // then
+        assertThat(window.tokens()).containsExactlyInAnyOrder("Ahri", "Zed", "Garen", "RabadonsDeathcap");
     }
 
     @Test

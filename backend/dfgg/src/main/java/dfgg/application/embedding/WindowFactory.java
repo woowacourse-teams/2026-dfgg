@@ -1,9 +1,8 @@
 package dfgg.application.embedding;
 
-import dfgg.domain.embedding.CounterContext;
+import dfgg.domain.embedding.BuildContext;
 import dfgg.domain.embedding.Window;
 import dfgg.domain.embedding.TeamComposition;
-import dfgg.domain.embedding.ParticipantBuild;
 import dfgg.domain.embedding.ContentContext;
 import org.springframework.stereotype.Component;
 
@@ -20,18 +19,13 @@ public class WindowFactory {
         );
     }
 
-    public Window createParticipantBuildWindow(ParticipantBuild build, double winWeight) {
+    public Window createBuildContextWindow(BuildContext buildContext, double winWeight) {
         List<String> tokens = new ArrayList<>();
-        tokens.add(build.championToken());
-        tokens.addAll(build.itemTokens());
-        return new Window(tokens, weightFor(build.win(), winWeight));
-    }
-
-    public Window createCounterContextWindow(CounterContext counterContext, double winWeight) {
-        List<String> tokens = new ArrayList<>();
-        tokens.addAll(counterContext.enemyChampionTokens());
-        tokens.addAll(counterContext.itemTokens());
-        return new Window(tokens, weightFor(counterContext.win(), winWeight));
+        tokens.add(buildContext.championToken());
+        tokens.addAll(buildContext.allyChampionTokens());
+        tokens.addAll(buildContext.enemyChampionTokens());
+        tokens.addAll(buildContext.itemTokens());
+        return new Window(tokens, weightFor(buildContext.win(), winWeight));
     }
 
     private double weightFor(boolean win, double winWeight) {

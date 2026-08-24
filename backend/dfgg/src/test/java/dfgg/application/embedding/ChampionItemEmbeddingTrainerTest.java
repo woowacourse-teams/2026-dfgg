@@ -1,8 +1,7 @@
 package dfgg.application.embedding;
 
+import dfgg.domain.embedding.BuildContext;
 import dfgg.domain.embedding.ContentContext;
-import dfgg.domain.embedding.CounterContext;
-import dfgg.domain.embedding.ParticipantBuild;
 import dfgg.domain.embedding.TrainingConfig;
 import dfgg.domain.embedding.Window;
 import org.junit.jupiter.api.DisplayName;
@@ -40,16 +39,16 @@ class ChampionItemEmbeddingTrainerTest {
     }
 
     @Test
-    @DisplayName("참가자-빌드 문맥으로 학습하면 챔피언과 그 챔피언이 자주 산 아이템이 임베딩 공간에서 더 가깝다")
+    @DisplayName("빌드 문맥으로 학습하면 챔피언과 그 챔피언이 자주 산 아이템이 임베딩 공간에서 더 가깝다")
     void train_WhenChampionFrequentlyBuysItem_ChampionAndItemEmbeddingsAreCloser() {
         // given
         List<Window> windows = new ArrayList<>();
         for (int i = 0; i < 30; i++) {
-            windows.add(windowFactory.createParticipantBuildWindow(
-                    new ParticipantBuild("Ahri", List.of("RabadonsDeathcap", "VoidStaff"), true), 1.0
+            windows.add(windowFactory.createBuildContextWindow(
+                    new BuildContext("Ahri", List.of(), List.of(), List.of("RabadonsDeathcap", "VoidStaff"), true), 1.0
             ));
-            windows.add(windowFactory.createParticipantBuildWindow(
-                    new ParticipantBuild("Garen", List.of("Thornmail"), false), 1.0
+            windows.add(windowFactory.createBuildContextWindow(
+                    new BuildContext("Garen", List.of(), List.of(), List.of("Thornmail"), false), 1.0
             ));
         }
         TrainingConfig config = new TrainingConfig(8, 4, 60, 0.05, 42L);
@@ -64,22 +63,17 @@ class ChampionItemEmbeddingTrainerTest {
     }
 
     @Test
-    @DisplayName("카운터 문맥으로 학습하면 적 챔피언과 그 적을 상대로 자주 구매된 아이템이, 그 적을 상대로 산 적 없는 아이템보다 임베딩 공간에서 더 가깝다")
-    void train_WhenItemFrequentlyBoughtAgainstEnemy_EnemyAndItemEmbeddingsAreCloser() {
-        // given
+    @DisplayName("빌드 문맥에 적 챔피언 정보가 섞여도, 아이템은 실제로 그 아이템을 산 챔피언과 자주 마주친 적 챔피언보다 더 가깝다")
+    void train_WhenBuildContextIncludesEnemies_ItemStaysCloserToOwningChampionThanToFrequentEnemy() {
+        // given: Ahri는 매번 RabadonsDeathcap을 사고, 매번 같은 적(Garen 등)과 마주친다
         List<Window> windows = new ArrayList<>();
         for (int i = 0; i < 30; i++) {
-            windows.add(windowFactory.createCounterContextWindow(
-                    new CounterContext(
-                            List.of("Ezreal", "Lucian", "Kaisa", "Thresh", "Braum"),
-                            List.of("FrozenHeart"),
-                            true
-                    ), 1.0
-            ));
-            windows.add(windowFactory.createCounterContextWindow(
-                    new CounterContext(
-                            List.of("Yasuo", "Zed", "Yone", "Leona", "Nautilus"),
-                            List.of("InfinityEdge"),
+            windows.add(windowFactory.createBuildContextWindow(
+                    new BuildContext(
+                            "Ahri",
+                            List.of(),
+                            List.of("Garen", "Darius", "Braum", "Ashe", "Sett"),
+                            List.of("RabadonsDeathcap", "VoidStaff"),
                             true
                     ), 1.0
             ));
@@ -89,10 +83,10 @@ class ChampionItemEmbeddingTrainerTest {
         // when
         Map<String, double[]> embeddings = trainer.train(windows, config);
 
-        // then
-        double ezrealFrozenHeart = cosineSimilarity(embeddings.get("Ezreal"), embeddings.get("FrozenHeart"));
-        double yasuoFrozenHeart = cosineSimilarity(embeddings.get("Yasuo"), embeddings.get("FrozenHeart"));
-        assertThat(ezrealFrozenHeart).isGreaterThan(yasuoFrozenHeart);
+        // then: 아이템은 실제 구매자(Ahri)와 더 가깝고, 단순히 자주 마주친 적(Garen)과는 덜 가깝다
+        double ahriRabadons = cosineSimilarity(embeddings.get("Ahri"), embeddings.get("RabadonsDeathcap"));
+        double garenRabadons = cosineSimilarity(embeddings.get("Garen"), embeddings.get("RabadonsDeathcap"));
+        assertThat(ahriRabadons).isGreaterThan(garenRabadons);
     }
 
     @Test

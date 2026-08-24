@@ -48,45 +48,37 @@ class MatchParticipantWindowBuilderTest {
     }
 
     @Test
-    @DisplayName("참가자마다 (챔피언+구매 아이템) 참가자-빌드 윈도우를 하나씩 만든다")
-    void buildMatchWindows_WhenParticipantsExist_CreatesParticipantBuildWindowPerParticipant() {
+    @DisplayName("참가자마다 (내 챔피언+아군 4명+적군 5명+구매 아이템) 빌드 문맥 윈도우를 하나씩 만든다")
+    void buildMatchWindows_WhenParticipantsExist_CreatesBuildContextWindowPerParticipant() {
         // given
-        List<NormalizedMatchParticipant> participants = matchParticipants(
-                List.of(1, 2, 3, 4, 5), true,
-                List.of(6, 7, 8, 9, 10), false
-        );
+        NormalizedMatch match = new NormalizedMatch("KR_2", "14.1", 420, List.of());
+        List<NormalizedMatchParticipant> participants = new ArrayList<>();
+        participants.add(new NormalizedMatchParticipant(match, new NormalizedParticipant(
+                "puuid-1", 1, 1, 100, "TOP", true, List.of(3071), List.of(3071), true)));
+        for (int championId : List.of(2, 3, 4, 5)) {
+            participants.add(new NormalizedMatchParticipant(match, new NormalizedParticipant(
+                    "puuid-" + championId, championId, championId, 100, "TOP", true,
+                    List.of(6653), List.of(6653), true)));
+        }
+        for (int championId : List.of(6, 7, 8, 9, 10)) {
+            participants.add(new NormalizedMatchParticipant(match, new NormalizedParticipant(
+                    "puuid-" + championId, championId, championId, 200, "TOP", false,
+                    List.of(3020), List.of(3020), true)));
+        }
 
         // when
         List<Window> windows = builder.buildMatchWindows(participants, WIN_WEIGHT);
 
-        // then
+        // then: 챔피언 1의 빌드 문맥 윈도우는 자신(1) + 아군 4명(2~5) + 적군 5명(6~10) + 자신이 산 아이템(3071)만 포함한다
         assertThat(windows)
-                .filteredOn(window -> window.tokens().containsAll(List.of("1", "3071", "6653"))
-                        && window.tokens().size() == 3)
+                .filteredOn(window -> window.tokens().contains("3071"))
                 .hasSize(1)
                 .first()
-                .satisfies(window -> assertThat(window.weight()).isEqualTo(WIN_WEIGHT));
-    }
-
-    @Test
-    @DisplayName("참가자마다 (적 5명 챔피언+자신이 구매한 아이템) 카운터 문맥 윈도우를 하나씩 만든다")
-    void buildMatchWindows_WhenParticipantsExist_CreatesCounterContextWindowPerParticipant() {
-        // given
-        List<NormalizedMatchParticipant> participants = matchParticipants(
-                List.of(1, 2, 3, 4, 5), true,
-                List.of(6, 7, 8, 9, 10), false
-        );
-
-        // when
-        List<Window> windows = builder.buildMatchWindows(participants, WIN_WEIGHT);
-
-        // then
-        assertThat(windows)
-                .filteredOn(window -> window.tokens().containsAll(List.of("6", "7", "8", "9", "10", "3071", "6653"))
-                        && window.tokens().size() == 7)
-                .isNotEmpty()
-                .first()
-                .satisfies(window -> assertThat(window.weight()).isEqualTo(WIN_WEIGHT));
+                .satisfies(window -> {
+                    assertThat(window.tokens())
+                            .containsExactlyInAnyOrder("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "3071");
+                    assertThat(window.weight()).isEqualTo(WIN_WEIGHT);
+                });
     }
 
     @Test
