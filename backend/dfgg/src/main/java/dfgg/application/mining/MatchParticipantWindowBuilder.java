@@ -11,6 +11,7 @@ import dfgg.domain.match.NormalizedMatchParticipant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,8 @@ import org.springframework.stereotype.Component;
 public class MatchParticipantWindowBuilder {
 
     private final WindowFactory windowFactory;
+    private final Map<Integer, String> championTokenCache = new ConcurrentHashMap<>();
+    private final Map<Long, String> itemTokenCache = new ConcurrentHashMap<>();
 
     public MatchParticipantWindowBuilder(WindowFactory windowFactory) {
         this.windowFactory = windowFactory;
@@ -46,7 +49,7 @@ public class MatchParticipantWindowBuilder {
         return items.stream()
                 .filter(item -> !item.getTags().isEmpty())
                 .map(item -> windowFactory.createContentContextWindow(
-                        new ContentContext(String.valueOf(item.getItemId()), item.getTags())
+                        new ContentContext(itemToken(item.getItemId()), item.getTags())
                 ))
                 .toList();
     }
@@ -69,7 +72,7 @@ public class MatchParticipantWindowBuilder {
 
     private ParticipantBuild participantBuild(NormalizedMatchParticipant participant) {
         return new ParticipantBuild(
-                String.valueOf(participant.getChampionId()),
+                championToken(participant.getChampionId()),
                 itemTokens(participant.getFinalCoreItemIds()),
                 participant.getWin()
         );
@@ -97,13 +100,21 @@ public class MatchParticipantWindowBuilder {
     private List<String> championTokens(List<NormalizedMatchParticipant> team) {
         return team.stream()
                 .map(NormalizedMatchParticipant::getChampionId)
-                .map(String::valueOf)
+                .map(this::championToken)
                 .toList();
     }
 
     private List<String> itemTokens(List<Integer> itemIds) {
         return itemIds.stream()
-                .map(String::valueOf)
+                .map(this::itemToken)
                 .toList();
+    }
+
+    private String championToken(int championId) {
+        return championTokenCache.computeIfAbsent(championId, id -> Integer.toString(id));
+    }
+
+    private String itemToken(long itemId) {
+        return itemTokenCache.computeIfAbsent(itemId, id -> Long.toString(id));
     }
 }
