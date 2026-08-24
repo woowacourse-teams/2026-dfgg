@@ -1,4 +1,4 @@
-package dfgg.application;
+package dfgg.application.recommend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

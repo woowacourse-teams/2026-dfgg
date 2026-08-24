@@ -1,6 +1,6 @@
 package dfgg.presentation;
 
-import dfgg.application.RecommendationService;
+import dfgg.application.recommend.RecommendationService;
 import dfgg.presentation.dto.request.RecommendationRequest;
 import dfgg.presentation.dto.response.RecommendationResponse;
 import jakarta.validation.Valid;
