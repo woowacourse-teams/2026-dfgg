@@ -9,13 +9,15 @@ import dfgg.infrastructure.config.RiotSchedulerProperties;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Riot 데이터 자동 수집의 전체 순서만 조율한다.
- * 플레이어 수집 → Raw Match/Timeline 수집 → 누락 Timeline 보완 → 정규화 → 통계 집계 순으로 실행한다.
+ * 플레이어를 조회한 뒤 매치별로 원본 수집 → 정규화 → 통계 집계를 이어서 실행하고,
+ * 이전 실행에서 남은 미완료 데이터는 마지막에 보완한다.
  */
 @Service
 public class RiotCollectionOrchestrator {
@@ -58,7 +60,9 @@ public class RiotCollectionOrchestrator {
 
         List<String> collectedPuuids = collectPlayers();
         collectMatches(collectedPuuids);
+        // 이번 실행에서 실패했거나 이전 실행에 남은 Timeline을 보완한다.
         collectMissingTimelines();
+        // 매치 단위 처리로 끝내지 못한 기존 미완료 매치를 복구한다.
         normalizePendingMatches(properties.getTiers());
     }
 
@@ -117,21 +121,66 @@ public class RiotCollectionOrchestrator {
     }
 
     private void collectMatches(List<String> puuids) {
+        Set<String> processedMatchIds = new LinkedHashSet<>();
         int playerCount = properties.getPlayerPageSize();
         for (int fromIndex = 0; fromIndex < puuids.size(); fromIndex += playerCount) {
             List<String> targets = puuids.subList(
                     fromIndex,
                     Math.min(fromIndex + playerCount, puuids.size())
             );
-            try {
-                matchSyncService.syncMatches(
-                        targets,
-                        0,
-                        properties.getMatchCount()
-                );
-            } catch (RuntimeException ignored) {
-                // 한 플레이어 묶음이 실패해도 다음 묶음의 수집은 계속한다.
+            for (String puuid : targets) {
+                collectPlayerMatches(puuid, processedMatchIds);
             }
+        }
+    }
+
+    /**
+     * 한 플레이어의 매치 ID를 조회하고, 각 매치를 원본 수집부터 통계 집계까지 처리한다.
+     * 매치 ID 조회가 실패해도 다른 플레이어의 수집은 계속한다.
+     */
+    private void collectPlayerMatches(String puuid, Set<String> processedMatchIds) {
+        List<String> matchIds;
+        try {
+            matchIds = matchSyncService.findMatchIds(
+                    puuid,
+                    0,
+                    properties.getMatchCount()
+            );
+        } catch (RuntimeException ignored) {
+            return;
+        }
+
+        for (String matchId : matchIds) {
+            // 여러 플레이어가 같은 매치를 조회할 수 있으므로 한 스케줄 실행 안에서는 한 번만 처리한다.
+            if (processedMatchIds.add(matchId)) {
+                processMatch(matchId);
+            }
+        }
+    }
+
+    /**
+     * 한 매치를 Raw Match → Timeline → 정규화 → 통계 순서로 처리한다.
+     * 원본 수집에 실패한 매치는 정규화하지 않고 다음 실행의 복구 대상으로 남긴다.
+     */
+    private void processMatch(String matchId) {
+        boolean collected;
+        try {
+            collected = matchSyncService.syncMatch(matchId);
+        } catch (RuntimeException ignored) {
+            return;
+        }
+
+        // 이미 원본이 모두 있던 매치는 마지막 복구 단계에서 미정규화 여부를 확인한다.
+        if (!collected) {
+            return;
+        }
+
+        try {
+            NormalizedMatch normalized = matchNormalizationService.normalize(matchId);
+            matchNormalizationService.save(normalized);
+            aggregateStats(normalized, properties.getTiers(), new ArrayList<>());
+        } catch (RuntimeException ignored) {
+            // 실패한 매치는 Raw 데이터와 함께 남겨 다음 실행의 복구 단계에서 다시 처리한다.
         }
     }
 

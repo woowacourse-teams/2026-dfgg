@@ -1,7 +1,6 @@
 package dfgg.application;
 
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -44,8 +43,8 @@ class RiotCollectionOrchestratorTest {
         when(playerSyncService.syncLeagueEntries(
                 anyString(), anyString(), anyString(), anyInt()
         )).thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of()));
-        when(matchSyncService.syncMissingTimelines())
-                .thenReturn(new RiotMatchSyncService.SyncResult(0, 0, 0, 0, List.of()));
+        when(matchSyncService.findMatchIds(anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of());
 
         orchestrator = new RiotCollectionOrchestrator(
                 properties,
@@ -63,12 +62,11 @@ class RiotCollectionOrchestratorTest {
                         2,
                         List.of("puuid-1", "puuid-2")
                 ));
-        when(matchSyncService.syncMatches(List.of("puuid-1", "puuid-2"), 0, 20))
-                .thenReturn(new RiotMatchSyncService.SyncResult(1, 2, 1, 3, List.of()));
+        when(matchSyncService.findMatchIds("puuid-1", 0, 20))
+                .thenReturn(List.of("KR_1"));
+        when(matchSyncService.syncMatch("KR_1")).thenReturn(true);
         NormalizedMatch normalized = normalizedMatch("KR_1");
         when(matchNormalizationService.findPendingMatchIdsAfter(""))
-                .thenReturn(List.of("KR_1"));
-        when(matchNormalizationService.findPendingMatchIdsAfter("KR_1"))
                 .thenReturn(List.of());
         when(matchNormalizationService.normalize("KR_1")).thenReturn(normalized);
         orchestrator.runOnce();
@@ -81,13 +79,38 @@ class RiotCollectionOrchestratorTest {
         );
         order.verify(playerSyncService)
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
-        order.verify(matchSyncService).syncMatches(List.of("puuid-1", "puuid-2"), 0, 20);
-        order.verify(matchSyncService).syncMissingTimelines();
-        order.verify(matchNormalizationService).findPendingMatchIdsAfter("");
+        order.verify(matchSyncService).findMatchIds("puuid-1", 0, 20);
+        order.verify(matchSyncService).syncMatch("KR_1");
         order.verify(matchNormalizationService).normalize("KR_1");
         order.verify(matchNormalizationService).save(normalized);
         order.verify(statsMatchService).registerMatchStats(normalized, "PLATINUM");
-        order.verify(matchNormalizationService).findPendingMatchIdsAfter("KR_1");
+        order.verify(matchSyncService).findMatchIds("puuid-2", 0, 20);
+        order.verify(matchSyncService).syncMissingTimelines();
+        order.verify(matchNormalizationService).findPendingMatchIdsAfter("");
+    }
+
+    @Test
+    void 여러_플레이어가_같은_매치를_조회해도_한_번만_끝까지_처리한다() {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(
+                        2,
+                        List.of("puuid-1", "puuid-2")
+                ));
+        when(matchSyncService.findMatchIds(anyString(), eq(0), eq(20)))
+                .thenReturn(List.of("KR_SHARED"));
+        when(matchSyncService.syncMatch("KR_SHARED")).thenReturn(true);
+        NormalizedMatch normalized = normalizedMatch("KR_SHARED");
+        when(matchNormalizationService.normalize("KR_SHARED")).thenReturn(normalized);
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of());
+
+        orchestrator.runOnce();
+
+        verify(matchSyncService, times(2)).findMatchIds(anyString(), eq(0), eq(20));
+        verify(matchSyncService).syncMatch("KR_SHARED");
+        verify(matchNormalizationService).normalize("KR_SHARED");
+        verify(matchNormalizationService).save(normalized);
+        verify(statsMatchService).registerMatchStats(normalized, "PLATINUM");
     }
 
     @Test
@@ -174,7 +197,7 @@ class RiotCollectionOrchestratorTest {
         when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
                 .thenThrow(new IllegalStateException("league unavailable"));
         orchestrator.runOnce();
-        verify(matchSyncService, never()).syncMatches(anyList(), eq(0), eq(20));
+        verify(matchSyncService, never()).findMatchIds(anyString(), eq(0), eq(20));
         verify(matchSyncService).syncMissingTimelines();
         verifyNoInteractions(statsMatchService);
     }
@@ -185,8 +208,6 @@ class RiotCollectionOrchestratorTest {
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
         when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 2))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-2")));
-        when(matchSyncService.syncMatches(anyList(), eq(0), eq(20)))
-                .thenReturn(new RiotMatchSyncService.SyncResult(1, 0, 0, 0, List.of()));
         orchestrator.runOnce();
         orchestrator.runOnce();
 
@@ -194,8 +215,8 @@ class RiotCollectionOrchestratorTest {
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
         verify(playerSyncService)
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 2);
-        verify(matchSyncService).syncMatches(List.of("puuid-1"), 0, 20);
-        verify(matchSyncService).syncMatches(List.of("puuid-2"), 0, 20);
+        verify(matchSyncService).findMatchIds("puuid-1", 0, 20);
+        verify(matchSyncService).findMatchIds("puuid-2", 0, 20);
     }
 
     @Test
@@ -207,7 +228,7 @@ class RiotCollectionOrchestratorTest {
 
         verify(playerSyncService, times(2))
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
-        verify(matchSyncService, never()).syncMatches(anyList(), eq(0), eq(20));
+        verify(matchSyncService, never()).findMatchIds(anyString(), eq(0), eq(20));
     }
 
     @Test
@@ -216,8 +237,6 @@ class RiotCollectionOrchestratorTest {
         when(playerSyncService.syncLeagueEntries(
                 anyString(), anyString(), anyString(), anyInt()
         )).thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of("puuid-1")));
-        when(matchSyncService.syncMatches(anyList(), eq(0), eq(20)))
-                .thenReturn(new RiotMatchSyncService.SyncResult(1, 0, 0, 0, List.of()));
         orchestrator.runOnce();
         orchestrator.runOnce();
         orchestrator.runOnce();

@@ -1,7 +1,7 @@
 package dfgg.application.match;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.tuple;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -71,17 +71,10 @@ class RawMatchTimelineServiceTest {
         when(rawMatchTimelineRepository.insertIfAbsent("KR_2", "{\"timeline\":2}"))
                 .thenReturn(1);
 
-        RawMatchTimelineService.MissingTimelineSyncResult result =
-                rawMatchTimelineService.collectMissingTimelines();
+        assertThatThrownBy(rawMatchTimelineService::collectMissingTimelines)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("temporary failure");
 
-        assertThat(result.newTimelines()).isEqualTo(1);
-        assertThat(result.skippedItems()).isZero();
-        assertThat(result.failures())
-                .extracting(
-                        RawMatchTimelineService.Failure::matchId,
-                        RawMatchTimelineService.Failure::reason
-                )
-                .containsExactly(tuple("KR_1", "IllegalStateException: temporary failure"));
         verify(riotClient).getRawMatchTimeline("KR_2");
     }
 
@@ -97,11 +90,8 @@ class RawMatchTimelineServiceTest {
         when(rawMatchTimelineRepository.insertIfAbsent("KR_1", "{\"timeline\":1}"))
                 .thenReturn(0);
 
-        RawMatchTimelineService.MissingTimelineSyncResult result =
-                rawMatchTimelineService.collectMissingTimelines();
+        rawMatchTimelineService.collectMissingTimelines();
 
-        assertThat(result.newTimelines()).isZero();
-        assertThat(result.skippedItems()).isEqualTo(1);
-        assertThat(result.failures()).isEmpty();
+        verify(rawMatchTimelineRepository).insertIfAbsent("KR_1", "{\"timeline\":1}");
     }
 }

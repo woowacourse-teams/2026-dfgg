@@ -1,7 +1,7 @@
 package dfgg.application.match;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.tuple;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -35,6 +35,32 @@ class RiotMatchSyncServiceTest {
     private RiotMatchSyncService riotMatchSyncService;
 
     @Test
+    void 한_플레이어의_매치_ID를_조회한다() {
+        when(riotClient.getMatchIds("puuid-1", 0, 1))
+                .thenReturn(List.of("KR_1"));
+
+        assertThat(riotMatchSyncService.findMatchIds("puuid-1", 0, 1))
+                .containsExactly("KR_1");
+        verify(riotClient).getMatchIds("puuid-1", 0, 1);
+        verifyNoInteractions(rawMatchService, rawMatchTimelineService);
+    }
+
+    @Test
+    void 단일_매치는_Match와_Timeline을_순서대로_수집한다() {
+        when(rawMatchService.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());
+        when(rawMatchTimelineService.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());
+        when(rawMatchService.collectRawMatch("KR_1")).thenReturn(true);
+        when(rawMatchTimelineService.collectRawMatchTimeline("KR_1")).thenReturn(true);
+
+        boolean collected = riotMatchSyncService.syncMatch("KR_1");
+
+        assertThat(collected).isTrue();
+        InOrder order = inOrder(rawMatchService, rawMatchTimelineService);
+        order.verify(rawMatchService).collectRawMatch("KR_1");
+        order.verify(rawMatchTimelineService).collectRawMatchTimeline("KR_1");
+    }
+
+    @Test
     void 플레이어와_매치_ID를_중복_제거하고_매치별_원본을_한_번만_수집한다() {
         when(riotClient.getMatchIds("puuid-1", 0, 20))
                 .thenReturn(List.of("KR_1", "KR_SHARED"));
@@ -51,19 +77,12 @@ class RiotMatchSyncServiceTest {
         when(rawMatchTimelineService.collectRawMatchTimeline("KR_SHARED")).thenReturn(true);
         when(rawMatchTimelineService.collectRawMatchTimeline("KR_2")).thenReturn(true);
 
-        RiotMatchSyncService.SyncResult result = riotMatchSyncService.syncMatches(
+        riotMatchSyncService.syncMatches(
                 List.of("puuid-1", "puuid-1", "puuid-2"),
                 0,
                 20
         );
 
-        assertThat(result).isEqualTo(new RiotMatchSyncService.SyncResult(
-                2,
-                3,
-                3,
-                0,
-                List.of()
-        ));
         verify(riotClient, times(1)).getMatchIds("puuid-1", 0, 20);
         verify(riotClient, times(1)).getMatchIds("puuid-2", 0, 20);
         verify(rawMatchService, times(1)).collectRawMatch("KR_SHARED");
@@ -72,9 +91,8 @@ class RiotMatchSyncServiceTest {
 
     @Test
     void 수집할_플레이어가_없으면_아무것도_호출하지_않는다() {
-        RiotMatchSyncService.SyncResult result = riotMatchSyncService.syncMatches(List.of(), 0, 20);
+        riotMatchSyncService.syncMatches(List.of(), 0, 20);
 
-        assertThat(result).isEqualTo(new RiotMatchSyncService.SyncResult(0, 0, 0, 0, List.of()));
         verifyNoInteractions(riotClient, rawMatchService, rawMatchTimelineService);
     }
 
@@ -84,13 +102,12 @@ class RiotMatchSyncServiceTest {
         when(rawMatchService.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of("KR_1"));
         when(rawMatchTimelineService.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of("KR_1"));
 
-        RiotMatchSyncService.SyncResult result = riotMatchSyncService.syncMatches(
+        riotMatchSyncService.syncMatches(
                 List.of("puuid-1"),
                 0,
                 20
         );
 
-        assertThat(result).isEqualTo(new RiotMatchSyncService.SyncResult(1, 0, 0, 2, List.of()));
         verify(rawMatchService, never()).collectRawMatch("KR_1");
         verify(rawMatchTimelineService, never()).collectRawMatchTimeline("KR_1");
     }
@@ -102,13 +119,12 @@ class RiotMatchSyncServiceTest {
         when(rawMatchTimelineService.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());
         when(rawMatchTimelineService.collectRawMatchTimeline("KR_1")).thenReturn(true);
 
-        RiotMatchSyncService.SyncResult result = riotMatchSyncService.syncMatches(
+        riotMatchSyncService.syncMatches(
                 List.of("puuid-1"),
                 0,
                 20
         );
 
-        assertThat(result).isEqualTo(new RiotMatchSyncService.SyncResult(1, 0, 1, 1, List.of()));
         verify(rawMatchService, never()).collectRawMatch("KR_1");
         verify(rawMatchTimelineService).collectRawMatchTimeline("KR_1");
     }
@@ -121,13 +137,12 @@ class RiotMatchSyncServiceTest {
         when(rawMatchService.collectRawMatch("KR_1")).thenReturn(true);
         when(rawMatchTimelineService.collectRawMatchTimeline("KR_1")).thenReturn(true);
 
-        RiotMatchSyncService.SyncResult result = riotMatchSyncService.syncMatches(
+        riotMatchSyncService.syncMatches(
                 List.of("puuid-1"),
                 0,
                 20
         );
 
-        assertThat(result).isEqualTo(new RiotMatchSyncService.SyncResult(1, 1, 1, 0, List.of()));
         InOrder order = inOrder(rawMatchService, rawMatchTimelineService);
         order.verify(rawMatchService).collectRawMatch("KR_1");
         order.verify(rawMatchTimelineService).collectRawMatchTimeline("KR_1");
@@ -143,24 +158,20 @@ class RiotMatchSyncServiceTest {
         when(rawMatchService.collectRawMatch("KR_2")).thenReturn(true);
         when(rawMatchTimelineService.collectRawMatchTimeline("KR_2")).thenReturn(true);
 
-        RiotMatchSyncService.SyncResult result = riotMatchSyncService.syncMatches(
+        assertThatThrownBy(() -> riotMatchSyncService.syncMatches(
                 List.of("puuid-1"),
                 0,
                 2
-        );
+        )).isInstanceOf(IllegalStateException.class)
+                .hasMessage("match failed");
 
-        assertThat(result.newMatches()).isEqualTo(1);
-        assertThat(result.newTimelines()).isEqualTo(1);
-        assertThat(result.failures())
-                .extracting(RiotMatchSyncService.Failure::stage, RiotMatchSyncService.Failure::targetId)
-                .containsExactly(tuple("MATCH", "KR_1"));
         verify(rawMatchTimelineService, never()).collectRawMatchTimeline("KR_1");
         verify(rawMatchService).collectRawMatch("KR_2");
         verify(rawMatchTimelineService).collectRawMatchTimeline("KR_2");
     }
 
     @Test
-    void Timeline_수집_실패를_기록한다() {
+    void Timeline_수집이_실패하면_예외를_전달한다() {
         when(riotClient.getMatchIds("puuid-1", 0, 1)).thenReturn(List.of("KR_1"));
         when(rawMatchService.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());
         when(rawMatchTimelineService.findExistingMatchIds(Set.of("KR_1"))).thenReturn(Set.of());
@@ -168,17 +179,12 @@ class RiotMatchSyncServiceTest {
         when(rawMatchTimelineService.collectRawMatchTimeline("KR_1"))
                 .thenThrow(new IllegalStateException("temporary failure"));
 
-        RiotMatchSyncService.SyncResult result = riotMatchSyncService.syncMatches(
+        assertThatThrownBy(() -> riotMatchSyncService.syncMatches(
                 List.of("puuid-1"),
                 0,
                 1
-        );
-
-        assertThat(result.newMatches()).isEqualTo(1);
-        assertThat(result.newTimelines()).isZero();
-        assertThat(result.failures())
-                .extracting(RiotMatchSyncService.Failure::stage, RiotMatchSyncService.Failure::targetId)
-                .containsExactly(tuple("TIMELINE", "KR_1"));
+        )).isInstanceOf(IllegalStateException.class)
+                .hasMessage("temporary failure");
     }
 
     @Test
@@ -194,48 +200,26 @@ class RiotMatchSyncServiceTest {
                 .thenThrow(new IllegalStateException("temporary failure"))
                 .thenReturn(true);
 
-        RiotMatchSyncService.SyncResult first = riotMatchSyncService.syncMatches(
+        assertThatThrownBy(() -> riotMatchSyncService.syncMatches(
                 List.of("puuid-1"),
                 0,
                 1
-        );
-        RiotMatchSyncService.SyncResult second = riotMatchSyncService.syncMatches(
+        )).isInstanceOf(IllegalStateException.class)
+                .hasMessage("temporary failure");
+        riotMatchSyncService.syncMatches(
                 List.of("puuid-1"),
                 0,
                 1
         );
 
-        assertThat(first.failures()).hasSize(1);
-        assertThat(first.newTimelines()).isZero();
-        assertThat(second.failures()).isEmpty();
-        assertThat(second.newTimelines()).isEqualTo(1);
         verify(rawMatchService, times(1)).collectRawMatch("KR_1");
         verify(rawMatchTimelineService, times(2)).collectRawMatchTimeline("KR_1");
     }
 
     @Test
     void 누락_Timeline_수집은_RawMatchTimelineService에_위임한다() {
-        when(rawMatchTimelineService.collectMissingTimelines()).thenReturn(
-                new RawMatchTimelineService.MissingTimelineSyncResult(
-                        2,
-                        1,
-                        List.of(new RawMatchTimelineService.Failure(
-                                "KR_FAILED",
-                                "IllegalStateException: timeline unavailable"
-                        ))
-                )
-        );
+        riotMatchSyncService.syncMissingTimelines();
 
-        RiotMatchSyncService.SyncResult result = riotMatchSyncService.syncMissingTimelines();
-
-        assertThat(result.newTimelines()).isEqualTo(2);
-        assertThat(result.skippedItems()).isEqualTo(1);
-        assertThat(result.failures())
-                .containsExactly(new RiotMatchSyncService.Failure(
-                        "TIMELINE",
-                        "KR_FAILED",
-                        "IllegalStateException: timeline unavailable"
-                ));
         verify(rawMatchTimelineService).collectMissingTimelines();
         verifyNoInteractions(riotClient, rawMatchService);
     }
@@ -250,19 +234,16 @@ class RiotMatchSyncServiceTest {
         when(rawMatchService.collectRawMatch("KR_1")).thenReturn(true);
         when(rawMatchTimelineService.collectRawMatchTimeline("KR_1")).thenReturn(true);
 
-        RiotMatchSyncService.SyncResult result = riotMatchSyncService.syncMatches(
+        assertThatThrownBy(() -> riotMatchSyncService.syncMatches(
                 List.of("puuid-failing", "puuid-succeeding"),
                 10,
                 20
-        );
+        )).isInstanceOf(IllegalStateException.class)
+                .hasMessage("temporary failure");
 
-        assertThat(result.scannedPlayers()).isEqualTo(2);
-        assertThat(result.newMatches()).isEqualTo(1);
-        assertThat(result.newTimelines()).isEqualTo(1);
-        assertThat(result.failures())
-                .extracting(RiotMatchSyncService.Failure::stage, RiotMatchSyncService.Failure::targetId)
-                .containsExactly(tuple("MATCH_IDS", "puuid-failing"));
         verify(riotClient).getMatchIds("puuid-succeeding", 10, 20);
+        verify(rawMatchService).collectRawMatch("KR_1");
+        verify(rawMatchTimelineService).collectRawMatchTimeline("KR_1");
     }
 
     @Test

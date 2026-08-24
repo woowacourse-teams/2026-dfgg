@@ -4,10 +4,8 @@ import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
 import dfgg.domain.match.RawMatchTimelineRepository;
 import dfgg.infrastructure.external.client.RiotClient;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -48,10 +46,8 @@ public class RawMatchTimelineService {
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public MissingTimelineSyncResult collectMissingTimelines() {
-        int newTimelines = 0;
-        int skippedItems = 0;
-        List<Failure> failures = new ArrayList<>();
+    public void collectMissingTimelines() {
+        RuntimeException firstFailure = null;
         String cursor = "";
 
         while (true) {
@@ -64,43 +60,18 @@ public class RawMatchTimelineService {
             }
             for (String matchId : matchIds) {
                 try {
-                    if (collectRawMatchTimeline(matchId)) {
-                        newTimelines++;
-                    } else {
-                        skippedItems++;
-                    }
+                    collectRawMatchTimeline(matchId);
                 } catch (RuntimeException exception) {
-                    failures.add(Failure.from(matchId, exception));
+                    if (firstFailure == null) {
+                        firstFailure = exception;
+                    }
                 }
             }
             cursor = matchIds.getLast();
         }
-        return new MissingTimelineSyncResult(newTimelines, skippedItems, failures);
-    }
 
-    public record MissingTimelineSyncResult(
-            int newTimelines,
-            int skippedItems,
-            List<Failure> failures
-    ) {
-
-        public MissingTimelineSyncResult {
-            failures = List.copyOf(Objects.requireNonNull(failures, "failures must not be null"));
-        }
-    }
-
-    public record Failure(String matchId, String reason) {
-
-        public Failure {
-            Objects.requireNonNull(matchId, "matchId must not be null");
-            Objects.requireNonNull(reason, "reason must not be null");
-        }
-
-        private static Failure from(String matchId, RuntimeException exception) {
-            String type = exception.getClass().getSimpleName();
-            String message = exception.getMessage();
-            String reason = message == null || message.isBlank() ? type : type + ": " + message;
-            return new Failure(matchId, reason);
+        if (firstFailure != null) {
+            throw firstFailure;
         }
     }
 }
