@@ -10,13 +10,18 @@ import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
+import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
@@ -29,50 +34,68 @@ public class EmbeddingTrainingBatchService {
     private final EmbeddingRepository embeddingRepository;
     private final MatchParticipantWindowBuilder windowBuilder;
     private final ChampionItemEmbeddingTrainer trainer;
+    private final EntityManager entityManager;
+    private final int matchPageSize;
 
     public EmbeddingTrainingBatchService(
             NormalizedMatchParticipantRepository participantRepository,
             ItemRepository itemRepository,
             EmbeddingRepository embeddingRepository,
             MatchParticipantWindowBuilder windowBuilder,
-            ChampionItemEmbeddingTrainer trainer
+            ChampionItemEmbeddingTrainer trainer,
+            EntityManager entityManager,
+            @Value("${mining.batch.match-page-size}") int matchPageSize
     ) {
         this.participantRepository = participantRepository;
         this.itemRepository = itemRepository;
         this.embeddingRepository = embeddingRepository;
         this.windowBuilder = windowBuilder;
         this.trainer = trainer;
+        this.entityManager = entityManager;
+        this.matchPageSize = matchPageSize;
     }
 
     @Transactional
     public Map<String, double[]> trainFromMatchData(double winWeight, TrainingConfig config, String algorithmVersion) {
         Assert.hasText(algorithmVersion, "algorithmVersion must not be blank");
 
-        List<NormalizedMatchParticipant> participants = participantRepository.findAll();
-        Map<String, List<NormalizedMatchParticipant>> byMatch = participants.stream()
-                .collect(Collectors.groupingBy(NormalizedMatchParticipant::getMatchId));
-
         List<Window> windows = new ArrayList<>();
-        for (List<NormalizedMatchParticipant> matchParticipants : byMatch.values()) {
-            windows.addAll(windowBuilder.buildMatchWindows(matchParticipants, winWeight));
-        }
+        Set<Long> championIds = new HashSet<>();
+
+        int page = 0;
+        Slice<String> matchIdPage;
+        do {
+            matchIdPage = participantRepository.findDistinctMatchIds(PageRequest.of(page, matchPageSize));
+            List<String> matchIds = matchIdPage.getContent();
+            if (!matchIds.isEmpty()) {
+                List<NormalizedMatchParticipant> participants = participantRepository.findByMatchIdIn(matchIds);
+                Map<String, List<NormalizedMatchParticipant>> byMatch = participants.stream()
+                        .collect(Collectors.groupingBy(NormalizedMatchParticipant::getMatchId));
+                for (List<NormalizedMatchParticipant> matchParticipants : byMatch.values()) {
+                    windows.addAll(windowBuilder.buildMatchWindows(matchParticipants, winWeight));
+                }
+                for (NormalizedMatchParticipant participant : participants) {
+                    championIds.add(Long.valueOf(participant.getChampionId()));
+                }
+                entityManager.clear();
+            }
+            page++;
+        } while (matchIdPage.hasNext());
+
         List<Item> items = itemRepository.findAll();
         windows.addAll(windowBuilder.buildContentContextWindows(items));
 
         Map<String, double[]> embeddings = trainer.train(windows, config);
-        persist(embeddings, participants, items, algorithmVersion);
+        persist(embeddings, championIds, items, algorithmVersion);
         return embeddings;
     }
 
     private void persist(
             Map<String, double[]> embeddings,
-            List<NormalizedMatchParticipant> participants,
+            Set<Long> championIds,
             List<Item> items,
             String algorithmVersion
     ) {
-        Set<Long> championIds = participants.stream()
-                .map(participant -> Long.valueOf(participant.getChampionId()))
-                .collect(Collectors.toSet());
         Set<Long> itemIds = items.stream()
                 .map(Item::getItemId)
                 .collect(Collectors.toSet());

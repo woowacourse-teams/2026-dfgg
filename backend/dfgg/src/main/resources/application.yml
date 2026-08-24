@@ -21,6 +21,10 @@ riot:
     platform-base-url: "${RIOT_PLATFORM_BASE_URL:https://kr.api.riotgames.com}"
     regional-base-url: "${RIOT_REGIONAL_BASE_URL:https://asia.api.riotgames.com}"
 
+mining:
+  batch:
+    match-page-size: "${MINING_BATCH_MATCH_PAGE_SIZE:200}"
+
 collection:
   scheduler:
     enabled: "${COLLECTION_SCHEDULER_ENABLED:false}"

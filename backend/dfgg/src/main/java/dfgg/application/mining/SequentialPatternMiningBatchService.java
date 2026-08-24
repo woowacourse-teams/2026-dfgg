@@ -10,6 +10,7 @@ import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import dfgg.domain.sequence.MinedSequentialPattern;
 import dfgg.domain.sequence.MinedSequentialPatternRepository;
 import dfgg.domain.sequence.SequentialPattern;
+import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +18,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
@@ -29,19 +33,25 @@ public class SequentialPatternMiningBatchService {
     private final MinedSequentialPatternRepository minedSequentialPatternRepository;
     private final PrefixSpanMiner prefixSpanMiner;
     private final ChampionPositionNormalizer positionNormalizer;
+    private final EntityManager entityManager;
+    private final int matchPageSize;
 
     public SequentialPatternMiningBatchService(
             NormalizedMatchParticipantRepository participantRepository,
             MatchParticipantCohortRepository cohortRepository,
             MinedSequentialPatternRepository minedSequentialPatternRepository,
             PrefixSpanMiner prefixSpanMiner,
-            ChampionPositionNormalizer positionNormalizer
+            ChampionPositionNormalizer positionNormalizer,
+            EntityManager entityManager,
+            @Value("${mining.batch.match-page-size}") int matchPageSize
     ) {
         this.participantRepository = participantRepository;
         this.cohortRepository = cohortRepository;
         this.minedSequentialPatternRepository = minedSequentialPatternRepository;
         this.prefixSpanMiner = prefixSpanMiner;
         this.positionNormalizer = positionNormalizer;
+        this.entityManager = entityManager;
+        this.matchPageSize = matchPageSize;
     }
 
     @Transactional
@@ -50,27 +60,39 @@ public class SequentialPatternMiningBatchService {
     ) {
         Assert.hasText(algorithmVersion, "algorithmVersion must not be blank");
 
-        List<NormalizedMatchParticipant> participants = participantRepository.findAll();
-        Map<String, String> tierByMatchAndPuuid = tierByMatchAndPuuid(participants, queueType);
-
         Map<MiningScope, List<ParticipantSequence>> sequencesByScope = new LinkedHashMap<>();
-        for (NormalizedMatchParticipant participant : participants) {
-            String tier = tierByMatchAndPuuid.get(cohortLookupKey(participant.getMatchId(), participant.getPuuid()));
-            if (tier == null) {
-                continue;
+
+        int page = 0;
+        Slice<String> matchIdPage;
+        do {
+            matchIdPage = participantRepository.findDistinctMatchIds(PageRequest.of(page, matchPageSize));
+            List<String> matchIds = matchIdPage.getContent();
+            if (!matchIds.isEmpty()) {
+                List<NormalizedMatchParticipant> participants = participantRepository.findByMatchIdIn(matchIds);
+                Map<String, String> tierByMatchAndPuuid = tierByMatchAndPuuid(participants, queueType);
+                for (NormalizedMatchParticipant participant : participants) {
+                    String tier = tierByMatchAndPuuid.get(
+                            cohortLookupKey(participant.getMatchId(), participant.getPuuid())
+                    );
+                    if (tier == null) {
+                        continue;
+                    }
+                    MiningScope scope = new MiningScope(
+                            Long.valueOf(participant.getChampionId()),
+                            participant.getPosition(),
+                            tier,
+                            participant.getPatch()
+                    );
+                    List<Long> sequence = participant.getCoreItemPurchaseOrder().stream()
+                            .map(Long::valueOf)
+                            .toList();
+                    sequencesByScope.computeIfAbsent(scope, ignored -> new ArrayList<>())
+                            .add(new ParticipantSequence(sequence, participant.getWin()));
+                }
+                entityManager.clear();
             }
-            MiningScope scope = new MiningScope(
-                    Long.valueOf(participant.getChampionId()),
-                    participant.getPosition(),
-                    tier,
-                    participant.getPatch()
-            );
-            List<Long> sequence = participant.getCoreItemPurchaseOrder().stream()
-                    .map(Long::valueOf)
-                    .toList();
-            sequencesByScope.computeIfAbsent(scope, ignored -> new ArrayList<>())
-                    .add(new ParticipantSequence(sequence, participant.getWin()));
-        }
+            page++;
+        } while (matchIdPage.hasNext());
 
         Map<MiningScope, List<SequentialPattern>> patternsByScope = new LinkedHashMap<>();
         List<MinedSequentialPattern> toSave = new ArrayList<>();
