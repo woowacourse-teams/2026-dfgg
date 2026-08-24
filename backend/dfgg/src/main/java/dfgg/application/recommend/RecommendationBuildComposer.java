@@ -1,5 +1,6 @@
 package dfgg.application.recommend;
 
+import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
 import java.util.ArrayList;
@@ -21,6 +22,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class RecommendationBuildComposer {
 
+    private static final String BOOTS_TAG = "Boots";
+    private static final int BOTTOM_ITEM_COUNT = 7;
+
     /**
      * 조회된 통계 행을 아이템 슬롯 순서의 추천 목록으로 변환한다.
      *
@@ -30,10 +34,66 @@ public class RecommendationBuildComposer {
      *     <li>각 슬롯에서 게임 수와 승리 수가 높은 아이템을 선택한다.</li>
      * </ol>
      */
-    public List<Item> compose(List<ChampionBuildStats> matchingStats) {
+    public List<Item> compose(List<ChampionBuildStats> matchingStats, ChampionPosition position) {
         List<ChampionBuildStats> representativePerBuildKey = pickRepresentativePerBuildKey(matchingStats);
         Map<Integer, Map<Long, SlotCandidate>> slots = accumulateBySlot(representativePerBuildKey);
+        if (position == ChampionPosition.BOTTOM) {
+            return pickBottomBuild(slots);
+        }
         return pickBestPerSlot(slots);
+    }
+
+    /**
+     * BOTTOM의 일곱 슬롯을 조합하되 신발을 실제로 관측된 구매 슬롯에 정확히 하나만 배치한다.
+     *
+     * <p>신발 후보는 아이템뿐 아니라 관측된 슬롯을 함께 비교한다. 가장 강한 신발 후보의 슬롯을
+     * 먼저 예약한 뒤 나머지 슬롯에서는 신발을 제외한 일반 아이템만 선택한다. 따라서 신발을
+     * 결과 마지막에 덧붙이지 않고 통계에 기록된 구매 순서를 유지한다.
+     *
+     * <p>신발 후보가 없거나 일곱 슬롯을 모두 채우지 못하면 유효한 BOTTOM 빌드를 만들 수 없으므로
+     * 빈 목록을 반환한다.
+     */
+    private List<Item> pickBottomBuild(Map<Integer, Map<Long, SlotCandidate>> slots) {
+        SlottedCandidate boot = findBestBootCandidate(slots);
+        if (boot == null) {
+            return List.of();
+        }
+
+        List<Item> composed = new ArrayList<>(BOTTOM_ITEM_COUNT);
+        Set<Long> chosenItemIds = new LinkedHashSet<>();
+        for (int slotIndex = 0; slotIndex < BOTTOM_ITEM_COUNT; slotIndex++) {
+            if (slotIndex == boot.slotIndex()) {
+                composed.add(boot.candidate().item());
+                chosenItemIds.add(boot.candidate().item().getItemId());
+                continue;
+            }
+
+            SlotCandidate best = slots.getOrDefault(slotIndex, Map.of()).values().stream()
+                    .filter(candidate -> !isBoot(candidate.item()))
+                    .filter(candidate -> !chosenItemIds.contains(candidate.item().getItemId()))
+                    .max(slotCandidateComparator())
+                    .orElse(null);
+            if (best == null) {
+                return List.of();
+            }
+            composed.add(best.item());
+            chosenItemIds.add(best.item().getItemId());
+        }
+        return List.copyOf(composed);
+    }
+
+    /**
+     * BOTTOM이 사용할 신발을 슬롯별 관측량과 함께 비교해 가장 대표적인 후보 하나로 고른다.
+     */
+    private SlottedCandidate findBestBootCandidate(Map<Integer, Map<Long, SlotCandidate>> slots) {
+        return slots.entrySet().stream()
+                .filter(entry -> entry.getKey() >= 0 && entry.getKey() < BOTTOM_ITEM_COUNT)
+                .flatMap(entry -> entry.getValue().values().stream()
+                        .filter(candidate -> isBoot(candidate.item()))
+                        .map(candidate -> new SlottedCandidate(entry.getKey(), candidate)))
+                .max(Comparator.comparingInt((SlottedCandidate candidate) -> candidate.candidate().gameCount())
+                        .thenComparingInt(candidate -> candidate.candidate().winCount()))
+                .orElse(null);
     }
 
     /**
@@ -90,14 +150,22 @@ public class RecommendationBuildComposer {
             // 이미 앞 슬롯에서 선택된 아이템은 중복 빌드가 되지 않도록 후보에서 제외한다.
             slotCandidates.values().stream()
                     .filter(candidate -> !chosenItemIds.contains(candidate.item().getItemId()))
-                    .max(Comparator.comparingInt(SlotCandidate::gameCount)
-                            .thenComparingInt(SlotCandidate::winCount))
+                    .max(slotCandidateComparator())
                     .ifPresent(best -> {
                         composed.add(best.item());
                         chosenItemIds.add(best.item().getItemId());
                     });
         }
         return composed;
+    }
+
+    private Comparator<SlotCandidate> slotCandidateComparator() {
+        return Comparator.comparingInt(SlotCandidate::gameCount)
+                .thenComparingInt(SlotCandidate::winCount);
+    }
+
+    private boolean isBoot(Item item) {
+        return item.hasTag(BOOTS_TAG);
     }
 
     /**
@@ -118,5 +186,11 @@ public class RecommendationBuildComposer {
         SlotCandidate combine(SlotCandidate other) {
             return new SlotCandidate(item, gameCount + other.gameCount, winCount + other.winCount);
         }
+    }
+
+    /**
+     * 후보 아이템과 실제로 관측된 구매 슬롯을 함께 보존한다.
+     */
+    private record SlottedCandidate(int slotIndex, SlotCandidate candidate) {
     }
 }

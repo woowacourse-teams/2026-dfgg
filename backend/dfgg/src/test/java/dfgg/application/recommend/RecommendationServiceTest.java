@@ -71,18 +71,22 @@ class RecommendationServiceTest {
         when(championService.findChampionByName("케이틀린")).thenReturn(caitlyn);
 
         Item item1 = new Item(1L, "아이템1");
-        Item item2 = new Item(2L, "아이템2");
-        Item item3 = new Item(3L, "아이템3");
+        Item boots = new Item(2L, "신발", List.of("Boots"));
+        Item item2 = new Item(3L, "아이템2");
+        Item item3 = new Item(4L, "아이템3");
+        Item item4 = new Item(5L, "아이템4");
+        Item item5 = new Item(6L, "아이템5");
+        Item item6 = new Item(7L, "아이템6");
 
         ChampionBuildStats shortPopularStats = new ChampionBuildStats(
                 "16.15", 420, myChampion, ChampionPosition.BOTTOM,
                 null, null, null, null, null,
-                "PLATINUM", "SHORT", List.of(item1, item2), 30, 50
+                "PLATINUM", "SHORT", List.of(item1, boots, item2), 30, 50
         );
         ChampionBuildStats longRareStats = new ChampionBuildStats(
                 "16.15", 420, myChampion, ChampionPosition.BOTTOM,
                 null, null, null, null, null,
-                "PLATINUM", "LONG", List.of(item1, item2, item3), 2, 3
+                "PLATINUM", "LONG", List.of(item1, boots, item2, item3, item4, item5, item6), 2, 3
         );
 
         when(statsRepository.findAllMatchingStats(
@@ -96,7 +100,7 @@ class RecommendationServiceTest {
         // then
         assertThat(response.champion()).isEqualTo("징크스");
         assertThat(response.position()).isEqualTo("BOTTOM");
-        assertThat(response.items()).hasSize(3);
+        assertThat(response.items()).hasSize(7);
     }
 
     @Test
@@ -121,6 +125,59 @@ class RecommendationServiceTest {
         )).thenReturn(List.of());
 
         // when & then
+        assertThatThrownBy(() -> recommendationService.recommend(request))
+                .isInstanceOf(CompositionStatsNotFoundException.class)
+                .hasMessageContaining("징크스")
+                .hasMessageContaining("BOTTOM");
+    }
+
+    @Test
+    @DisplayName("BOTTOM 통계는 존재하지만 신발 후보가 없으면 추천 없음 예외가 발생한다")
+    void recommend_WhenBottomStatsHaveNoBootCandidate_ThrowCompositionStatsNotFoundException() {
+        RecommendationRequest request = new RecommendationRequest(
+                new ChampionDto("징크스", "BOTTOM"),
+                List.of(),
+                List.of()
+        );
+        Champion myChampion = mock(Champion.class);
+        when(myChampion.getChampionId()).thenReturn(1L);
+        when(myChampion.getName()).thenReturn("징크스");
+        when(championService.findChampionByName("징크스")).thenReturn(myChampion);
+
+        ChampionBuildStats bootlessStats = new ChampionBuildStats(
+                "16.15",
+                420,
+                myChampion,
+                ChampionPosition.BOTTOM,
+                false,
+                false,
+                false,
+                false,
+                false,
+                "PLATINUM",
+                "BOOTLESS",
+                List.of(
+                        new Item(10L, "아이템0"),
+                        new Item(11L, "아이템1"),
+                        new Item(12L, "아이템2"),
+                        new Item(13L, "아이템3"),
+                        new Item(14L, "아이템4"),
+                        new Item(15L, "아이템5"),
+                        new Item(16L, "아이템6")
+                ),
+                50,
+                100
+        );
+        when(statsRepository.findAllMatchingStats(
+                eq(1L),
+                eq("BOTTOM"),
+                anyBoolean(),
+                anyBoolean(),
+                anyBoolean(),
+                anyBoolean(),
+                anyBoolean()
+        )).thenReturn(List.of(bootlessStats));
+
         assertThatThrownBy(() -> recommendationService.recommend(request))
                 .isInstanceOf(CompositionStatsNotFoundException.class)
                 .hasMessageContaining("징크스")
