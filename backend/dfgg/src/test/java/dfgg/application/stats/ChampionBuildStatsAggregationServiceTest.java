@@ -84,32 +84,30 @@ class ChampionBuildStatsAggregationServiceTest {
 
         aggregationService.aggregate(match, "PLATINUM", List.of("p-focal"));
 
-        verify(statsRepository, times(32)).insertIfAbsent(
+        verify(statsRepository).insertIfAbsent(
                 eq("16.15"),
                 eq(420),
                 eq(1L),
                 eq("TOP"),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
+                eq(false),
+                eq(false),
+                eq(false),
+                eq(false),
+                eq(false),
                 eq("PLATINUM"),
                 eq("3071>6610"),
                 anyString()
         );
-        verify(statsRepository, times(64)).insertItem(anyString(), anyLong(), anyInt());
+        verify(statsRepository, times(2)).insertItem(anyString(), anyLong(), anyInt());
         ArgumentCaptor<String> statsKeyCaptor = ArgumentCaptor.forClass(String.class);
-        verify(sampleRepository, times(32)).insertAndIncrementIfAbsent(
+        verify(sampleRepository).insertAndIncrementIfAbsent(
                 statsKeyCaptor.capture(),
                 eq("KR_1"),
                 eq("p-focal"),
                 eq(true)
         );
         assertThat(statsKeyCaptor.getAllValues())
-                .hasSize(32)
-                .allMatch(statsKey -> statsKey.startsWith("16.15|420|1|TOP|"))
-                .allMatch(statsKey -> statsKey.endsWith("|PLATINUM|3071>6610"));
+                .containsExactly("16.15|420|1|TOP|false|false|false|false|false|PLATINUM|3071>6610");
     }
 
     @ParameterizedTest
@@ -143,16 +141,16 @@ class ChampionBuildStatsAggregationServiceTest {
 
         aggregationService.aggregate(match, "PLATINUM", List.of("p-focal"));
 
-        verify(statsRepository, times(32)).insertIfAbsent(
+        verify(statsRepository).insertIfAbsent(
                 eq("16.15"),
                 eq(420),
                 eq(1L),
                 eq(servicePosition),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
+                eq(false),
+                eq(false),
+                eq(false),
+                eq(false),
+                eq(false),
                 eq("PLATINUM"),
                 eq("3071>6610"),
                 anyString()

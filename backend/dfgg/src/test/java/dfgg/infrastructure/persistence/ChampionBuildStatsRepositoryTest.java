@@ -101,8 +101,8 @@ class ChampionBuildStatsRepositoryTest {
     }
 
     @Test
-    @DisplayName("조건에 맞는 모든 buildKey row를 반환한다")
-    void findAllMatchingStats_WhenMultipleBuildKeysMatchCondition_ReturnAllRows() {
+    @DisplayName("조합 조건이 정확히 일치하는 buildKey row만 반환한다")
+    void findAllMatchingStats_WhenLegacyWildcardRowExists_ReturnOnlyExactRow() {
         Champion champion = championRepository.save(new Champion(
                 266L,
                 "Aatrox",
@@ -114,7 +114,7 @@ class ChampionBuildStatsRepositoryTest {
                 false, false, false, false, false,
                 "PLATINUM", "SHORT", List.of(), 50, 100
         ));
-        ChampionBuildStats longBuild = statsRepository.save(new ChampionBuildStats(
+        ChampionBuildStats legacyWildcardBuild = statsRepository.save(new ChampionBuildStats(
                 "16.15", 420, champion, ChampionPosition.TOP,
                 null, null, null, null, null,
                 "PLATINUM", "LONG", List.of(), 1, 2
@@ -125,7 +125,8 @@ class ChampionBuildStatsRepositoryTest {
                 266L, "TOP", false, false, false, false, false
         );
 
-        assertThat(matched).containsExactlyInAnyOrder(shortBuild, longBuild);
+        assertThat(matched).containsExactly(shortBuild);
+        assertThat(matched).doesNotContain(legacyWildcardBuild);
     }
 
     @Test
@@ -186,7 +187,7 @@ class ChampionBuildStatsRepositoryTest {
     }
 
     @Test
-    void game_count가_0인_구체적_통계는_추천에서_제외하고_유효한_통계로_fallback한다() {
+    void 정확한_조건의_game_count가_0이면_와일드카드_통계로_fallback하지_않는다() {
         Champion champion = championRepository.save(new Champion(
                 266L,
                 "Aatrox",
@@ -198,7 +199,7 @@ class ChampionBuildStatsRepositoryTest {
                 true, true, true, true, true,
                 "PLATINUM", "EMPTY", List.of(), 0, 0
         ));
-        ChampionBuildStats validFallbackStats = statsRepository.save(new ChampionBuildStats(
+        ChampionBuildStats legacyWildcardStats = statsRepository.save(new ChampionBuildStats(
                 "16.15", 420, champion, ChampionPosition.TOP,
                 null, null, null, null, null,
                 "PLATINUM", "VALID", List.of(), 2, 3
@@ -208,10 +209,11 @@ class ChampionBuildStatsRepositoryTest {
         assertThat(statsRepository.findBestMatchingStatsForScope(
                 "16.15", 420, "PLATINUM", 266L, "TOP",
                 true, true, true, true, true
-        )).contains(validFallbackStats);
+        )).isEmpty();
         assertThat(statsRepository.findBestMatchingStats(
                 266L, "TOP", true, true, true, true, true
-        )).contains(validFallbackStats);
+        )).isEmpty();
+        assertThat(statsRepository.findById(legacyWildcardStats.getId())).isPresent();
         assertThat(statsRepository.findById(emptySpecificStats.getId()))
                 .get()
                 .extracting(ChampionBuildStats::getGameCount)

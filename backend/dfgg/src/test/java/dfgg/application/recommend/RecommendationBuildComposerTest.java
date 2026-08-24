@@ -28,10 +28,11 @@ class RecommendationBuildComposerTest {
     @DisplayName("표본이 많은 짧은 빌드와 표본이 적은 긴 빌드를 슬롯별로 병합해 최대 6개까지 채운다")
     void compose_WhenShortPopularBuildAndLongRareBuildExist_MergeItemsBySlotUpToSix() {
         ChampionBuildStats shortPopularBuild = stats(
-                "A", List.of(boots, itemA2, itemA3), 50, 30, null, null, null, null, null
+                "A", List.of(boots, itemA2, itemA3), 50, 30, false, false, false, false, false
         );
         ChampionBuildStats longRareBuild = stats(
-                "B", List.of(boots, itemA2, itemA3, itemB4, itemB5, itemB6), 3, 2, null, null, null, null, null
+                "B", List.of(boots, itemA2, itemA3, itemB4, itemB5, itemB6), 3, 2,
+                false, false, false, false, false
         );
 
         List<Item> composed = composer.compose(List.of(shortPopularBuild, longRareBuild));
@@ -46,8 +47,12 @@ class RecommendationBuildComposerTest {
         Item itemQ = new Item(11L, "Q");
         Item itemR = new Item(12L, "R");
 
-        ChampionBuildStats buildX = stats("X", List.of(itemP, itemQ), 20, 10, null, null, null, null, null);
-        ChampionBuildStats buildY = stats("Y", List.of(itemR, itemP), 15, 5, null, null, null, null, null);
+        ChampionBuildStats buildX = stats(
+                "X", List.of(itemP, itemQ), 20, 10, false, false, false, false, false
+        );
+        ChampionBuildStats buildY = stats(
+                "Y", List.of(itemR, itemP), 15, 5, false, false, false, false, false
+        );
 
         List<Item> composed = composer.compose(List.of(buildX, buildY));
 
@@ -56,16 +61,22 @@ class RecommendationBuildComposerTest {
     }
 
     @Test
-    @DisplayName("같은 buildKey의 variant row 중 가장 구체적인 row만 반영하고 이중 집계하지 않는다")
-    void compose_WhenBuildKeyHasMultipleSpecificityVariants_UseOnlyMostSpecificRow() {
+    @DisplayName("같은 buildKey의 여러 통계 중 표본이 가장 많은 행만 반영하고 이중 집계하지 않는다")
+    void compose_WhenBuildKeyHasMultipleRows_UseOnlyMostObservedRow() {
         Item itemZ = new Item(20L, "Z");
         Item itemW = new Item(21L, "W");
 
-        ChampionBuildStats zWildcard = stats("Z", List.of(itemZ), 1000, 500, null, null, null, null, null);
-        ChampionBuildStats zSpecific = stats("Z", List.of(itemZ), 50, 25, true, true, true, true, true);
-        ChampionBuildStats wSpecific = stats("W", List.of(itemW), 100, 60, true, true, true, true, true);
+        ChampionBuildStats zLessObserved = stats(
+                "Z", List.of(itemZ), 40, 20, true, true, true, true, true
+        );
+        ChampionBuildStats zMoreObserved = stats(
+                "Z", List.of(itemZ), 50, 25, true, true, true, true, true
+        );
+        ChampionBuildStats wObserved = stats(
+                "W", List.of(itemW), 80, 40, true, true, true, true, true
+        );
 
-        List<Item> composed = composer.compose(List.of(zWildcard, zSpecific, wSpecific));
+        List<Item> composed = composer.compose(List.of(zLessObserved, zMoreObserved, wObserved));
 
         assertThat(composed).containsExactly(itemW);
     }

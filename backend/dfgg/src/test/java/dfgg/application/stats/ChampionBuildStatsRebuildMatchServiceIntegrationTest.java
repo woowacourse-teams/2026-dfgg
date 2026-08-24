@@ -218,11 +218,11 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
                 420,
                 champion,
                 ChampionPosition.TOP,
-                null,
-                null,
-                null,
-                null,
-                null,
+                false,
+                false,
+                false,
+                false,
+                false,
                 "GOLD",
                 "3071",
                 List.of(item),
@@ -281,13 +281,13 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
 
         rebuildService.rebuildAll("PLATINUM");
         assertThat(normalizedRepository.count()).isEqualTo(3);
-        assertThat(statsRepository.count()).isEqualTo(32);
-        assertThat(sampleRepository.count()).isEqualTo(32);
+        assertThat(statsRepository.count()).isEqualTo(1);
+        assertThat(sampleRepository.count()).isEqualTo(1);
 
         rebuildService.rebuildAll("PLATINUM");
         assertThat(normalizedRepository.count()).isEqualTo(3);
-        assertThat(statsRepository.count()).isEqualTo(32);
-        assertThat(sampleRepository.count()).isEqualTo(32);
+        assertThat(statsRepository.count()).isEqualTo(1);
+        assertThat(sampleRepository.count()).isEqualTo(1);
         assertThat(completionRepository.count()).isEqualTo(1);
         assertThat(statsRepository.findAll())
                 .allSatisfy(stats -> {
@@ -307,8 +307,8 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
         normalizedRepository.deleteAllInBatch();
         matchService.registerMatchStats(normalized, "PLATINUM");
 
-        assertThat(statsRepository.count()).isEqualTo(32);
-        assertThat(sampleRepository.count()).isEqualTo(32);
+        assertThat(statsRepository.count()).isEqualTo(1);
+        assertThat(sampleRepository.count()).isEqualTo(1);
         assertThat(completionRepository.count()).isEqualTo(1);
     }
 
@@ -366,14 +366,14 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
         assertThat(normalizedRepository.findByMatchId("KR_INVALID"))
                 .extracting(NormalizedMatchParticipant::getPuuid)
                 .containsExactlyInAnyOrder("p-focal", "p-ally", "p-enemy");
-        assertThat(statsRepository.count()).isEqualTo(32);
-        assertThat(sampleRepository.count()).isEqualTo(32);
+        assertThat(statsRepository.count()).isEqualTo(1);
+        assertThat(sampleRepository.count()).isEqualTo(1);
         assertThat(completionRepository.count()).isEqualTo(1);
 
         rebuildService.rebuildAll("PLATINUM");
 
         assertThat(normalizedRepository.findByMatchId("KR_INVALID")).hasSize(3);
-        assertThat(sampleRepository.count()).isEqualTo(64);
+        assertThat(sampleRepository.count()).isEqualTo(2);
         assertThat(completionRepository.count()).isEqualTo(2);
     }
 
@@ -409,7 +409,7 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
         rebuildService.rebuildAll("PLATINUM");
 
         assertThat(completionRepository.count()).isEqualTo(2);
-        assertThat(sampleRepository.count()).isEqualTo(64);
+        assertThat(sampleRepository.count()).isEqualTo(2);
         assertThat(normalizedRepository.findByMatchId("KR_BATCH")).hasSize(3);
     }
 
@@ -426,7 +426,7 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
         rebuildService.rebuildAll("PLATINUM");
 
         assertThat(completionRepository.count()).isEqualTo(2);
-        assertThat(sampleRepository.count()).isEqualTo(64);
+        assertThat(sampleRepository.count()).isEqualTo(2);
         assertThat(statsRepository.findAll())
                 .allSatisfy(stats -> assertThat(stats.getGameCount()).isEqualTo(1));
     }
@@ -444,11 +444,11 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
                 420,
                 champion,
                 ChampionPosition.TOP,
-                null,
-                null,
-                null,
-                null,
-                null,
+                false,
+                false,
+                false,
+                false,
+                false,
                 "PLATINUM",
                 "3071>6610",
                 buildItems,
@@ -464,8 +464,8 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
         rebuildService.rebuildAll("PLATINUM");
 
         assertThat(completionRepository.count()).isEqualTo(1);
-        assertThat(statsRepository.count()).isEqualTo(32);
-        assertThat(sampleRepository.count()).isEqualTo(32);
+        assertThat(statsRepository.count()).isEqualTo(1);
+        assertThat(sampleRepository.count()).isEqualTo(1);
         assertThat(statsRepository.findAll())
                 .allSatisfy(stats -> {
                     assertThat(stats.getGameCount()).isEqualTo(1);
@@ -497,8 +497,8 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
         }
 
         assertThat(completionRepository.count()).isEqualTo(1);
-        assertThat(statsRepository.count()).isEqualTo(32);
-        assertThat(sampleRepository.count()).isEqualTo(32);
+        assertThat(statsRepository.count()).isEqualTo(1);
+        assertThat(sampleRepository.count()).isEqualTo(1);
     }
 
     @Test
@@ -513,15 +513,15 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
         rebuildService.replayOne("KR_REPLAY", "PLATINUM");
         rebuildService.replayOne("KR_REPLAY", "PLATINUM");
 
-        assertThat(sampleRepository.count()).isEqualTo(32);
+        assertThat(sampleRepository.count()).isEqualTo(1);
         assertThat(sampleRepository.findAll()).allSatisfy(sample -> assertThat(sample.getWin()).isFalse());
         assertThat(statsRepository.findAll().stream()
                 .filter(stats -> stats.getGameCount() == 0))
-                .hasSize(32)
+                .hasSize(1)
                 .allSatisfy(stats -> assertThat(stats.getBuildKey()).isEqualTo("3071>6610"));
         assertThat(statsRepository.findAll().stream()
                 .filter(stats -> stats.getGameCount() == 1))
-                .hasSize(32)
+                .hasSize(1)
                 .allSatisfy(stats -> {
                     assertThat(stats.getBuildKey()).isEqualTo("6610>3071");
                     assertThat(stats.getWinCount()).isZero();
@@ -560,10 +560,10 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
                     assertThat(participant.getWin()).isTrue();
                 });
         assertThat(sampleRepository.findAll())
-                .hasSize(32)
+                .hasSize(1)
                 .allSatisfy(sample -> assertThat(sample.getWin()).isTrue());
         assertThat(statsRepository.findAll())
-                .hasSize(32)
+                .hasSize(1)
                 .allSatisfy(stats -> {
                     assertThat(stats.getBuildKey()).isEqualTo("3071>6610");
                     assertThat(stats.getGameCount()).isEqualTo(1);
@@ -584,7 +584,7 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
         rebuildService.replayOne("KR_BACKFILL", "PLATINUM");
 
         assertThat(sampleRepository.findAll())
-                .hasSize(32)
+                .hasSize(1)
                 .allSatisfy(sample -> assertThat(sample.getWin()).isTrue());
         assertThat(statsRepository.findAll()).allSatisfy(stats -> {
             assertThat(stats.getGameCount()).isEqualTo(1);
@@ -605,7 +605,7 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
         assertThatThrownBy(() -> rebuildService.replayOne("KR_UNKNOWN_WIN", "PLATINUM"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("normalized participants not found");
-        assertThat(sampleRepository.count()).isEqualTo(32);
+        assertThat(sampleRepository.count()).isEqualTo(1);
         assertThat(sampleRepository.findAll()).allSatisfy(sample -> assertThat(sample.getWin()).isNull());
         assertThat(statsRepository.findAll()).allSatisfy(stats -> {
             assertThat(stats.getGameCount()).isEqualTo(1);
