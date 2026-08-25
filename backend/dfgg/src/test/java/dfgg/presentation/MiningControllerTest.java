@@ -74,6 +74,42 @@ class MiningControllerTest {
     }
 
     @Test
+    @DisplayName("카운터 임베딩을 기본 하이퍼파라미터로 호출하면 별도 algorithmVersion으로 저장된다")
+    void trainCounterEmbeddings_WhenCalledWithDefaults_PersistsCounterEmbeddingsUnderGivenAlgorithmVersion() {
+        // given & when
+        EmbeddingTrainingResult result = given()
+                .queryParam("algorithmVersion", "sgns-default-counter")
+                .when().post("/admin/mining/counter-embeddings")
+                .then()
+                .statusCode(200)
+                .extract().as(EmbeddingTrainingResult.class);
+
+        // then
+        assertThat(result.algorithmVersion()).isEqualTo("sgns-default-counter");
+        assertThat(result.persistedEmbeddingCount()).isGreaterThan(0);
+
+        List<Embedding> saved = embeddingRepository.findAll();
+        assertThat(saved).hasSize((int) result.persistedEmbeddingCount());
+        assertThat(saved).allSatisfy(embedding -> {
+            assertThat(embedding.getAlgorithmVersion()).isEqualTo("sgns-default-counter");
+            assertThat(embedding.getVector()).hasSize(64);
+        });
+    }
+
+    @Test
+    @DisplayName("카운터 임베딩 요청에 algorithmVersion이 없으면 요청을 거부하고 아무것도 저장하지 않는다")
+    void trainCounterEmbeddings_WhenAlgorithmVersionMissing_RejectsRequestAndPersistsNothing() {
+        // given & when
+        given()
+                .when().post("/admin/mining/counter-embeddings")
+                .then()
+                .statusCode(400);
+
+        // then
+        assertThat(embeddingRepository.findAll()).isEmpty();
+    }
+
+    @Test
     @DisplayName("요청 파라미터로 차원 수를 지정하면 기본값 대신 지정한 차원 수로 학습한다")
     void trainEmbeddings_WhenDimensionsProvided_OverridesDefaultDimensions() {
         // given & when

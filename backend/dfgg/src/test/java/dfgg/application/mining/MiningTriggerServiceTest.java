@@ -61,6 +61,28 @@ class MiningTriggerServiceTest {
     }
 
     @Test
+    @DisplayName("카운터 임베딩 학습을 실행한 뒤 저장된 개수와 학습 규모를 결과로 반환한다")
+    void trainCounterEmbeddings_WhenTrainingCompletes_ReturnsPersistedCountFromRepository() {
+        // given
+        TrainingConfig config = new TrainingConfig(8, 4, 30, 0.05, 42L);
+        EmbeddingTrainingOutcome outcome = new EmbeddingTrainingOutcome(Map.of(), 64428, 128856, 8000L);
+        when(embeddingTrainingBatchService.trainCounterEmbeddingsFromMatchData(3.0, config, "sgns-v1-counter"))
+                .thenReturn(outcome);
+        when(embeddingRepository.countByAlgorithmVersion("sgns-v1-counter")).thenReturn(9L);
+
+        // when
+        EmbeddingTrainingResult result = miningTriggerService.trainCounterEmbeddings(3.0, config, "sgns-v1-counter");
+
+        // then
+        verify(embeddingTrainingBatchService).trainCounterEmbeddingsFromMatchData(3.0, config, "sgns-v1-counter");
+        assertThat(result.persistedEmbeddingCount()).isEqualTo(9L);
+        assertThat(result.algorithmVersion()).isEqualTo("sgns-v1-counter");
+        assertThat(result.matchCount()).isEqualTo(64428);
+        assertThat(result.windowCount()).isEqualTo(128856);
+        assertThat(result.trainingDurationMillis()).isEqualTo(8000L);
+    }
+
+    @Test
     @DisplayName("순차 패턴 마이닝을 실행한 뒤 스코프 개수와 저장된 패턴 개수를 결과로 반환한다")
     void mineSequentialPatterns_WhenMiningCompletes_ReturnsScopeCountAndPersistedPatternCount() {
         // given

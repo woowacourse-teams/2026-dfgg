@@ -103,6 +103,50 @@ public class EmbeddingTrainingBatchService {
         return new EmbeddingTrainingOutcome(embeddings, matchCount, windows.size(), trainingDurationMillis);
     }
 
+    @Transactional
+    public EmbeddingTrainingOutcome trainCounterEmbeddingsFromMatchData(
+            double winWeight, TrainingConfig config, String algorithmVersion
+    ) {
+        Assert.hasText(algorithmVersion, "algorithmVersion must not be blank");
+        long startedAt = System.currentTimeMillis();
+
+        List<Window> windows = new ArrayList<>();
+        Set<Long> championIds = new HashSet<>();
+        int matchCount = 0;
+
+        int page = 0;
+        Slice<String> matchIdPage;
+        do {
+            matchIdPage = participantRepository.findDistinctMatchIds(PageRequest.of(page, matchPageSize));
+            List<String> matchIds = matchIdPage.getContent();
+            if (!matchIds.isEmpty()) {
+                List<NormalizedMatchParticipant> participants = participantRepository.findByMatchIdIn(matchIds);
+                Map<String, List<NormalizedMatchParticipant>> byMatch = participants.stream()
+                        .collect(Collectors.groupingBy(NormalizedMatchParticipant::getMatchId));
+                for (List<NormalizedMatchParticipant> matchParticipants : byMatch.values()) {
+                    windows.addAll(windowBuilder.buildCounterWindows(matchParticipants, winWeight));
+                }
+                for (NormalizedMatchParticipant participant : participants) {
+                    championIds.add(Long.valueOf(participant.getChampionId()));
+                }
+                matchCount += matchIds.size();
+                entityManager.clear();
+            }
+            page++;
+        } while (matchIdPage.hasNext());
+
+        List<Item> items = itemRepository.findAll();
+        Map<String, double[]> embeddings = trainer.train(windows, config);
+        persist(embeddings, championIds, items, algorithmVersion);
+
+        long trainingDurationMillis = System.currentTimeMillis() - startedAt;
+        log.info(
+                "Counter embedding training completed: algorithmVersion={}, matchCount={}, windowCount={}, durationMs={}",
+                algorithmVersion, matchCount, windows.size(), trainingDurationMillis
+        );
+        return new EmbeddingTrainingOutcome(embeddings, matchCount, windows.size(), trainingDurationMillis);
+    }
+
     private void persist(
             Map<String, double[]> embeddings,
             Set<Long> championIds,

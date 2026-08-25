@@ -1,6 +1,7 @@
 package dfgg.application.embedding;
 
 import dfgg.domain.embedding.BuildContext;
+import dfgg.domain.embedding.CounterTeamContext;
 import dfgg.domain.embedding.Window;
 import dfgg.domain.embedding.TeamComposition;
 import dfgg.domain.embedding.ContentContext;
@@ -22,10 +23,15 @@ public class WindowFactory {
     public Window createBuildContextWindow(BuildContext buildContext, double winWeight) {
         List<String> tokens = new ArrayList<>();
         tokens.add(buildContext.championToken());
-        tokens.addAll(buildContext.allyChampionTokens());
-        tokens.addAll(buildContext.enemyChampionTokens());
         tokens.addAll(buildContext.itemTokens());
         return new Window(tokens, weightFor(buildContext.win(), winWeight));
+    }
+
+    public Window createCounterTeamWindow(CounterTeamContext counterTeamContext, double winWeight) {
+        List<String> tokens = new ArrayList<>();
+        tokens.addAll(counterTeamContext.enemyChampionTokens());
+        tokens.addAll(counterTeamContext.itemTokens());
+        return new Window(tokens, weightFor(counterTeamContext.win(), winWeight));
     }
 
     private double weightFor(boolean win, double winWeight) {

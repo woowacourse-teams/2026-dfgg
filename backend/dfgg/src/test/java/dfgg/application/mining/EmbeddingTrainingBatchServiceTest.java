@@ -119,6 +119,58 @@ class EmbeddingTrainingBatchServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    @DisplayName("카운터 임베딩은 상대했던 적 챔피언과 우리 팀 아이템 사이의 별도 임베딩 공간을 학습한다")
+    @Sql("/sql/embedding-training-batch-service-test-data.sql")
+    void trainCounterEmbeddingsFromMatchData_WhenGivenRealMatchData_LearnsEnemyChampionAndTeamItemEmbeddings() {
+        // given: 아군(1~5)은 매번 승리해 3071을 사고, 그때 상대는 항상 6~10번이었다.
+        //        즉 카운터 문맥에서 3071은 6~10번과는 매치마다 함께 등장하지만 1~5번과는 전혀 등장하지 않는다.
+        TrainingConfig config = new TrainingConfig(8, 4, 30, 0.05, 42L);
+
+        // when
+        EmbeddingTrainingOutcome outcome = embeddingTrainingBatchService.trainCounterEmbeddingsFromMatchData(
+                WIN_WEIGHT, config, "sgns-v1-counter"
+        );
+        Map<String, double[]> embeddings = outcome.embeddings();
+
+        // then: 3071은 실제로 상대했던 6번과, 한 번도 상대한 적 없는 1번보다 더 가깝다
+        double closeToActualOpponent = cosineSimilarity(embeddings.get("3071"), embeddings.get("6"));
+        double closeToNeverOpposedChampion = cosineSimilarity(embeddings.get("3071"), embeddings.get("1"));
+        assertThat(closeToActualOpponent).isGreaterThan(closeToNeverOpposedChampion);
+
+        // then: 카운터 윈도우는 참가자가 아니라 팀 단위로 매치당 2개씩 생성된다
+        assertThat(outcome.matchCount()).isEqualTo(30);
+        assertThat(outcome.windowCount()).isEqualTo(60);
+    }
+
+    @Test
+    @DisplayName("카운터 임베딩은 식별(identity) 임베딩과 별개의 algorithmVersion으로 저장된다")
+    @Sql("/sql/embedding-training-batch-service-test-data.sql")
+    void trainCounterEmbeddingsFromMatchData_WhenTrainingCompletes_PersistsUnderGivenAlgorithmVersion() {
+        // given
+        TrainingConfig config = new TrainingConfig(8, 4, 30, 0.05, 42L);
+
+        // when
+        embeddingTrainingBatchService.trainCounterEmbeddingsFromMatchData(WIN_WEIGHT, config, "sgns-v1-counter");
+
+        // then: 챔피언 1~10번 + 아이템 3071만 저장되고, 전부 요청한 algorithmVersion으로 태깅된다
+        List<Embedding> saved = embeddingRepository.findAll();
+        assertThat(saved).hasSize(11);
+        assertThat(saved).allSatisfy(embedding -> assertThat(embedding.getAlgorithmVersion()).isEqualTo("sgns-v1-counter"));
+    }
+
+    @Test
+    @DisplayName("카운터 임베딩 학습에서 algorithmVersion이 비어 있으면 예외가 발생한다")
+    @Sql("/sql/embedding-training-batch-service-test-data.sql")
+    void trainCounterEmbeddingsFromMatchData_WhenAlgorithmVersionIsBlank_ThrowsIllegalArgumentException() {
+        // given
+        TrainingConfig config = new TrainingConfig(8, 4, 30, 0.05, 42L);
+
+        // when & then
+        assertThatThrownBy(() -> embeddingTrainingBatchService.trainCounterEmbeddingsFromMatchData(WIN_WEIGHT, config, " "))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     private double cosineSimilarity(double[] a, double[] b) {
         double dot = 0;
         double normA = 0;

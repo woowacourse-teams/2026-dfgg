@@ -48,36 +48,91 @@ class MatchParticipantWindowBuilderTest {
     }
 
     @Test
-    @DisplayName("참가자마다 (내 챔피언+아군 4명+적군 5명+구매 아이템) 빌드 문맥 윈도우를 하나씩 만든다")
+    @DisplayName("참가자마다 (내 챔피언+구매 아이템) 빌드 문맥 윈도우를 하나씩 만든다")
     void buildMatchWindows_WhenParticipantsExist_CreatesBuildContextWindowPerParticipant() {
         // given
-        NormalizedMatch match = new NormalizedMatch("KR_2", "14.1", 420, List.of());
-        List<NormalizedMatchParticipant> participants = new ArrayList<>();
-        participants.add(new NormalizedMatchParticipant(match, new NormalizedParticipant(
-                "puuid-1", 1, 1, 100, "TOP", true, List.of(3071), List.of(3071), true)));
-        for (int championId : List.of(2, 3, 4, 5)) {
-            participants.add(new NormalizedMatchParticipant(match, new NormalizedParticipant(
-                    "puuid-" + championId, championId, championId, 100, "TOP", true,
-                    List.of(6653), List.of(6653), true)));
-        }
-        for (int championId : List.of(6, 7, 8, 9, 10)) {
-            participants.add(new NormalizedMatchParticipant(match, new NormalizedParticipant(
-                    "puuid-" + championId, championId, championId, 200, "TOP", false,
-                    List.of(3020), List.of(3020), true)));
-        }
+        List<NormalizedMatchParticipant> participants = matchParticipants(
+                List.of(1, 2, 3, 4, 5), true,
+                List.of(6, 7, 8, 9, 10), false
+        );
 
         // when
         List<Window> windows = builder.buildMatchWindows(participants, WIN_WEIGHT);
 
-        // then: 챔피언 1의 빌드 문맥 윈도우는 자신(1) + 아군 4명(2~5) + 적군 5명(6~10) + 자신이 산 아이템(3071)만 포함한다
+        // then: 챔피언 1의 빌드 문맥 윈도우는 자신(1)과 자신이 산 아이템(3071, 6653)만 포함하고,
+        //       아군/적군 챔피언은 섞이지 않는다
+        assertThat(windows)
+                .filteredOn(window -> window.tokens().contains("1") && window.tokens().contains("3071"))
+                .hasSize(1)
+                .first()
+                .satisfies(window -> {
+                    assertThat(window.tokens()).containsExactlyInAnyOrder("1", "3071", "6653");
+                    assertThat(window.weight()).isEqualTo(WIN_WEIGHT);
+                });
+    }
+
+    @Test
+    @DisplayName("2팀 매치면 팀당 1개씩, 총 2개의 카운터 문맥 윈도우를 만든다")
+    void buildCounterWindows_WhenMatchHasTwoTeams_CreatesOneCounterWindowPerTeam() {
+        // given
+        List<NormalizedMatchParticipant> participants = matchParticipants(
+                List.of(1, 2, 3, 4, 5), true,
+                List.of(6, 7, 8, 9, 10), false
+        );
+
+        // when
+        List<Window> windows = builder.buildCounterWindows(participants, WIN_WEIGHT);
+
+        // then
+        assertThat(windows).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("카운터 문맥 윈도우는 상대팀 챔피언 전원과, 우리 팀이 산 아이템을 중복 없이 합쳐서 포함한다")
+    void buildCounterWindows_WhenParticipantsBuyOverlappingItems_IncludesEnemyChampionsAndDeduplicatedTeamItems() {
+        // given: 아군(1~5)은 3071을 두 명이 겹쳐서 사고, 적군(6~10)은 전원 3040만 산다
+        NormalizedMatch match = new NormalizedMatch("KR_3", "14.1", 420, List.of());
+        List<NormalizedMatchParticipant> participants = new ArrayList<>();
+        List<List<Integer>> allyItemsByParticipant = List.of(
+                List.of(3071, 6653), List.of(3071, 3020), List.of(6653), List.of(3071), List.of(3020)
+        );
+        int championId = 1;
+        for (List<Integer> items : allyItemsByParticipant) {
+            participants.add(new NormalizedMatchParticipant(match, new NormalizedParticipant(
+                    "puuid-" + championId, championId, championId, 100, "TOP", true, items, items, true)));
+            championId++;
+        }
+        for (int enemyChampionId : List.of(6, 7, 8, 9, 10)) {
+            participants.add(new NormalizedMatchParticipant(match, new NormalizedParticipant(
+                    "puuid-" + enemyChampionId, enemyChampionId, enemyChampionId, 200, "TOP", false,
+                    List.of(3040), List.of(3040), true)));
+        }
+
+        // when
+        List<Window> windows = builder.buildCounterWindows(participants, WIN_WEIGHT);
+
+        // then: 아군팀 관점 카운터 윈도우는 적팀 챔피언(6~10) + 아군팀이 산 아이템 합집합(3071, 6653, 3020)만 포함하고,
+        //       승리팀이므로 가중치가 적용된다
         assertThat(windows)
                 .filteredOn(window -> window.tokens().contains("3071"))
                 .hasSize(1)
                 .first()
                 .satisfies(window -> {
                     assertThat(window.tokens())
-                            .containsExactlyInAnyOrder("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "3071");
+                            .containsExactlyInAnyOrder("6", "7", "8", "9", "10", "3071", "6653", "3020");
                     assertThat(window.weight()).isEqualTo(WIN_WEIGHT);
+                });
+
+        // then: 적팀 관점 카운터 윈도우는 아군팀 챔피언(1~5) + 적팀이 산 아이템(3040)만 포함하고,
+        //       패배팀이므로 가중치가 1.0이다
+        assertThat(windows)
+                .filteredOn(window -> window.tokens().contains("3040"))
+                .hasSize(1)
+                .first()
+                .satisfies(window -> {
+                    assertThat(window.tokens())
+                            .containsExactlyInAnyOrder("1", "2", "3", "4", "5", "3040");
+                    assertThat(window.weight()).isEqualTo(1.0);
                 });
     }
 

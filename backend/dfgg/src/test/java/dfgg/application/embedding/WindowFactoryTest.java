@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.domain.embedding.BuildContext;
 import dfgg.domain.embedding.ContentContext;
+import dfgg.domain.embedding.CounterTeamContext;
 import dfgg.domain.embedding.TeamComposition;
 import dfgg.domain.embedding.Window;
 import java.util.List;
@@ -37,8 +38,6 @@ class WindowFactoryTest {
         // given
         BuildContext buildContext = new BuildContext(
                 "Ahri",
-                List.of("Zed", "Leona", "Jinx", "Nautilus"),
-                List.of("Garen", "Darius", "Braum", "Ashe", "Sett"),
                 List.of("RabadonsDeathcap", "VoidStaff"),
                 true
         );
@@ -56,8 +55,6 @@ class WindowFactoryTest {
         // given
         BuildContext buildContext = new BuildContext(
                 "Ahri",
-                List.of("Zed", "Leona", "Jinx", "Nautilus"),
-                List.of("Garen", "Darius", "Braum", "Ashe", "Sett"),
                 List.of("RabadonsDeathcap", "VoidStaff"),
                 false
         );
@@ -70,13 +67,11 @@ class WindowFactoryTest {
     }
 
     @Test
-    @DisplayName("빌드 문맥 윈도우는 내 챔피언, 아군, 적군, 아이템 토큰을 모두 포함한다")
-    void createBuildContextWindow_IncludesChampionAllyEnemyAndItemTokens() {
+    @DisplayName("빌드 문맥 윈도우는 내 챔피언과 아이템 토큰만 포함한다")
+    void createBuildContextWindow_IncludesOnlyChampionAndItemTokens() {
         // given
         BuildContext buildContext = new BuildContext(
                 "Ahri",
-                List.of("Zed"),
-                List.of("Garen"),
                 List.of("RabadonsDeathcap"),
                 true
         );
@@ -85,7 +80,58 @@ class WindowFactoryTest {
         Window window = windowFactory.createBuildContextWindow(buildContext, WIN_WEIGHT);
 
         // then
-        assertThat(window.tokens()).containsExactlyInAnyOrder("Ahri", "Zed", "Garen", "RabadonsDeathcap");
+        assertThat(window.tokens()).containsExactlyInAnyOrder("Ahri", "RabadonsDeathcap");
+    }
+
+    @Test
+    @DisplayName("카운터 문맥에서 승리한 팀의 윈도우에는 승패 가중치가 적용된다")
+    void createCounterTeamWindow_WhenWin_AppliesWinWeight() {
+        // given
+        CounterTeamContext counterTeamContext = new CounterTeamContext(
+                List.of("Garen", "Darius", "Braum", "Ashe", "Sett"),
+                List.of("FrozenHeart", "Thornmail"),
+                true
+        );
+
+        // when
+        Window window = windowFactory.createCounterTeamWindow(counterTeamContext, WIN_WEIGHT);
+
+        // then
+        assertThat(window.weight()).isEqualTo(WIN_WEIGHT);
+    }
+
+    @Test
+    @DisplayName("카운터 문맥에서 패배한 팀의 윈도우에는 가중치 1.0이 적용된다")
+    void createCounterTeamWindow_WhenLose_AppliesDefaultWeight() {
+        // given
+        CounterTeamContext counterTeamContext = new CounterTeamContext(
+                List.of("Garen", "Darius", "Braum", "Ashe", "Sett"),
+                List.of("FrozenHeart", "Thornmail"),
+                false
+        );
+
+        // when
+        Window window = windowFactory.createCounterTeamWindow(counterTeamContext, WIN_WEIGHT);
+
+        // then
+        assertThat(window.weight()).isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("카운터 문맥 윈도우는 적팀 챔피언과 우리 팀 아이템 토큰만 포함한다")
+    void createCounterTeamWindow_IncludesEnemyChampionAndItemTokensOnly() {
+        // given
+        CounterTeamContext counterTeamContext = new CounterTeamContext(
+                List.of("Garen", "Darius"),
+                List.of("FrozenHeart"),
+                true
+        );
+
+        // when
+        Window window = windowFactory.createCounterTeamWindow(counterTeamContext, WIN_WEIGHT);
+
+        // then
+        assertThat(window.tokens()).containsExactlyInAnyOrder("Garen", "Darius", "FrozenHeart");
     }
 
     @Test

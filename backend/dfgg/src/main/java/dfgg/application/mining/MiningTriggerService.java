@@ -36,6 +36,15 @@ public class MiningTriggerService {
         );
     }
 
+    public EmbeddingTrainingResult trainCounterEmbeddings(double winWeight, TrainingConfig config, String algorithmVersion) {
+        EmbeddingTrainingOutcome outcome =
+                embeddingTrainingBatchService.trainCounterEmbeddingsFromMatchData(winWeight, config, algorithmVersion);
+        long persistedCount = embeddingRepository.countByAlgorithmVersion(algorithmVersion);
+        return new EmbeddingTrainingResult(
+                persistedCount, algorithmVersion, outcome.matchCount(), outcome.windowCount(), outcome.trainingDurationMillis()
+        );
+    }
+
     public SequentialPatternMiningResult mineSequentialPatterns(String queueType, int minSupport, String algorithmVersion) {
         Map<MiningScope, List<SequentialPattern>> patternsByScope =
                 sequentialPatternMiningBatchService.mineFromMatchData(queueType, minSupport, algorithmVersion);

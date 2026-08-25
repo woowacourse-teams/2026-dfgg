@@ -3,13 +3,16 @@ package dfgg.application.mining;
 import dfgg.application.embedding.WindowFactory;
 import dfgg.domain.embedding.BuildContext;
 import dfgg.domain.embedding.ContentContext;
+import dfgg.domain.embedding.CounterTeamContext;
 import dfgg.domain.embedding.TeamComposition;
 import dfgg.domain.embedding.Window;
 import dfgg.domain.item.Item;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
@@ -26,18 +29,28 @@ public class MatchParticipantWindowBuilder {
     }
 
     public List<Window> buildMatchWindows(List<NormalizedMatchParticipant> matchParticipants, double winWeight) {
-        Map<Integer, List<NormalizedMatchParticipant>> byTeam = matchParticipants.stream()
-                .collect(Collectors.groupingBy(NormalizedMatchParticipant::getTeamId));
+        Map<Integer, List<NormalizedMatchParticipant>> byTeam = groupByTeam(matchParticipants);
 
         List<Window> windows = new ArrayList<>();
         windows.addAll(teamCompositionWindows(byTeam, winWeight));
 
         for (NormalizedMatchParticipant participant : matchParticipants) {
-            List<NormalizedMatchParticipant> allyTeam = byTeam.get(participant.getTeamId());
-            List<NormalizedMatchParticipant> enemyTeam = opposingTeam(byTeam, participant.getTeamId());
-            windows.add(windowFactory.createBuildContextWindow(
-                    buildContext(participant, allyTeam, enemyTeam), winWeight
-            ));
+            windows.add(windowFactory.createBuildContextWindow(buildContext(participant), winWeight));
+        }
+        return windows;
+    }
+
+    public List<Window> buildCounterWindows(List<NormalizedMatchParticipant> matchParticipants, double winWeight) {
+        Map<Integer, List<NormalizedMatchParticipant>> byTeam = groupByTeam(matchParticipants);
+        if (byTeam.size() != 2) {
+            return List.of();
+        }
+
+        List<Window> windows = new ArrayList<>();
+        for (Map.Entry<Integer, List<NormalizedMatchParticipant>> entry : byTeam.entrySet()) {
+            List<NormalizedMatchParticipant> team = entry.getValue();
+            List<NormalizedMatchParticipant> enemyTeam = opposingTeam(byTeam, entry.getKey());
+            windows.add(windowFactory.createCounterTeamWindow(counterTeamContext(team, enemyTeam), winWeight));
         }
         return windows;
     }
@@ -49,6 +62,11 @@ public class MatchParticipantWindowBuilder {
                         new ContentContext(itemToken(item.getItemId()), item.getTags())
                 ))
                 .toList();
+    }
+
+    private Map<Integer, List<NormalizedMatchParticipant>> groupByTeam(List<NormalizedMatchParticipant> matchParticipants) {
+        return matchParticipants.stream()
+                .collect(Collectors.groupingBy(NormalizedMatchParticipant::getTeamId));
     }
 
     private List<Window> teamCompositionWindows(Map<Integer, List<NormalizedMatchParticipant>> byTeam, double winWeight) {
@@ -67,23 +85,26 @@ public class MatchParticipantWindowBuilder {
         return new TeamComposition(championTokens(team), team.get(0).getWin());
     }
 
-    private BuildContext buildContext(
-            NormalizedMatchParticipant participant,
-            List<NormalizedMatchParticipant> allyTeam,
-            List<NormalizedMatchParticipant> enemyTeam
-    ) {
-        List<String> allyTokens = allyTeam.stream()
-                .filter(ally -> ally != participant)
-                .map(NormalizedMatchParticipant::getChampionId)
-                .map(this::championToken)
-                .toList();
-        List<String> enemyTokens = enemyTeam == null ? List.of() : championTokens(enemyTeam);
+    private BuildContext buildContext(NormalizedMatchParticipant participant) {
         return new BuildContext(
                 championToken(participant.getChampionId()),
-                allyTokens,
-                enemyTokens,
                 itemTokens(participant.getFinalCoreItemIds()),
                 participant.getWin()
+        );
+    }
+
+    private CounterTeamContext counterTeamContext(
+            List<NormalizedMatchParticipant> team,
+            List<NormalizedMatchParticipant> enemyTeam
+    ) {
+        Set<String> teamItemTokens = new LinkedHashSet<>();
+        for (NormalizedMatchParticipant participant : team) {
+            teamItemTokens.addAll(itemTokens(participant.getFinalCoreItemIds()));
+        }
+        return new CounterTeamContext(
+                championTokens(enemyTeam),
+                List.copyOf(teamItemTokens),
+                team.get(0).getWin()
         );
     }
 
