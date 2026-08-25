@@ -22,14 +22,25 @@ export default function DesktopApp() {
             </p>
           </div>
 
-          {/* 같은 탭에서 열어야 새 창이 떴다 사라지지 않고 다운로드만 시작된다. */}
-          <a
-            data-umami-event='download-click'
-            href={DOWNLOAD_URL}
-            className='chamfer-sm shrink-0 bg-accent-strong px-5 py-3 font-display text-sm font-bold tracking-[0.12em] text-white uppercase transition-colors hover:bg-accent'
-          >
-            Windows 다운로드
-          </a>
+          <div className='flex shrink-0 flex-wrap gap-2.5'>
+            {/* 같은 탭에서 열어야 새 창이 떴다 사라지지 않고 다운로드만 시작된다. */}
+            <a
+              data-umami-event='download-click'
+              href={DOWNLOAD_URL}
+              className='chamfer-sm bg-accent-strong px-5 py-3 font-display text-sm font-bold tracking-[0.12em] text-white uppercase transition-colors hover:bg-accent'
+            >
+              exe 파일로 받기
+            </a>
+            <a
+              data-umami-event='store-click-top'
+              href={MS_STORE_URL}
+              target='_blank'
+              rel='noreferrer'
+              className='chamfer-sm bg-accent-strong px-5 py-3 font-display text-sm font-bold tracking-[0.12em] text-white uppercase transition-colors hover:bg-accent'
+            >
+              Microsoft Store에서 받기
+            </a>
+          </div>
         </div>
 
         <ul className='mt-5 space-y-1.5 text-xs text-ink-3'>
@@ -111,7 +122,7 @@ export default function DesktopApp() {
             </p>
             {MS_STORE_URL && (
               <a
-                data-umami-event='store-click'
+                data-umami-event='store-click-bottom'
                 href={MS_STORE_URL}
                 target='_blank'
                 rel='noreferrer'
