@@ -40,7 +40,11 @@ public class MatchParticipantWindowBuilder {
         return windows;
     }
 
-    public List<Window> buildCounterWindows(List<NormalizedMatchParticipant> matchParticipants, double winWeight) {
+    public List<Window> buildCounterWindows(
+            List<NormalizedMatchParticipant> matchParticipants,
+            double winWeight,
+            ItemFrequencyWeights itemFrequencyWeights
+    ) {
         Map<Integer, List<NormalizedMatchParticipant>> byTeam = groupByTeam(matchParticipants);
         if (byTeam.size() != 2) {
             return List.of();
@@ -55,7 +59,9 @@ public class MatchParticipantWindowBuilder {
             for (NormalizedMatchParticipant enemy : enemyTeam) {
                 String enemyToken = championToken(enemy.getChampionId());
                 for (String itemToken : teamItemTokens) {
-                    CounterTeamContext counterTeamContext = new CounterTeamContext(enemyToken, itemToken, teamWin);
+                    CounterTeamContext counterTeamContext = new CounterTeamContext(
+                            enemyToken, itemToken, teamWin, itemFrequencyWeights.weightFor(itemToken)
+                    );
                     windows.add(windowFactory.createCounterTeamWindow(counterTeamContext, winWeight));
                 }
             }

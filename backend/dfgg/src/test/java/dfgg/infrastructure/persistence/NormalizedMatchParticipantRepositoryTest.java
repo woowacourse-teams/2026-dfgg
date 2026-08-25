@@ -6,6 +6,8 @@ import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,5 +59,21 @@ class NormalizedMatchParticipantRepositoryTest {
         assertThat(participants)
                 .extracting(NormalizedMatchParticipant::getMatchId)
                 .containsOnly("KR_B", "KR_D");
+    }
+
+    @Test
+    @DisplayName("아이템별 등장 횟수를 참가자 전체에서 집계한다")
+    @Sql("/sql/item-occurrence-count-repository-test-data.sql")
+    void countItemOccurrences_WhenGivenParticipants_CountsOccurrencesPerItem() {
+        // given: 참가자 4명 중 아이템 1001은 3명, 2002는 2명이 샀다(KR_FREQ_3은 둘 다 삼)
+
+        // when
+        List<Object[]> counts = participantRepository.countItemOccurrences();
+
+        // then
+        Map<String, Long> occurrenceCountByItem = counts.stream()
+                .collect(Collectors.toMap(row -> String.valueOf(row[0]), row -> ((Number) row[1]).longValue()));
+        assertThat(occurrenceCountByItem).containsEntry("1001", 3L);
+        assertThat(occurrenceCountByItem).containsEntry("2002", 2L);
     }
 }

@@ -10,6 +10,7 @@ import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedParticipant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -81,12 +82,38 @@ class MatchParticipantWindowBuilderTest {
         );
 
         // when
-        List<Window> windows = builder.buildCounterWindows(participants, WIN_WEIGHT);
+        List<Window> windows = builder.buildCounterWindows(participants, WIN_WEIGHT, neutralItemFrequencyWeights());
 
         // then: 아군 관점(적 5명 × 아이템 2종=10) + 적 관점(아군 5명 × 아이템 1종=5) = 15개,
         //       모든 윈도우가 정확히 토큰 2개(챔피언 1명+아이템 1개)라 챔피언-챔피언/아이템-아이템 쌍이 생길 수 없다
         assertThat(windows).hasSize(15);
         assertThat(windows).allSatisfy(window -> assertThat(window.tokens()).hasSize(2));
+    }
+
+    @Test
+    @DisplayName("카운터 문맥 윈도우 가중치에는 아이템 빈도 가중치가 곱해진다")
+    void buildCounterWindows_MultipliesWindowWeightByItemFrequencyWeight() {
+        // given: 아군은 아이템 3071(자주 나옴, 가중치 0.5)/6653(드묾, 가중치 4.0)을 산다
+        List<NormalizedMatchParticipant> participants = matchParticipants(
+                List.of(1, 2, 3, 4, 5), true,
+                List.of(6, 7, 8, 9, 10), false
+        );
+        ItemFrequencyWeights itemFrequencyWeights =
+                ItemFrequencyWeights.from(Map.of("3071", 900L, "6653", 5L), 1000L);
+
+        // when
+        List<Window> windows = builder.buildCounterWindows(participants, WIN_WEIGHT, itemFrequencyWeights);
+
+        // then: 같은 승리팀 window라도 아이템에 따라 최종 가중치가 다르다(WIN_WEIGHT * 빈도 가중치)
+        double item3071Weight = itemFrequencyWeights.weightFor("3071");
+        double item6653Weight = itemFrequencyWeights.weightFor("6653");
+        assertThat(windows)
+                .filteredOn(window -> window.tokens().contains("3071"))
+                .allSatisfy(window -> assertThat(window.weight()).isEqualTo(WIN_WEIGHT * item3071Weight));
+        assertThat(windows)
+                .filteredOn(window -> window.tokens().contains("6653"))
+                .allSatisfy(window -> assertThat(window.weight()).isEqualTo(WIN_WEIGHT * item6653Weight));
+        assertThat(item6653Weight).isGreaterThan(item3071Weight);
     }
 
     @Test
@@ -111,7 +138,7 @@ class MatchParticipantWindowBuilderTest {
         }
 
         // when
-        List<Window> windows = builder.buildCounterWindows(participants, WIN_WEIGHT);
+        List<Window> windows = builder.buildCounterWindows(participants, WIN_WEIGHT, neutralItemFrequencyWeights());
 
         // then: 아군팀 관점 윈도우는 (적 5명 × 아이템 3종=15개), 전부 토큰 2개이고 승리팀이라 가중치가 적용된다
         List<Window> allyPerspectiveWindows = windows.stream()
@@ -196,5 +223,9 @@ class MatchParticipantWindowBuilderTest {
             )));
         }
         return participants;
+    }
+
+    private ItemFrequencyWeights neutralItemFrequencyWeights() {
+        return ItemFrequencyWeights.from(Map.of(), 1L);
     }
 }

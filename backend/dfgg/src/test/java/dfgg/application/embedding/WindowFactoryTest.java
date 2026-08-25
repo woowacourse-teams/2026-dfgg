@@ -87,7 +87,7 @@ class WindowFactoryTest {
     @DisplayName("카운터 문맥에서 승리한 팀의 윈도우에는 승패 가중치가 적용된다")
     void createCounterTeamWindow_WhenWin_AppliesWinWeight() {
         // given
-        CounterTeamContext counterTeamContext = new CounterTeamContext("Garen", "FrozenHeart", true);
+        CounterTeamContext counterTeamContext = new CounterTeamContext("Garen", "FrozenHeart", true, 1.0);
 
         // when
         Window window = windowFactory.createCounterTeamWindow(counterTeamContext, WIN_WEIGHT);
@@ -100,7 +100,7 @@ class WindowFactoryTest {
     @DisplayName("카운터 문맥에서 패배한 팀의 윈도우에는 가중치 1.0이 적용된다")
     void createCounterTeamWindow_WhenLose_AppliesDefaultWeight() {
         // given
-        CounterTeamContext counterTeamContext = new CounterTeamContext("Garen", "FrozenHeart", false);
+        CounterTeamContext counterTeamContext = new CounterTeamContext("Garen", "FrozenHeart", false, 1.0);
 
         // when
         Window window = windowFactory.createCounterTeamWindow(counterTeamContext, WIN_WEIGHT);
@@ -113,13 +113,26 @@ class WindowFactoryTest {
     @DisplayName("카운터 문맥 윈도우는 적 챔피언 한 명과 아이템 한 개, 단 두 토큰만 포함한다")
     void createCounterTeamWindow_IncludesExactlyOneEnemyChampionAndOneItemToken() {
         // given
-        CounterTeamContext counterTeamContext = new CounterTeamContext("Garen", "FrozenHeart", true);
+        CounterTeamContext counterTeamContext = new CounterTeamContext("Garen", "FrozenHeart", true, 1.0);
 
         // when
         Window window = windowFactory.createCounterTeamWindow(counterTeamContext, WIN_WEIGHT);
 
         // then
         assertThat(window.tokens()).containsExactlyInAnyOrder("Garen", "FrozenHeart");
+    }
+
+    @Test
+    @DisplayName("카운터 문맥 윈도우 가중치는 승패 가중치와 아이템 빈도 가중치를 곱한 값이다")
+    void createCounterTeamWindow_MultipliesWinWeightByItemFrequencyWeight() {
+        // given
+        CounterTeamContext counterTeamContext = new CounterTeamContext("Garen", "FrozenHeart", true, 2.5);
+
+        // when
+        Window window = windowFactory.createCounterTeamWindow(counterTeamContext, WIN_WEIGHT);
+
+        // then
+        assertThat(window.weight()).isEqualTo(WIN_WEIGHT * 2.5);
     }
 
     @Test

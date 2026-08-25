@@ -14,6 +14,7 @@ import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -110,6 +111,8 @@ public class EmbeddingTrainingBatchService {
         Assert.hasText(algorithmVersion, "algorithmVersion must not be blank");
         long startedAt = System.currentTimeMillis();
 
+        ItemFrequencyWeights itemFrequencyWeights = itemFrequencyWeights();
+
         List<Window> windows = new ArrayList<>();
         Set<Long> championIds = new HashSet<>();
         int matchCount = 0;
@@ -124,7 +127,7 @@ public class EmbeddingTrainingBatchService {
                 Map<String, List<NormalizedMatchParticipant>> byMatch = participants.stream()
                         .collect(Collectors.groupingBy(NormalizedMatchParticipant::getMatchId));
                 for (List<NormalizedMatchParticipant> matchParticipants : byMatch.values()) {
-                    windows.addAll(windowBuilder.buildCounterWindows(matchParticipants, winWeight));
+                    windows.addAll(windowBuilder.buildCounterWindows(matchParticipants, winWeight, itemFrequencyWeights));
                 }
                 for (NormalizedMatchParticipant participant : participants) {
                     championIds.add(Long.valueOf(participant.getChampionId()));
@@ -145,6 +148,14 @@ public class EmbeddingTrainingBatchService {
                 algorithmVersion, matchCount, windows.size(), trainingDurationMillis
         );
         return new EmbeddingTrainingOutcome(embeddings, matchCount, windows.size(), trainingDurationMillis);
+    }
+
+    private ItemFrequencyWeights itemFrequencyWeights() {
+        Map<String, Long> occurrenceCountByItem = new HashMap<>();
+        for (Object[] row : participantRepository.countItemOccurrences()) {
+            occurrenceCountByItem.put(String.valueOf(row[0]), ((Number) row[1]).longValue());
+        }
+        return ItemFrequencyWeights.from(occurrenceCountByItem, participantRepository.count());
     }
 
     private void persist(
