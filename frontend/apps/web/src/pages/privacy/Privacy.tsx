@@ -36,7 +36,7 @@ export default function Privacy() {
         <Section title='1. 수집하지 않는 정보'>
           <p>
             DFGG는 회원가입과 로그인이 없습니다. 이름, 이메일, 소환사명, Riot ID, PUUID, 결제 정보를
-            수집하거나 저장하지 않습니다. 광고 식별자는 사용하지 않습니다.
+            수집하거나 저장하지 않습니다. 광고 식별자나 추적 쿠키도 사용하지 않습니다.
           </p>
         </Section>
 
@@ -58,8 +58,8 @@ export default function Privacy() {
             남습니다. 이 기록은 통계나 마케팅에 사용하지 않습니다.
           </p>
           <p>
-            또한 서비스 개선을 위해 Google Analytics 를 사용합니다. 방문한 페이지와 버튼 클릭 등
-            사용 기록이 쿠키를 통해 수집되며, 개인을 식별할 수 있는 정보는 수집하지 않습니다.
+            또한 서비스 개선을 위해 방문한 페이지와 버튼 클릭 등 사용 기록을 익명으로 집계합니다. 이
+            집계에는 쿠키를 사용하지 않으며, 개인을 식별할 수 있는 정보는 수집하지 않습니다.
             마케팅이나 광고에는 사용하지 않습니다.
           </p>
         </Section>
@@ -70,9 +70,9 @@ export default function Privacy() {
             에서 직접 불러옵니다.
           </p>
           <p>
-            사용 기록 집계를 위해 Google Analytics 를 사용합니다. 수집된 정보는 Google LLC(미국)로
-            이전되어 처리되며, 해당 처리는 Google 의 개인정보처리방침
-            (https://policies.google.com/privacy)을 따릅니다.
+            사용 기록 집계를 위해 Umami Software, Inc. 가 제공하는 Umami Cloud 를 사용합니다. 집계된
+            기록은 국외 서버에서 처리되며, 해당 처리는 Umami 의 개인정보처리방침
+            (https://umami.is/privacy)을 따릅니다.
           </p>
         </Section>
 
