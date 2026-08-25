@@ -63,6 +63,7 @@ export default function Feedback() {
           </p>
 
           <button
+            data-umami-event='feedback-submit'
             type='submit'
             disabled={!canSubmit}
             className='chamfer-sm cursor-pointer bg-accent-strong px-6 py-3 font-display text-sm font-bold tracking-[0.12em] text-white uppercase transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3'

@@ -83,10 +83,15 @@ export default function ChampionSelect() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!response.ok) throw new Error(String(response.status));
+      if (!response.ok) {
+        window.umami?.track('recommend-fail', { status: response.status });
+        throw new Error(String(response.status));
+      }
       setResult(await response.json());
+      window.umami?.track('recommend-success');
     } catch (error) {
       console.error(error);
+      window.umami?.track('recommend-error');
       setError('추천을 불러오지 못했어요. 다시 시도해 주세요.');
     } finally {
       setLoading(false);
@@ -195,7 +200,8 @@ export default function ChampionSelect() {
         </p>
 
         <button
-          type='submit'
+          data-umami-event='recommend-item'
+          type='button'
           disabled={loading || !isReady}
           className='chamfer-sm mt-4 w-full cursor-pointer bg-accent-strong py-3.5 font-display text-sm font-bold tracking-[0.16em] text-white uppercase transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3'
         >
@@ -267,7 +273,7 @@ export default function ChampionSelect() {
               다음 판부터는 입력하지 않아도 됩니다.
             </p>
           </div>
-          <DesktopAppButton className='shrink-0 px-5 py-2.5' />
+          <DesktopAppButton data='desktop-app-champion-select' className='shrink-0 px-5 py-2.5' />
         </aside>
       )}
     </>

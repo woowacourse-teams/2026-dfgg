@@ -25,7 +25,7 @@ export default function TopBar() {
         >
           피드백
         </h2>
-        <DesktopAppButton className='px-4 py-2' />
+        <DesktopAppButton data='desktop-app-champion-topbar' className='px-4 py-2' />
       </div>
     </header>
   );

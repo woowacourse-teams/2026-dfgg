@@ -49,8 +49,9 @@ export default function Home() {
         </h1>
 
         <div className='flex flex-row gap-24 items-center justify-center'>
-          <DesktopAppButton className='px-10 py-4' />
+          <DesktopAppButton data='desktop-app-home' className='px-10 py-4' />
           <button
+            data-umami-event='10-champion-recommend-top'
             onClick={() => navigate('/champion-select')}
             type='button'
             className='px-10 py-4 cursor-pointer rounded-xl bg-linear-to-br from-cobalt-deep to-cobalt font-bold text-white transition-opacity hover:opacity-90'
@@ -106,6 +107,7 @@ export default function Home() {
       </section>
 
       <button
+        data-umami-event='10-champion-recommend-bottom'
         type='button'
         onClick={() => navigate('/champion-select')}
         className='group mx-auto mt-16 flex w-fit cursor-pointer items-center gap-2 rounded-2xl border border-line bg-surface-2/60 px-8 py-3.5 font-bold text-ink transition-colors hover:border-accent-strong hover:bg-accent-strong hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
