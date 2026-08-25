@@ -39,5 +39,10 @@ export function useLineup() {
     };
   }, []);
 
+  // 전체 화면으로 바뀌는 순간에만 기록한다. 계속 전체 화면이어도 반복 전송하지 않는다.
+  useEffect(() => {
+    if (windowMode === WINDOW_MODE_FULLSCREEN) window.umami?.track('desktop-fullscreen-warned');
+  }, [windowMode]);
+
   return { lineup, status, windowMode };
 }

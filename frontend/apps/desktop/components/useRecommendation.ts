@@ -74,7 +74,10 @@ export function useRecommendation() {
     loadDDragon(controller.signal)
       .then(setDDragon)
       .catch(() => {
-        if (!controller.signal.aborted) setError('챔피언 정보를 불러오지 못했어요.');
+        if (!controller.signal.aborted) {
+          setError('챔피언 정보를 불러오지 못했어요.');
+          window.umami?.track('desktop-ddragon-load-failed');
+        }
       });
     return () => controller.abort();
   }, []);
@@ -107,11 +110,15 @@ export function useRecommendation() {
         setFetchedSession(sessionId);
         setResult(response);
         setError('');
+        window.umami?.track('desktop-recommend-success');
       })
       .catch((cause) => {
         if (controller.signal.aborted) return;
         console.error(cause);
         setError('추천을 불러오지 못했어요. 다시 시도 중...');
+        window.umami?.track('desktop-recommend-fail', {
+          reason: cause instanceof Error ? cause.message : 'unknown',
+        });
         retryTimer = setTimeout(() => setRetryTick((tick) => tick + 1), RETRY_MS);
       });
 
