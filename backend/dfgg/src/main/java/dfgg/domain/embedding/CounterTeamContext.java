@@ -3,7 +3,7 @@ package dfgg.domain.embedding;
 import java.util.List;
 
 public record CounterTeamContext(
-        List<String> enemyChampionTokens,
+        String enemyChampionToken,
         List<String> itemTokens,
         boolean win
 ) {

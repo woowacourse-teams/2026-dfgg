@@ -50,7 +50,14 @@ public class MatchParticipantWindowBuilder {
         for (Map.Entry<Integer, List<NormalizedMatchParticipant>> entry : byTeam.entrySet()) {
             List<NormalizedMatchParticipant> team = entry.getValue();
             List<NormalizedMatchParticipant> enemyTeam = opposingTeam(byTeam, entry.getKey());
-            windows.add(windowFactory.createCounterTeamWindow(counterTeamContext(team, enemyTeam), winWeight));
+            List<String> teamItemTokens = teamItemTokens(team);
+            boolean teamWin = team.get(0).getWin();
+            for (NormalizedMatchParticipant enemy : enemyTeam) {
+                CounterTeamContext counterTeamContext = new CounterTeamContext(
+                        championToken(enemy.getChampionId()), teamItemTokens, teamWin
+                );
+                windows.add(windowFactory.createCounterTeamWindow(counterTeamContext, winWeight));
+            }
         }
         return windows;
     }
@@ -93,19 +100,12 @@ public class MatchParticipantWindowBuilder {
         );
     }
 
-    private CounterTeamContext counterTeamContext(
-            List<NormalizedMatchParticipant> team,
-            List<NormalizedMatchParticipant> enemyTeam
-    ) {
+    private List<String> teamItemTokens(List<NormalizedMatchParticipant> team) {
         Set<String> teamItemTokens = new LinkedHashSet<>();
         for (NormalizedMatchParticipant participant : team) {
             teamItemTokens.addAll(itemTokens(participant.getFinalCoreItemIds()));
         }
-        return new CounterTeamContext(
-                championTokens(enemyTeam),
-                List.copyOf(teamItemTokens),
-                team.get(0).getWin()
-        );
+        return List.copyOf(teamItemTokens);
     }
 
     private List<NormalizedMatchParticipant> opposingTeam(

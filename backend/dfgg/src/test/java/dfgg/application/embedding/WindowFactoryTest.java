@@ -88,7 +88,7 @@ class WindowFactoryTest {
     void createCounterTeamWindow_WhenWin_AppliesWinWeight() {
         // given
         CounterTeamContext counterTeamContext = new CounterTeamContext(
-                List.of("Garen", "Darius", "Braum", "Ashe", "Sett"),
+                "Garen",
                 List.of("FrozenHeart", "Thornmail"),
                 true
         );
@@ -105,7 +105,7 @@ class WindowFactoryTest {
     void createCounterTeamWindow_WhenLose_AppliesDefaultWeight() {
         // given
         CounterTeamContext counterTeamContext = new CounterTeamContext(
-                List.of("Garen", "Darius", "Braum", "Ashe", "Sett"),
+                "Garen",
                 List.of("FrozenHeart", "Thornmail"),
                 false
         );
@@ -118,11 +118,11 @@ class WindowFactoryTest {
     }
 
     @Test
-    @DisplayName("카운터 문맥 윈도우는 적팀 챔피언과 우리 팀 아이템 토큰만 포함한다")
-    void createCounterTeamWindow_IncludesEnemyChampionAndItemTokensOnly() {
+    @DisplayName("카운터 문맥 윈도우는 적 챔피언 한 명과 우리 팀 아이템 토큰만 포함하고, 다른 적 챔피언은 섞이지 않는다")
+    void createCounterTeamWindow_IncludesOnlySingleEnemyChampionAndItemTokens() {
         // given
         CounterTeamContext counterTeamContext = new CounterTeamContext(
-                List.of("Garen", "Darius"),
+                "Garen",
                 List.of("FrozenHeart"),
                 true
         );
@@ -131,7 +131,7 @@ class WindowFactoryTest {
         Window window = windowFactory.createCounterTeamWindow(counterTeamContext, WIN_WEIGHT);
 
         // then
-        assertThat(window.tokens()).containsExactlyInAnyOrder("Garen", "Darius", "FrozenHeart");
+        assertThat(window.tokens()).containsExactlyInAnyOrder("Garen", "FrozenHeart");
     }
 
     @Test

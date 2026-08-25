@@ -138,9 +138,9 @@ class EmbeddingTrainingBatchServiceTest {
         double closeToNeverOpposedChampion = cosineSimilarity(embeddings.get("3071"), embeddings.get("1"));
         assertThat(closeToActualOpponent).isGreaterThan(closeToNeverOpposedChampion);
 
-        // then: 카운터 윈도우는 참가자가 아니라 팀 단위로 매치당 2개씩 생성된다
+        // then: 카운터 윈도우는 적 챔피언 한 명당 하나씩, 매치당 10개(양 팀 5명씩) 생성된다
         assertThat(outcome.matchCount()).isEqualTo(30);
-        assertThat(outcome.windowCount()).isEqualTo(60);
+        assertThat(outcome.windowCount()).isEqualTo(300);
     }
 
     @Test

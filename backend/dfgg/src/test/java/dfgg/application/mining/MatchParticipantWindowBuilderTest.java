@@ -72,8 +72,8 @@ class MatchParticipantWindowBuilderTest {
     }
 
     @Test
-    @DisplayName("2팀 매치면 팀당 1개씩, 총 2개의 카운터 문맥 윈도우를 만든다")
-    void buildCounterWindows_WhenMatchHasTwoTeams_CreatesOneCounterWindowPerTeam() {
+    @DisplayName("2팀 매치면 각 팀마다 적 챔피언 수만큼(5개씩), 총 10개의 카운터 문맥 윈도우를 만든다")
+    void buildCounterWindows_WhenMatchHasTwoTeams_CreatesOneCounterWindowPerEnemyChampion() {
         // given
         List<NormalizedMatchParticipant> participants = matchParticipants(
                 List.of(1, 2, 3, 4, 5), true,
@@ -84,12 +84,12 @@ class MatchParticipantWindowBuilderTest {
         List<Window> windows = builder.buildCounterWindows(participants, WIN_WEIGHT);
 
         // then
-        assertThat(windows).hasSize(2);
+        assertThat(windows).hasSize(10);
     }
 
     @Test
-    @DisplayName("카운터 문맥 윈도우는 상대팀 챔피언 전원과, 우리 팀이 산 아이템을 중복 없이 합쳐서 포함한다")
-    void buildCounterWindows_WhenParticipantsBuyOverlappingItems_IncludesEnemyChampionsAndDeduplicatedTeamItems() {
+    @DisplayName("카운터 문맥 윈도우는 적 챔피언 한 명과 우리 팀이 산 아이템(중복 제거)만 포함하고, 다른 적 챔피언과는 섞이지 않는다")
+    void buildCounterWindows_WhenParticipantsBuyOverlappingItems_IncludesSingleEnemyAndDeduplicatedTeamItems() {
         // given: 아군(1~5)은 3071을 두 명이 겹쳐서 사고, 적군(6~10)은 전원 3040만 산다
         NormalizedMatch match = new NormalizedMatch("KR_3", "14.1", 420, List.of());
         List<NormalizedMatchParticipant> participants = new ArrayList<>();
@@ -111,29 +111,32 @@ class MatchParticipantWindowBuilderTest {
         // when
         List<Window> windows = builder.buildCounterWindows(participants, WIN_WEIGHT);
 
-        // then: 아군팀 관점 카운터 윈도우는 적팀 챔피언(6~10) + 아군팀이 산 아이템 합집합(3071, 6653, 3020)만 포함하고,
-        //       승리팀이므로 가중치가 적용된다
-        assertThat(windows)
-                .filteredOn(window -> window.tokens().contains("3071"))
-                .hasSize(1)
-                .first()
-                .satisfies(window -> {
-                    assertThat(window.tokens())
-                            .containsExactlyInAnyOrder("6", "7", "8", "9", "10", "3071", "6653", "3020");
-                    assertThat(window.weight()).isEqualTo(WIN_WEIGHT);
-                });
+        // then: 아군팀이 산 아이템(3071 포함)을 담은 윈도우는 적 챔피언 수(5개)만큼 따로 생기고,
+        //       각 윈도우는 적 챔피언을 단 한 명만 담으며(다른 적과 섞이지 않음), 승리팀이라 가중치가 적용된다
+        List<Window> allyPerspectiveWindows = windows.stream()
+                .filter(window -> window.tokens().contains("3071"))
+                .toList();
+        assertThat(allyPerspectiveWindows).hasSize(5);
+        assertThat(allyPerspectiveWindows).allSatisfy(window -> {
+            assertThat(window.tokens()).containsAll(List.of("3071", "6653", "3020"));
+            assertThat(window.tokens()).hasSize(4); // 적 챔피언 1명 + 아이템 3개
+            assertThat(window.weight()).isEqualTo(WIN_WEIGHT);
+        });
+        List<String> allyPerspectiveEnemyTokens = allyPerspectiveWindows.stream()
+                .flatMap(window -> window.tokens().stream())
+                .filter(token -> List.of("6", "7", "8", "9", "10").contains(token))
+                .toList();
+        assertThat(allyPerspectiveEnemyTokens).containsExactlyInAnyOrder("6", "7", "8", "9", "10");
 
-        // then: 적팀 관점 카운터 윈도우는 아군팀 챔피언(1~5) + 적팀이 산 아이템(3040)만 포함하고,
-        //       패배팀이므로 가중치가 1.0이다
-        assertThat(windows)
-                .filteredOn(window -> window.tokens().contains("3040"))
-                .hasSize(1)
-                .first()
-                .satisfies(window -> {
-                    assertThat(window.tokens())
-                            .containsExactlyInAnyOrder("1", "2", "3", "4", "5", "3040");
-                    assertThat(window.weight()).isEqualTo(1.0);
-                });
+        // then: 적팀 관점 윈도우는 아군 챔피언 1명 + 적팀이 산 아이템(3040)만 포함하고, 패배팀이라 가중치가 1.0이다
+        List<Window> enemyPerspectiveWindows = windows.stream()
+                .filter(window -> window.tokens().contains("3040"))
+                .toList();
+        assertThat(enemyPerspectiveWindows).hasSize(5);
+        assertThat(enemyPerspectiveWindows).allSatisfy(window -> {
+            assertThat(window.tokens()).hasSize(2); // 아군 챔피언 1명 + 아이템 1개
+            assertThat(window.weight()).isEqualTo(1.0);
+        });
     }
 
     @Test
