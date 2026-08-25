@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 
+import { trackEvent } from './analytics';
+
 /** 렌더러가 배너를 그리는 데 필요한 만큼만. */
 export interface UpdateState {
   /** idle: 조용함 · downloading: 받는 중 · ready: 재시작하면 적용 · error: 실패 */
@@ -45,9 +47,13 @@ function publish(windows: () => BrowserWindow[], next: Partial<UpdateState>) {
  * 몰래 재시작시키지 않는다 — 밴픽 중에 앱이 꺼지면 그게 더 큰 사고다.
  */
 export function setupAutoUpdate(getWindows: () => BrowserWindow[]) {
+  const track = (event: string, data?: Record<string, unknown>) =>
+    trackEvent(() => getWindows()[0] ?? null, event, data);
+
   ipcMain.handle('update:getState', () => state);
   ipcMain.handle('update:install', () => {
     if (state.status !== 'ready') return false;
+    track('update-install-triggered', { version: state.version });
     // isSilent=true, isForceRunAfter=true — 설치 창 없이 끝나고 다시 켜진다.
     autoUpdater.quitAndInstall(true, true);
     return true;
@@ -64,7 +70,12 @@ export function setupAutoUpdate(getWindows: () => BrowserWindow[]) {
 
   autoUpdater.on('update-available', (info) => {
     console.log('[update] 새 버전', info.version);
+    track('update-check-result', { result: 'available', version: info.version });
     publish(getWindows, { status: 'downloading', version: info.version, percent: 0 });
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    track('update-check-result', { result: 'not-available', version: info.version });
   });
 
   autoUpdater.on('download-progress', (progress) => {
@@ -73,12 +84,14 @@ export function setupAutoUpdate(getWindows: () => BrowserWindow[]) {
 
   autoUpdater.on('update-downloaded', (info) => {
     console.log('[update] 준비됨', info.version);
+    track('update-downloaded', { version: info.version });
     publish(getWindows, { status: 'ready', version: info.version, percent: 100 });
   });
 
   autoUpdater.on('error', (error) => {
     // 인터넷이 끊겨도 앱은 그대로 써야 하므로 조용히 넘어간다.
     console.error('[update] 실패', error);
+    track('update-check-result', { result: 'error', message: error.message });
     publish(getWindows, { status: 'error' });
   });
 
