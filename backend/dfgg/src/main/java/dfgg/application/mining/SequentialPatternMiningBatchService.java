@@ -3,8 +3,6 @@ package dfgg.application.mining;
 import dfgg.application.ChampionPositionNormalizer;
 import dfgg.application.sequence.PrefixSpanMiner;
 import dfgg.domain.champion.ChampionPosition;
-import dfgg.domain.match.MatchParticipantCohort;
-import dfgg.domain.match.MatchParticipantCohortRepository;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import dfgg.domain.sequence.MinedSequentialPattern;
@@ -16,8 +14,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
@@ -29,7 +25,6 @@ import org.springframework.util.Assert;
 public class SequentialPatternMiningBatchService {
 
     private final NormalizedMatchParticipantRepository participantRepository;
-    private final MatchParticipantCohortRepository cohortRepository;
     private final MinedSequentialPatternRepository minedSequentialPatternRepository;
     private final PrefixSpanMiner prefixSpanMiner;
     private final ChampionPositionNormalizer positionNormalizer;
@@ -38,7 +33,6 @@ public class SequentialPatternMiningBatchService {
 
     public SequentialPatternMiningBatchService(
             NormalizedMatchParticipantRepository participantRepository,
-            MatchParticipantCohortRepository cohortRepository,
             MinedSequentialPatternRepository minedSequentialPatternRepository,
             PrefixSpanMiner prefixSpanMiner,
             ChampionPositionNormalizer positionNormalizer,
@@ -46,7 +40,6 @@ public class SequentialPatternMiningBatchService {
             @Value("${mining.batch.match-page-size}") int matchPageSize
     ) {
         this.participantRepository = participantRepository;
-        this.cohortRepository = cohortRepository;
         this.minedSequentialPatternRepository = minedSequentialPatternRepository;
         this.prefixSpanMiner = prefixSpanMiner;
         this.positionNormalizer = positionNormalizer;
@@ -55,9 +48,7 @@ public class SequentialPatternMiningBatchService {
     }
 
     @Transactional
-    public Map<MiningScope, List<SequentialPattern>> mineFromMatchData(
-            String queueType, int minSupport, String algorithmVersion
-    ) {
+    public Map<MiningScope, List<SequentialPattern>> mineFromMatchData(int minSupport, String algorithmVersion) {
         Assert.hasText(algorithmVersion, "algorithmVersion must not be blank");
 
         Map<MiningScope, List<ParticipantSequence>> sequencesByScope = new LinkedHashMap<>();
@@ -69,11 +60,8 @@ public class SequentialPatternMiningBatchService {
             List<String> matchIds = matchIdPage.getContent();
             if (!matchIds.isEmpty()) {
                 List<NormalizedMatchParticipant> participants = participantRepository.findByMatchIdIn(matchIds);
-                Map<String, String> tierByMatchAndPuuid = tierByMatchAndPuuid(participants, queueType);
                 for (NormalizedMatchParticipant participant : participants) {
-                    String tier = tierByMatchAndPuuid.get(
-                            cohortLookupKey(participant.getMatchId(), participant.getPuuid())
-                    );
+                    String tier = participant.getTier();
                     if (tier == null) {
                         continue;
                     }
@@ -144,24 +132,6 @@ public class SequentialPatternMiningBatchService {
             ));
         }
         return minedPatterns;
-    }
-
-    private Map<String, String> tierByMatchAndPuuid(List<NormalizedMatchParticipant> participants, String queueType) {
-        Set<String> matchIds = participants.stream()
-                .map(NormalizedMatchParticipant::getMatchId)
-                .collect(Collectors.toSet());
-        if (matchIds.isEmpty()) {
-            return Map.of();
-        }
-        return cohortRepository.findByMatchIdInAndQueueType(matchIds, queueType).stream()
-                .collect(Collectors.toMap(
-                        cohort -> cohortLookupKey(cohort.getMatchId(), cohort.getPuuid()),
-                        MatchParticipantCohort::getTier
-                ));
-    }
-
-    private String cohortLookupKey(String matchId, String puuid) {
-        return matchId + "|" + puuid;
     }
 
     private record ParticipantSequence(List<Long> items, boolean win) {

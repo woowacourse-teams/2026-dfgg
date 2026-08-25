@@ -92,16 +92,16 @@ class MiningTriggerServiceTest {
                 scopeA, List.of(new SequentialPattern(List.of(3071L), 10)),
                 scopeB, List.of()
         );
-        when(sequentialPatternMiningBatchService.mineFromMatchData(eq("RANKED_SOLO_5x5"), eq(5), any()))
+        when(sequentialPatternMiningBatchService.mineFromMatchData(eq(5), any()))
                 .thenReturn(patternsByScope);
         when(minedSequentialPatternRepository.countByAlgorithmVersion("prefixspan-v1")).thenReturn(7L);
 
         // when
         SequentialPatternMiningResult result =
-                miningTriggerService.mineSequentialPatterns("RANKED_SOLO_5x5", 5, "prefixspan-v1");
+                miningTriggerService.mineSequentialPatterns(5, "prefixspan-v1");
 
         // then
-        verify(sequentialPatternMiningBatchService).mineFromMatchData("RANKED_SOLO_5x5", 5, "prefixspan-v1");
+        verify(sequentialPatternMiningBatchService).mineFromMatchData(5, "prefixspan-v1");
         assertThat(result.scopeCount()).isEqualTo(2);
         assertThat(result.persistedPatternCount()).isEqualTo(7L);
         assertThat(result.algorithmVersion()).isEqualTo("prefixspan-v1");

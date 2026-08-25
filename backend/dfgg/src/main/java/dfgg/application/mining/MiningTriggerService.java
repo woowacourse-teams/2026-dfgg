@@ -45,9 +45,9 @@ public class MiningTriggerService {
         );
     }
 
-    public SequentialPatternMiningResult mineSequentialPatterns(String queueType, int minSupport, String algorithmVersion) {
+    public SequentialPatternMiningResult mineSequentialPatterns(int minSupport, String algorithmVersion) {
         Map<MiningScope, List<SequentialPattern>> patternsByScope =
-                sequentialPatternMiningBatchService.mineFromMatchData(queueType, minSupport, algorithmVersion);
+                sequentialPatternMiningBatchService.mineFromMatchData(minSupport, algorithmVersion);
         long persistedCount = minedSequentialPatternRepository.countByAlgorithmVersion(algorithmVersion);
         return new SequentialPatternMiningResult(patternsByScope.size(), persistedCount, algorithmVersion);
     }

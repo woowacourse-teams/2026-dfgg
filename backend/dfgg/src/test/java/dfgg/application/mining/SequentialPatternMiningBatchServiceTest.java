@@ -6,16 +6,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dfgg.application.ChampionPositionNormalizer;
 import dfgg.application.sequence.PrefixSpanMiner;
 import dfgg.domain.champion.ChampionPosition;
-import dfgg.domain.match.MatchParticipantCohort;
-import dfgg.domain.match.MatchParticipantCohortRepository;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
-import dfgg.domain.match.NormalizedParticipant;
 import dfgg.domain.sequence.MinedSequentialPattern;
 import dfgg.domain.sequence.MinedSequentialPatternRepository;
 import dfgg.domain.sequence.SequentialPattern;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,32 +38,28 @@ class SequentialPatternMiningBatchServiceTest {
     private NormalizedMatchParticipantRepository participantRepository;
 
     @Autowired
-    private MatchParticipantCohortRepository cohortRepository;
-
-    @Autowired
     private MinedSequentialPatternRepository minedSequentialPatternRepository;
 
     @BeforeEach
     void cleanUp() {
         participantRepository.deleteAllInBatch();
-        cohortRepository.deleteAllInBatch();
         minedSequentialPatternRepository.deleteAllInBatch();
     }
 
     @Test
-    @DisplayName("실 매치 데이터와 코호트를 조인해 챔피언/포지션/티어/패치 스코프별로 시퀀스를 마이닝한다")
-    void mineFromMatchData_WhenGivenRealMatchDataAndCohorts_MinesSequencesPerScope() {
+    @DisplayName("실 매치 데이터를 챔피언/포지션/티어/패치 스코프별로 시퀀스를 마이닝한다")
+    void mineFromMatchData_WhenGivenRealMatchData_MinesSequencesPerScope() {
         // given
         for (int i = 0; i < 10; i++) {
-            seedParticipantWithCohort("KR_MATCH_" + i, "GOLD", true);
+            seedParticipant("KR_MATCH_" + i, "GOLD", true);
         }
         for (int i = 0; i < 3; i++) {
-            seedParticipantWithCohort("KR_LOW_SUPPORT_" + i, "PLATINUM", true);
+            seedParticipant("KR_LOW_SUPPORT_" + i, "PLATINUM", true);
         }
 
         // when
         Map<MiningScope, List<SequentialPattern>> patternsByScope =
-                miningBatchService.mineFromMatchData("RANKED_SOLO_5x5", 5, ALGORITHM_VERSION);
+                miningBatchService.mineFromMatchData(5, ALGORITHM_VERSION);
 
         // then
         MiningScope goldTopScope = new MiningScope(1L, "TOP", "GOLD", "14.1");
@@ -81,61 +73,30 @@ class SequentialPatternMiningBatchServiceTest {
     }
 
     @Test
-    @DisplayName("코호트 정보가 없는 참가자는 마이닝에서 제외한다")
-    void mineFromMatchData_WhenParticipantHasNoCohort_ExcludesParticipantFromMining() {
+    @DisplayName("티어 정보가 없는 참가자는 마이닝에서 제외한다")
+    void mineFromMatchData_WhenParticipantHasNoTier_ExcludesParticipantFromMining() {
         // given
-        NormalizedMatch match = new NormalizedMatch("KR_NO_COHORT", "14.1", 420, List.of());
-        participantRepository.save(new NormalizedMatchParticipant(match, new NormalizedParticipant(
-                "puuid-no-cohort",
+        NormalizedMatchParticipant participant = new NormalizedMatchParticipant(
+                "puuid-no-tier",
                 1,
                 1,
                 100,
                 "TOP",
+                null,
                 true,
                 List.of(3071, 6653),
                 List.of(3071, 6653),
                 true
-        )));
+        );
+        new NormalizedMatch("KR_NO_TIER", "14.1", 420, List.of(participant));
+        participantRepository.save(participant);
 
         // when
         Map<MiningScope, List<SequentialPattern>> patternsByScope =
-                miningBatchService.mineFromMatchData("RANKED_SOLO_5x5", 1, ALGORITHM_VERSION);
+                miningBatchService.mineFromMatchData(1, ALGORITHM_VERSION);
 
         // then
         assertThat(patternsByScope).isEmpty();
-    }
-
-    @Test
-    @DisplayName("같은 매치와 puuid라도 요청한 큐 타입의 코호트만 사용해 티어를 판단한다")
-    void mineFromMatchData_WhenSameMatchAndPuuidHasMultipleQueueTypes_UsesOnlyRequestedQueueTypeCohort() {
-        // given
-        NormalizedMatch match = new NormalizedMatch("KR_MULTI_QUEUE", "14.1", 420, List.of());
-        String puuid = "puuid-multi-queue";
-        participantRepository.save(new NormalizedMatchParticipant(match, new NormalizedParticipant(
-                puuid,
-                1,
-                1,
-                100,
-                "TOP",
-                true,
-                List.of(3071, 6653),
-                List.of(3071, 6653),
-                true
-        )));
-        cohortRepository.save(new MatchParticipantCohort(
-                "KR_MULTI_QUEUE", puuid, "RANKED_SOLO_5x5", "GOLD", "II", Instant.now()
-        ));
-        cohortRepository.save(new MatchParticipantCohort(
-                "KR_MULTI_QUEUE", puuid, "RANKED_FLEX_SR", "PLATINUM", "IV", Instant.now()
-        ));
-
-        // when
-        Map<MiningScope, List<SequentialPattern>> patternsByScope =
-                miningBatchService.mineFromMatchData("RANKED_SOLO_5x5", 1, ALGORITHM_VERSION);
-
-        // then
-        assertThat(patternsByScope).containsKey(new MiningScope(1L, "TOP", "GOLD", "14.1"));
-        assertThat(patternsByScope).doesNotContainKey(new MiningScope(1L, "TOP", "PLATINUM", "14.1"));
     }
 
     @Test
@@ -143,11 +104,11 @@ class SequentialPatternMiningBatchServiceTest {
     void mineFromMatchData_WhenPatternMeetsMinSupport_PersistsMinedSequentialPatternWithScopeCounts() {
         // given
         for (int i = 0; i < 10; i++) {
-            seedParticipantWithCohort("KR_MATCH_" + i, "GOLD", true);
+            seedParticipant("KR_MATCH_" + i, "GOLD", true);
         }
 
         // when
-        miningBatchService.mineFromMatchData("RANKED_SOLO_5x5", 5, ALGORITHM_VERSION);
+        miningBatchService.mineFromMatchData(5, ALGORITHM_VERSION);
 
         // then
         MinedSequentialPattern saved = minedSequentialPatternRepository.findAll().stream()
@@ -168,13 +129,13 @@ class SequentialPatternMiningBatchServiceTest {
     @DisplayName("일부 참가자가 패배했다면 승리한 참가자만 승리 횟수로 집계한다")
     void mineFromMatchData_WhenSomeParticipantsLost_CountsOnlyWinnersAsWinCount() {
         // given: 4명이 같은 시퀀스를 만들지만 그중 1명만 패배한다
-        seedParticipantWithCohort("KR_WIN_1", "GOLD", true);
-        seedParticipantWithCohort("KR_WIN_2", "GOLD", true);
-        seedParticipantWithCohort("KR_WIN_3", "GOLD", true);
-        seedParticipantWithCohort("KR_LOSE_1", "GOLD", false);
+        seedParticipant("KR_WIN_1", "GOLD", true);
+        seedParticipant("KR_WIN_2", "GOLD", true);
+        seedParticipant("KR_WIN_3", "GOLD", true);
+        seedParticipant("KR_LOSE_1", "GOLD", false);
 
         // when
-        miningBatchService.mineFromMatchData("RANKED_SOLO_5x5", 3, ALGORITHM_VERSION);
+        miningBatchService.mineFromMatchData(3, ALGORITHM_VERSION);
 
         // then
         MinedSequentialPattern saved = minedSequentialPatternRepository.findAll().stream()
@@ -191,11 +152,11 @@ class SequentialPatternMiningBatchServiceTest {
     void mineFromMatchData_WhenPositionIsRiotRawValue_NormalizesBeforePersisting() {
         // given: Riot API가 실제로 내려주는 원시 포지션 값(MIDDLE)으로 5명을 시드한다
         for (int i = 0; i < 5; i++) {
-            seedParticipantWithCohortAndPosition("KR_MID_" + i, "GOLD", "MIDDLE", true);
+            seedParticipantWithPosition("KR_MID_" + i, "GOLD", "MIDDLE", true);
         }
 
         // when
-        miningBatchService.mineFromMatchData("RANKED_SOLO_5x5", 3, ALGORITHM_VERSION);
+        miningBatchService.mineFromMatchData(3, ALGORITHM_VERSION);
 
         // then
         MinedSequentialPattern saved = minedSequentialPatternRepository.findAll().stream()
@@ -210,13 +171,13 @@ class SequentialPatternMiningBatchServiceTest {
     void mineFromMatchData_WhenRunTwiceWithSameAlgorithmVersion_ReplacesPreviousPatternsWithoutDuplicates() {
         // given
         for (int i = 0; i < 10; i++) {
-            seedParticipantWithCohort("KR_MATCH_" + i, "GOLD", true);
+            seedParticipant("KR_MATCH_" + i, "GOLD", true);
         }
-        miningBatchService.mineFromMatchData("RANKED_SOLO_5x5", 5, ALGORITHM_VERSION);
+        miningBatchService.mineFromMatchData(5, ALGORITHM_VERSION);
         int firstRunCount = minedSequentialPatternRepository.findAll().size();
 
         // when
-        miningBatchService.mineFromMatchData("RANKED_SOLO_5x5", 5, ALGORITHM_VERSION);
+        miningBatchService.mineFromMatchData(5, ALGORITHM_VERSION);
 
         // then
         assertThat(minedSequentialPatternRepository.findAll()).hasSize(firstRunCount);
@@ -226,35 +187,28 @@ class SequentialPatternMiningBatchServiceTest {
     @DisplayName("algorithmVersion이 비어 있으면 예외가 발생한다")
     void mineFromMatchData_WhenAlgorithmVersionIsBlank_ThrowsIllegalArgumentException() {
         // given & when & then
-        assertThatThrownBy(() -> miningBatchService.mineFromMatchData("RANKED_SOLO_5x5", 1, " "))
+        assertThatThrownBy(() -> miningBatchService.mineFromMatchData(1, " "))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    private void seedParticipantWithCohort(String matchId, String tier, boolean win) {
-        seedParticipantWithCohortAndPosition(matchId, tier, "TOP", win);
+    private void seedParticipant(String matchId, String tier, boolean win) {
+        seedParticipantWithPosition(matchId, tier, "TOP", win);
     }
 
-    private void seedParticipantWithCohortAndPosition(String matchId, String tier, String position, boolean win) {
-        NormalizedMatch match = new NormalizedMatch(matchId, "14.1", 420, List.of());
-        String puuid = "puuid-" + matchId;
-        participantRepository.save(new NormalizedMatchParticipant(match, new NormalizedParticipant(
-                puuid,
+    private void seedParticipantWithPosition(String matchId, String tier, String position, boolean win) {
+        NormalizedMatchParticipant participant = new NormalizedMatchParticipant(
+                "puuid-" + matchId,
                 1,
                 1,
                 100,
                 position,
+                tier,
                 win,
                 List.of(3071, 6653),
                 List.of(3071, 6653),
                 true
-        )));
-        cohortRepository.save(new MatchParticipantCohort(
-                matchId,
-                puuid,
-                "RANKED_SOLO_5x5",
-                tier,
-                "II",
-                Instant.now()
-        ));
+        );
+        new NormalizedMatch(matchId, "14.1", 420, List.of(participant));
+        participantRepository.save(participant);
     }
 }

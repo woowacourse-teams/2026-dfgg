@@ -56,9 +56,8 @@ public class MiningController {
     @PostMapping("/patterns")
     public ResponseEntity<SequentialPatternMiningResult> minePatterns(
             @RequestParam @NotBlank String algorithmVersion,
-            @RequestParam(defaultValue = "RANKED_SOLO_5x5") String queueType,
             @RequestParam(defaultValue = "10") @Min(1) int minSupport
     ) {
-        return ResponseEntity.ok(miningTriggerService.mineSequentialPatterns(queueType, minSupport, algorithmVersion));
+        return ResponseEntity.ok(miningTriggerService.mineSequentialPatterns(minSupport, algorithmVersion));
     }
 }

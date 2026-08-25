@@ -5,9 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dfgg.application.embedding.WindowFactory;
 import dfgg.domain.embedding.Window;
 import dfgg.domain.item.Item;
-import dfgg.domain.match.NormalizedMatch;
 import dfgg.domain.match.NormalizedMatchParticipant;
-import dfgg.domain.match.NormalizedParticipant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -120,21 +118,22 @@ class MatchParticipantWindowBuilderTest {
     @DisplayName("카운터 문맥 윈도우는 적-아이템 쌍마다 정확히 하나씩 생기고, 아이템은 팀 내에서 중복 제거된다")
     void buildCounterWindows_WhenParticipantsBuyOverlappingItems_CreatesOneWindowPerDeduplicatedEnemyItemPair() {
         // given: 아군(1~5)은 3071을 두 명이 겹쳐서 사서 실제 종류는 3071/6653/3020 세 가지, 적군(6~10)은 전원 3040만 산다
-        NormalizedMatch match = new NormalizedMatch("KR_3", "14.1", 420, List.of());
         List<NormalizedMatchParticipant> participants = new ArrayList<>();
         List<List<Integer>> allyItemsByParticipant = List.of(
                 List.of(3071, 6653), List.of(3071, 3020), List.of(6653), List.of(3071), List.of(3020)
         );
         int championId = 1;
         for (List<Integer> items : allyItemsByParticipant) {
-            participants.add(new NormalizedMatchParticipant(match, new NormalizedParticipant(
-                    "puuid-" + championId, championId, championId, 100, "TOP", true, items, items, true)));
+            participants.add(new NormalizedMatchParticipant(
+                    "puuid-" + championId, championId, championId, 100, "TOP", null, true, items, items, true
+            ));
             championId++;
         }
         for (int enemyChampionId : List.of(6, 7, 8, 9, 10)) {
-            participants.add(new NormalizedMatchParticipant(match, new NormalizedParticipant(
-                    "puuid-" + enemyChampionId, enemyChampionId, enemyChampionId, 200, "TOP", false,
-                    List.of(3040), List.of(3040), true)));
+            participants.add(new NormalizedMatchParticipant(
+                    "puuid-" + enemyChampionId, enemyChampionId, enemyChampionId, 200, "TOP", null, false,
+                    List.of(3040), List.of(3040), true
+            ));
         }
 
         // when
@@ -193,34 +192,35 @@ class MatchParticipantWindowBuilderTest {
             List<Integer> enemyChampionIds,
             boolean enemyWin
     ) {
-        NormalizedMatch match = new NormalizedMatch("KR_1", "14.1", 420, List.of());
         List<NormalizedMatchParticipant> participants = new ArrayList<>();
         int participantId = 1;
         for (Integer championId : allyChampionIds) {
-            participants.add(new NormalizedMatchParticipant(match, new NormalizedParticipant(
+            participants.add(new NormalizedMatchParticipant(
                     "puuid-" + participantId,
                     participantId++,
                     championId,
                     100,
                     "TOP",
+                    null,
                     allyWin,
                     List.of(3071, 6653),
                     List.of(3071, 6653),
                     true
-            )));
+            ));
         }
         for (Integer championId : enemyChampionIds) {
-            participants.add(new NormalizedMatchParticipant(match, new NormalizedParticipant(
+            participants.add(new NormalizedMatchParticipant(
                     "puuid-" + participantId,
                     participantId++,
                     championId,
                     200,
                     "TOP",
+                    null,
                     enemyWin,
                     List.of(3020),
                     List.of(3020),
                     true
-            )));
+            ));
         }
         return participants;
     }

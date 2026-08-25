@@ -1,5 +1,4 @@
 DELETE FROM normalized_match_participants;
-DELETE FROM item_tags;
 DELETE FROM items;
 
 INSERT INTO normalized_match_participants (
