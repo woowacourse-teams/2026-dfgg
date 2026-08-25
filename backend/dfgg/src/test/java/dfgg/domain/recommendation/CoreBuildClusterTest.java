@@ -17,6 +17,7 @@ public class CoreBuildClusterTest {
     private final Item itemB = new Item(2L, "아이템 B");
     private final Item itemC = new Item(3L, "아이템 C");
     private final Item itemD = new Item(4L, "아이템 D");
+    private final Item boots = new Item(10L, "신발", List.of("Boots"));
 
     @Test
     @DisplayName("같은 clusterKey의 원본 통계를 군집 안에 보존한다")
@@ -64,10 +65,102 @@ public class CoreBuildClusterTest {
                 .hasMessage("관측 빌드에는 신발을 제외한 코어 아이템 3개가 필요합니다.");
     }
 
+    @Test
+    @DisplayName("군집의 gameCount와 winCount를 합산한다")
+    void from_SumsClusterStats() {
+        // given
+        ChampionBuildStats first = stats(6, 3, itemA, itemB, itemC);
+        ChampionBuildStats second = stats(4, 2, itemB, itemA, itemC);
+
+        // when
+        CoreBuildCluster cluster = CoreBuildCluster.from(
+                List.of(1L, 2L, 3L),
+                List.of(first, second)
+        );
+
+        // then
+        assertThat(cluster.getGameCount()).isEqualTo(10);
+        assertThat(cluster.getWinCount()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("같은 구매 순서의 통계를 누적해 대표 순서를 선정한다")
+    void from_SelectsMostObservedPurchaseOrder() {
+        // given
+        ChampionBuildStats first = stats(6, 3, itemA, itemB, itemC);
+        ChampionBuildStats sameOrder = stats(5, 2, itemA, itemB, itemC, itemD);
+        ChampionBuildStats otherOrder = stats(10, 7, itemB, itemA, itemC);
+
+        // when
+        CoreBuildCluster cluster = CoreBuildCluster.from(
+                List.of(1L, 2L, 3L),
+                List.of(first, sameOrder, otherOrder)
+        );
+
+        // then
+        assertThat(cluster.getRepresentativeSequence().getOrderedItems())
+                .containsExactly(itemA, itemB, itemC);
+    }
+
+    @Test
+    @DisplayName("대표 순서의 통계가 동률이면 먼저 관측된 순서를 유지한다")
+    void from_WhenRepresentativeOrderIsTied_KeepsFirstObservedOrder() {
+        // given
+        ChampionBuildStats first = stats(10, 5, itemA, itemB, itemC);
+        ChampionBuildStats second = stats(10, 5, itemB, itemA, itemC);
+
+        // when
+        CoreBuildCluster cluster = CoreBuildCluster.from(
+                List.of(1L, 2L, 3L),
+                List.of(first, second)
+        );
+
+        // then
+        assertThat(cluster.getRepresentativeSequence().getOrderedItems())
+                .containsExactly(itemA, itemB, itemC);
+    }
+
+    @Test
+    @DisplayName("대표 순서와 일치하는 실제 완성 빌드를 선택한다")
+    void findRepresentativeBuild_SelectsObservedCompleteBuild() {
+        // given
+        ChampionBuildStats partial = stats(100, 50, itemA, itemB, itemC);
+        ChampionBuildStats complete = stats(
+                5,
+                2,
+                itemA,
+                boots,
+                itemB,
+                itemC
+        );
+
+        // when
+        CoreBuildCluster cluster = CoreBuildCluster.from(
+                List.of(1L, 2L, 3L),
+                List.of(partial, complete)
+        );
+
+        // then
+        assertThat(cluster.findRepresentativeBuild(4))
+                .hasValue(complete);
+        assertThat(cluster.findRepresentativeBuild(6))
+                .isEmpty();
+    }
 
     private ChampionBuildStats stats(Item... items) {
         ChampionBuildStats stats = mock(ChampionBuildStats.class);
         given(stats.getItems()).willReturn(List.of(items));
+        return stats;
+    }
+
+    private ChampionBuildStats stats(
+            int gameCount,
+            int winCount,
+            Item... items
+    ) {
+        ChampionBuildStats stats = stats(items);
+        given(stats.getGameCount()).willReturn(gameCount);
+        given(stats.getWinCount()).willReturn(winCount);
         return stats;
     }
 
