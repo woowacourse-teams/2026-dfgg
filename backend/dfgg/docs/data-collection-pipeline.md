@@ -180,8 +180,11 @@ curl -X POST \
   "http://localhost:8080/admin/riot/matches/stats?tier=PLATINUM"
 ```
 
-이 API는 외부 API에서 새 데이터를 수집하지 않습니다. 먼저 저장된 원본 데이터를
-정규화하고, 생성한 정규화 객체를 바로 통계 서비스에 전달해 신규 sample을 반영합니다.
+이 API는 저장된 원본과 Player 티어를 우선 사용합니다. Player 또는 티어가 누락된
+참가자만 Riot API에서 동기화한 뒤 원본 데이터를 정규화하고, 생성한 정규화 객체를
+바로 통계 서비스에 전달해 신규 sample을 반영합니다. 한 번 실패한 매치는 전체 pending
+목록 처리 후 한 번 재시도합니다. Riot API가 429와 올바른 `Retry-After`를 반환하면
+지정된 시간만큼 기다린 뒤 성공할 때까지 재시도하며, 헤더가 없거나 잘못되면 즉시 실패합니다.
 그런 다음 DB에 저장되어 있지만 아직 집계되지 않은 정규화 행을 조회해 복구·백필합니다.
 
 - `normalized_match_participants`

@@ -1,5 +1,6 @@
 package dfgg.application;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -22,6 +23,8 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
 
 class RiotCollectionOrchestratorTest {
 
@@ -133,6 +136,109 @@ class RiotCollectionOrchestratorTest {
         order.verify(matchNormalizationService).save(succeeded);
         order.verify(statsMatchService).registerMatchStats(succeeded, "PLATINUM");
         order.verify(matchNormalizationService).findPendingMatchIdsAfter("KR_SUCCEEDED");
+    }
+
+    @Test
+    void 관리자_재집계는_Riot_API_갱신_없이_저장된_플레이어_티어를_사용한다() {
+        NormalizedMatch normalized = normalizedMatch("KR_1");
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of("KR_1"));
+        when(matchNormalizationService.findPendingMatchIdsAfter("KR_1"))
+                .thenReturn(List.of());
+        when(matchNormalizationService.normalizeForRebuild("KR_1"))
+                .thenReturn(normalized);
+
+        orchestrator.normalizeAndAggregatePendingMatches("PLATINUM");
+
+        InOrder order = inOrder(matchNormalizationService, statsMatchService);
+        order.verify(matchNormalizationService).normalizeForRebuild("KR_1");
+        order.verify(matchNormalizationService).save(normalized);
+        order.verify(statsMatchService).registerMatchStats(normalized, "PLATINUM");
+        verify(matchNormalizationService, never()).normalize("KR_1");
+        verifyNoInteractions(playerSyncService, matchSyncService);
+    }
+
+    @Test
+    void 관리자_재집계에서_실패한_매치는_전체_조회_후_한_번_재시도한다() {
+        NormalizedMatch retried = normalizedMatch("KR_RETRY");
+        NormalizedMatch succeeded = normalizedMatch("KR_SUCCEEDED");
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of("KR_RETRY", "KR_SUCCEEDED"));
+        when(matchNormalizationService.findPendingMatchIdsAfter("KR_SUCCEEDED"))
+                .thenReturn(List.of());
+        when(matchNormalizationService.normalizeForRebuild("KR_RETRY"))
+                .thenThrow(new IllegalStateException("temporary Riot failure"))
+                .thenReturn(retried);
+        when(matchNormalizationService.normalizeForRebuild("KR_SUCCEEDED"))
+                .thenReturn(succeeded);
+
+        orchestrator.normalizeAndAggregatePendingMatches("PLATINUM");
+
+        InOrder order = inOrder(matchNormalizationService, statsMatchService);
+        order.verify(matchNormalizationService).normalizeForRebuild("KR_RETRY");
+        order.verify(matchNormalizationService).normalizeForRebuild("KR_SUCCEEDED");
+        order.verify(matchNormalizationService).save(succeeded);
+        order.verify(statsMatchService).registerMatchStats(succeeded, "PLATINUM");
+        order.verify(matchNormalizationService).normalizeForRebuild("KR_RETRY");
+        order.verify(matchNormalizationService).save(retried);
+        order.verify(statsMatchService).registerMatchStats(retried, "PLATINUM");
+    }
+
+    @Test
+    void 관리자_재집계의_재시도도_실패하면_원래_원인을_보존한다() {
+        IllegalStateException failure = new IllegalStateException("Riot rate limit");
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of("KR_FAILED"));
+        when(matchNormalizationService.findPendingMatchIdsAfter("KR_FAILED"))
+                .thenReturn(List.of());
+        when(matchNormalizationService.normalizeForRebuild("KR_FAILED"))
+                .thenThrow(failure);
+
+        assertThatThrownBy(() -> orchestrator.normalizeAndAggregatePendingMatches("PLATINUM"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasCause(failure);
+
+        verify(matchNormalizationService, times(2)).normalizeForRebuild("KR_FAILED");
+        verifyNoInteractions(statsMatchService);
+    }
+
+    @Test
+    void Retry_After가_없는_429는_매치를_재시도하지_않는다() {
+        HttpClientErrorException rateLimit = new HttpClientErrorException(HttpStatus.TOO_MANY_REQUESTS);
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of("KR_RATE_LIMITED"));
+        when(matchNormalizationService.findPendingMatchIdsAfter("KR_RATE_LIMITED"))
+                .thenReturn(List.of());
+        when(matchNormalizationService.normalizeForRebuild("KR_RATE_LIMITED"))
+                .thenThrow(rateLimit);
+
+        assertThatThrownBy(() -> orchestrator.normalizeAndAggregatePendingMatches("PLATINUM"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasCause(rateLimit);
+
+        verify(matchNormalizationService).normalizeForRebuild("KR_RATE_LIMITED");
+        verifyNoInteractions(statsMatchService);
+    }
+
+    @Test
+    void 관리자_재집계에서_통계_집계가_실패하면_한_번_재시도한다() {
+        NormalizedMatch normalized = normalizedMatch("KR_STATS_RETRY");
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of("KR_STATS_RETRY"));
+        when(matchNormalizationService.findPendingMatchIdsAfter("KR_STATS_RETRY"))
+                .thenReturn(List.of());
+        when(matchNormalizationService.normalizeForRebuild("KR_STATS_RETRY"))
+                .thenReturn(normalized);
+        doThrow(new IllegalStateException("temporary database failure"))
+                .doNothing()
+                .when(statsMatchService)
+                .registerMatchStats(normalized, "PLATINUM");
+
+        orchestrator.normalizeAndAggregatePendingMatches("PLATINUM");
+
+        verify(matchNormalizationService).normalizeForRebuild("KR_STATS_RETRY");
+        verify(matchNormalizationService).save(normalized);
+        verify(statsMatchService, times(2)).registerMatchStats(normalized, "PLATINUM");
     }
 
     @Test

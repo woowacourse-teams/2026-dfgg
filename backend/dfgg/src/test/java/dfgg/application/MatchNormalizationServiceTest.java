@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -107,6 +109,86 @@ class MatchNormalizationServiceTest {
             assertThat(participant.tier()).isEqualTo("PLATINUM");
             assertThat(participant.finalCoreItemIds()).containsExactly(3071);
         });
+    }
+
+    @Test
+    void 재집계는_Riot_API를_호출하지_않고_저장된_플레이어_티어를_사용한다() {
+        String rawMatchData = """
+                {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
+                  {"puuid":"puuid-1","participantId":1,"championId":1,"teamId":100,
+                   "teamPosition":"TOP","item0":3071,"win":true}
+                ]}}
+                """;
+        String rawTimelineData = """
+                {"metadata":{"participants":["puuid-1"]},"info":{"frames":[
+                  {"events":[
+                    {"timestamp":100,"type":"ITEM_PURCHASED","participantId":1,"itemId":3071}
+                  ]}
+                ]}}
+                """;
+        when(rawMatchRepository.findById("KR_1"))
+                .thenReturn(Optional.of(new RawMatch("KR_1", rawMatchData)));
+        when(rawMatchTimelineRepository.findById("KR_1"))
+                .thenReturn(Optional.of(new RawMatchTimeline("KR_1", rawTimelineData)));
+        when(itemService.findCoreItemIds()).thenReturn(Set.of(3071));
+        when(playerRepository.findAllById(List.of("puuid-1"))).thenReturn(List.of(
+                new Player(
+                        "puuid-1",
+                        "KR",
+                        "PLATINUM",
+                        "I",
+                        Instant.parse("2026-08-23T00:00:00Z")
+                )
+        ));
+
+        NormalizedMatch normalized = normalizer.normalizeForRebuild("KR_1");
+
+        verifyNoInteractions(riotPlayerSyncService);
+        assertThat(normalized.participants()).singleElement()
+                .extracting(NormalizedMatchParticipant::tier)
+                .isEqualTo("PLATINUM");
+    }
+
+    @Test
+    void 재집계는_저장된_티어가_없는_참가자만_동기화한다() {
+        String rawMatchData = """
+                {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
+                  {"puuid":"stored-puuid","participantId":1,"championId":1,"teamId":100,"win":true},
+                  {"puuid":"missing-puuid","participantId":2,"championId":2,"teamId":200,"win":false}
+                ]}}
+                """;
+        String rawTimelineData = """
+                {"metadata":{"participants":["stored-puuid","missing-puuid"]},"info":{"frames":[]}}
+                """;
+        Player storedPlayer = new Player(
+                "stored-puuid",
+                "KR",
+                "PLATINUM",
+                "I",
+                Instant.parse("2026-08-23T00:00:00Z")
+        );
+        Player syncedPlayer = new Player(
+                "missing-puuid",
+                "KR",
+                "GOLD",
+                "I",
+                Instant.parse("2026-08-24T00:00:00Z")
+        );
+        when(rawMatchRepository.findById("KR_1"))
+                .thenReturn(Optional.of(new RawMatch("KR_1", rawMatchData)));
+        when(rawMatchTimelineRepository.findById("KR_1"))
+                .thenReturn(Optional.of(new RawMatchTimeline("KR_1", rawTimelineData)));
+        when(itemService.findCoreItemIds()).thenReturn(Set.of());
+        when(playerRepository.findAllById(List.of("stored-puuid", "missing-puuid")))
+                .thenReturn(List.of(storedPlayer), List.of(storedPlayer, syncedPlayer));
+
+        NormalizedMatch normalized = normalizer.normalizeForRebuild("KR_1");
+
+        verify(riotPlayerSyncService).syncPlayerTiers(List.of("missing-puuid"));
+        verifyNoMoreInteractions(riotPlayerSyncService);
+        assertThat(normalized.participants())
+                .extracting(NormalizedMatchParticipant::tier)
+                .containsExactly("PLATINUM", "GOLD");
     }
 
     @Test
