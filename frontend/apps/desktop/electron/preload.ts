@@ -75,6 +75,19 @@ const lcuApi = {
       ipcRenderer.removeListener('lcu:windowMode', handler);
     };
   },
+
+  /**
+   * 메인 프로세스에서 일어난 일을 umami 이벤트로 흘려보낸다.
+   * window.umami 는 렌더러(브라우저 컨텍스트)에만 있어 메인 프로세스가 직접 못 부른다.
+   */
+  onAnalyticsEvent: (callback: (event: string, data?: Record<string, unknown>) => void) => {
+    const handler = (_event: unknown, name: string, data?: Record<string, unknown>) =>
+      callback(name, data);
+    ipcRenderer.on('analytics:event', handler);
+    return () => {
+      ipcRenderer.removeListener('analytics:event', handler);
+    };
+  },
 };
 
 export type LcuApi = typeof lcuApi;

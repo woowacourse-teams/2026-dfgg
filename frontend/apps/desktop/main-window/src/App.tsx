@@ -3,6 +3,7 @@ import type { Position } from '../../../../packages/shared/types';
 import ItemBuild from '../../components/ItemBuild';
 import OverlayControls from '../../components/OverlayControls';
 import UpdateBanner from '../../components/UpdateBanner';
+import { useAnalyticsBridge } from '../../components/useAnalyticsBridge';
 import { WINDOW_MODE_FULLSCREEN } from '../../components/useLineup';
 import { findChampion, isPicked, useRecommendation } from '../../components/useRecommendation';
 import type { LineupSlot } from '../../electron/types';
@@ -48,6 +49,8 @@ function ChampionRow({ slots, ddragon }: { slots: LineupSlot[]; ddragon: DDragon
 }
 
 export default function App() {
+  useAnalyticsBridge();
+
   const {
     lineup,
     status,
