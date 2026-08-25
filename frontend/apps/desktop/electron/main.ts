@@ -507,8 +507,9 @@ function applyOverlayBounds() {
   overlayWindow.webContents.setZoomFactor(overlayScale);
 }
 
-function setOverlayVisible(visible: boolean) {
+function setOverlayVisible(visible: boolean, source: 'hotkey' | 'button' = 'button') {
   overlayVisible = visible;
+  track('overlay-toggle', { visible, source });
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
   if (visible) overlayWindow.showInactive();
   else overlayWindow.hide();
@@ -565,21 +566,24 @@ async function createOverlayWindow() {
   // ow-electron 이면 게임 프로세스 안에 그린다. 전체 화면에서도 가려지지 않는다.
   const { height } = screen.getPrimaryDisplay().workAreaSize;
 
-  const inGame = await createGameOverlay({
-    ...OVERLAY_SIZE,
-    name: 'dfgg-overlay',
-    x: OVERLAY_MARGIN,
-    y: Math.round((height - OVERLAY_SIZE.height) / 2),
-    transparent: true,
-    frame: false,
-    resizable: false,
-    show: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
+  const inGame = await createGameOverlay(
+    {
+      ...OVERLAY_SIZE,
+      name: 'dfgg-overlay',
+      x: OVERLAY_MARGIN,
+      y: Math.round((height - OVERLAY_SIZE.height) / 2),
+      transparent: true,
+      frame: false,
+      resizable: false,
+      show: true,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
     },
-  });
+    () => mainWindow,
+  );
 
   const created = inGame ?? createPlainOverlayWindow();
   overlayWindow = created;
@@ -599,6 +603,7 @@ async function createOverlayWindow() {
 
   created.webContents.on('did-fail-load', (_event, code, description, url) => {
     console.error('[overlay] 로드 실패', code, description, url);
+    track('overlay-load-failed', { code, description });
   });
 
   created.on('closed', () => {
@@ -627,6 +632,7 @@ ipcMain.handle('overlay:setScale', (_event, scale: number) => {
   const min = OVERLAY_SCALES[0];
   const max = OVERLAY_SCALES[OVERLAY_SCALES.length - 1];
   overlayScale = Math.min(Math.max(scale, min), max);
+  track('overlay-scale', { scale: overlayScale });
   applyOverlayBounds();
   return overlayScale;
 });
@@ -651,7 +657,7 @@ app.whenReady().then(() => {
 
   const registered = globalShortcut.register(TOGGLE_OVERLAY, () => {
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
-    setOverlayVisible(!overlayWindow.isVisible());
+    setOverlayVisible(!overlayWindow.isVisible(), 'hotkey');
   });
   console.log(`[overlay] 단축키 ${TOGGLE_OVERLAY} 등록`, registered ? '성공' : '실패');
 
