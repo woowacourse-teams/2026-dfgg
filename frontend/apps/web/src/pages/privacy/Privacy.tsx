@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { PRIVACY_URL } from '../../components/SiteFooter';
 
-const LAST_UPDATED = '2026년 8월 21일';
+const LAST_UPDATED = '2026년 8월 25일';
 
 const CONTACT_EMAIL = 'dfgg0821@gmail.com';
 
@@ -58,9 +58,10 @@ export default function Privacy() {
             남습니다. 이 기록은 통계나 마케팅에 사용하지 않습니다.
           </p>
           <p>
-            또한 서비스 개선을 위해 방문한 페이지와 버튼 클릭 등 사용 기록을 익명으로 집계합니다. 이
-            집계에는 쿠키를 사용하지 않으며, 개인을 식별할 수 있는 정보는 수집하지 않습니다.
-            마케팅이나 광고에는 사용하지 않습니다.
+            또한 서비스 개선을 위해 웹사이트와 데스크톱 앱에서 방문한 페이지와 기능 사용 기록(예:
+            버튼 클릭, 추천 요청 성공 여부)을 익명으로 집계합니다. 이 집계에는 쿠키를 사용하지
+            않으며, 개인을 식별할 수 있는 정보나 경기 내용은 수집하지 않습니다. 마케팅이나 광고에는
+            사용하지 않습니다.
           </p>
         </Section>
 
