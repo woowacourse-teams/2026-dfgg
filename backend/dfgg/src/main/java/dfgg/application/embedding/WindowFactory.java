@@ -28,9 +28,7 @@ public class WindowFactory {
     }
 
     public Window createCounterTeamWindow(CounterTeamContext counterTeamContext, double winWeight) {
-        List<String> tokens = new ArrayList<>();
-        tokens.add(counterTeamContext.enemyChampionToken());
-        tokens.addAll(counterTeamContext.itemTokens());
+        List<String> tokens = List.of(counterTeamContext.enemyChampionToken(), counterTeamContext.itemToken());
         return new Window(tokens, weightFor(counterTeamContext.win(), winWeight));
     }
 

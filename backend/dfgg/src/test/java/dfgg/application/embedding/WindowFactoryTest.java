@@ -87,11 +87,7 @@ class WindowFactoryTest {
     @DisplayName("카운터 문맥에서 승리한 팀의 윈도우에는 승패 가중치가 적용된다")
     void createCounterTeamWindow_WhenWin_AppliesWinWeight() {
         // given
-        CounterTeamContext counterTeamContext = new CounterTeamContext(
-                "Garen",
-                List.of("FrozenHeart", "Thornmail"),
-                true
-        );
+        CounterTeamContext counterTeamContext = new CounterTeamContext("Garen", "FrozenHeart", true);
 
         // when
         Window window = windowFactory.createCounterTeamWindow(counterTeamContext, WIN_WEIGHT);
@@ -104,11 +100,7 @@ class WindowFactoryTest {
     @DisplayName("카운터 문맥에서 패배한 팀의 윈도우에는 가중치 1.0이 적용된다")
     void createCounterTeamWindow_WhenLose_AppliesDefaultWeight() {
         // given
-        CounterTeamContext counterTeamContext = new CounterTeamContext(
-                "Garen",
-                List.of("FrozenHeart", "Thornmail"),
-                false
-        );
+        CounterTeamContext counterTeamContext = new CounterTeamContext("Garen", "FrozenHeart", false);
 
         // when
         Window window = windowFactory.createCounterTeamWindow(counterTeamContext, WIN_WEIGHT);
@@ -118,14 +110,10 @@ class WindowFactoryTest {
     }
 
     @Test
-    @DisplayName("카운터 문맥 윈도우는 적 챔피언 한 명과 우리 팀 아이템 토큰만 포함하고, 다른 적 챔피언은 섞이지 않는다")
-    void createCounterTeamWindow_IncludesOnlySingleEnemyChampionAndItemTokens() {
+    @DisplayName("카운터 문맥 윈도우는 적 챔피언 한 명과 아이템 한 개, 단 두 토큰만 포함한다")
+    void createCounterTeamWindow_IncludesExactlyOneEnemyChampionAndOneItemToken() {
         // given
-        CounterTeamContext counterTeamContext = new CounterTeamContext(
-                "Garen",
-                List.of("FrozenHeart"),
-                true
-        );
+        CounterTeamContext counterTeamContext = new CounterTeamContext("Garen", "FrozenHeart", true);
 
         // when
         Window window = windowFactory.createCounterTeamWindow(counterTeamContext, WIN_WEIGHT);

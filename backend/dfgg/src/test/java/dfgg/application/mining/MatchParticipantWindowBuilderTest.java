@@ -72,9 +72,9 @@ class MatchParticipantWindowBuilderTest {
     }
 
     @Test
-    @DisplayName("2팀 매치면 각 팀마다 적 챔피언 수만큼(5개씩), 총 10개의 카운터 문맥 윈도우를 만든다")
-    void buildCounterWindows_WhenMatchHasTwoTeams_CreatesOneCounterWindowPerEnemyChampion() {
-        // given
+    @DisplayName("카운터 문맥 윈도우는 (적 챔피언 수 × 우리 팀 아이템 종류 수)개만큼, 적-아이템 쌍 하나당 하나씩(토큰 2개) 생긴다")
+    void buildCounterWindows_WhenMatchHasTwoTeams_CreatesOneWindowPerEnemyItemPair() {
+        // given: 아군은 아이템 2종(3071, 6653), 적군은 아이템 1종(3020)을 산다 (matchParticipants 기본 픽스처)
         List<NormalizedMatchParticipant> participants = matchParticipants(
                 List.of(1, 2, 3, 4, 5), true,
                 List.of(6, 7, 8, 9, 10), false
@@ -83,14 +83,16 @@ class MatchParticipantWindowBuilderTest {
         // when
         List<Window> windows = builder.buildCounterWindows(participants, WIN_WEIGHT);
 
-        // then
-        assertThat(windows).hasSize(10);
+        // then: 아군 관점(적 5명 × 아이템 2종=10) + 적 관점(아군 5명 × 아이템 1종=5) = 15개,
+        //       모든 윈도우가 정확히 토큰 2개(챔피언 1명+아이템 1개)라 챔피언-챔피언/아이템-아이템 쌍이 생길 수 없다
+        assertThat(windows).hasSize(15);
+        assertThat(windows).allSatisfy(window -> assertThat(window.tokens()).hasSize(2));
     }
 
     @Test
-    @DisplayName("카운터 문맥 윈도우는 적 챔피언 한 명과 우리 팀이 산 아이템(중복 제거)만 포함하고, 다른 적 챔피언과는 섞이지 않는다")
-    void buildCounterWindows_WhenParticipantsBuyOverlappingItems_IncludesSingleEnemyAndDeduplicatedTeamItems() {
-        // given: 아군(1~5)은 3071을 두 명이 겹쳐서 사고, 적군(6~10)은 전원 3040만 산다
+    @DisplayName("카운터 문맥 윈도우는 적-아이템 쌍마다 정확히 하나씩 생기고, 아이템은 팀 내에서 중복 제거된다")
+    void buildCounterWindows_WhenParticipantsBuyOverlappingItems_CreatesOneWindowPerDeduplicatedEnemyItemPair() {
+        // given: 아군(1~5)은 3071을 두 명이 겹쳐서 사서 실제 종류는 3071/6653/3020 세 가지, 적군(6~10)은 전원 3040만 산다
         NormalizedMatch match = new NormalizedMatch("KR_3", "14.1", 420, List.of());
         List<NormalizedMatchParticipant> participants = new ArrayList<>();
         List<List<Integer>> allyItemsByParticipant = List.of(
@@ -111,30 +113,34 @@ class MatchParticipantWindowBuilderTest {
         // when
         List<Window> windows = builder.buildCounterWindows(participants, WIN_WEIGHT);
 
-        // then: 아군팀이 산 아이템(3071 포함)을 담은 윈도우는 적 챔피언 수(5개)만큼 따로 생기고,
-        //       각 윈도우는 적 챔피언을 단 한 명만 담으며(다른 적과 섞이지 않음), 승리팀이라 가중치가 적용된다
+        // then: 아군팀 관점 윈도우는 (적 5명 × 아이템 3종=15개), 전부 토큰 2개이고 승리팀이라 가중치가 적용된다
         List<Window> allyPerspectiveWindows = windows.stream()
-                .filter(window -> window.tokens().contains("3071"))
+                .filter(window -> window.tokens().stream().anyMatch(List.of("3071", "6653", "3020")::contains))
                 .toList();
-        assertThat(allyPerspectiveWindows).hasSize(5);
+        assertThat(allyPerspectiveWindows).hasSize(15);
         assertThat(allyPerspectiveWindows).allSatisfy(window -> {
-            assertThat(window.tokens()).containsAll(List.of("3071", "6653", "3020"));
-            assertThat(window.tokens()).hasSize(4); // 적 챔피언 1명 + 아이템 3개
+            assertThat(window.tokens()).hasSize(2);
             assertThat(window.weight()).isEqualTo(WIN_WEIGHT);
         });
-        List<String> allyPerspectiveEnemyTokens = allyPerspectiveWindows.stream()
+
+        // then: 아이템 3071은 두 참가자가 겹쳐서 샀지만 중복 제거되어, 적 5명과 각각 한 번씩 총 5개 윈도우만 생긴다
+        List<Window> item3071Windows = windows.stream()
+                .filter(window -> window.tokens().contains("3071"))
+                .toList();
+        assertThat(item3071Windows).hasSize(5);
+        List<String> enemiesPairedWith3071 = item3071Windows.stream()
                 .flatMap(window -> window.tokens().stream())
                 .filter(token -> List.of("6", "7", "8", "9", "10").contains(token))
                 .toList();
-        assertThat(allyPerspectiveEnemyTokens).containsExactlyInAnyOrder("6", "7", "8", "9", "10");
+        assertThat(enemiesPairedWith3071).containsExactlyInAnyOrder("6", "7", "8", "9", "10");
 
-        // then: 적팀 관점 윈도우는 아군 챔피언 1명 + 적팀이 산 아이템(3040)만 포함하고, 패배팀이라 가중치가 1.0이다
+        // then: 적팀 관점 윈도우는 (아군 5명 × 아이템 1종=5개), 패배팀이라 가중치가 1.0이다
         List<Window> enemyPerspectiveWindows = windows.stream()
                 .filter(window -> window.tokens().contains("3040"))
                 .toList();
         assertThat(enemyPerspectiveWindows).hasSize(5);
         assertThat(enemyPerspectiveWindows).allSatisfy(window -> {
-            assertThat(window.tokens()).hasSize(2); // 아군 챔피언 1명 + 아이템 1개
+            assertThat(window.tokens()).hasSize(2);
             assertThat(window.weight()).isEqualTo(1.0);
         });
     }

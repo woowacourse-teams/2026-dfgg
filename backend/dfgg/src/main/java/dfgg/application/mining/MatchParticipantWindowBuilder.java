@@ -53,10 +53,11 @@ public class MatchParticipantWindowBuilder {
             List<String> teamItemTokens = teamItemTokens(team);
             boolean teamWin = team.get(0).getWin();
             for (NormalizedMatchParticipant enemy : enemyTeam) {
-                CounterTeamContext counterTeamContext = new CounterTeamContext(
-                        championToken(enemy.getChampionId()), teamItemTokens, teamWin
-                );
-                windows.add(windowFactory.createCounterTeamWindow(counterTeamContext, winWeight));
+                String enemyToken = championToken(enemy.getChampionId());
+                for (String itemToken : teamItemTokens) {
+                    CounterTeamContext counterTeamContext = new CounterTeamContext(enemyToken, itemToken, teamWin);
+                    windows.add(windowFactory.createCounterTeamWindow(counterTeamContext, winWeight));
+                }
             }
         }
         return windows;
