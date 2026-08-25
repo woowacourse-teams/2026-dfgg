@@ -4,6 +4,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.HttpClientErrorException;
@@ -16,8 +18,7 @@ import org.springframework.web.client.HttpClientErrorException;
  */
 final class RiotRateLimitExecutor {
 
-    // 한 요청에서 허용하는 최대 시도 횟수다. 최초 요청도 시도 횟수에 포함한다.
-    private static final int MAX_ATTEMPTS = 3;
+    private static final Logger log = LoggerFactory.getLogger(RiotRateLimitExecutor.class);
 
     private final Clock clock;
     private final Sleeper sleeper;
@@ -39,13 +40,14 @@ final class RiotRateLimitExecutor {
     /**
      * 요청을 실행하고 Riot API가 알려준 대기 시간만큼 이후 요청을 지연한다.
      *
-     * <p>429 응답에 Retry-After 헤더가 있으면 해당 시간 동안 대기한 뒤 재시도하고,
-     * 헤더가 없거나 최대 시도 횟수를 넘으면 원래 예외를 다시 던진다.
+     * <p>429 응답에 Retry-After 헤더가 있으면 해당 시간 동안 대기한 뒤 성공할 때까지 재시도하고,
+     * 헤더가 없거나 올바르지 않으면 원래 예외를 다시 던진다.
      */
     synchronized <T> T execute(Supplier<T> request) {
         Objects.requireNonNull(request, "request must not be null");
 
-        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        long attempt = 1;
+        while (true) {
             // 이전 요청이 설정한 전역 대기 시간이 남아 있으면 먼저 기다린다.
             awaitAvailable();
 
@@ -56,13 +58,14 @@ final class RiotRateLimitExecutor {
                 Duration retryAfter = retryAfter(exception);
                 blockRequests(retryAfter);
 
-                if (attempt == MAX_ATTEMPTS) {
-                    throw exception;
-                }
+                log.warn(
+                        "Riot API 호출 제한: attempt={}, retryAfterMs={}",
+                        attempt,
+                        retryAfter.toMillis()
+                );
+                attempt++;
             }
         }
-
-        throw new IllegalStateException("[Error] Riot API retry attempts exhausted");
     }
 
     /**
@@ -72,21 +75,27 @@ final class RiotRateLimitExecutor {
     private Duration retryAfter(HttpClientErrorException.TooManyRequests exception) {
         HttpHeaders responseHeaders = exception.getResponseHeaders();
         if (responseHeaders == null) {
+            log.error("Riot API 호출 제한 응답 오류: Retry-After 없음");
             throw exception;
         }
 
         String header = responseHeaders.getFirst(HttpHeaders.RETRY_AFTER);
         if (!StringUtils.hasText(header)) {
+            log.error("Riot API 호출 제한 응답 오류: Retry-After 없음");
             throw exception;
         }
 
         try {
             long seconds = Long.parseLong(header);
-            if (seconds < 0) {
+            if (seconds <= 0) {
+                log.error("Riot API 호출 제한 응답 오류: Retry-After={}", header);
                 throw exception;
             }
-            return Duration.ofSeconds(seconds);
-        } catch (NumberFormatException parseException) {
+            long retryAfterMillis = Math.multiplyExact(seconds, 1_000L);
+            Math.addExact(clock.millis(), retryAfterMillis);
+            return Duration.ofMillis(retryAfterMillis);
+        } catch (NumberFormatException | ArithmeticException parseException) {
+            log.error("Riot API 호출 제한 응답 오류: Retry-After={}", header);
             throw exception;
         }
     }

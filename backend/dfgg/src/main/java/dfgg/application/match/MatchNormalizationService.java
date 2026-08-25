@@ -18,6 +18,7 @@ import dfgg.infrastructure.external.dto.MatchResponse;
 import dfgg.infrastructure.external.dto.MatchTimelineResponse;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>정규화의 전체 흐름은 다음과 같다.
  * <ol>
  *     <li>Raw Match와 Raw Timeline이 모두 준비된 매치를 조회한다.</li>
- *     <li>참가자의 현재 티어를 갱신한다.</li>
+ *     <li>수집 경로에서는 참가자의 현재 티어를 갱신하고, 재집계 경로에서는 저장된 티어를 우선 사용한다.</li>
  *     <li>원본 JSON에서 최종 아이템과 구매 순서를 계산한다.</li>
  *     <li>추천 통계에 필요한 참가자 데이터만 {@link NormalizedMatch}로 만든다.</li>
  *     <li>정규화된 참가자 전체를 한 트랜잭션으로 저장한다.</li>
@@ -106,24 +107,51 @@ public class MatchNormalizationService {
      * 참가자 티어 API 호출은 DB 저장 트랜잭션을 시작하기 전에 모두 끝낸다.
      */
     public NormalizedMatch normalize(String matchId) {
-        RawMatch rawMatch = rawMatchRepository.findById(matchId)
-                .orElseThrow(() -> new IllegalStateException("raw match not found: " + matchId));
-        RawMatchTimeline timeline = rawMatchTimelineRepository.findById(matchId)
-                .orElseThrow(() -> new IllegalStateException("raw match timeline not found: " + matchId));
+        StoredMatchData storedMatch = loadStoredMatch(matchId);
 
         // 매치에 실제로 참가한 10명의 현재 티어를 먼저 갱신한다.
         // 이후 normalize(...)가 players 테이블에서 이 티어를 읽어 참가자 데이터에 넣는다.
-        List<String> participantPuuids = findParticipantPuuids(rawMatch.getRawData());
+        List<String> participantPuuids = findParticipantPuuids(storedMatch.rawMatchData());
         if (participantPuuids.isEmpty()) {
             throw new IllegalArgumentException("match participant puuids must not be empty: " + matchId);
         }
         riotPlayerSyncService.syncPlayerTiers(participantPuuids);
 
+        return normalizeStoredMatch(matchId, storedMatch);
+    }
+
+    /**
+     * 저장된 Raw Match, Raw Timeline, Player 티어를 우선 사용해 한 매치를 정규화한다.
+     * 저장된 티어가 없는 참가자만 동기화해 대량 재집계의 Riot API 호출을 최소화한다.
+     */
+    public NormalizedMatch normalizeForRebuild(String matchId) {
+        StoredMatchData storedMatch = loadStoredMatch(matchId);
+        List<String> participantPuuids = findParticipantPuuids(storedMatch.rawMatchData());
+        if (participantPuuids.isEmpty()) {
+            throw new IllegalArgumentException("match participant puuids must not be empty: " + matchId);
+        }
+
+        List<String> missingTierPuuids = findMissingTierPuuids(participantPuuids);
+        if (!missingTierPuuids.isEmpty()) {
+            riotPlayerSyncService.syncPlayerTiers(missingTierPuuids);
+        }
+        return normalizeStoredMatch(matchId, storedMatch);
+    }
+
+    private StoredMatchData loadStoredMatch(String matchId) {
+        RawMatch rawMatch = rawMatchRepository.findById(matchId)
+                .orElseThrow(() -> new IllegalStateException("raw match not found: " + matchId));
+        RawMatchTimeline timeline = rawMatchTimelineRepository.findById(matchId)
+                .orElseThrow(() -> new IllegalStateException("raw match timeline not found: " + matchId));
+        return new StoredMatchData(rawMatch.getRawData(), timeline.getRawData());
+    }
+
+    private NormalizedMatch normalizeStoredMatch(String matchId, StoredMatchData storedMatch) {
         Set<Integer> coreItemIds = itemService.findCoreItemIds();
         return normalize(
                 matchId,
-                rawMatch.getRawData(),
-                timeline.getRawData(),
+                storedMatch.rawMatchData(),
+                storedMatch.rawTimelineData(),
                 coreItemIds
         );
     }
@@ -251,6 +279,18 @@ public class MatchNormalizationService {
                 .toList();
     }
 
+    private List<String> findMissingTierPuuids(List<String> participantPuuids) {
+        Set<String> puuidsWithTier = new HashSet<>();
+        for (Player player : playerRepository.findAllById(participantPuuids)) {
+            if (player.getTier() != null && !player.getTier().isBlank()) {
+                puuidsWithTier.add(player.getPuuid());
+            }
+        }
+        return participantPuuids.stream()
+                .filter(puuid -> !puuidsWithTier.contains(puuid))
+                .toList();
+    }
+
     private List<MatchParticipant> participantsOf(MatchResponse match) {
         if (match.info() == null || match.info().participants() == null) {
             throw new IllegalArgumentException("match participants must not be null");
@@ -332,5 +372,8 @@ public class MatchNormalizationService {
             // 잘못된 원본을 일부만 정규화하지 않고 매치 전체를 실패시킨다.
             throw new IllegalArgumentException(dataName + " raw data is invalid", exception);
         }
+    }
+
+    private record StoredMatchData(String rawMatchData, String rawTimelineData) {
     }
 }

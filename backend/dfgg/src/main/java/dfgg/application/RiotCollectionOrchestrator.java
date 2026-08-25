@@ -10,9 +10,13 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
 
 /**
  * Riot 데이터 자동 수집의 전체 순서만 조율한다.
@@ -22,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RiotCollectionOrchestrator {
 
+    private static final Logger log = LoggerFactory.getLogger(RiotCollectionOrchestrator.class);
     private static final String QUEUE_TYPE = "RANKED_SOLO_5x5";
     private static final List<String> DIVISION_ORDER = List.of("IV", "III", "II", "I");
 
@@ -63,7 +68,11 @@ public class RiotCollectionOrchestrator {
         // 이번 실행에서 실패했거나 이전 실행에 남은 Timeline을 보완한다.
         collectMissingTimelines();
         // 매치 단위 처리로 끝내지 못한 기존 미완료 매치를 복구한다.
-        normalizePendingMatches(properties.getTiers());
+        normalizePendingMatches(
+                properties.getTiers(),
+                matchNormalizationService::normalize,
+                false
+        );
     }
 
     private List<String> collectPlayers() {
@@ -203,66 +212,172 @@ public class RiotCollectionOrchestrator {
         if (tier == null || tier.isBlank()) {
             throw new IllegalArgumentException("tier must not be blank");
         }
-        List<Failure> failures = normalizePendingMatches(List.of(tier));
+        // 관리자 재집계는 복원된 Player 티어를 우선 사용하고, 누락된 참가자만 동기화한다.
+        List<Failure> failures = normalizePendingMatches(
+                List.of(tier),
+                matchNormalizationService::normalizeForRebuild,
+                true
+        );
         if (!failures.isEmpty()) {
             Failure firstFailure = failures.getFirst();
             throw new IllegalStateException(
                     "failed to normalize or aggregate " + failures.size() + " match(es): "
-                            + firstFailure.targetId + " - " + firstFailure.reason
+                            + firstFailure.targetId + " - " + firstFailure.reason,
+                    firstFailure.cause
             );
         }
     }
 
-    private synchronized List<Failure> normalizePendingMatches(List<String> tiers) {
+    private synchronized List<Failure> normalizePendingMatches(
+            List<String> tiers,
+            Function<String, NormalizedMatch> normalizer,
+            boolean retryFailedMatches
+    ) {
         List<Failure> failures = new ArrayList<>();
         // 스케줄러와 관리자 API가 동시에 호출되어도 한 프로세스에서는 정규화를 한 번씩만 실행한다.
         try {
-            normalizeMatches(failures, tiers);
+            normalizeMatches(failures, tiers, normalizer, retryFailedMatches);
         } catch (RuntimeException exception) {
             // 대상 페이지 조회 자체가 실패하면 다음 실행에서 같은 범위를 다시 시도한다.
+            log.error("미처리 매치 조회 실패", exception);
             failures.add(Failure.from("all-pending", exception));
         }
         return List.copyOf(failures);
     }
 
-    private void normalizeMatches(List<Failure> failures, List<String> tiers) {
+    private void normalizeMatches(
+            List<Failure> failures,
+            List<String> tiers,
+            Function<String, NormalizedMatch> normalizer,
+            boolean retryFailedMatches
+    ) {
         String cursor = "";
+        Set<String> retryMatchIds = new LinkedHashSet<>();
+        List<StatsRetry> statsRetries = new ArrayList<>();
 
         while (true) {
             // Raw Match와 Timeline이 모두 있고, 아직 정규화 데이터가 없는 매치만 페이지 단위로 읽는다.
             List<String> matchIds = matchNormalizationService.findPendingMatchIdsAfter(cursor);
             if (matchIds.isEmpty()) {
-                return;
+                break;
             }
 
             for (String matchId : matchIds) {
                 NormalizedMatch normalized;
                 try {
-                    // 외부 티어 조회와 변환을 먼저 끝낸 뒤 저장만 짧은 트랜잭션으로 실행한다.
-                    // 두 호출 모두 다른 Spring Bean을 통하므로 save()의 @Transactional이 정상 적용된다.
-                    normalized = matchNormalizationService.normalize(matchId);
+                    normalized = normalizer.apply(matchId);
                     matchNormalizationService.save(normalized);
                 } catch (RuntimeException exception) {
-                    // 한 매치가 실패해도 다음 매치를 계속 처리한다. 실패한 매치는 다음 실행에서 다시 조회된다.
-                    failures.add(Failure.from(matchId, exception));
+                    if (retryFailedMatches && !isRateLimitFailure(exception)) {
+                        log.warn("매치 정규화 실패: matchId={}", matchId, exception);
+                        retryMatchIds.add(matchId);
+                    } else {
+                        log.error("매치 정규화 실패: matchId={}", matchId, exception);
+                        failures.add(Failure.from(matchId, exception));
+                    }
                     continue;
                 }
-                aggregateStats(normalized, tiers, failures);
+                aggregateStats(
+                        normalized,
+                        tiers,
+                        failures,
+                        statsRetries,
+                        retryFailedMatches
+                );
             }
             cursor = matchIds.getLast();
+        }
+
+        retryFailedMatches(retryMatchIds, failures, tiers, normalizer, statsRetries);
+        retryFailedStats(statsRetries, failures);
+    }
+
+    private boolean isRateLimitFailure(RuntimeException exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            if (cause instanceof HttpClientErrorException clientError
+                    && clientError.getStatusCode().value() == 429) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
+    }
+
+    private void retryFailedMatches(
+            Set<String> retryMatchIds,
+            List<Failure> failures,
+            List<String> tiers,
+            Function<String, NormalizedMatch> normalizer,
+            List<StatsRetry> statsRetries
+    ) {
+        for (String matchId : retryMatchIds) {
+            try {
+                NormalizedMatch normalized = normalizer.apply(matchId);
+                matchNormalizationService.save(normalized);
+                aggregateStats(normalized, tiers, failures, statsRetries, true);
+            } catch (RuntimeException exception) {
+                log.error("매치 정규화 재시도 실패: matchId={}", matchId, exception);
+                failures.add(Failure.from(matchId, exception));
+            }
+        }
+    }
+
+    private void retryFailedStats(List<StatsRetry> statsRetries, List<Failure> failures) {
+        for (StatsRetry retry : statsRetries) {
+            try {
+                statsMatchService.registerMatchStats(retry.normalized, retry.tier);
+            } catch (RuntimeException exception) {
+                log.error(
+                        "매치 통계 집계 재시도 실패: matchId={}, tier={}",
+                        retry.normalized.matchId(),
+                        retry.tier,
+                        exception
+                );
+                failures.add(Failure.from(
+                        retry.normalized.matchId() + "/" + retry.tier,
+                        exception
+                ));
+            }
         }
     }
 
     private void aggregateStats(NormalizedMatch normalized, List<String> tiers, List<Failure> failures) {
+        aggregateStats(normalized, tiers, failures, new ArrayList<>(), false);
+    }
+
+    private void aggregateStats(
+            NormalizedMatch normalized,
+            List<String> tiers,
+            List<Failure> failures,
+            List<StatsRetry> statsRetries,
+            boolean queueStatsRetries
+    ) {
         // 저장이 끝난 정규화 객체를 그대로 전달해 정상 경로에서는 DB에서 다시 조립하지 않는다.
         for (String tier : tiers) {
             try {
                 statsMatchService.registerMatchStats(normalized, tier);
             } catch (RuntimeException exception) {
-                failures.add(Failure.from(
-                        normalized.matchId() + "/" + tier,
-                        exception
-                ));
+                if (queueStatsRetries) {
+                    log.warn(
+                            "매치 통계 집계 실패: matchId={}, tier={}",
+                            normalized.matchId(),
+                            tier,
+                            exception
+                    );
+                    statsRetries.add(new StatsRetry(normalized, tier));
+                } else {
+                    log.error(
+                            "매치 통계 집계 실패: matchId={}, tier={}",
+                            normalized.matchId(),
+                            tier,
+                            exception
+                    );
+                    failures.add(Failure.from(
+                            normalized.matchId() + "/" + tier,
+                            exception
+                    ));
+                }
             }
         }
     }
@@ -288,15 +403,19 @@ public class RiotCollectionOrchestrator {
         }
     }
 
-    private record Failure(String targetId, String reason) {
+    private record Failure(String targetId, String reason, RuntimeException cause) {
 
         private static Failure from(String targetId, RuntimeException exception) {
             String type = exception.getClass().getSimpleName();
             String message = exception.getMessage();
             return new Failure(
                     targetId,
-                    message == null || message.isBlank() ? type : type + ": " + message
+                    message == null || message.isBlank() ? type : type + ": " + message,
+                    exception
             );
         }
+    }
+
+    private record StatsRetry(NormalizedMatch normalized, String tier) {
     }
 }

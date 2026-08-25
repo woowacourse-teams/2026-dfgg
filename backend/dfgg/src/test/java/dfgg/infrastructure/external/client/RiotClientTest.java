@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -464,14 +466,43 @@ class RiotClientTest {
     }
 
     @Test
-    void 호출_제한_재시도_횟수를_초과하면_429_예외를_전파한다() {
+    void 호출_제한이_반복되어도_Retry_After_이후에_성공할_때까지_재시도한다() {
         server.expect(
-                        ExpectedCount.times(3),
+                        ExpectedCount.times(4),
                         requestTo(PLATFORM_BASE_URL
                                 + "/lol/league/v4/entries/RANKED_SOLO_5x5/EMERALD/III?page=1")
                 )
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
                         .header(HttpHeaders.RETRY_AFTER, "1"));
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/entries/RANKED_SOLO_5x5/EMERALD/III?page=1"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        List<LeagueEntryResponse> entries = client.getLeagueEntries(
+                "RANKED_SOLO_5x5",
+                "EMERALD",
+                "III",
+                1
+        );
+
+        assertThat(entries).isEmpty();
+        assertThat(retryDelays).containsExactly(
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1)
+        );
+
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"invalid", "-1", "0", "9223372036854775807"})
+    void Retry_After가_올바르지_않으면_429_예외를_즉시_전파한다(String retryAfter) {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/entries/RANKED_SOLO_5x5/EMERALD/III?page=1"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
+                        .header(HttpHeaders.RETRY_AFTER, retryAfter));
 
         assertThatThrownBy(() -> client.getLeagueEntries(
                 "RANKED_SOLO_5x5",
@@ -480,10 +511,7 @@ class RiotClientTest {
                 1
         )).isInstanceOf(HttpClientErrorException.TooManyRequests.class);
 
-        assertThat(retryDelays).containsExactly(
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1)
-        );
+        assertThat(retryDelays).isEmpty();
 
         server.verify();
     }
