@@ -44,9 +44,10 @@ class EmbeddingTrainingBatchServiceTest {
         TrainingConfig config = new TrainingConfig(8, 4, 30, 0.05, 42L);
 
         // when
-        Map<String, double[]> embeddings = embeddingTrainingBatchService.trainFromMatchData(
+        EmbeddingTrainingOutcome outcome = embeddingTrainingBatchService.trainFromMatchData(
                 WIN_WEIGHT, config, ALGORITHM_VERSION
         );
+        Map<String, double[]> embeddings = outcome.embeddings();
 
         // then: 같은 팀에서 항상 함께 등장한 챔피언끼리, 적으로만 마주친 챔피언보다 더 가깝다
         double allyCloseness = cosineSimilarity(embeddings.get("1"), embeddings.get("2"));
@@ -55,6 +56,10 @@ class EmbeddingTrainingBatchServiceTest {
 
         // then: 챔피언과 그 챔피언이 산 아이템도 임베딩 공간에 함께 학습된다
         assertThat(embeddings).containsKey("3071");
+
+        // then: 학습 규모(매치 수, window 수)도 함께 보고된다
+        assertThat(outcome.matchCount()).isEqualTo(30);
+        assertThat(outcome.windowCount()).isGreaterThan(0);
     }
 
     @Test

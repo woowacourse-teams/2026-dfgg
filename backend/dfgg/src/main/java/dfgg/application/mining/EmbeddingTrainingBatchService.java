@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
@@ -28,6 +30,8 @@ import org.springframework.util.Assert;
 
 @Service
 public class EmbeddingTrainingBatchService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmbeddingTrainingBatchService.class);
 
     private final NormalizedMatchParticipantRepository participantRepository;
     private final ItemRepository itemRepository;
@@ -56,11 +60,13 @@ public class EmbeddingTrainingBatchService {
     }
 
     @Transactional
-    public Map<String, double[]> trainFromMatchData(double winWeight, TrainingConfig config, String algorithmVersion) {
+    public EmbeddingTrainingOutcome trainFromMatchData(double winWeight, TrainingConfig config, String algorithmVersion) {
         Assert.hasText(algorithmVersion, "algorithmVersion must not be blank");
+        long startedAt = System.currentTimeMillis();
 
         List<Window> windows = new ArrayList<>();
         Set<Long> championIds = new HashSet<>();
+        int matchCount = 0;
 
         int page = 0;
         Slice<String> matchIdPage;
@@ -77,6 +83,7 @@ public class EmbeddingTrainingBatchService {
                 for (NormalizedMatchParticipant participant : participants) {
                     championIds.add(Long.valueOf(participant.getChampionId()));
                 }
+                matchCount += matchIds.size();
                 entityManager.clear();
             }
             page++;
@@ -87,7 +94,13 @@ public class EmbeddingTrainingBatchService {
 
         Map<String, double[]> embeddings = trainer.train(windows, config);
         persist(embeddings, championIds, items, algorithmVersion);
-        return embeddings;
+
+        long trainingDurationMillis = System.currentTimeMillis() - startedAt;
+        log.info(
+                "Embedding training completed: algorithmVersion={}, matchCount={}, windowCount={}, durationMs={}",
+                algorithmVersion, matchCount, windows.size(), trainingDurationMillis
+        );
+        return new EmbeddingTrainingOutcome(embeddings, matchCount, windows.size(), trainingDurationMillis);
     }
 
     private void persist(

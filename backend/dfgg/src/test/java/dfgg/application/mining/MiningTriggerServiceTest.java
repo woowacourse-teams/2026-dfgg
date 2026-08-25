@@ -40,10 +40,12 @@ class MiningTriggerServiceTest {
     }
 
     @Test
-    @DisplayName("임베딩 학습을 실행한 뒤 저장된 개수를 결과로 반환한다")
+    @DisplayName("임베딩 학습을 실행한 뒤 저장된 개수와 학습 규모를 결과로 반환한다")
     void trainEmbeddings_WhenTrainingCompletes_ReturnsPersistedCountFromRepository() {
         // given
         TrainingConfig config = new TrainingConfig(8, 4, 30, 0.05, 42L);
+        EmbeddingTrainingOutcome outcome = new EmbeddingTrainingOutcome(Map.of(), 64428, 1546272, 42000L);
+        when(embeddingTrainingBatchService.trainFromMatchData(3.0, config, "sgns-v1")).thenReturn(outcome);
         when(embeddingRepository.countByAlgorithmVersion("sgns-v1")).thenReturn(11L);
 
         // when
@@ -53,6 +55,9 @@ class MiningTriggerServiceTest {
         verify(embeddingTrainingBatchService).trainFromMatchData(3.0, config, "sgns-v1");
         assertThat(result.persistedEmbeddingCount()).isEqualTo(11L);
         assertThat(result.algorithmVersion()).isEqualTo("sgns-v1");
+        assertThat(result.matchCount()).isEqualTo(64428);
+        assertThat(result.windowCount()).isEqualTo(1546272);
+        assertThat(result.trainingDurationMillis()).isEqualTo(42000L);
     }
 
     @Test

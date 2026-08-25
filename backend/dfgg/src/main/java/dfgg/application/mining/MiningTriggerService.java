@@ -29,9 +29,11 @@ public class MiningTriggerService {
     }
 
     public EmbeddingTrainingResult trainEmbeddings(double winWeight, TrainingConfig config, String algorithmVersion) {
-        embeddingTrainingBatchService.trainFromMatchData(winWeight, config, algorithmVersion);
+        EmbeddingTrainingOutcome outcome = embeddingTrainingBatchService.trainFromMatchData(winWeight, config, algorithmVersion);
         long persistedCount = embeddingRepository.countByAlgorithmVersion(algorithmVersion);
-        return new EmbeddingTrainingResult(persistedCount, algorithmVersion);
+        return new EmbeddingTrainingResult(
+                persistedCount, algorithmVersion, outcome.matchCount(), outcome.windowCount(), outcome.trainingDurationMillis()
+        );
     }
 
     public SequentialPatternMiningResult mineSequentialPatterns(String queueType, int minSupport, String algorithmVersion) {
