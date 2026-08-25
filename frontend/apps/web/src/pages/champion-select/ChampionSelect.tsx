@@ -201,7 +201,7 @@ export default function ChampionSelect() {
 
         <button
           data-umami-event='recommend-item'
-          type='button'
+          type='submit'
           disabled={loading || !isReady}
           className='chamfer-sm mt-4 w-full cursor-pointer bg-accent-strong py-3.5 font-display text-sm font-bold tracking-[0.16em] text-white uppercase transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3'
         >
