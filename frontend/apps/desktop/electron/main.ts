@@ -1,6 +1,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, Menu, screen, shell } from 'electron';
 import path from 'node:path';
 
+import { trackEvent } from './analytics';
 import { requestRecommendation } from './backend';
 import { parseChampSelect } from './champ-select';
 import { type ClientWindowRect, watchClientWindow } from './client-window';
@@ -99,6 +100,8 @@ let overlayVisible = true;
 let unwatchClient: (() => void) | null = null;
 /** 마지막으로 붙여준 클라이언트 좌표. 같은 값이면 창을 건드리지 않는다. */
 let lastDockedTo = '';
+/** 직전 dock 시도가 자리 부족이었는지. 계속 좁은 동안 이벤트를 반복하지 않는다. */
+let wasDockInsufficient = false;
 
 /** 앱 안에서 열어주는 외부 주소. 여기 없는 곳으로는 보내지 않는다. */
 const EXTERNAL_ORIGINS = ['https://dfgg.pro', 'https://www.dfgg.pro'];
@@ -132,6 +135,11 @@ function broadcast(channel: string, payload: unknown) {
   for (const window of [mainWindow, overlayWindow]) {
     if (window && !window.isDestroyed()) window.webContents.send(channel, payload);
   }
+}
+
+/** 메인 창의 umami 로 이벤트를 흘려보낸다. */
+function track(event: string, data?: Record<string, unknown>) {
+  trackEvent(() => mainWindow, event, data);
 }
 
 function setStatus(status: LcuStatus) {
@@ -194,6 +202,7 @@ function beginSession(source: Lineup['source'], reason: string) {
   missCount = 0;
   sessionId += 1;
   console.log(`[lcu] 새 판 시작(${reason}) — 세션`, sessionId);
+  track('session-detected', { source });
 }
 
 async function refreshSession() {
@@ -218,6 +227,7 @@ async function refreshSession() {
     } else {
       // 두 호출이 모두 실패했다. 클라이언트가 꺼졌거나 포트가 바뀌었다.
       console.log('[lcu] 클라이언트 응답 없음 — 자격증명을 다시 찾는다');
+      if (lastStatus !== 'disconnected') track('lcu-failed', { reason: 'lost-connection' });
       credentials = null;
       setStatus('disconnected');
       scheduleReconnect();
@@ -236,6 +246,7 @@ async function refreshSession() {
     sessionActive = true;
     sessionId += 1;
     console.log('[lcu] 새 판 시작 — 세션', sessionId);
+    track('session-detected', { source: 'in-game' });
   }
 
   let parsed: Lineup | null = null;
@@ -302,6 +313,7 @@ async function connectLcu() {
   try {
     credentials = await findCredentials();
 
+    track('lcu-connected');
     setStatus('connected');
     await refreshSession();
 
@@ -326,7 +338,11 @@ async function connectLcu() {
       },
     });
   } catch (error) {
-    if (!(error instanceof LcuNotRunningError)) console.error(error);
+    const reason = error instanceof LcuNotRunningError ? 'not-running' : 'error';
+    if (reason === 'error') console.error(error);
+    // 클라이언트가 꺼져 있는 동안 5초마다 재시도되므로, 상태가 바뀔 때만 보낸다.
+    // 매번 보내면 "롤 안 켠 사용자"가 실패 이벤트를 계속 만들어내 노이즈가 된다.
+    if (lastStatus !== 'disconnected') track('lcu-failed', { reason });
     // 자격증명 자체를 못 찾았다. 이때만 연결이 없는 것으로 본다.
     credentials = null;
     setStatus('disconnected');
@@ -433,12 +449,17 @@ function dockToClient(rect: ClientWindowRect) {
   const y = Math.max(area.y, Math.min(client.y, area.y + area.height - height));
 
   mainWindow.setBounds({ x, y, width, height });
+  const insufficient = space < MIN_DOCK_WIDTH;
   console.log(
     `[dock] 클라이언트 DIP ${client.width}x${client.height}@${client.x},${client.y}` +
       ` / 여백 좌${leftSpace} 우${rightSpace}` +
       ` → ${useRight ? '오른쪽' : '왼쪽'} ${width}x${height}@${x},${y}` +
-      (space < MIN_DOCK_WIDTH ? ' (자리 부족 — 일부 겹침)' : ''),
+      (insufficient ? ' (자리 부족 — 일부 겹침)' : ''),
   );
+  // 자리 부족 상태가 새로 시작될 때만 보낸다. 창을 옮길 때마다 계속 좁으면
+  // dockToClient가 매번 불려도 한 번만 기록한다.
+  if (insufficient && !wasDockInsufficient) track('dock-space-insufficient');
+  wasDockInsufficient = insufficient;
 
   // 클라이언트를 클릭하면 그 창이 위로 올라오면서 우리 창을 덮는다. 옆에 붙어
   // 있으려면 같이 따라 올라와야 한다. 포커스는 뺏지 않는다.
@@ -450,17 +471,20 @@ function dockToClient(rect: ClientWindowRect) {
 
 function startClientDock() {
   unwatchClient?.();
-  unwatchClient = watchClientWindow((rect) => {
-    if (!rect) {
-      // 클라이언트가 꺼졌다. 다시 켜지면 그때 한 번 붙인다.
-      lastDockedTo = '';
-      return;
-    }
-    const key = `${rect.x},${rect.y},${rect.width},${rect.height},${rect.minimized}`;
-    if (key === lastDockedTo) return;
-    lastDockedTo = key;
-    dockToClient(rect);
-  });
+  unwatchClient = watchClientWindow(
+    (rect) => {
+      if (!rect) {
+        // 클라이언트가 꺼졌다. 다시 켜지면 그때 한 번 붙인다.
+        lastDockedTo = '';
+        return;
+      }
+      const key = `${rect.x},${rect.y},${rect.width},${rect.height},${rect.minimized}`;
+      if (key === lastDockedTo) return;
+      lastDockedTo = key;
+      dockToClient(rect);
+    },
+    () => track('window-watch-spawn-failed'),
+  );
 }
 
 /**
