@@ -3,6 +3,9 @@ spring:
     url: "${TEST_DB_URL:jdbc:postgresql://127.0.0.1:5432/dfgg_test}"
     username: "${TEST_DB_USERNAME:dfgg}"
     password: "${TEST_DB_PASSWORD:dfgg}"
+    hikari:
+      maximum-pool-size: 3
+      minimum-idle: 1
 
   jpa:
     hibernate:
@@ -17,6 +20,9 @@ riot:
     key: "test-riot-api-key"
     platform-base-url: "https://kr.api.riotgames.com"
     regional-base-url: "https://asia.api.riotgames.com"
+mining:
+  batch:
+    match-page-size: 5
 collection:
   scheduler:
     enabled: false

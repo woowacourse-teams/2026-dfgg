@@ -1,0 +1,153 @@
+package dfgg.application.recommend.fallback;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import dfgg.application.recommend.CandidateSimilarityScorer;
+import dfgg.application.recommend.CandidateZoneMixer;
+import dfgg.application.recommend.ExplorationZoneCandidateGenerator;
+import dfgg.application.recommend.FinalScoreCalculator;
+import dfgg.application.recommend.ItemSimilarityScores;
+import dfgg.application.recommend.MixedCandidates;
+import dfgg.application.recommend.RankedItemCandidate;
+import dfgg.application.recommend.SafeZoneCandidateGenerator;
+import dfgg.domain.champion.ChampionPosition;
+import dfgg.infrastructure.config.RecommendationProperties;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+class PrimaryRecommendationStrategyTest {
+
+    private SafeZoneCandidateGenerator safeZoneCandidateGenerator;
+    private ExplorationZoneCandidateGenerator explorationZoneCandidateGenerator;
+    private CandidateZoneMixer candidateZoneMixer;
+    private CandidateSimilarityScorer candidateSimilarityScorer;
+    private PrimaryRecommendationStrategy strategy;
+
+    private static final RecommendationProperties PROPERTIES = new RecommendationProperties(
+            "checkpoint-a-4", "checkpoint-c-1-counter", "checkpoint-d-1", 2,
+            10, 0.8, 1.0, 1.0, 1.0, 1.0
+    );
+
+    @BeforeEach
+    void setUp() {
+        safeZoneCandidateGenerator = mock(SafeZoneCandidateGenerator.class);
+        explorationZoneCandidateGenerator = mock(ExplorationZoneCandidateGenerator.class);
+        candidateZoneMixer = mock(CandidateZoneMixer.class);
+        candidateSimilarityScorer = mock(CandidateSimilarityScorer.class);
+        strategy = new PrimaryRecommendationStrategy(
+                safeZoneCandidateGenerator,
+                explorationZoneCandidateGenerator,
+                candidateZoneMixer,
+                candidateSimilarityScorer,
+                new FinalScoreCalculator(),
+                PROPERTIES
+        );
+    }
+
+    private RecommendationContext contextOf(List<Long> purchasedItemIds) {
+        return new RecommendationContext(
+                222L, purchasedItemIds, ChampionPosition.BOTTOM, "PLATINUM", "16.16", List.of(412L), List.of(54L)
+        );
+    }
+
+    @Test
+    @DisplayName("안전 구역과 탐색 구역 후보를 합쳐 finalScore 내림차순으로 정렬한 아이템 목록을 반환한다")
+    void recommend_WhenCandidatesExistInBothZones_ReturnsItemIdsSortedByFinalScoreDescending() {
+        // given: 안전 구역 후보 3072(wilson=0.5), 탐색 구역 후보 3006(wilson 항 없음, 0으로 처리)
+        RankedItemCandidate safeZoneCandidate = new RankedItemCandidate(3072L, 0.5);
+        RankedItemCandidate explorationZoneCandidate = new RankedItemCandidate(3006L, 0.9);
+
+        when(safeZoneCandidateGenerator.rankNextItemCandidates(
+                anyList(), any(), any(), anyString(), anyString(), anyString(), anyInt()
+        )).thenReturn(List.of(safeZoneCandidate));
+        when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString()))
+                .thenReturn(List.of(explorationZoneCandidate));
+        when(candidateZoneMixer.mix(List.of(safeZoneCandidate), List.of(explorationZoneCandidate), 10, 0.8))
+                .thenReturn(new MixedCandidates(List.of(safeZoneCandidate), List.of(explorationZoneCandidate)));
+
+        // 3072: cos=0.5, allySim=0.5, enemySim=0.1 → finalScore = 0.5(wilson)+0.5+0.5+0.1 = 1.6
+        // 3006: cos=0.1, allySim=0.1, enemySim=0.9 → finalScore = 0(wilson 없음)+0.1+0.1+0.9 = 1.1
+        when(candidateSimilarityScorer.scoreItems(
+                List.of(3072L, 3006L), 222L, List.of(412L), List.of(54L), "checkpoint-a-4", "checkpoint-c-1-counter"
+        )).thenReturn(List.of(
+                new ItemSimilarityScores(3072L, 0.5, 0.5, 0.1),
+                new ItemSimilarityScores(3006L, 0.1, 0.1, 0.9)
+        ));
+
+        // when
+        Optional<List<Long>> result = strategy.recommend(contextOf(List.of(3031L)));
+
+        // then
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsExactly(3072L, 3006L);
+    }
+
+    @Test
+    @DisplayName("두 구역 모두 후보가 없으면 빈 Optional을 반환해 체인이 다음 단계로 내려가게 한다")
+    void recommend_WhenBothZonesHaveNoCandidates_ReturnsEmptyOptional() {
+        // given
+        when(safeZoneCandidateGenerator.rankNextItemCandidates(
+                anyList(), any(), any(), anyString(), anyString(), anyString(), anyInt()
+        )).thenReturn(List.of());
+        when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString()))
+                .thenReturn(List.of());
+        when(candidateZoneMixer.mix(List.of(), List.of(), 10, 0.8))
+                .thenReturn(new MixedCandidates(List.of(), List.of()));
+
+        // when
+        Optional<List<Long>> result = strategy.recommend(contextOf(List.of()));
+
+        // then
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("안전 구역과 탐색 구역에 같은 아이템이 겹치면 안전 구역의 Wilson 점수를 우선하고 중복 없이 한 번만 채택한다")
+    void recommend_WhenSameItemAppearsInBothZones_PrefersSafeZoneWilsonScoreAndDeduplicates() {
+        // given: 3072가 안전 구역(wilson=0.5)과 탐색 구역 둘 다에 등장, 3006은 탐색 구역에만 등장
+        // 3072가 wilson=0.5를 제대로 쓰면 finalScore=0.5+0.2+0.2+0.2=1.1 > 3006의 0.8 → [3072, 3006]
+        // 3072가 잘못 wilson=0으로 계산되면 finalScore=0.6 < 3006의 0.8 → [3006, 3072] (버그로 판별됨)
+        RankedItemCandidate safeZoneCandidate = new RankedItemCandidate(3072L, 0.5);
+        RankedItemCandidate explorationZoneOverlap = new RankedItemCandidate(3072L, 0.9);
+        RankedItemCandidate explorationZoneUnique = new RankedItemCandidate(3006L, 0.5);
+
+        when(safeZoneCandidateGenerator.rankNextItemCandidates(
+                anyList(), any(), any(), anyString(), anyString(), anyString(), anyInt()
+        )).thenReturn(List.of(safeZoneCandidate));
+        when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString()))
+                .thenReturn(List.of(explorationZoneOverlap, explorationZoneUnique));
+        when(candidateZoneMixer.mix(
+                List.of(safeZoneCandidate), List.of(explorationZoneOverlap, explorationZoneUnique), 10, 0.8
+        )).thenReturn(new MixedCandidates(
+                List.of(safeZoneCandidate), List.of(explorationZoneOverlap, explorationZoneUnique)
+        ));
+        when(candidateSimilarityScorer.scoreItems(
+                List.of(3072L, 3006L), 222L, List.of(412L), List.of(54L), "checkpoint-a-4", "checkpoint-c-1-counter"
+        )).thenReturn(List.of(
+                new ItemSimilarityScores(3072L, 0.2, 0.2, 0.2),
+                new ItemSimilarityScores(3006L, 0.3, 0.3, 0.2)
+        ));
+
+        // when
+        Optional<List<Long>> result = strategy.recommend(contextOf(List.of(3031L)));
+
+        // then
+        assertThat(result.get()).containsExactly(3072L, 3006L);
+    }
+
+    @Test
+    @DisplayName("자신이 담당하는 폴백 단계를 알려준다")
+    void stage_ReturnsPrimaryStage() {
+        // given & when & then
+        assertThat(strategy.stage()).isEqualTo(FallbackStage.PRIMARY);
+    }
+}
