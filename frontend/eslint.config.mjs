@@ -7,13 +7,20 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', '*.config.js'] },
+  { ignores: ['dist/**', 'dist-desktop/**', 'node_modules/**', '*.config.js'] },
 
   js.configs.recommended,
   ...tseslint.configs.recommended,
 
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: [
+      'apps/web/src/**/*.{ts,tsx}',
+      'apps/desktop/main-window/**/*.{ts,tsx}',
+      'apps/desktop/overlay/**/*.{ts,tsx}',
+      // 두 창이 함께 쓰는 렌더러 코드와 웹·앱 공용 코드도 브라우저에서 돈다.
+      'apps/desktop/components/**/*.{ts,tsx}',
+      'packages/**/*.{ts,tsx}',
+    ],
     languageOptions: {
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
@@ -32,6 +39,10 @@ export default tseslint.config(
       'simple-import-sort/exports': 'error',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
+  },
+  {
+    files: ['apps/desktop/electron/**/*.ts'],
+    languageOptions: { globals: globals.node },
   },
 
   prettier,
