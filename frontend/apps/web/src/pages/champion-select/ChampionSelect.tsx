@@ -6,15 +6,43 @@ import DesktopAppButton from '../../components/DesktopAppButton';
 import { itemImageUrl, useChampions } from '../../hooks/useChampions';
 import { type Position, POSITIONS, type RecommendationResponse } from '../../types/recommendation';
 
-/** 한 판에 채우는 아이템 칸 수. 격자 열 수와 안내 문구가 이 값을 함께 쓴다. */
-const BUILD_SIZE = 6;
-
 const POSITION_LABEL: Record<Position, string> = {
   TOP: '탑',
   JUNGLE: '정글',
   MID: '미드',
   BOTTOM: '원딜',
   SUPPORT: '서폿',
+};
+
+const CHAMPION_TAG_LABEL: Record<string, string> = {
+  TANK: '탱커',
+  FIGHTER: '전사',
+  MAGE: '마법사',
+  ASSASSIN: '암살자',
+  MARKSMAN: '원거리 딜러',
+  SUPPORT: '서포터',
+};
+
+// championTag마다 값이 겹치지 않아 태그 구분 없이 하나로 모아도 된다.
+const DIRECTION_LABEL: Record<string, string> = {
+  PHYSICAL_DAMAGE: '물리 피해 대응',
+  MAGIC_DAMAGE: '마법 피해 대응',
+  MIXED_DAMAGE: '물리·마법 복합 피해 대응',
+  ANTI_TANK: '탱커 대응',
+  BURST_SURVIVAL: '순간 피해 생존',
+  SUSTAINED_COMBAT: '지속 전투',
+  BURST_DAMAGE: '순간 피해',
+  SUSTAINED_DAMAGE: '지속 피해',
+  SURVIVAL_RESPONSE: '생존 대응',
+  BURST_ASSASSINATION: '순간 암살',
+  DEFENSE_NEUTRALIZATION: '방어 무력화',
+  ENGAGE_SURVIVAL: '진입 후 생존',
+  CRITICAL_STRIKE_DAMAGE: '치명타 피해',
+  ANTI_TANK_SUSTAINED_DAMAGE: '대탱커 지속 피해',
+  SURVIVAL_KITING: '생존 및 카이팅',
+  ENGAGE_INITIATION: '전투 개시',
+  ALLY_PROTECTION: '아군 보호',
+  HEALING_ENHANCEMENT: '회복 및 강화',
 };
 
 type Lineup = Record<Position, string>;
@@ -78,7 +106,7 @@ export default function ChampionSelect() {
     // 지난 판 아이템이 함께 떠서, 지금 조합의 추천인 것처럼 보인다.
     setResult(null);
     try {
-      const response = await fetch('/recommendations', {
+      const response = await fetch('/api/recommendations/v2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -226,39 +254,46 @@ export default function ChampionSelect() {
       {result && !loading && (
         <section className='mt-6' aria-live='polite'>
           <h2 className='font-display text-lg font-bold'>
-            {champions.find((champion) => champion.id === result.champion)?.name ?? result.champion}
+            {result.champion}{' '}
             <span className='ml-2 text-sm font-normal text-ink-3'>
               {POSITION_LABEL[result.position] ?? result.position}
             </span>
           </h2>
-          <ol className='mt-3 grid grid-cols-6 gap-2'>
-            {result.items.map((item, index) => (
-              <li key={item.id} className='text-center'>
-                <div className='chamfer-sm relative bg-surface-2'>
-                  <img
-                    src={version ? itemImageUrl(version, item.id) : undefined}
-                    alt={item.name}
-                    width={64}
-                    height={64}
-                    loading='lazy'
-                    className='w-full'
-                  />
-                  <span className='absolute top-0 left-0 bg-ground/80 px-1 font-display text-[10px] text-accent'>
-                    {index + 1}
-                  </span>
-                </div>
-                <p className='mt-1 line-clamp-2 text-[11px] leading-tight text-ink-2'>
-                  {item.name}
-                </p>
-              </li>
-            ))}
-          </ol>
-
-          {result.items.length < BUILD_SIZE && (
+          {result.builds.length === 0 ? (
             <p className='mt-3 text-sm text-ink-3'>
-              지금은 {result.items.length}개까지만 모였어요. 이 조합의 데이터가 더 쌓이면{' '}
-              {BUILD_SIZE}개를 모두 채워 보여드릴게요.
+              이 조합에 맞는 추천 빌드를 아직 찾지 못했어요.
             </p>
+          ) : (
+            result.builds.map((buildInfo, buildIndex) => (
+              <div key={buildIndex} className='mt-4 first:mt-3'>
+                <p className='text-xs text-ink-3'>
+                  {CHAMPION_TAG_LABEL[buildInfo.championTag] ?? buildInfo.championTag} ·{' '}
+                  {DIRECTION_LABEL[buildInfo.direction] ?? buildInfo.direction}
+                </p>
+                <ol className='mt-2 grid grid-cols-6 gap-2'>
+                  {buildInfo.build.map((item, index) => (
+                    <li key={`${buildIndex}-${item.id}`} className='text-center'>
+                      <div className='chamfer-sm relative bg-surface-2'>
+                        <img
+                          src={version ? itemImageUrl(version, item.id) : undefined}
+                          alt={item.name}
+                          width={64}
+                          height={64}
+                          loading='lazy'
+                          className='w-full'
+                        />
+                        <span className='absolute top-0 left-0 bg-ground/80 px-1 font-display text-[10px] text-accent'>
+                          {index + 1}
+                        </span>
+                      </div>
+                      <p className='mt-1 line-clamp-2 text-[11px] leading-tight text-ink-2'>
+                        {item.name}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ))
           )}
         </section>
       )}
