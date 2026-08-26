@@ -58,20 +58,20 @@ public class SafeZoneCandidateGenerator {
             int anchoredPrefixLimit
     ) {
         if (purchasedItemIds.size() < anchoredPrefixLimit) {
-            return rankByActualPurchaseOrder(purchasedItemIds, championId, position, tier, patch);
+            return rankByActualPurchaseOrder(purchasedItemIds, championId, position, patch);
         }
         return rankByMinedPattern(purchasedItemIds, championId, position, tier, patch, algorithmVersion);
     }
 
     private List<RankedItemCandidate> rankByActualPurchaseOrder(
-            List<Long> purchasedItemIds, Long championId, ChampionPosition position, String tier, String patch
+            List<Long> purchasedItemIds, Long championId, ChampionPosition position, String patch
     ) {
         List<String> positions = positionNormalizer.riotValuesOf(position);
         String prefix = purchasedItemIds.stream().map(String::valueOf).collect(Collectors.joining(","));
         int nextPosition = purchasedItemIds.size() + 1;
 
         List<Object[]> rows = participantRepository.findNextItemDistribution(
-                championId, positions, tier, patch, prefix, nextPosition
+                championId, positions, patch, prefix, nextPosition
         );
 
         return rows.stream()

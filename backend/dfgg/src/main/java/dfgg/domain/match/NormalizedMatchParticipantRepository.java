@@ -77,6 +77,10 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
      * 순서의 실제 앞부분에 정확히 anchoring된 통계다 — "빌드 어딘가에 있음"과 "그 위치에
      * 정확히 있음"을 혼동하지 않기 위함(1~2코어에서 이 차이가 크게 벌어짐을 실측으로 확인).
      * {@code prefix}가 빈 문자열이면 전체(필터 없음)를 대상으로 1번째 위치를 본다.
+     *
+     * <p>티어로 거르지 않는다. 요청자의 티어("누가 묻는가")와 학습 데이터의 티어("누구의
+     * 판에서 배우는가")는 다른 개념인데, 예전엔 요청 티어를 그대로 조건에 넣어 수집 티어와
+     * 다른 사용자는 0행을 받고 폴백 체인 맨 아래까지 떨어졌다.
      */
     @Query(value = """
             SELECT item_id, count(*) AS support, sum(win::int) AS win_count
@@ -85,7 +89,6 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
                 FROM normalized_match_participants
                 WHERE champion_id = :championId
                   AND position IN (:positions)
-                  AND tier = :tier
                   AND patch = :patch
                   AND (:prefix = '' OR core_item_purchase_order LIKE :prefix || ',%')
             ) AS next_items
@@ -95,7 +98,6 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
     List<Object[]> findNextItemDistribution(
             @Param("championId") Long championId,
             @Param("positions") Collection<String> positions,
-            @Param("tier") String tier,
             @Param("patch") String patch,
             @Param("prefix") String prefix,
             @Param("nextPosition") int nextPosition

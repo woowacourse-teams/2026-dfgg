@@ -20,11 +20,21 @@ import java.util.List;
                 columnNames = {"match_id", "puuid"}
         ),
         // 추천 안전 구역 조회(findNextItemDistribution)는 1~2코어 추천마다 호출되는 핫패스인데,
-        // champion_id/position/tier/patch로 필터링한다. 이 인덱스가 없으면 매 요청이 참가자
-        // 테이블 전체를 순차 스캔한다. 선택도가 가장 높은 champion_id를 선두 컬럼으로 둔다.
+        // champion_id/position/patch로 필터링한다. 이 인덱스가 없으면 매 요청이 참가자
+        // 테이블 전체를 순차 스캔한다.
+        //
+        // 컬럼 순서를 champion_id부터로 고정한 이유는 선택도가 아니다. 세 술어가 전부 동등
+        // 비교라서 이 쿼리 하나만 보면 순서를 바꿔도 성능이 비슷하다. 진짜 이유는 좌측 prefix
+        // 재사용이다 — findMostFrequentBuild가 (champion_id, position)만으로 조회하므로,
+        // 이 순서여야 인덱스 하나가 쿼리 둘을 받친다. patch가 선두면 그쪽은 못 쓴다.
+        // (덤으로 다중값 술어인 position이 선두가 아닌 것도 유리하다. 선두가 IN이면 값마다
+        //  별도 인덱스 스캔이 된다.)
+        //
+        // tier는 일부러 뺐다. 추천이 요청자 티어로 거르지 않게 되면서 WHERE에서 사라졌는데,
+        // 중간 컬럼으로 남겨두면 뒤따르는 patch가 인덱스 경계로 못 쓰이고 필터로만 동작한다.
         indexes = @Index(
-                name = "idx_nmp_champion_position_tier_patch",
-                columnList = "champion_id, position, tier, patch"
+                name = "idx_nmp_champion_position_patch",
+                columnList = "champion_id, position, patch"
         )
 )
 public class NormalizedMatchParticipant {

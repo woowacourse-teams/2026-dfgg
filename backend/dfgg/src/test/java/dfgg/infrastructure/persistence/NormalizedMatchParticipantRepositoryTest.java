@@ -125,7 +125,7 @@ class NormalizedMatchParticipantRepositoryTest {
 
         // when
         List<Object[]> rows = participantRepository.findNextItemDistribution(
-                222L, List.of("BOTTOM"), "PLATINUM", "16.16", "", 1
+                222L, List.of("BOTTOM"), "16.16","", 1
         );
 
         // then
@@ -145,7 +145,7 @@ class NormalizedMatchParticipantRepositoryTest {
 
         // when
         List<Object[]> rows = participantRepository.findNextItemDistribution(
-                222L, List.of("BOTTOM"), "PLATINUM", "16.16", "3031", 2
+                222L, List.of("BOTTOM"), "16.16","3031", 2
         );
 
         // then
@@ -161,7 +161,7 @@ class NormalizedMatchParticipantRepositoryTest {
     void findNextItemDistribution_WhenNoOneMatchesPrefix_ReturnsEmptyList() {
         // given & when
         List<Object[]> rows = participantRepository.findNextItemDistribution(
-                222L, List.of("BOTTOM"), "PLATINUM", "16.16", "9999", 2
+                222L, List.of("BOTTOM"), "16.16","9999", 2
         );
 
         // then
@@ -176,7 +176,7 @@ class NormalizedMatchParticipantRepositoryTest {
 
         // when
         List<Object[]> rows = participantRepository.findNextItemDistribution(
-                103L, List.of("MID", "MIDDLE"), "PLATINUM", "16.16", "", 1
+                103L, List.of("MID", "MIDDLE"), "16.16","", 1
         );
 
         // then
@@ -184,5 +184,26 @@ class NormalizedMatchParticipantRepositoryTest {
         assertThat(rows.get(0)[0]).isEqualTo("3020");
         assertThat(((Number) rows.get(0)[1]).longValue()).isEqualTo(2L);
         assertThat(((Number) rows.get(0)[2]).longValue()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("티어가 다른 참가자도 집계에 포함한다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findNextItemDistribution_WhenParticipantsHaveDifferentTiers_AggregatesAcrossAllTiers() {
+        // given: 챔피언 222(BOTTOM)에 PLATINUM 4건과 GOLD 1건('3078,3072')이 섞여 있다.
+        //        추천은 요청자 티어와 무관하게 수집된 전 티어 데이터를 근거로 삼는다.
+
+        // when
+        List<Object[]> rows = participantRepository.findNextItemDistribution(
+                222L, List.of("BOTTOM"), "16.16", "", 1
+        );
+
+        // then: GOLD 참가자의 1코어(3078)가 PLATINUM 참가자들과 나란히 집계된다
+        Map<String, long[]> byItem = rows.stream().collect(Collectors.toMap(
+                row -> (String) row[0],
+                row -> new long[]{((Number) row[1]).longValue(), ((Number) row[2]).longValue()}
+        ));
+        assertThat(byItem).containsOnlyKeys("3031", "3006", "3078");
+        assertThat(byItem.get("3078")).containsExactly(1L, 1L);
     }
 }
