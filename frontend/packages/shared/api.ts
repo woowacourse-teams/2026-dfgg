@@ -11,13 +11,13 @@ export async function requestRecommendation(
   request: RecommendationRequest,
   signal?: AbortSignal,
 ): Promise<RecommendationResponse> {
-  const response = await fetch(`${API_BASE}/recommendations`, {
+  const response = await fetch(`${API_BASE}/recommendations/v2`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
     signal,
   });
 
-  if (!response.ok) throw new Error(`recommendations ${response.status}`);
+  if (!response.ok) throw new Error(`recommendations/v2 ${response.status}`);
   return response.json();
 }

@@ -1,5 +1,5 @@
 import type { Position } from '../../../../packages/shared/types';
-import ItemBuild from '../../components/ItemBuild';
+import BuildList from '../../components/BuildList';
 import { findChampion, useRecommendation } from '../../components/useRecommendation';
 
 const POSITION_LABEL: Record<Position, string> = {
@@ -23,11 +23,11 @@ export default function App() {
   return (
     <div className='p-2'>
       {/*
-        게임 화면이 그대로 비치도록 배경을 흰색 반투명으로만 얹는다.
-        어두운 판이 없어졌으므로 글자는 전부 흰색으로 올리고, 밝은 장면
-        위에서도 읽히도록 그림자로 윤곽을 만든다.
+        게임 화면 위에서도 카드 경계가 또렷하도록 반투명 검정 + 블러를 쓴다.
+        빌드가 최대 3개까지 세로로 늘어서므로 흰 반투명 배경(bg-white/10)보다
+        어두운 배경이 밝은 게임 장면에서도 안정적으로 대비된다.
       */}
-      <div className='rounded-lg bg-white/10 p-2.5 ring-1 ring-white/20 [text-shadow:0_1px_2px_rgb(0_0_0/0.95),0_0_6px_rgb(0_0_0/0.8)]'>
+      <div className='rounded-xl bg-black/55 p-2.5 shadow-[0_8px_24px_rgb(0_0_0/0.5)] ring-1 ring-white/15 backdrop-blur-md [text-shadow:0_1px_2px_rgb(0_0_0/0.95),0_0_6px_rgb(0_0_0/0.8)]'>
         <header className='flex items-baseline justify-between gap-2'>
           <h1 className='truncate text-xs font-bold text-white'>
             {myChampion?.name ?? 'dfgg'}
@@ -60,9 +60,13 @@ export default function App() {
           </p>
         )}
 
-        {result && ddragon && !loading && (
+        {result && result.builds.length === 0 && !loading && (
+          <p className='mt-1.5 text-[11px] text-white/80'>이 조합엔 추천할 빌드가 아직 없어요</p>
+        )}
+
+        {result && ddragon && !loading && result.builds.length > 0 && (
           <div className='mt-1.5'>
-            <ItemBuild items={result.items} ddragon={ddragon} compact />
+            <BuildList builds={result.builds} ddragon={ddragon} compact />
           </div>
         )}
       </div>

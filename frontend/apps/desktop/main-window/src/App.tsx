@@ -1,6 +1,6 @@
 import type { DDragonData } from '../../../../packages/shared/ddragon';
 import type { Position } from '../../../../packages/shared/types';
-import ItemBuild from '../../components/ItemBuild';
+import BuildList from '../../components/BuildList';
 import OverlayControls from '../../components/OverlayControls';
 import UpdateBanner from '../../components/UpdateBanner';
 import { useAnalyticsBridge } from '../../components/useAnalyticsBridge';
@@ -151,7 +151,11 @@ export default function App() {
           </p>
         )}
 
-        {result && ddragon && !loading && (
+        {result && result.builds.length === 0 && !loading && (
+          <p className='mt-8 text-sm text-neutral-400'>이 조합엔 추천할 빌드가 아직 없어요.</p>
+        )}
+
+        {result && ddragon && !loading && result.builds.length > 0 && (
           <section className='mt-8' aria-live='polite'>
             <h2 className='text-lg font-bold'>
               {(lineup &&
@@ -162,7 +166,7 @@ export default function App() {
               </span>
             </h2>
             <div className='mt-3'>
-              <ItemBuild items={result.items} ddragon={ddragon} />
+              <BuildList builds={result.builds} ddragon={ddragon} />
             </div>
           </section>
         )}
