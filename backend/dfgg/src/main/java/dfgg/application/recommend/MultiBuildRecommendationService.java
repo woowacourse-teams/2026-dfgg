@@ -5,6 +5,7 @@ import dfgg.common.CompositionStatsNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionTag;
+import dfgg.domain.item.Item;
 import dfgg.domain.recommendation.BuildCandidate;
 import dfgg.domain.recommendation.BuildDirection;
 import dfgg.domain.recommendation.ChampionBuildPolicy;
@@ -190,31 +191,24 @@ public class MultiBuildRecommendationService {
             List<BuildDirection> supportedDirections,
             int expectedItemCount
     ) {
-        List<Optional<ChampionBuildStats>> completedBuilds = selectedCandidates.stream()
+        List<Optional<List<Item>>> completedBuilds = selectedCandidates.stream()
                 .map(selected -> findCompletedBuild(
                         selected.candidate(),
                         expectedItemCount
                 ))
                 .toList();
-        int recommendedIndex = findRecommendedAvailableIndex(
-                selectedCandidates,
-                completedBuilds
-        );
-
         List<BuildOptionResponse> options = new ArrayList<>(
                 BuildCandidateSelectService.MAX_SELECTED_CANDIDATES
         );
         Set<BuildDirection> selectedDirections = new LinkedHashSet<>();
         for (int index = 0; index < selectedCandidates.size(); index++) {
             SelectedBuildCandidate selected = selectedCandidates.get(index);
-            Optional<ChampionBuildStats> completedBuild = completedBuilds.get(index);
+            Optional<List<Item>> completedBuild = completedBuilds.get(index);
             BuildDirection direction = selected.candidate().direction();
             selectedDirections.add(direction);
             options.add(new BuildOptionResponse(
                     direction.championTag().name(),
                     direction.code(),
-                    completedBuild.isPresent(),
-                    index == recommendedIndex,
                     completedBuild
                             .map(this::toItemDtos)
                             .orElse(null)
@@ -236,19 +230,16 @@ public class MultiBuildRecommendationService {
         return new BuildOptionResponse(
                 direction.championTag().name(),
                 direction.code(),
-                false,
-                false,
                 null
         );
     }
 
-    private Optional<ChampionBuildStats> findCompletedBuild(
+    private Optional<List<Item>> findCompletedBuild(
             BuildCandidate candidate,
             int expectedItemCount
     ) {
         return candidate.cluster()
-                .findRepresentativeBuild(expectedItemCount)
-                .filter(this::hasExactlyOneBoots);
+                .findOrComposeRepresentativeBuild(expectedItemCount);
     }
 
     private int expectedItemCount(ChampionPosition position) {
@@ -257,32 +248,8 @@ public class MultiBuildRecommendationService {
                 : NORMAL_BUILD_ITEM_COUNT;
     }
 
-    private int findRecommendedAvailableIndex(
-            List<SelectedBuildCandidate> selectedCandidates,
-            List<Optional<ChampionBuildStats>> completedBuilds
-    ) {
-        int recommendedIndex = -1;
-        for (int index = 0; index < selectedCandidates.size(); index++) {
-            if (completedBuilds.get(index).isEmpty()) {
-                continue;
-            }
-            if (recommendedIndex < 0
-                    || selectedCandidates.get(index).candidate().suitabilityScore()
-                    > selectedCandidates.get(recommendedIndex).candidate().suitabilityScore()) {
-                recommendedIndex = index;
-            }
-        }
-        return recommendedIndex;
-    }
-
-    private boolean hasExactlyOneBoots(ChampionBuildStats stats) {
-        return stats.getItems().stream()
-                .filter(item -> item.hasTag("Boots"))
-                .count() == 1;
-    }
-
-    private List<ItemDto> toItemDtos(ChampionBuildStats stats) {
-        return stats.getItems().stream()
+    private List<ItemDto> toItemDtos(List<Item> items) {
+        return items.stream()
                 .map(ItemDto::from)
                 .toList();
     }

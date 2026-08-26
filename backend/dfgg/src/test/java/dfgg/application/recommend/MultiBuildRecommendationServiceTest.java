@@ -91,15 +91,9 @@ class MultiBuildRecommendationServiceTest {
                         "MAGIC_DAMAGE",
                         "MIXED_DAMAGE"
                 );
-        assertThat(response.builds().getFirst().available()).isTrue();
-        assertThat(response.builds().getFirst().recommended()).isTrue();
         assertThat(response.builds().getFirst().build()).hasSize(6);
         assertThat(response.builds().subList(1, 3))
-                .allSatisfy(option -> {
-                    assertThat(option.available()).isFalse();
-                    assertThat(option.recommended()).isFalse();
-                    assertThat(option.build()).isNull();
-                });
+                .allSatisfy(option -> assertThat(option.build()).isNull());
     }
 
     @Test
@@ -120,7 +114,6 @@ class MultiBuildRecommendationServiceTest {
 
         // then
         assertThat(response.builds()).hasSize(3);
-        assertThat(response.builds().getFirst().available()).isTrue();
         assertThat(response.builds().getFirst().build()).hasSize(7);
     }
 
@@ -151,12 +144,68 @@ class MultiBuildRecommendationServiceTest {
                         "PHYSICAL_DAMAGE",
                         "MAGIC_DAMAGE",
                         "MIXED_DAMAGE"
-                );
+        );
         assertThat(response.builds()).allSatisfy(option -> {
-            assertThat(option.available()).isFalse();
-            assertThat(option.recommended()).isFalse();
             assertThat(option.build()).isNull();
         });
+    }
+
+    @Test
+    @DisplayName("완성 buildKey가 없어도 같은 군집의 후반 통계로 6개를 보충한다")
+    void recommend_WhenCompletedBuildDoesNotExist_ComposesFromClusterStats() {
+        // given
+        RecommendationRequest request = prepareRequest(ChampionPosition.TOP);
+        Item firstCore = armorItem(151L);
+        Item secondCore = armorItem(152L);
+        Item thirdCore = armorItem(153L);
+        Item boots = new Item(154L, "신발", List.of("Boots"));
+        Item fourthItem = new Item(155L, "네 번째 아이템");
+        Item fifthItem = new Item(156L, "다섯 번째 아이템");
+        ChampionBuildStats firstPartial = stats(
+                ChampionPosition.TOP,
+                "FIRST_PARTIAL",
+                List.of(
+                        firstCore,
+                        boots,
+                        secondCore,
+                        thirdCore,
+                        fourthItem
+                ),
+                20
+        );
+        ChampionBuildStats secondPartial = stats(
+                ChampionPosition.TOP,
+                "SECOND_PARTIAL",
+                List.of(
+                        firstCore,
+                        secondCore,
+                        thirdCore,
+                        fourthItem,
+                        fifthItem
+                ),
+                10
+        );
+        givenMatchingStats(
+                ChampionPosition.TOP,
+                List.of(firstPartial, secondPartial)
+        );
+
+        // when
+        MultiBuildRecommendationResponse response = recommendationService.recommend(request);
+
+        // then
+        BuildOptionResponse physicalBuild = response.builds().getFirst();
+        assertThat(physicalBuild.direction()).isEqualTo("PHYSICAL_DAMAGE");
+        assertThat(physicalBuild.build())
+                .extracting(item -> item.name())
+                .containsExactly(
+                        "방어 아이템 151",
+                        "신발",
+                        "방어 아이템 152",
+                        "방어 아이템 153",
+                        "네 번째 아이템",
+                        "다섯 번째 아이템"
+                );
     }
 
     @Test
@@ -190,12 +239,9 @@ class MultiBuildRecommendationServiceTest {
 
         // then
         assertThat(response.builds()).hasSize(3);
-        assertThat(response.builds())
-                .extracting(BuildOptionResponse::available)
-                .containsExactly(true, false, false);
-        assertThat(response.builds())
-                .extracting(BuildOptionResponse::recommended)
-                .containsExactly(true, false, false);
+        assertThat(response.builds().getFirst().build()).hasSize(6);
+        assertThat(response.builds().subList(1, 3))
+                .allSatisfy(option -> assertThat(option.build()).isNull());
         assertThat(response.builds())
                 .extracting(BuildOptionResponse::direction)
                 .containsExactly(

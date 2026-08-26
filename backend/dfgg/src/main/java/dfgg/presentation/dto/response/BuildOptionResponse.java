@@ -9,8 +9,6 @@ import java.util.List;
 public record BuildOptionResponse(
         String championTag,
         String direction,
-        boolean available,
-        boolean recommended,
         List<ItemDto> build
 ) {
 }

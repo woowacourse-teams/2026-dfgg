@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +18,8 @@ public class CoreBuildClusterTest {
     private final Item itemB = new Item(2L, "아이템 B");
     private final Item itemC = new Item(3L, "아이템 C");
     private final Item itemD = new Item(4L, "아이템 D");
+    private final Item itemE = new Item(5L, "아이템 E");
+    private final Item itemF = new Item(6L, "아이템 F");
     private final Item boots = new Item(10L, "신발", List.of("Boots"));
 
     @Test
@@ -143,8 +146,87 @@ public class CoreBuildClusterTest {
         // then
         assertThat(cluster.findRepresentativeBuild(4))
                 .hasValue(complete);
+        assertThat(cluster.findOrComposeRepresentativeBuild(4))
+                .hasValue(List.of(itemA, boots, itemB, itemC));
         assertThat(cluster.findRepresentativeBuild(6))
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("완성 빌드가 없으면 같은 군집의 후반 아이템 통계로 6개를 채운다")
+    void findOrComposeRepresentativeBuild_ComposesMissingLateItems() {
+        // given
+        ChampionBuildStats firstPartial = stats(
+                10,
+                5,
+                itemA,
+                boots,
+                itemB,
+                itemC,
+                itemD
+        );
+        ChampionBuildStats secondPartial = stats(
+                8,
+                4,
+                itemA,
+                itemB,
+                itemC,
+                itemD,
+                itemE
+        );
+        ChampionBuildStats otherLateItem = stats(
+                3,
+                2,
+                itemA,
+                itemB,
+                itemC,
+                itemF
+        );
+        CoreBuildCluster cluster = CoreBuildCluster.from(
+                List.of(1L, 2L, 3L),
+                List.of(firstPartial, secondPartial, otherLateItem)
+        );
+
+        // when
+        Optional<List<Item>> completed =
+                cluster.findOrComposeRepresentativeBuild(6);
+
+        // then
+        assertThat(completed)
+                .hasValue(List.of(
+                        itemA,
+                        boots,
+                        itemB,
+                        itemC,
+                        itemD,
+                        itemE
+                ));
+    }
+
+    @Test
+    @DisplayName("후반 아이템 슬롯을 모두 채울 수 없으면 완성 빌드를 만들지 않는다")
+    void findOrComposeRepresentativeBuild_WhenLateItemsAreInsufficient_ReturnsEmpty() {
+        // given
+        ChampionBuildStats partial = stats(
+                10,
+                5,
+                itemA,
+                boots,
+                itemB,
+                itemC,
+                itemD
+        );
+        CoreBuildCluster cluster = CoreBuildCluster.from(
+                List.of(1L, 2L, 3L),
+                List.of(partial)
+        );
+
+        // when
+        Optional<List<Item>> completed =
+                cluster.findOrComposeRepresentativeBuild(6);
+
+        // then
+        assertThat(completed).isEmpty();
     }
 
     private ChampionBuildStats stats(Item... items) {

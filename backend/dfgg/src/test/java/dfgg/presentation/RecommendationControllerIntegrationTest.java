@@ -83,15 +83,11 @@ class RecommendationControllerIntegrationTest {
                                 new BuildOptionResponse(
                                         "TANK",
                                         "PHYSICAL_DAMAGE",
-                                        true,
-                                        true,
                                         List.of(new ItemDto(1L, "아이템"))
                                 ),
                                 new BuildOptionResponse(
                                         "TANK",
                                         "MAGIC_DAMAGE",
-                                        false,
-                                        false,
                                         null
                                 )
                         )
@@ -105,11 +101,9 @@ class RecommendationControllerIntegrationTest {
                 .andExpect(jsonPath("$.champion").value("말파이트"))
                 .andExpect(jsonPath("$.position").value("TOP"))
                 .andExpect(jsonPath("$.builds.length()").value(2))
-                .andExpect(jsonPath("$.builds[0].available").value(true))
-                .andExpect(jsonPath("$.builds[0].recommended").value(true))
                 .andExpect(jsonPath("$.builds[0].build[0].id").value(1))
-                .andExpect(jsonPath("$.builds[1].available").value(false))
-                .andExpect(jsonPath("$.builds[1].recommended").value(false))
+                .andExpect(jsonPath("$.builds[0].available").doesNotExist())
+                .andExpect(jsonPath("$.builds[0].recommended").doesNotExist())
                 .andExpect(jsonPath("$.builds[1].build").isEmpty());
     }
 }
