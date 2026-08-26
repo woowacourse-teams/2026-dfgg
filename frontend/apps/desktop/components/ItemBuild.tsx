@@ -25,20 +25,20 @@ export default function ItemBuild({ items, ddragon, compact = false }: ItemBuild
     >
       {items.map((item, index) => (
         <li key={`${item.id}-${index}`} className={`${size} shrink-0 text-center`}>
-          <div className="relative">
+          <div className='relative'>
             <img
               src={itemImageUrl(ddragon.version, item.id)}
               alt={item.name}
               width={64}
               height={64}
-              className="w-full rounded"
+              className='w-full rounded'
             />
-            <span className="absolute top-0 left-0 bg-black/70 px-0.5 text-[9px] leading-tight text-emerald-400">
+            <span className='absolute top-0 left-0 bg-black/70 px-0.5 text-[9px] leading-tight text-emerald-400'>
               {index + 1}
             </span>
           </div>
           {!compact && (
-            <p className="mt-1 line-clamp-2 text-[11px] leading-tight text-neutral-300">
+            <p className='mt-1 line-clamp-2 text-[11px] leading-tight text-neutral-300'>
               {item.name}
             </p>
           )}
