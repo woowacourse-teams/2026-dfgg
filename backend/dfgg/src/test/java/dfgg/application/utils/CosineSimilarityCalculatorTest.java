@@ -50,4 +50,35 @@ class CosineSimilarityCalculatorTest {
         // then
         assertThat(similarity).isCloseTo(0.6, offset(0.0001));
     }
+
+    @Test
+    @DisplayName("여러 벡터 중 코사인 유사도가 가장 높은 값을 반환한다 (평균으로 뭉치지 않고 개별 비교)")
+    void maxSimilarity_WhenMultipleOtherVectors_ReturnsHighestSimilarity() {
+        // given
+        List<Double> item = List.of(0.6, 0.8);
+        List<List<Double>> others = List.of(
+                List.of(1.0, 0.0),   // cosine = 0.6
+                List.of(0.0, 1.0)    // cosine = 0.8
+        );
+
+        // when
+        double maxSimilarity = calculator.maxSimilarity(item, others);
+
+        // then
+        assertThat(maxSimilarity).isCloseTo(0.8, offset(0.0001));
+    }
+
+    @Test
+    @DisplayName("비교 대상 벡터가 하나뿐이면 그 값을 그대로 반환한다")
+    void maxSimilarity_WhenOnlyOneOtherVector_ReturnsThatSimilarity() {
+        // given
+        List<Double> item = List.of(1.0, 0.0);
+        List<List<Double>> others = List.of(List.of(0.6, 0.8));
+
+        // when
+        double maxSimilarity = calculator.maxSimilarity(item, others);
+
+        // then
+        assertThat(maxSimilarity).isCloseTo(0.6, offset(0.0001));
+    }
 }

@@ -17,4 +17,15 @@ public class CosineSimilarityCalculator {
         }
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
+
+    /**
+     * 여러 벡터를 평균으로 뭉치지 않고 각각과 개별 비교한 뒤 최댓값을 취한다
+     * (ColBERT의 late-interaction/MaxSim과 동일한 아이디어).
+     */
+    public double maxSimilarity(List<Double> vector, List<List<Double>> others) {
+        return others.stream()
+                .mapToDouble(other -> compute(vector, other))
+                .max()
+                .getAsDouble();
+    }
 }

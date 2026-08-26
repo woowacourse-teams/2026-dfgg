@@ -41,16 +41,14 @@ public class ExplorationZoneCandidateGenerator {
                 algorithmVersion, EmbeddingEntityType.ITEM
         );
 
+        List<List<Double>> enemyVectors = enemyEmbeddings.stream().map(Embedding::getVector).toList();
+
         return itemEmbeddings.stream()
-                .map(item -> new RankedItemCandidate(item.getEntityId(), maxSimilarity(item, enemyEmbeddings)))
+                .map(item -> new RankedItemCandidate(
+                        item.getEntityId(),
+                        cosineSimilarityCalculator.maxSimilarity(item.getVector(), enemyVectors)
+                ))
                 .sorted(Comparator.comparingDouble(RankedItemCandidate::maxSimilarity).reversed())
                 .toList();
-    }
-
-    private double maxSimilarity(Embedding item, List<Embedding> enemyEmbeddings) {
-        return enemyEmbeddings.stream()
-                .mapToDouble(enemy -> cosineSimilarityCalculator.compute(item.getVector(), enemy.getVector()))
-                .max()
-                .getAsDouble();
     }
 }
