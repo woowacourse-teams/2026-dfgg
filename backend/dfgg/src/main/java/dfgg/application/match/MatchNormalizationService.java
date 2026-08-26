@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>정규화의 전체 흐름은 다음과 같다.
  * <ol>
  *     <li>Raw Match와 Raw Timeline이 모두 준비된 매치를 조회한다.</li>
- *     <li>수집 경로에서는 참가자의 현재 티어를 갱신하고, 재집계 경로에서는 저장된 티어를 우선 사용한다.</li>
+ *     <li>저장된 참가자 티어를 우선 사용하고, 없는 참가자만 Riot API로 동기화한다.</li>
  *     <li>원본 JSON에서 최종 아이템과 구매 순서를 계산한다.</li>
  *     <li>추천 통계에 필요한 참가자 데이터만 {@link NormalizedMatch}로 만든다.</li>
  *     <li>정규화된 참가자 전체를 한 트랜잭션으로 저장한다.</li>
@@ -104,18 +104,16 @@ public class MatchNormalizationService {
 
     /**
      * 저장된 Raw Match와 Raw Timeline을 읽고 한 매치를 정규화한다.
-     * 참가자 티어 API 호출은 DB 저장 트랜잭션을 시작하기 전에 모두 끝낸다.
+     * 저장된 티어가 없는 참가자의 API 호출은 DB 저장 트랜잭션을 시작하기 전에 모두 끝낸다.
      */
     public NormalizedMatch normalize(String matchId) {
         StoredMatchData storedMatch = loadStoredMatch(matchId);
 
-        // 매치에 실제로 참가한 10명의 현재 티어를 먼저 갱신한다.
-        // 이후 normalize(...)가 players 테이블에서 이 티어를 읽어 참가자 데이터에 넣는다.
         List<String> participantPuuids = findParticipantPuuids(storedMatch.rawMatchData());
         if (participantPuuids.isEmpty()) {
             throw new IllegalArgumentException("match participant puuids must not be empty: " + matchId);
         }
-        riotPlayerSyncService.syncPlayerTiers(participantPuuids);
+        syncMissingPlayerTiers(participantPuuids);
 
         return normalizeStoredMatch(matchId, storedMatch);
     }
@@ -131,11 +129,15 @@ public class MatchNormalizationService {
             throw new IllegalArgumentException("match participant puuids must not be empty: " + matchId);
         }
 
+        syncMissingPlayerTiers(participantPuuids);
+        return normalizeStoredMatch(matchId, storedMatch);
+    }
+
+    private void syncMissingPlayerTiers(List<String> participantPuuids) {
         List<String> missingTierPuuids = findMissingTierPuuids(participantPuuids);
         if (!missingTierPuuids.isEmpty()) {
             riotPlayerSyncService.syncPlayerTiers(missingTierPuuids);
         }
-        return normalizeStoredMatch(matchId, storedMatch);
     }
 
     private StoredMatchData loadStoredMatch(String matchId) {
@@ -267,7 +269,7 @@ public class MatchNormalizationService {
     }
 
     /**
-     * 매치에 참가한 고유 PUUID를 추출한다. 정규화 전에 참가자들의 현재 티어를 조회할 때 사용한다.
+     * 매치에 참가한 고유 PUUID를 추출한다. 정규화 전에 저장된 티어의 누락 여부를 확인할 때 사용한다.
      */
     private List<String> findParticipantPuuids(String rawMatchData) {
         MatchResponse match = read(rawMatchData, MatchResponse.class, "match");

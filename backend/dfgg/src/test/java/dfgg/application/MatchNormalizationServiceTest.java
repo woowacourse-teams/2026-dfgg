@@ -61,7 +61,7 @@ class MatchNormalizationServiceTest {
     }
 
     @Test
-    void 저장된_원본을_조회하고_참가자_티어를_갱신한_뒤_정규화한다() {
+    void 일반_정규화는_Riot_API를_호출하지_않고_저장된_플레이어_티어를_사용한다() {
         String rawMatchData = """
                 {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
                   {"puuid":"puuid-1","participantId":1,"championId":1,"teamId":100,
@@ -95,15 +95,15 @@ class MatchNormalizationServiceTest {
         InOrder order = inOrder(
                 rawMatchRepository,
                 rawMatchTimelineRepository,
-                riotPlayerSyncService,
                 itemService,
                 playerRepository
         );
         order.verify(rawMatchRepository).findById("KR_1");
         order.verify(rawMatchTimelineRepository).findById("KR_1");
-        order.verify(riotPlayerSyncService).syncPlayerTiers(List.of("puuid-1"));
+        order.verify(playerRepository).findAllById(List.of("puuid-1"));
         order.verify(itemService).findCoreItemIds();
         order.verify(playerRepository).findAllById(List.of("puuid-1"));
+        verifyNoInteractions(riotPlayerSyncService);
         assertThat(normalized.participants()).singleElement().satisfies(participant -> {
             assertThat(participant.puuid()).isEqualTo("puuid-1");
             assertThat(participant.tier()).isEqualTo("PLATINUM");
@@ -150,7 +150,7 @@ class MatchNormalizationServiceTest {
     }
 
     @Test
-    void 재집계는_저장된_티어가_없는_참가자만_동기화한다() {
+    void 일반_정규화는_저장된_티어가_없는_참가자만_동기화한다() {
         String rawMatchData = """
                 {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
                   {"puuid":"stored-puuid","participantId":1,"championId":1,"teamId":100,"win":true},
@@ -182,7 +182,7 @@ class MatchNormalizationServiceTest {
         when(playerRepository.findAllById(List.of("stored-puuid", "missing-puuid")))
                 .thenReturn(List.of(storedPlayer), List.of(storedPlayer, syncedPlayer));
 
-        NormalizedMatch normalized = normalizer.normalizeForRebuild("KR_1");
+        NormalizedMatch normalized = normalizer.normalize("KR_1");
 
         verify(riotPlayerSyncService).syncPlayerTiers(List.of("missing-puuid"));
         verifyNoMoreInteractions(riotPlayerSyncService);
