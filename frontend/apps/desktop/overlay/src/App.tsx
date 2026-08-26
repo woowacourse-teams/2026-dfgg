@@ -66,7 +66,12 @@ export default function App() {
 
         {result && ddragon && !loading && result.builds.length > 0 && (
           <div className='mt-1.5'>
-            <BuildList builds={result.builds} ddragon={ddragon} compact />
+            <BuildList
+              builds={result.builds}
+              ddragon={ddragon}
+              compact
+              ownedItemIds={lineup?.myItemIds}
+            />
           </div>
         )}
       </div>

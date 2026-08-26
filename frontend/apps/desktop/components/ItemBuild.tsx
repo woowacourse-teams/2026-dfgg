@@ -6,6 +6,8 @@ interface ItemBuildProps {
   ddragon: DDragonData;
   /** 오버레이는 좁으니 작게 그린다. */
   compact?: boolean;
+  /** 지금 들고 있는 완성 아이템 id. 이미 산 아이템은 체크 표시로 구분한다. */
+  ownedItemIds?: number[];
 }
 
 /**
@@ -20,7 +22,12 @@ function compactLayout(count: number): { size: string; gap: string } {
 }
 
 /** 추천 아이템을 순서대로 보여준다. 두 창이 함께 쓴다. */
-export default function ItemBuild({ items, ddragon, compact = false }: ItemBuildProps) {
+export default function ItemBuild({
+  items,
+  ddragon,
+  compact = false,
+  ownedItemIds = [],
+}: ItemBuildProps) {
   // 오버레이는 게임 화면을 가리면 안 되니 확실히 작게 그린다.
   const { size, gap } = compact ? compactLayout(items.length) : { size: 'w-14', gap: 'gap-2' };
 
@@ -30,27 +37,48 @@ export default function ItemBuild({ items, ddragon, compact = false }: ItemBuild
         compact ? `flex flex-nowrap items-start ${gap}` : `flex flex-wrap items-start ${gap}`
       }
     >
-      {items.map((item, index) => (
-        <li key={`${item.id}-${index}`} className={`${size} shrink-0 text-center`}>
-          <div className='relative'>
-            <img
-              src={itemImageUrl(ddragon.version, item.id)}
-              alt={item.name}
-              width={64}
-              height={64}
-              className='w-full rounded'
-            />
-            <span className='absolute top-0 left-0 bg-black/70 px-0.5 text-[9px] leading-tight text-emerald-400'>
-              {index + 1}
-            </span>
-          </div>
-          {!compact && (
-            <p className='mt-1 line-clamp-2 text-[11px] leading-tight text-neutral-300'>
-              {item.name}
-            </p>
-          )}
-        </li>
-      ))}
+      {items.map((item, index) => {
+        const owned = ownedItemIds.includes(item.id);
+        return (
+          <li key={`${item.id}-${index}`} className={`${size} shrink-0 text-center`}>
+            <div className='relative'>
+              <img
+                src={itemImageUrl(ddragon.version, item.id)}
+                alt={item.name}
+                width={64}
+                height={64}
+                // 이미 산 아이템은 흐리게 눌러서 아직 안 산 것과 한눈에 구분되게 한다.
+                className={`w-full rounded ${owned ? 'opacity-40' : ''}`}
+              />
+              {owned ? (
+                <span
+                  aria-label='구매함'
+                  className='absolute inset-0 flex items-center justify-center bg-black/40 text-emerald-400'
+                >
+                  <svg viewBox='0 0 20 20' fill='currentColor' className='size-1/2'>
+                    <path
+                      fillRule='evenodd'
+                      d='M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z'
+                      clipRule='evenodd'
+                    />
+                  </svg>
+                </span>
+              ) : (
+                <span className='absolute top-0 left-0 bg-black/70 px-0.5 text-[9px] leading-tight text-emerald-400'>
+                  {index + 1}
+                </span>
+              )}
+            </div>
+            {!compact && (
+              <p
+                className={`mt-1 line-clamp-2 text-[11px] leading-tight ${owned ? 'text-neutral-500 line-through' : 'text-neutral-300'}`}
+              >
+                {item.name}
+              </p>
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 }

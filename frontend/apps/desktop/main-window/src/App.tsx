@@ -166,7 +166,7 @@ export default function App() {
               </span>
             </h2>
             <div className='mt-3'>
-              <BuildList builds={result.builds} ddragon={ddragon} />
+              <BuildList builds={result.builds} ddragon={ddragon} ownedItemIds={lineup?.myItemIds} />
             </div>
           </section>
         )}

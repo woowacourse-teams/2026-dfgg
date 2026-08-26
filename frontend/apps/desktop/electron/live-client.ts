@@ -14,12 +14,19 @@ const POSITION_BY_LIVE: Record<string, Position> = {
   UTILITY: 'SUPPORT',
 };
 
+interface LiveItem {
+  itemID?: number;
+  /** 와드 토큰처럼 소모되거나 쓰는 아이템. 완성 빌드 체크에는 세지 않는다. */
+  consumable?: boolean;
+}
+
 interface LivePlayer {
   championName?: string;
   team?: string;
   position?: string;
   riotIdGameName?: string;
   summonerName?: string;
+  items?: LiveItem[];
 }
 
 interface LiveGameData {
@@ -67,6 +74,13 @@ function bareName(name: string | undefined): string {
   return (name ?? '').split('#')[0].trim();
 }
 
+/** 완성 아이템 id만 남긴다. 와드류 소모품은 빌드 체크 대상이 아니다. */
+function completedItemIds(items: LiveItem[] | undefined): number[] {
+  return (items ?? [])
+    .filter((item) => !item.consumable && typeof item.itemID === 'number')
+    .map((item) => item.itemID as number);
+}
+
 /**
  * 진행 중인 게임의 조합을 읽는다. 게임 중이 아니면 연결이 거부되므로 null.
  *
@@ -100,6 +114,7 @@ export async function fetchLiveGame(): Promise<Lineup | null> {
     myChampionId: 0,
     myChampionName: me.championName ?? null,
     myPosition: POSITION_BY_LIVE[me.position?.toUpperCase() ?? ''] ?? null,
+    myItemIds: completedItemIds(me.items),
     allies,
     enemies,
   };
