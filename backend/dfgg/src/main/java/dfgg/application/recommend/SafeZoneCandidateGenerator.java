@@ -75,9 +75,10 @@ public class SafeZoneCandidateGenerator {
         );
 
         return rows.stream()
+                .map(NextItemRow::from)
                 .map(row -> new RankedItemCandidate(
-                        Long.valueOf((String) row[0]),
-                        wilsonScoreCalculator.lowerBound(((Number) row[2]).intValue(), ((Number) row[1]).intValue())
+                        row.itemId(),
+                        wilsonScoreCalculator.lowerBound(row.winCount(), row.support())
                 ))
                 .sorted(Comparator.comparingDouble(RankedItemCandidate::score).reversed())
                 .toList();
@@ -111,5 +112,16 @@ public class SafeZoneCandidateGenerator {
 
     private Long lastItem(List<Long> items) {
         return items.get(items.size() - 1);
+    }
+
+    private record NextItemRow(Long itemId, int support, int winCount) {
+
+        private static NextItemRow from(Object[] row) {
+            return new NextItemRow(
+                    Long.valueOf((String) row[0]),
+                    ((Number) row[1]).intValue(),
+                    ((Number) row[2]).intValue()
+            );
+        }
     }
 }
