@@ -59,6 +59,15 @@ public final class MarksmanBuildPolicy implements ChampionBuildPolicy {
     }
 
     @Override
+    public List<BuildDirection> supportedDirections() {
+        return List.of(
+                new BuildDirection(ChampionTag.MARKSMAN, CRITICAL_STRIKE_DAMAGE),
+                new BuildDirection(ChampionTag.MARKSMAN, ANTI_TANK_SUSTAINED_DAMAGE),
+                new BuildDirection(ChampionTag.MARKSMAN, SURVIVAL_KITING)
+        );
+    }
+
+    @Override
     public List<BuildCandidate> evaluate(
             List<CoreBuildCluster> clusters,
             List<Champion> enemies

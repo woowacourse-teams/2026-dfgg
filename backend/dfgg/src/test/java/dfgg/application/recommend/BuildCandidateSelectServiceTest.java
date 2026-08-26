@@ -67,8 +67,8 @@ class BuildCandidateSelectServiceTest {
     }
 
     @Test
-    @DisplayName("서로 다른 방향 후보가 부족하면 같은 방향 후보로 남은 슬롯을 채운다")
-    void select_WhenDistinctDirectionsAreInsufficient_FillsRemainingSlots() {
+    @DisplayName("같은 방향의 여러 군집이 있어도 하나의 후보만 선택한다")
+    void select_WhenDirectionIsDuplicated_SelectsOnlyOneCandidate() {
         // given
         BuildCandidate firstCandidate = candidate(ChampionTag.TANK, "PHYSICAL_DAMAGE", 10.0, 20L);
         BuildCandidate secondCandidate = candidate(ChampionTag.TANK, "PHYSICAL_DAMAGE", 9.0, 21L);
@@ -84,7 +84,7 @@ class BuildCandidateSelectServiceTest {
         // then
         assertThat(selected)
                 .extracting(item -> item.candidate().cluster().getClusterKey())
-                .containsExactly(List.of(20L), List.of(21L), List.of(22L));
+                .containsExactly(List.of(20L));
     }
 
     @Test

@@ -78,6 +78,15 @@ public final class SupportBuildPolicy implements ChampionBuildPolicy {
     }
 
     @Override
+    public List<BuildDirection> supportedDirections() {
+        return List.of(
+                new BuildDirection(ChampionTag.SUPPORT, ENGAGE_INITIATION),
+                new BuildDirection(ChampionTag.SUPPORT, ALLY_PROTECTION),
+                new BuildDirection(ChampionTag.SUPPORT, HEALING_ENHANCEMENT)
+        );
+    }
+
+    @Override
     public List<BuildCandidate> evaluate(
             List<CoreBuildCluster> clusters,
             List<Champion> enemies

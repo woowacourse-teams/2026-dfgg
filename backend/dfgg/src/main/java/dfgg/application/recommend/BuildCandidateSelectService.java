@@ -22,7 +22,7 @@ public final class BuildCandidateSelectService {
     public static final int MAX_SELECTED_CANDIDATES = 3;
 
     /**
-     * 실제 군집이 서로 다르고 가능한 한 방향도 서로 다른 후보를 최대 3개 선택한다.
+     * 실제 군집이 서로 다르고 방향도 서로 다른 후보를 최대 3개 선택한다.
      */
     public List<SelectedBuildCandidate> select(List<BuildCandidate> candidates) {
         Objects.requireNonNull(candidates, "빌드 후보 목록은 null일 수 없습니다.");
@@ -33,9 +33,6 @@ public final class BuildCandidateSelectService {
                 .toList();
 
         List<BuildCandidate> selectedCandidates = selectDistinctDirections(rankedCandidates);
-        if (selectedCandidates.size() < MAX_SELECTED_CANDIDATES) {
-            fillRemainingCandidates(selectedCandidates, rankedCandidates);
-        }
 
         int recommendedIndex = findRecommendedIndex(selectedCandidates);
         List<SelectedBuildCandidate> result = new ArrayList<>(selectedCandidates.size());
@@ -77,20 +74,6 @@ public final class BuildCandidateSelectService {
             }
         }
         return selectedCandidates;
-    }
-
-    private void fillRemainingCandidates(
-            List<BuildCandidate> selectedCandidates,
-            List<BuildCandidate> rankedCandidates
-    ) {
-        for (BuildCandidate candidate : rankedCandidates) {
-            if (selectedCandidates.size() == MAX_SELECTED_CANDIDATES) {
-                return;
-            }
-            if (!selectedCandidates.contains(candidate)) {
-                selectedCandidates.add(candidate);
-            }
-        }
     }
 
     private int findRecommendedIndex(List<BuildCandidate> selectedCandidates) {

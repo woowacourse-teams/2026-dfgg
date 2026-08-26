@@ -6,6 +6,7 @@ import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.recommendation.BuildCandidate;
+import dfgg.domain.recommendation.BuildDirection;
 import dfgg.domain.recommendation.ChampionBuildPolicy;
 import dfgg.domain.recommendation.CoreBuildCluster;
 import dfgg.domain.recommendation.SelectedBuildCandidate;
@@ -20,10 +21,12 @@ import dfgg.presentation.dto.response.BuildOptionResponse;
 import dfgg.presentation.dto.response.MultiBuildRecommendationResponse;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -85,13 +88,27 @@ public class MultiBuildRecommendationService {
                 clusters,
                 enemies
         );
+        int expectedItemCount = expectedItemCount(position);
+        List<BuildCandidate> availableCandidates = candidates.stream()
+                .filter(candidate -> findCompletedBuild(
+                        candidate,
+                        expectedItemCount
+                ).isPresent())
+                .toList();
         List<SelectedBuildCandidate> selectedCandidates =
-                candidateSelectService.select(candidates);
+                candidateSelectService.select(availableCandidates);
+        List<BuildDirection> supportedDirections = collectSupportedDirections(
+                myChampion.getChampionTags()
+        );
 
         return new MultiBuildRecommendationResponse(
                 myChampion.getName(),
                 position.name(),
-                createBuildOptions(selectedCandidates, position)
+                createBuildOptions(
+                        selectedCandidates,
+                        supportedDirections,
+                        expectedItemCount
+                )
         );
     }
 
@@ -156,30 +173,46 @@ public class MultiBuildRecommendationService {
         return Map.copyOf(policyMap);
     }
 
+    private List<BuildDirection> collectSupportedDirections(
+            List<ChampionTag> championTags
+    ) {
+        Set<BuildDirection> directions = new LinkedHashSet<>();
+        championTags.stream()
+                .distinct()
+                .map(policies::get)
+                .filter(Objects::nonNull)
+                .forEach(policy -> directions.addAll(policy.supportedDirections()));
+        return List.copyOf(directions);
+    }
+
     private List<BuildOptionResponse> createBuildOptions(
             List<SelectedBuildCandidate> selectedCandidates,
-            ChampionPosition position
+            List<BuildDirection> supportedDirections,
+            int expectedItemCount
     ) {
-        int expectedItemCount = position == ChampionPosition.BOTTOM
-                ? BOTTOM_BUILD_ITEM_COUNT
-                : NORMAL_BUILD_ITEM_COUNT;
         List<Optional<ChampionBuildStats>> completedBuilds = selectedCandidates.stream()
-                .map(selected -> selected.candidate().cluster()
-                        .findRepresentativeBuild(expectedItemCount)
-                        .filter(this::hasExactlyOneBoots))
+                .map(selected -> findCompletedBuild(
+                        selected.candidate(),
+                        expectedItemCount
+                ))
                 .toList();
         int recommendedIndex = findRecommendedAvailableIndex(
                 selectedCandidates,
                 completedBuilds
         );
 
-        List<BuildOptionResponse> options = new ArrayList<>(selectedCandidates.size());
+        List<BuildOptionResponse> options = new ArrayList<>(
+                BuildCandidateSelectService.MAX_SELECTED_CANDIDATES
+        );
+        Set<BuildDirection> selectedDirections = new LinkedHashSet<>();
         for (int index = 0; index < selectedCandidates.size(); index++) {
             SelectedBuildCandidate selected = selectedCandidates.get(index);
             Optional<ChampionBuildStats> completedBuild = completedBuilds.get(index);
+            BuildDirection direction = selected.candidate().direction();
+            selectedDirections.add(direction);
             options.add(new BuildOptionResponse(
-                    selected.candidate().direction().championTag().name(),
-                    selected.candidate().direction().code(),
+                    direction.championTag().name(),
+                    direction.code(),
                     completedBuild.isPresent(),
                     index == recommendedIndex,
                     completedBuild
@@ -187,7 +220,41 @@ public class MultiBuildRecommendationService {
                             .orElse(null)
             ));
         }
+
+        for (BuildDirection direction : supportedDirections) {
+            if (options.size() == BuildCandidateSelectService.MAX_SELECTED_CANDIDATES) {
+                break;
+            }
+            if (selectedDirections.add(direction)) {
+                options.add(unavailableOption(direction));
+            }
+        }
         return List.copyOf(options);
+    }
+
+    private BuildOptionResponse unavailableOption(BuildDirection direction) {
+        return new BuildOptionResponse(
+                direction.championTag().name(),
+                direction.code(),
+                false,
+                false,
+                null
+        );
+    }
+
+    private Optional<ChampionBuildStats> findCompletedBuild(
+            BuildCandidate candidate,
+            int expectedItemCount
+    ) {
+        return candidate.cluster()
+                .findRepresentativeBuild(expectedItemCount)
+                .filter(this::hasExactlyOneBoots);
+    }
+
+    private int expectedItemCount(ChampionPosition position) {
+        return position == ChampionPosition.BOTTOM
+                ? BOTTOM_BUILD_ITEM_COUNT
+                : NORMAL_BUILD_ITEM_COUNT;
     }
 
     private int findRecommendedAvailableIndex(

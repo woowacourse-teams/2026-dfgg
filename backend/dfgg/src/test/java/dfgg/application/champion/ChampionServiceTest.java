@@ -109,6 +109,27 @@ class ChampionServiceTest {
     }
 
     @Test
+    void 한글_표시_이름으로_챔피언을_찾는다() {
+        // given
+        Champion champion = new Champion(
+                897L,
+                "KSante",
+                "크산테",
+                List.of(ChampionTag.TANK, ChampionTag.FIGHTER)
+        );
+        when(championRepository.findByRiotKeyIgnoreCase("크산테"))
+                .thenReturn(Optional.empty());
+        when(championRepository.findByNameIgnoreCase("크산테"))
+                .thenReturn(Optional.of(champion));
+
+        // when
+        Champion foundChampion = championService.findChampionByName("  크산테  ");
+
+        // then
+        assertThat(foundChampion).isSameAs(champion);
+    }
+
+    @Test
     void 챔피언_이름이_비어_있으면_예외가_발생한다() {
         assertThatThrownBy(() -> championService.findChampionByName(" "))
                 .isInstanceOf(ChampionNotFoundException.class)

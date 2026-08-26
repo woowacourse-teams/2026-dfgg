@@ -11,6 +11,8 @@ public interface ChampionBuildPolicy {
 
     ChampionTag supportedTag();
 
+    List<BuildDirection> supportedDirections();
+
     List<BuildCandidate> evaluate(
             List<CoreBuildCluster> clusters,
             List<Champion> enemies

@@ -61,6 +61,15 @@ public final class MageBuildPolicy implements ChampionBuildPolicy {
     }
 
     @Override
+    public List<BuildDirection> supportedDirections() {
+        return List.of(
+                new BuildDirection(ChampionTag.MAGE, BURST_DAMAGE),
+                new BuildDirection(ChampionTag.MAGE, SUSTAINED_DAMAGE),
+                new BuildDirection(ChampionTag.MAGE, SURVIVAL_RESPONSE)
+        );
+    }
+
+    @Override
     public List<BuildCandidate> evaluate(
             List<CoreBuildCluster> clusters,
             List<Champion> enemies

@@ -45,6 +45,7 @@ public class ChampionService {
         String trimmed = name.trim();
 
         return championRepository.findByRiotKeyIgnoreCase(trimmed)
+                .or(() -> championRepository.findByNameIgnoreCase(trimmed))
                 .orElseThrow(() -> new ChampionNotFoundException(trimmed));
     }
 }

@@ -43,6 +43,15 @@ public final class TankBuildPolicy implements ChampionBuildPolicy {
     }
 
     @Override
+    public List<BuildDirection> supportedDirections() {
+        return List.of(
+                new BuildDirection(ChampionTag.TANK, PHYSICAL_DAMAGE),
+                new BuildDirection(ChampionTag.TANK, MAGIC_DAMAGE),
+                new BuildDirection(ChampionTag.TANK, MIXED_DAMAGE)
+        );
+    }
+
+    @Override
     public List<BuildCandidate> evaluate(
             List<CoreBuildCluster> clusters,
             List<Champion> enemies

@@ -83,10 +83,23 @@ class MultiBuildRecommendationServiceTest {
         MultiBuildRecommendationResponse response = recommendationService.recommend(request);
 
         // then
-        assertThat(response.builds()).hasSize(1);
+        assertThat(response.builds()).hasSize(3);
+        assertThat(response.builds())
+                .extracting(BuildOptionResponse::direction)
+                .containsExactly(
+                        "PHYSICAL_DAMAGE",
+                        "MAGIC_DAMAGE",
+                        "MIXED_DAMAGE"
+                );
         assertThat(response.builds().getFirst().available()).isTrue();
         assertThat(response.builds().getFirst().recommended()).isTrue();
         assertThat(response.builds().getFirst().build()).hasSize(6);
+        assertThat(response.builds().subList(1, 3))
+                .allSatisfy(option -> {
+                    assertThat(option.available()).isFalse();
+                    assertThat(option.recommended()).isFalse();
+                    assertThat(option.build()).isNull();
+                });
     }
 
     @Test
@@ -106,7 +119,7 @@ class MultiBuildRecommendationServiceTest {
         MultiBuildRecommendationResponse response = recommendationService.recommend(request);
 
         // then
-        assertThat(response.builds()).hasSize(1);
+        assertThat(response.builds()).hasSize(3);
         assertThat(response.builds().getFirst().available()).isTrue();
         assertThat(response.builds().getFirst().build()).hasSize(7);
     }
@@ -132,11 +145,18 @@ class MultiBuildRecommendationServiceTest {
         MultiBuildRecommendationResponse response = recommendationService.recommend(request);
 
         // then
-        BuildOptionResponse option = response.builds().getFirst();
-        assertThat(option.direction()).isEqualTo("PHYSICAL_DAMAGE");
-        assertThat(option.available()).isFalse();
-        assertThat(option.recommended()).isFalse();
-        assertThat(option.build()).isNull();
+        assertThat(response.builds())
+                .extracting(BuildOptionResponse::direction)
+                .containsExactly(
+                        "PHYSICAL_DAMAGE",
+                        "MAGIC_DAMAGE",
+                        "MIXED_DAMAGE"
+                );
+        assertThat(response.builds()).allSatisfy(option -> {
+            assertThat(option.available()).isFalse();
+            assertThat(option.recommended()).isFalse();
+            assertThat(option.build()).isNull();
+        });
     }
 
     @Test
@@ -169,13 +189,20 @@ class MultiBuildRecommendationServiceTest {
         MultiBuildRecommendationResponse response = recommendationService.recommend(request);
 
         // then
-        assertThat(response.builds()).hasSize(2);
+        assertThat(response.builds()).hasSize(3);
         assertThat(response.builds())
                 .extracting(BuildOptionResponse::available)
-                .containsExactly(false, true);
+                .containsExactly(true, false, false);
         assertThat(response.builds())
                 .extracting(BuildOptionResponse::recommended)
-                .containsExactly(false, true);
+                .containsExactly(true, false, false);
+        assertThat(response.builds())
+                .extracting(BuildOptionResponse::direction)
+                .containsExactly(
+                        "PHYSICAL_DAMAGE",
+                        "MAGIC_DAMAGE",
+                        "MIXED_DAMAGE"
+                );
     }
 
     @Test

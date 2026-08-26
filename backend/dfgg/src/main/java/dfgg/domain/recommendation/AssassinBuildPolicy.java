@@ -60,6 +60,15 @@ public final class AssassinBuildPolicy implements ChampionBuildPolicy {
     }
 
     @Override
+    public List<BuildDirection> supportedDirections() {
+        return List.of(
+                new BuildDirection(ChampionTag.ASSASSIN, BURST_ASSASSINATION),
+                new BuildDirection(ChampionTag.ASSASSIN, DEFENSE_NEUTRALIZATION),
+                new BuildDirection(ChampionTag.ASSASSIN, ENGAGE_SURVIVAL)
+        );
+    }
+
+    @Override
     public List<BuildCandidate> evaluate(
             List<CoreBuildCluster> clusters,
             List<Champion> enemies

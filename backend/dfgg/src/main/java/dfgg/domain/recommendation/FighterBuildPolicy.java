@@ -64,6 +64,15 @@ public final class FighterBuildPolicy implements ChampionBuildPolicy {
     }
 
     @Override
+    public List<BuildDirection> supportedDirections() {
+        return List.of(
+                new BuildDirection(ChampionTag.FIGHTER, ANTI_TANK),
+                new BuildDirection(ChampionTag.FIGHTER, BURST_SURVIVAL),
+                new BuildDirection(ChampionTag.FIGHTER, SUSTAINED_COMBAT)
+        );
+    }
+
+    @Override
     public List<BuildCandidate> evaluate(
             List<CoreBuildCluster> clusters,
             List<Champion> enemies
