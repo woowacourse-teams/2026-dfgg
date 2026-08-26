@@ -14,7 +14,7 @@ import java.util.Set;
  * SUPPORT 챔피언의 첫 3코어 군집을 대표 방향으로 분류하고,
  * 적 챔피언 조합에 대한 적합도를 계산한다.
  */
-public final class SupportBuildPolicy {
+public final class SupportBuildPolicy implements ChampionBuildPolicy {
 
     private static final String ENGAGE_INITIATION = "ENGAGE_INITIATION";
     private static final String ALLY_PROTECTION = "ALLY_PROTECTION";
@@ -72,6 +72,12 @@ public final class SupportBuildPolicy {
      *
      * <p>대표 방향을 하나로 결정할 수 없는 군집은 후보에 포함하지 않는다.
      */
+    @Override
+    public ChampionTag supportedTag() {
+        return ChampionTag.SUPPORT;
+    }
+
+    @Override
     public List<BuildCandidate> evaluate(
             List<CoreBuildCluster> clusters,
             List<Champion> enemies

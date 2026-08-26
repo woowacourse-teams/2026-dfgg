@@ -12,7 +12,7 @@ import java.util.Set;
  * MARKSMAN 챔피언의 첫 3코어 군집을 대표 방향으로 분류하고,
  * 적 챔피언 조합에 대한 적합도를 계산한다.
  */
-public final class MarksmanBuildPolicy {
+public final class MarksmanBuildPolicy implements ChampionBuildPolicy {
 
     private static final String CRITICAL_STRIKE_DAMAGE = "CRITICAL_STRIKE_DAMAGE";
     private static final String ANTI_TANK_SUSTAINED_DAMAGE = "ANTI_TANK_SUSTAINED_DAMAGE";
@@ -53,6 +53,12 @@ public final class MarksmanBuildPolicy {
      *
      * <p>대표 방향을 하나로 결정할 수 없는 군집은 후보에 포함하지 않는다.
      */
+    @Override
+    public ChampionTag supportedTag() {
+        return ChampionTag.MARKSMAN;
+    }
+
+    @Override
     public List<BuildCandidate> evaluate(
             List<CoreBuildCluster> clusters,
             List<Champion> enemies

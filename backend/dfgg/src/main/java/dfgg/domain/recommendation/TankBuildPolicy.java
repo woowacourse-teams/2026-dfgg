@@ -12,7 +12,7 @@ import java.util.Set;
  * TANK 챔피언의 첫 3코어 군집을 방어 방향으로 분류하고,
  * 적 챔피언 조합에 대한 적합도를 계산한다.
  */
-public final class TankBuildPolicy {
+public final class TankBuildPolicy implements ChampionBuildPolicy {
 
     private static final String ARMOR_TAG = "Armor";
     private static final String SPELL_BLOCK_TAG = "SpellBlock";
@@ -37,6 +37,12 @@ public final class TankBuildPolicy {
      *
      * <p>방어 방향을 판단할 수 없는 군집은 후보에 포함하지 않는다.
      */
+    @Override
+    public ChampionTag supportedTag() {
+        return ChampionTag.TANK;
+    }
+
+    @Override
     public List<BuildCandidate> evaluate(
             List<CoreBuildCluster> clusters,
             List<Champion> enemies

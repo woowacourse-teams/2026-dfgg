@@ -12,7 +12,7 @@ import java.util.Set;
  * FIGHTER 챔피언의 첫 3코어 군집을 대표 방향으로 분류하고,
  * 적 챔피언 조합에 대한 적합도를 계산한다.
  */
-public final class FighterBuildPolicy {
+public final class FighterBuildPolicy implements ChampionBuildPolicy {
 
     private static final String ANTI_TANK = "ANTI_TANK";
     private static final String BURST_SURVIVAL = "BURST_SURVIVAL";
@@ -58,6 +58,12 @@ public final class FighterBuildPolicy {
      *
      * <p>대표 방향을 하나로 결정할 수 없는 군집은 후보에 포함하지 않는다.
      */
+    @Override
+    public ChampionTag supportedTag() {
+        return ChampionTag.FIGHTER;
+    }
+
+    @Override
     public List<BuildCandidate> evaluate(
             List<CoreBuildCluster> clusters,
             List<Champion> enemies
