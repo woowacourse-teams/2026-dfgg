@@ -259,41 +259,48 @@ export default function ChampionSelect() {
               {POSITION_LABEL[result.position] ?? result.position}
             </span>
           </h2>
-          {result.builds.length === 0 ? (
+          {/*
+              스펙엔 build가 null이 아니라고 돼 있지만, 실제 응답은 아이템이 없는
+              빌드에 build: null을 준다. 그대로 .map을 부르면 전체 화면이 죽어서
+              다른 챔피언도 못 누르게 되므로 방어적으로 걸러낸다.
+            */}
+          {result.builds.every((buildInfo) => !buildInfo.build?.length) ? (
             <p className='mt-3 text-sm text-ink-3'>
               이 조합에 맞는 추천 빌드를 아직 찾지 못했어요.
             </p>
           ) : (
-            result.builds.map((buildInfo, buildIndex) => (
-              <div key={buildIndex} className='mt-4 first:mt-3'>
-                <p className='text-xs text-ink-3'>
-                  {CHAMPION_TAG_LABEL[buildInfo.championTag] ?? buildInfo.championTag} ·{' '}
-                  {DIRECTION_LABEL[buildInfo.direction] ?? buildInfo.direction}
-                </p>
-                <ol className='mt-2 grid grid-cols-6 gap-2'>
-                  {buildInfo.build.map((item, index) => (
-                    <li key={`${buildIndex}-${item.id}`} className='text-center'>
-                      <div className='chamfer-sm relative bg-surface-2'>
-                        <img
-                          src={version ? itemImageUrl(version, item.id) : undefined}
-                          alt={item.name}
-                          width={64}
-                          height={64}
-                          loading='lazy'
-                          className='w-full'
-                        />
-                        <span className='absolute top-0 left-0 bg-ground/80 px-1 font-display text-[10px] text-accent'>
-                          {index + 1}
-                        </span>
-                      </div>
-                      <p className='mt-1 line-clamp-2 text-[11px] leading-tight text-ink-2'>
-                        {item.name}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            ))
+            result.builds
+              .filter((buildInfo) => buildInfo.build?.length)
+              .map((buildInfo, buildIndex) => (
+                <div key={buildIndex} className='mt-4 first:mt-3'>
+                  <p className='text-xs text-ink-3'>
+                    {CHAMPION_TAG_LABEL[buildInfo.championTag] ?? buildInfo.championTag} ·{' '}
+                    {DIRECTION_LABEL[buildInfo.direction] ?? buildInfo.direction}
+                  </p>
+                  <ol className='mt-2 grid grid-cols-6 gap-2'>
+                    {(buildInfo.build ?? []).map((item, index) => (
+                      <li key={`${buildIndex}-${item.id}`} className='text-center'>
+                        <div className='chamfer-sm relative bg-surface-2'>
+                          <img
+                            src={version ? itemImageUrl(version, item.id) : undefined}
+                            alt={item.name}
+                            width={64}
+                            height={64}
+                            loading='lazy'
+                            className='w-full'
+                          />
+                          <span className='absolute top-0 left-0 bg-ground/80 px-1 font-display text-[10px] text-accent'>
+                            {index + 1}
+                          </span>
+                        </div>
+                        <p className='mt-1 line-clamp-2 text-[11px] leading-tight text-ink-2'>
+                          {item.name}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ))
           )}
         </section>
       )}
