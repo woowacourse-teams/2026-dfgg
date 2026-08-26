@@ -94,6 +94,41 @@ class EmbeddingRepositoryTest {
     }
 
     @Test
+    @DisplayName("algorithmVersion과 entityType이 모두 일치하는 임베딩만 조회한다")
+    @Sql("/sql/embedding-repository-test-data.sql")
+    void findByAlgorithmVersionAndEntityType_WhenVersionAndTypeMatch_ReturnsOnlyMatchingEmbeddings() {
+        // given: data.sql이 v1-CHAMPION(entityId=266) 1건, v1-ITEM(entityId=3071) 1건,
+        // v2-ITEM(entityId=9999) 1건을 적재해둔다
+
+        // when
+        List<Embedding> found = embeddingRepository.findByAlgorithmVersionAndEntityType(
+                "v1", EmbeddingEntityType.ITEM
+        );
+
+        // then
+        assertThat(found).hasSize(1);
+        assertThat(found.get(0).getAlgorithmVersion()).isEqualTo("v1");
+        assertThat(found.get(0).getEntityId()).isEqualTo(3071L);
+    }
+
+    @Test
+    @DisplayName("algorithmVersion, entityType, entityId 목록이 모두 일치하는 임베딩만 조회한다")
+    @Sql("/sql/embedding-repository-test-data.sql")
+    void findByAlgorithmVersionAndEntityTypeAndEntityIdIn_WhenIdsGiven_ReturnsOnlyMatchingEmbeddings() {
+        // given: data.sql이 v1-CHAMPION(entityId=266) 1건, v1-ITEM(entityId=3071) 1건,
+        // v2-ITEM(entityId=9999) 1건을 적재해둔다
+
+        // when
+        List<Embedding> found = embeddingRepository.findByAlgorithmVersionAndEntityTypeAndEntityIdIn(
+                "v1", EmbeddingEntityType.CHAMPION, List.of(266L, 999L)
+        );
+
+        // then
+        assertThat(found).hasSize(1);
+        assertThat(found.get(0).getEntityId()).isEqualTo(266L);
+    }
+
+    @Test
     @DisplayName("같은 entityType, entityId, algorithmVersion 조합은 중복 저장할 수 없다")
     void save_WhenEntityTypeAndEntityIdAndAlgorithmVersionDuplicate_ThrowsDataIntegrityViolationException() {
         // given
