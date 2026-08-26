@@ -36,9 +36,9 @@ export default function OverlayControls() {
   if (!api) return null;
 
   return (
-    <section className="mt-4 flex flex-wrap items-center gap-3 rounded border border-neutral-800 bg-neutral-900/60 p-3">
+    <section className='mt-4 flex flex-wrap items-center gap-3 rounded border border-neutral-800 bg-neutral-900/60 p-3'>
       <button
-        type="button"
+        type='button'
         onClick={() => void api.setVisible(!visible).then(setVisible)}
         aria-pressed={visible}
         className={`cursor-pointer rounded px-3 py-1.5 text-xs font-bold ${
@@ -48,12 +48,12 @@ export default function OverlayControls() {
         오버레이 {visible ? '켜짐' : '꺼짐'}
       </button>
 
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-neutral-400">크기</span>
+      <div className='flex items-center gap-1.5'>
+        <span className='text-xs text-neutral-400'>크기</span>
         {SCALES.map((option) => (
           <button
             key={option.value}
-            type="button"
+            type='button'
             onClick={() => void api.setScale(option.value).then(setScale)}
             aria-pressed={scale === option.value}
             className={`cursor-pointer rounded px-2 py-1 text-xs ${
@@ -71,12 +71,12 @@ export default function OverlayControls() {
         전체 화면 배너는 실제로 그 모드일 때만 뜬다. 아직 클라이언트에 연결되지
         않았거나 모드를 못 읽은 동안에도 알 수 있도록 여기에 항상 적어둔다.
       */}
-      <div className="w-full space-y-1 text-[11px] text-neutral-500">
+      <div className='w-full space-y-1 text-[11px] text-neutral-500'>
         <p>단축키 Alt+D 로도 켜고 끌 수 있어요</p>
         <p>
-          롤이 <strong className="text-neutral-400">전체 화면</strong>이면 오버레이가 게임에
-          가려집니다. <strong className="text-neutral-400">테두리 없음</strong> 또는{' '}
-          <strong className="text-neutral-400">창 모드</strong>로 두세요.
+          롤이 <strong className='text-neutral-400'>전체 화면</strong>이면 오버레이가 게임에
+          가려집니다. <strong className='text-neutral-400'>테두리 없음</strong> 또는{' '}
+          <strong className='text-neutral-400'>창 모드</strong>로 두세요.
         </p>
       </div>
     </section>

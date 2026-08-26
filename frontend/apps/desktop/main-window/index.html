@@ -5,9 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://ddragon.leagueoflegends.com; connect-src 'self' https://ddragon.leagueoflegends.com http://localhost:3000 ws://localhost:3000"
+      content="default-src 'self'; script-src 'self' https://cloud.umami.is; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://ddragon.leagueoflegends.com; connect-src 'self' https://ddragon.leagueoflegends.com https://gateway.umami.is http://localhost:3000 ws://localhost:3000"
     />
     <title>dfgg</title>
+    <!--
+      웹과 같은 website ID를 쓴다(무료 플랜은 사이트 1개). data-domains는 웹 전용
+      도메인 화이트리스트라 여기서는 뺀다 — 앱은 file:// 로 뜨므로 도메인이 없다.
+      웹/앱 이벤트는 이벤트 이름에 붙인 desktop- 접두사로 대시보드에서 구분한다.
+    -->
+    <script
+      defer
+      src="https://cloud.umami.is/script.js"
+      data-website-id="93de5e12-4372-4120-82c0-deab98b3f33a"
+    ></script>
   </head>
   <body>
     <div id="root"></div>

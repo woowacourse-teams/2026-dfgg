@@ -4,8 +4,29 @@
   /* 배너 계열 */
   --color-cornflower: #5b78dc;
   --color-cornflower-deep: #3f57b4;
-  --color-hextech: #4fd9d2;
-  --color-hextech-bright: #7ceee8;
+  /*
+   * 브랜드 레드. accent 는 검은 바탕 위 글자·테두리용으로 밝게 잡았고
+   * (대비 5.1:1, 본문 크기도 읽힌다), accent-strong 은 로고에서 뽑은 값이라
+   * 채움면에 쓴다. 채움 위 글자는 흰색이어야 대비가 선다 (5.9:1).
+   */
+  --color-accent: #e63950;
+  --color-accent-strong: #c1243d;
+  --color-accent-bright: #ff5f74;
+
+  /*
+   * 채움 버튼용 그라데이션 정지색. 흰 글자를 얹으므로 양 끝 모두 어두워야 한다.
+   * accent-deep 7.4:1, accent-mid 5.1:1 — 밝은 accent-bright(2.9:1)는 채움에 쓰면 안 된다.
+   */
+  --color-accent-deep: #a51d33;
+  --color-accent-mid: #d1293f;
+
+  /*
+   * 빨강 옆에 나란히 두는 보조 버튼. 카드 테두리(--color-line #1b2344)와 같은
+   * 남색 계열이라 빨강과 부딪히지 않으면서 화면에 이미 있는 색을 쓴다.
+   * 흰 글자 13.7:1 / 7.5:1.
+   */
+  --color-cobalt-deep: #1e2a5a;
+  --color-cobalt: #3b4f9e;
   --color-sky: #8ccbf2;
 
   /* 바탕은 순검정, 면만 푸른기를 얹어 띄운다 */
@@ -20,6 +41,13 @@
   --color-ink-3: #6b78a4;
 
   /* 수치 판단용 — 액센트와 분리해서 쓴다 */
+  /*
+   * 내 챔피언·내 포지션 표시. 브랜드가 빨강이 되면서 accent 로 표시하면
+   * 상대(--color-loss)와 색이 겹쳐, 아군 칸이 적팀처럼 읽혔다.
+   * 아군(초록)·상대(빨강) 어느 쪽과도 안 겹치는 금색으로 뺀다. 검정 대비 11.2:1.
+   */
+  --color-mine: #e8b64c;
+
   --color-win: #3fc094;
   --color-loss: #ec6d86;
 
@@ -63,4 +91,22 @@
     rgb(0 0 0 / 0.55) 82%,
     #000 100%
   );
+}
+
+/* 상단 헤더 고정 */
+/*
+ * 상단 바. fixed 는 문서 흐름에서 빠져 아래 내용이 바 밑으로 파고든다.
+ * sticky 는 흐름에 남아 자기 높이만큼 자리를 차지하면서도 스크롤에 따라붙는다.
+ * 덕분에 바 높이를 padding-top 으로 따로 맞춰줄 필요가 없다 — 로고 크기를
+ * 바꿔도 어긋나지 않는다.
+ */
+.fixed-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  padding: 16px 40px;
+
+  /* 배경이 없으면 스크롤된 내용이 바를 그대로 통과해 보인다. */
+  background-color: var(--color-ground);
+  border-bottom: 1px solid var(--color-line);
 }

@@ -1,6 +1,8 @@
 import type { BrowserWindow, BrowserWindowConstructorOptions } from 'electron';
 import { app } from 'electron';
 
+import { trackEvent } from './analytics';
+
 /** Overwolf 게임 ID. 타입 패키지의 game-list 에서 확인한 값이다. */
 export const LEAGUE_OF_LEGENDS_GAME_ID = 5426;
 
@@ -72,18 +74,28 @@ function waitForOverlayApi(timeoutMs = 10_000): Promise<OverlayApi | null> {
  * 일반 BrowserWindow 와 달리 게임 프로세스 안에서 렌더링되므로 전체 화면에서도
  * 가려지지 않는다. ow-electron 이 아니거나 오버레이 패키지가 없으면 null 을
  * 돌려주고, 호출한 쪽이 기존 방식으로 떨어진다.
+ *
+ * getMainWindow 는 fallback 사유를 렌더러에 흘려보내기 위한 것뿐이라 없어도
+ * 동작에는 영향이 없다(메인 창이 아직 안 뜬 시점에 호출될 수 있어 선택값이다).
  */
 export async function createGameOverlay(
   options: BrowserWindowConstructorOptions & { name: string },
+  getMainWindow?: () => BrowserWindow | null,
 ): Promise<BrowserWindow | null> {
+  const fallback = (reason: string) => {
+    if (getMainWindow) trackEvent(getMainWindow, 'game-overlay-fallback', { reason });
+  };
+
   if (!getPackages()) {
     console.log('[overlay] ow-electron 이 아님 — 일반 창으로 대체');
+    fallback('not-ow-electron');
     return null;
   }
 
   const api = await waitForOverlayApi();
   if (!api) {
     console.error('[overlay] 오버레이 패키지를 쓸 수 없음 — 일반 창으로 대체');
+    fallback('api-unavailable');
     return null;
   }
 
@@ -104,6 +116,7 @@ export async function createGameOverlay(
 
   api.on('game-injection-error', ((gameInfo: GameInfo, error: unknown) => {
     console.error('[overlay] 주입 실패', gameInfo?.name, error);
+    fallback('inject-error');
   }) as (...args: never[]) => void);
 
   api.on('game-injected', ((gameInfo: GameInfo) => {
@@ -123,6 +136,7 @@ export async function createGameOverlay(
     return created.window;
   } catch (error) {
     console.error('[overlay] 창 생성 실패 — 일반 창으로 대체', error);
+    fallback('create-window-failed');
     return null;
   }
 }

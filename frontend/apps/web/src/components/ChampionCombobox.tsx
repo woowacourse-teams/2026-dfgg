@@ -10,6 +10,11 @@ interface ChampionComboboxProps {
   champions: ChampionInfo[];
   label: string;
   accentClass: string;
+  /**
+   * 포커스했을 때의 테두리. 팀 색과 맞춰야 지금 어느 편 칸을 치고 있는지
+   * 눈에 남는다. 아군 칸이 빨갛게 빛나면 적팀 칸으로 착각한다.
+   */
+  focusClass: string;
   /** 내 포지션 칸. 값이 비어 있어도 테두리를 계속 강조한다. */
   highlighted?: boolean;
   onChange: (name: string) => void;
@@ -20,6 +25,7 @@ export default function ChampionCombobox({
   champions,
   label,
   accentClass,
+  focusClass,
   highlighted = false,
   onChange,
 }: ChampionComboboxProps) {
@@ -106,29 +112,29 @@ export default function ChampionCombobox({
   const activeChampion = champions.find((champion) => champion.name === value);
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className='relative'>
       <div
-        className={`chamfer-sm flex items-center gap-2 bg-surface-2 pl-2 shadow-[inset_0_0_0_1px_var(--color-line)] transition-shadow focus-within:shadow-[inset_0_0_0_2px_var(--color-hextech)] ${
+        className={`chamfer-sm flex items-center gap-2 bg-surface-2 pl-2 shadow-[inset_0_0_0_1px_var(--color-line)] transition-shadow ${focusClass} ${
           isExactMatch || highlighted ? accentClass : ''
         }`}
       >
         {activeChampion ? (
           <img
             src={activeChampion.imageUrl}
-            alt=""
+            alt=''
             width={32}
             height={32}
-            className="shrink-0 rounded-sm"
+            className='shrink-0 rounded-sm'
           />
         ) : (
           <span
-            aria-hidden="true"
-            className="size-8 shrink-0 rounded-sm bg-surface shadow-[inset_0_0_0_1px_var(--color-line)]"
+            aria-hidden='true'
+            className='size-8 shrink-0 rounded-sm bg-surface shadow-[inset_0_0_0_1px_var(--color-line)]'
           />
         )}
         <input
-          type="text"
-          role="combobox"
+          type='text'
+          role='combobox'
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -142,24 +148,24 @@ export default function ChampionCombobox({
           aria-expanded={showList}
           aria-controls={showList ? listboxId : undefined}
           aria-activedescendant={showList ? `${listboxId}-${activeIndex}` : undefined}
-          aria-autocomplete="list"
-          autoComplete="off"
-          className="min-w-0 flex-1 bg-transparent py-2.5 pr-3 text-ink outline-none placeholder:text-ink-3"
+          aria-autocomplete='list'
+          autoComplete='off'
+          className='min-w-0 flex-1 bg-transparent py-2.5 pr-3 text-ink outline-none placeholder:text-ink-3'
         />
       </div>
 
       {showList && (
         <ul
           id={listboxId}
-          role="listbox"
+          role='listbox'
           aria-label={`${label} 추천`}
-          className="chamfer-sm absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden bg-surface shadow-[inset_0_0_0_1px_var(--color-hextech),0_12px_28px_rgb(0_0_0/0.6)]"
+          className='chamfer-sm absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden bg-surface shadow-[inset_0_0_0_1px_var(--color-accent),0_12px_28px_rgb(0_0_0/0.6)]'
         >
           {suggestions.map((champion, index) => (
             <li
               key={champion.id}
               id={`${listboxId}-${index}`}
-              role="option"
+              role='option'
               aria-selected={index === activeIndex}
               onPointerDown={(event) => {
                 event.preventDefault();
@@ -167,18 +173,18 @@ export default function ChampionCombobox({
               }}
               onPointerEnter={() => setActiveIndex(index)}
               className={`flex cursor-pointer items-center gap-2.5 px-2 py-1.5 transition-colors ${
-                index === activeIndex ? 'bg-surface-2 text-hextech' : 'text-ink-2'
+                index === activeIndex ? 'bg-surface-2 text-accent' : 'text-ink-2'
               }`}
             >
               <img
                 src={champion.imageUrl}
-                alt=""
+                alt=''
                 width={28}
                 height={28}
-                loading="lazy"
-                className="shrink-0 rounded-sm"
+                loading='lazy'
+                className='shrink-0 rounded-sm'
               />
-              <span className="truncate text-sm">{champion.name}</span>
+              <span className='truncate text-sm'>{champion.name}</span>
             </li>
           ))}
         </ul>

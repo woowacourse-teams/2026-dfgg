@@ -1,108 +1,122 @@
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
-import banner from '../../assets/dfgg.png';
-import SiteFooter from '../../components/SiteFooter';
+import Intro1 from '../../assets/intro1.png';
+import Intro2 from '../../assets/intro2.jpg';
+import DesktopAppButton from '../../components/DesktopAppButton';
 
-/**
- * 릴리스 에셋을 직접 가리킨다. GitHub 이 Content-Disposition: attachment 로
- * 내려주므로 페이지 이동 없이 바로 다운로드가 시작된다.
- *
- * Riot 심사에 소스 저장소로 팀 저장소를 적었으므로 배포도 같은 곳에서 한다.
- * 파일명에 버전이 들어 있어 릴리스를 올릴 때마다 이 상수를 바꿔야 한다.
- * 고정 링크를 원하면 에셋 이름을 dfgg.exe 처럼 버전 없이 올리고
- * .../releases/latest/download/dfgg.exe 를 쓰면 된다.
- */
-const DOWNLOAD_VERSION = 'v1.1.0';
-const DOWNLOAD_URL = `https://github.com/woowacourse-teams/2026-dfgg/releases/download/${DOWNLOAD_VERSION}/dfgg-1.1.0.exe`;
-
-const ENTRIES = [
-  // {
-  //   to: '/nickname',
-  //   title: '닉네임으로 추천받기',
-  //   description: '소환사 이름을 입력하면 최근 전적을 바탕으로 아이템을 추천해드려요.',
-  // },
+const FEATURES = [
   {
-    to: '/champion-select',
-    title: '챔피언 조합으로 추천받기',
-    description: '지금 밴픽 중인 10명의 챔피언을 입력하면 아이템을 추천해드려요.',
+    eyebrow: '데스크톱 앱',
+    title: '조합 자동 인식',
+    body: [
+      '밴픽이 끝나면 롤 클라이언트에서 양 팀 조합을 그대로 읽어옵니다.',
+      '열 명을 하나씩 입력할 필요가 없습니다.',
+    ],
+    image: Intro1,
+    alt: '데스크톱 앱이 양 팀 조합을 읽어와 추천 아이템을 보여주는 화면',
+    fade: true,
+  },
+  {
+    eyebrow: '인게임 오버레이',
+    title: '게임 위에 바로',
+    body: [
+      '추천 아이템 6개를 순서대로 게임 화면 위에 띄워줍니다.',
+      '알트탭 없이 그 자리에서 확인하세요.',
+    ],
+    image: Intro2,
+    alt: '게임 화면 위에 추천 아이템 6개가 떠 있는 오버레이',
+    fade: true,
   },
 ];
 
 export default function Home() {
+  const navigate = useNavigate();
+
   return (
-    <div className="min-h-screen bg-ground">
-      <div className="relative aspect-5/1 overflow-hidden bg-cornflower">
-        <img
-          src={banner}
-          alt="DFGG"
-          className="absolute inset-0 h-full w-full object-cover object-[center_49%]"
-        />
-        <div className="banner-veil pointer-events-none absolute inset-0" />
+    <>
+      {/* 가운데 정렬은 히어로에만 준다. 공통 래퍼에 걸면 본문까지 따라간다. */}
+      <div className='text-center'>
+        <h1 className='font-display font-bold text-balance mb-12'>
+          <span className='block text-xl leading-snug text-ink-2 sm:text-3xl'>
+            나의 조합, 상대 조합에 맞는
+          </span>
+          <span className='mt-2 block text-4xl leading-[1.1] sm:text-6xl'>
+            <em className='bg-linear-to-br from-red-500 via-red-400 to-red-950 bg-clip-text text-transparent text-accent not-italic'>
+              6가지
+            </em>{' '}
+            아이템 추천
+          </span>
+        </h1>
+
+        <div className='flex flex-row gap-24 items-center justify-center'>
+          <DesktopAppButton data='desktop-app-home' className='px-10 py-4' />
+          <button
+            data-umami-event='10-champion-recommend-top'
+            onClick={() => navigate('/champion-select')}
+            type='button'
+            className='px-10 py-4 cursor-pointer rounded-xl bg-linear-to-br from-cobalt-deep to-cobalt font-bold text-white transition-opacity hover:opacity-90'
+          >
+            추천 받아보기
+          </button>
+        </div>
+
+        <div aria-hidden='true' className='mx-auto mt-7 h-px w-14 bg-accent/50' />
       </div>
 
-      <div className="mx-auto max-w-200 px-6 pt-11 pb-13 text-center">
-        <h1 className="font-display text-4xl leading-none font-bold text-balance sm:text-6xl">
-          다음 판, <em className="text-hextech not-italic">뭘 골라야</em> 이길까
-        </h1>
-        <p className="mx-auto mt-3 max-w-[42ch] text-ink-2 text-balance">
-          어떤 방식으로 추천받을지 골라주세요.
-        </p>
+      <section className='mt-16 grid gap-x-10 gap-y-16 text-left sm:mt-24 lg:grid-cols-2'>
+        {FEATURES.map((feature) => (
+          <article key={feature.title}>
+            <p className='flex items-center gap-2.5 text-sm font-medium text-ink-3'>
+              <span aria-hidden='true' className='h-4 w-1 bg-accent' />
+              {feature.eyebrow}
+            </p>
 
-        <nav className="mt-9 grid gap-4 text-left sm:grid-cols-2">
-          {ENTRIES.map((entry) => (
-            <Link
-              key={entry.to}
-              to={entry.to}
-              className="chamfer group bg-surface-2 p-6 shadow-[inset_0_0_0_1px_var(--color-line)] transition-shadow hover:shadow-[inset_0_0_0_1px_var(--color-hextech)]"
-            >
-              <h2 className="font-display text-xl font-bold transition-colors group-hover:text-hextech">
-                {entry.title}
-              </h2>
-              <p className="mt-2 text-sm text-ink-2">{entry.description}</p>
-            </Link>
-          ))}
-        </nav>
+            <h2 className='mt-3 font-display text-3xl leading-tight font-bold sm:text-4xl'>
+              {feature.title}
+            </h2>
 
-        <section className="chamfer mt-8 bg-surface-2 p-6 text-left shadow-[inset_0_0_0_1px_var(--color-line)]">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 className="font-display text-xl font-bold">데스크톱 앱</h2>
-              <p className="mt-2 max-w-[46ch] text-sm text-ink-2">
-                열 명을 직접 입력하지 않아도 됩니다. 롤 클라이언트에서 조합을 자동으로 읽어 게임
-                위에 추천 아이템을 띄워줍니다.
-              </p>
+            <div className='mt-6 space-y-1 leading-relaxed text-ink-2 text-pretty'>
+              {feature.body.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
             </div>
 
-            {/* 같은 탭에서 열어야 새 창이 떴다 사라지지 않고 다운로드만 시작된다. */}
-            <a
-              href={DOWNLOAD_URL}
-              className="chamfer-sm shrink-0 bg-hextech px-5 py-3 font-display text-sm font-bold tracking-[0.12em] text-[#04231f] uppercase transition-colors hover:bg-hextech-bright"
+            <figure
+              className={
+                feature.fade
+                  ? 'relative mt-6'
+                  : 'chamfer mt-6 overflow-hidden bg-surface-2 shadow-[inset_0_0_0_1px_var(--color-line)]'
+              }
             >
-              Windows 다운로드
-              <span className="ml-2 font-body text-[11px] font-normal tracking-normal normal-case opacity-70">
-                {DOWNLOAD_VERSION}
-              </span>
-            </a>
-          </div>
+              <img src={feature.image} alt={feature.alt} className='block w-full' />
+              {feature.fade && (
+                <>
+                  <div
+                    aria-hidden='true'
+                    className='pointer-events-none absolute inset-x-0 top-0 h-45 bg-linear-to-b from-ground via-ground/70 to-transparent'
+                  />
+                  <div
+                    aria-hidden='true'
+                    className='pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-ground via-ground/70 to-transparent'
+                  />
+                </>
+              )}
+            </figure>
+          </article>
+        ))}
+      </section>
 
-          <ul className="mt-5 space-y-1.5 text-xs text-ink-3">
-            <li>
-              설치 없이 실행됩니다. 처음 실행하면 Windows 보안 경고가 뜨는데{' '}
-              <strong className="text-ink-2">추가 정보 → 실행</strong>을 눌러주세요. 코드 서명
-              인증서를 준비 중입니다.
-            </li>
-            <li>
-              롤이 <strong className="text-ink-2">전체 화면</strong>이면 오버레이가 게임에
-              가려집니다. 롤 설정 → 그래픽 → 창 모드를{' '}
-              <strong className="text-ink-2">테두리 없음</strong>이나{' '}
-              <strong className="text-ink-2">창 모드</strong>로 두세요.
-            </li>
-            <li>롤 클라이언트가 실행 중이어야 밴픽·게임 조합을 읽어옵니다.</li>
-          </ul>
-        </section>
-
-        <SiteFooter />
-      </div>
-    </div>
+      <button
+        data-umami-event='10-champion-recommend-bottom'
+        type='button'
+        onClick={() => navigate('/champion-select')}
+        className='group mx-auto mt-16 flex w-fit cursor-pointer items-center gap-2 rounded-2xl border border-line bg-surface-2/60 px-8 py-3.5 font-bold text-ink transition-colors hover:border-accent-strong hover:bg-accent-strong hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+      >
+        체험해보기
+        <span aria-hidden='true' className='transition-transform group-hover:translate-x-1'>
+          →
+        </span>
+      </button>
+    </>
   );
 }

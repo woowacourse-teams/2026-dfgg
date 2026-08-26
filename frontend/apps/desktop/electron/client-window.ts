@@ -84,8 +84,14 @@ function parseRect(line: string): ClientWindowRect | null {
 /**
  * 감시를 시작한다. 좌표가 바뀔 때마다 콜백이 불린다. 클라이언트가 없으면 null.
  * 돌려주는 함수를 호출하면 감시를 멈춘다.
+ *
+ * onSpawnFailed 는 감시용 PowerShell 프로세스 자체를 못 띄웠을 때만 불린다
+ * (실행 정책, 권한 제약 등). dock 기능이 이 사용자에게는 통째로 동작하지 않는다는 뜻이다.
  */
-export function watchClientWindow(onRect: (rect: ClientWindowRect | null) => void): () => void {
+export function watchClientWindow(
+  onRect: (rect: ClientWindowRect | null) => void,
+  onSpawnFailed?: (error: unknown) => void,
+): () => void {
   if (process.platform !== 'win32') return () => {};
 
   // 따옴표 이스케이프를 신경 쓰지 않도록 스크립트를 통째로 인코딩해 넘긴다.
@@ -98,6 +104,7 @@ export function watchClientWindow(onRect: (rect: ClientWindowRect | null) => voi
     });
   } catch (error) {
     console.error('[dock] 창 감시를 시작하지 못했습니다', error);
+    onSpawnFailed?.(error);
     return () => {};
   }
 
