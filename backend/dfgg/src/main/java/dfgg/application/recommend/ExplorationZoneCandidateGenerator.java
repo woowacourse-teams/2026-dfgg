@@ -48,7 +48,7 @@ public class ExplorationZoneCandidateGenerator {
                         item.getEntityId(),
                         cosineSimilarityCalculator.maxSimilarity(item.getVector(), enemyVectors)
                 ))
-                .sorted(Comparator.comparingDouble(RankedItemCandidate::maxSimilarity).reversed())
+                .sorted(Comparator.comparingDouble(RankedItemCandidate::score).reversed())
                 .toList();
     }
 }

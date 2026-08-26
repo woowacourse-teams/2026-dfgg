@@ -2,6 +2,7 @@ package dfgg.application.recommend.fallback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -14,10 +15,8 @@ import dfgg.application.recommend.FinalScoreCalculator;
 import dfgg.application.recommend.ItemSimilarityScores;
 import dfgg.application.recommend.MixedCandidates;
 import dfgg.application.recommend.RankedItemCandidate;
-import dfgg.application.recommend.RankedSequentialPattern;
 import dfgg.application.recommend.SafeZoneCandidateGenerator;
 import dfgg.domain.champion.ChampionPosition;
-import dfgg.domain.sequence.MinedSequentialPattern;
 import dfgg.infrastructure.config.RecommendationProperties;
 import java.util.List;
 import java.util.Optional;
@@ -34,7 +33,7 @@ class PrimaryRecommendationStrategyTest {
     private PrimaryRecommendationStrategy strategy;
 
     private static final RecommendationProperties PROPERTIES = new RecommendationProperties(
-            "checkpoint-a-4", "checkpoint-c-1-counter", "checkpoint-d-1",
+            "checkpoint-a-4", "checkpoint-c-1-counter", "checkpoint-d-1", 2,
             10, 0.8, 1.0, 1.0, 1.0, 1.0
     );
 
@@ -60,23 +59,15 @@ class PrimaryRecommendationStrategyTest {
         );
     }
 
-    private MinedSequentialPattern patternEndingWith(Long lastItem) {
-        return new MinedSequentialPattern(
-                222L, ChampionPosition.BOTTOM, "PLATINUM", "16.16",
-                List.of(3031L, lastItem), 100, 1000, 60, "checkpoint-d-1"
-        );
-    }
-
     @Test
     @DisplayName("안전 구역과 탐색 구역 후보를 합쳐 finalScore 내림차순으로 정렬한 아이템 목록을 반환한다")
     void recommend_WhenCandidatesExistInBothZones_ReturnsItemIdsSortedByFinalScoreDescending() {
         // given: 안전 구역 후보 3072(wilson=0.5), 탐색 구역 후보 3006(wilson 항 없음, 0으로 처리)
-        RankedSequentialPattern safeZoneCandidate =
-                new RankedSequentialPattern(patternEndingWith(3072L), 0.5);
+        RankedItemCandidate safeZoneCandidate = new RankedItemCandidate(3072L, 0.5);
         RankedItemCandidate explorationZoneCandidate = new RankedItemCandidate(3006L, 0.9);
 
         when(safeZoneCandidateGenerator.rankNextItemCandidates(
-                anyList(), any(), any(), anyString(), anyString(), anyString()
+                anyList(), any(), any(), anyString(), anyString(), anyString(), anyInt()
         )).thenReturn(List.of(safeZoneCandidate));
         when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString()))
                 .thenReturn(List.of(explorationZoneCandidate));
@@ -105,7 +96,7 @@ class PrimaryRecommendationStrategyTest {
     void recommend_WhenBothZonesHaveNoCandidates_ReturnsEmptyOptional() {
         // given
         when(safeZoneCandidateGenerator.rankNextItemCandidates(
-                anyList(), any(), any(), anyString(), anyString(), anyString()
+                anyList(), any(), any(), anyString(), anyString(), anyString(), anyInt()
         )).thenReturn(List.of());
         when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString()))
                 .thenReturn(List.of());
@@ -125,13 +116,12 @@ class PrimaryRecommendationStrategyTest {
         // given: 3072가 안전 구역(wilson=0.5)과 탐색 구역 둘 다에 등장, 3006은 탐색 구역에만 등장
         // 3072가 wilson=0.5를 제대로 쓰면 finalScore=0.5+0.2+0.2+0.2=1.1 > 3006의 0.8 → [3072, 3006]
         // 3072가 잘못 wilson=0으로 계산되면 finalScore=0.6 < 3006의 0.8 → [3006, 3072] (버그로 판별됨)
-        RankedSequentialPattern safeZoneCandidate =
-                new RankedSequentialPattern(patternEndingWith(3072L), 0.5);
+        RankedItemCandidate safeZoneCandidate = new RankedItemCandidate(3072L, 0.5);
         RankedItemCandidate explorationZoneOverlap = new RankedItemCandidate(3072L, 0.9);
         RankedItemCandidate explorationZoneUnique = new RankedItemCandidate(3006L, 0.5);
 
         when(safeZoneCandidateGenerator.rankNextItemCandidates(
-                anyList(), any(), any(), anyString(), anyString(), anyString()
+                anyList(), any(), any(), anyString(), anyString(), anyString(), anyInt()
         )).thenReturn(List.of(safeZoneCandidate));
         when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString()))
                 .thenReturn(List.of(explorationZoneOverlap, explorationZoneUnique));

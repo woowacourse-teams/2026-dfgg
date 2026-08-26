@@ -29,6 +29,7 @@ recommendation:
   identity-algorithm-version: "${RECOMMENDATION_IDENTITY_ALGORITHM_VERSION:checkpoint-a-4}"
   counter-algorithm-version: "${RECOMMENDATION_COUNTER_ALGORITHM_VERSION:checkpoint-c-1-counter}"
   pattern-algorithm-version: "${RECOMMENDATION_PATTERN_ALGORITHM_VERSION:checkpoint-d-1}"
+  anchored-prefix-limit: "${RECOMMENDATION_ANCHORED_PREFIX_LIMIT:2}"
   total-candidate-count: "${RECOMMENDATION_TOTAL_CANDIDATE_COUNT:10}"
   safe-zone-ratio: "${RECOMMENDATION_SAFE_ZONE_RATIO:0.8}"
   wilson-weight: "${RECOMMENDATION_WILSON_WEIGHT:1.0}"

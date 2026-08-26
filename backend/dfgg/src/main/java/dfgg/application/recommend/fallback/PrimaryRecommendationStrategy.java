@@ -8,7 +8,6 @@ import dfgg.application.recommend.FinalScoreWeights;
 import dfgg.application.recommend.ItemSimilarityScores;
 import dfgg.application.recommend.MixedCandidates;
 import dfgg.application.recommend.RankedItemCandidate;
-import dfgg.application.recommend.RankedSequentialPattern;
 import dfgg.application.recommend.SafeZoneCandidateGenerator;
 import dfgg.infrastructure.config.RecommendationProperties;
 import java.util.Comparator;
@@ -55,9 +54,10 @@ public class PrimaryRecommendationStrategy implements RecommendationStrategy {
 
     @Override
     public Optional<List<Long>> recommend(RecommendationContext context) {
-        List<RankedSequentialPattern> safeZoneRanked = safeZoneCandidateGenerator.rankNextItemCandidates(
+        List<RankedItemCandidate> safeZoneRanked = safeZoneCandidateGenerator.rankNextItemCandidates(
                 context.purchasedItemIds(), context.myChampionId(), context.position(),
-                context.tier(), context.patch(), recommendationProperties.patternAlgorithmVersion()
+                context.tier(), context.patch(), recommendationProperties.patternAlgorithmVersion(),
+                recommendationProperties.anchoredPrefixLimit()
         );
         List<RankedItemCandidate> explorationZoneRanked = explorationZoneCandidateGenerator
                 .rankByMaxSimilarityToEnemies(context.enemyChampionIds(), recommendationProperties.counterAlgorithmVersion());
@@ -88,10 +88,8 @@ public class PrimaryRecommendationStrategy implements RecommendationStrategy {
 
     private Map<Long, Double> collectWilsonScores(MixedCandidates mixed) {
         Map<Long, Double> wilsonScoreByItemId = new LinkedHashMap<>();
-        for (RankedSequentialPattern candidate : mixed.safeZoneCandidates()) {
-            List<Long> items = candidate.pattern().getItems();
-            Long nextItemId = items.get(items.size() - 1);
-            wilsonScoreByItemId.putIfAbsent(nextItemId, candidate.wilsonLowerBound());
+        for (RankedItemCandidate candidate : mixed.safeZoneCandidates()) {
+            wilsonScoreByItemId.putIfAbsent(candidate.itemId(), candidate.score());
         }
         for (RankedItemCandidate candidate : mixed.explorationZoneCandidates()) {
             wilsonScoreByItemId.putIfAbsent(candidate.itemId(), 0.0);

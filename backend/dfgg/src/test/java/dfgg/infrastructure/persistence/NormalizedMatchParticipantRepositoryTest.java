@@ -116,4 +116,73 @@ class NormalizedMatchParticipantRepositoryTest {
         // then
         assertThat(build).isEmpty();
     }
+
+    @Test
+    @DisplayName("prefix가 비어있으면(1코어) 실제로 1번째 위치에 있는 아이템 분포를 반환한다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findNextItemDistribution_WhenPrefixIsEmpty_ReturnsFirstPositionItemDistribution() {
+        // given: 챔피언 222(BOTTOM)는 '3031,3072'를 3번(승2패1), '3006,3031'을 1번(패) 샀다
+
+        // when
+        List<Object[]> rows = participantRepository.findNextItemDistribution(
+                222L, List.of("BOTTOM"), "PLATINUM", "16.16", "", 1
+        );
+
+        // then
+        Map<String, long[]> byItem = rows.stream().collect(Collectors.toMap(
+                row -> (String) row[0],
+                row -> new long[]{((Number) row[1]).longValue(), ((Number) row[2]).longValue()}
+        ));
+        assertThat(byItem.get("3031")).containsExactly(3L, 2L);
+        assertThat(byItem.get("3006")).containsExactly(1L, 0L);
+    }
+
+    @Test
+    @DisplayName("prefix가 주어지면 그 prefix로 정확히 시작하는 사람들만 걸러 다음 위치 아이템 분포를 반환한다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findNextItemDistribution_WhenPrefixGiven_ReturnsNextPositionItemDistributionForExactMatches() {
+        // given: '3031'로 시작하는 건 '3031,3072' 3건뿐('3006,3031'은 3031로 시작하지 않음)
+
+        // when
+        List<Object[]> rows = participantRepository.findNextItemDistribution(
+                222L, List.of("BOTTOM"), "PLATINUM", "16.16", "3031", 2
+        );
+
+        // then
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0)[0]).isEqualTo("3072");
+        assertThat(((Number) rows.get(0)[1]).longValue()).isEqualTo(3L);
+        assertThat(((Number) rows.get(0)[2]).longValue()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("어느 누구도 그 prefix로 시작하지 않으면 빈 리스트를 반환한다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findNextItemDistribution_WhenNoOneMatchesPrefix_ReturnsEmptyList() {
+        // given & when
+        List<Object[]> rows = participantRepository.findNextItemDistribution(
+                222L, List.of("BOTTOM"), "PLATINUM", "16.16", "9999", 2
+        );
+
+        // then
+        assertThat(rows).isEmpty();
+    }
+
+    @Test
+    @DisplayName("MID 포지션은 Riot 원시값 MIDDLE까지 조회 대상에 포함해야 데이터를 찾는다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findNextItemDistribution_WhenPositionIsMid_RequiresRiotAliasToFindData() {
+        // given: 챔피언 103은 position이 Riot 원시값 'MIDDLE'로 저장돼 있다
+
+        // when
+        List<Object[]> rows = participantRepository.findNextItemDistribution(
+                103L, List.of("MID", "MIDDLE"), "PLATINUM", "16.16", "", 1
+        );
+
+        // then
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0)[0]).isEqualTo("3020");
+        assertThat(((Number) rows.get(0)[1]).longValue()).isEqualTo(2L);
+        assertThat(((Number) rows.get(0)[2]).longValue()).isEqualTo(2L);
+    }
 }

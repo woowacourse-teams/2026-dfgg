@@ -68,4 +68,36 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
             @Param("championId") Long championId,
             @Param("positions") Collection<String> positions
     );
+
+    /**
+     * {@code prefix}(콤마 구분 아이템 ID 문자열)로 구매 순서가 정확히 시작하는 참가자들만
+     * 걸러, {@code nextPosition}번째(1-indexed) 아이템의 분포를 반환한다.
+     *
+     * <p>{@code mined_sequential_patterns}(PrefixSpan)와 달리 gap을 허용하지 않고 구매
+     * 순서의 실제 앞부분에 정확히 anchoring된 통계다 — "빌드 어딘가에 있음"과 "그 위치에
+     * 정확히 있음"을 혼동하지 않기 위함(1~2코어에서 이 차이가 크게 벌어짐을 실측으로 확인).
+     * {@code prefix}가 빈 문자열이면 전체(필터 없음)를 대상으로 1번째 위치를 본다.
+     */
+    @Query(value = """
+            SELECT item_id, count(*) AS support, sum(win::int) AS win_count
+            FROM (
+                SELECT split_part(core_item_purchase_order, ',', :nextPosition) AS item_id, win
+                FROM normalized_match_participants
+                WHERE champion_id = :championId
+                  AND position IN (:positions)
+                  AND tier = :tier
+                  AND patch = :patch
+                  AND (:prefix = '' OR core_item_purchase_order LIKE :prefix || ',%')
+            ) AS next_items
+            WHERE item_id <> ''
+            GROUP BY item_id
+            """, nativeQuery = true)
+    List<Object[]> findNextItemDistribution(
+            @Param("championId") Long championId,
+            @Param("positions") Collection<String> positions,
+            @Param("tier") String tier,
+            @Param("patch") String patch,
+            @Param("prefix") String prefix,
+            @Param("nextPosition") int nextPosition
+    );
 }

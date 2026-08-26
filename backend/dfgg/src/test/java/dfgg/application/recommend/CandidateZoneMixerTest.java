@@ -2,8 +2,6 @@ package dfgg.application.recommend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dfgg.domain.champion.ChampionPosition;
-import dfgg.domain.sequence.MinedSequentialPattern;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,19 +10,7 @@ class CandidateZoneMixerTest {
 
     private final CandidateZoneMixer candidateZoneMixer = new CandidateZoneMixer();
 
-    private List<RankedSequentialPattern> rankedSafeZoneCandidates(int count) {
-        return java.util.stream.IntStream.range(0, count)
-                .mapToObj(i -> new RankedSequentialPattern(
-                        new MinedSequentialPattern(
-                                1L, ChampionPosition.BOTTOM, "PLATINUM", "16.16",
-                                List.of((long) i), 10, 100, 5, "checkpoint-d-1"
-                        ),
-                        1.0 - i * 0.01
-                ))
-                .toList();
-    }
-
-    private List<RankedItemCandidate> rankedExplorationZoneCandidates(int count) {
+    private List<RankedItemCandidate> rankedCandidates(int count) {
         return java.util.stream.IntStream.range(0, count)
                 .mapToObj(i -> new RankedItemCandidate((long) i, 1.0 - i * 0.01))
                 .toList();
@@ -34,8 +20,8 @@ class CandidateZoneMixerTest {
     @DisplayName("요청한 비율(80/20)대로 총 개수를 정확히 나눈다")
     void mix_WhenRatioIsEightyTwenty_SplitsExactlyByRatio() {
         // given
-        List<RankedSequentialPattern> safeZone = rankedSafeZoneCandidates(20);
-        List<RankedItemCandidate> explorationZone = rankedExplorationZoneCandidates(20);
+        List<RankedItemCandidate> safeZone = rankedCandidates(20);
+        List<RankedItemCandidate> explorationZone = rankedCandidates(20);
 
         // when
         MixedCandidates mixed = candidateZoneMixer.mix(safeZone, explorationZone, 10, 0.8);
@@ -49,8 +35,8 @@ class CandidateZoneMixerTest {
     @DisplayName("비율 파라미터를 다르게 주면 그 비율대로 나뉜다 (하드코딩된 80/20이 아님을 증명)")
     void mix_WhenRatioIsFiftyFifty_SplitsByGivenRatioNotHardcodedEightyTwenty() {
         // given
-        List<RankedSequentialPattern> safeZone = rankedSafeZoneCandidates(20);
-        List<RankedItemCandidate> explorationZone = rankedExplorationZoneCandidates(20);
+        List<RankedItemCandidate> safeZone = rankedCandidates(20);
+        List<RankedItemCandidate> explorationZone = rankedCandidates(20);
 
         // when
         MixedCandidates mixed = candidateZoneMixer.mix(safeZone, explorationZone, 10, 0.5);
@@ -64,8 +50,8 @@ class CandidateZoneMixerTest {
     @DisplayName("각 구역에서 랭킹 상위 순서 그대로 잘라낸다")
     void mix_WhenSplitting_KeepsTopRankedOrderFromEachZone() {
         // given
-        List<RankedSequentialPattern> safeZone = rankedSafeZoneCandidates(20);
-        List<RankedItemCandidate> explorationZone = rankedExplorationZoneCandidates(20);
+        List<RankedItemCandidate> safeZone = rankedCandidates(20);
+        List<RankedItemCandidate> explorationZone = rankedCandidates(20);
 
         // when
         MixedCandidates mixed = candidateZoneMixer.mix(safeZone, explorationZone, 10, 0.8);
@@ -79,8 +65,8 @@ class CandidateZoneMixerTest {
     @DisplayName("안전 구역 후보가 요청한 개수보다 적으면 있는 만큼만 채택한다")
     void mix_WhenSafeZoneHasFewerCandidatesThanRequested_TakesOnlyAvailableOnes() {
         // given
-        List<RankedSequentialPattern> safeZone = rankedSafeZoneCandidates(3);
-        List<RankedItemCandidate> explorationZone = rankedExplorationZoneCandidates(20);
+        List<RankedItemCandidate> safeZone = rankedCandidates(3);
+        List<RankedItemCandidate> explorationZone = rankedCandidates(20);
 
         // when
         MixedCandidates mixed = candidateZoneMixer.mix(safeZone, explorationZone, 10, 0.8);
@@ -94,8 +80,8 @@ class CandidateZoneMixerTest {
     @DisplayName("비율 계산이 딱 나눠떨어지지 않으면 반올림한 개수를 안전 구역에 배정한다")
     void mix_WhenRatioDoesNotDivideEvenly_RoundsSafeZoneCount() {
         // given: totalCandidateCount=3, ratio=0.8 → 3*0.8=2.4 → 반올림 2
-        List<RankedSequentialPattern> safeZone = rankedSafeZoneCandidates(20);
-        List<RankedItemCandidate> explorationZone = rankedExplorationZoneCandidates(20);
+        List<RankedItemCandidate> safeZone = rankedCandidates(20);
+        List<RankedItemCandidate> explorationZone = rankedCandidates(20);
 
         // when
         MixedCandidates mixed = candidateZoneMixer.mix(safeZone, explorationZone, 3, 0.8);

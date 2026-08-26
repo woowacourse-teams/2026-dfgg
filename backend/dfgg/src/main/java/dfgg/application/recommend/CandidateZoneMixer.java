@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 public class CandidateZoneMixer {
 
     public MixedCandidates mix(
-            List<RankedSequentialPattern> rankedSafeZoneCandidates,
+            List<RankedItemCandidate> rankedSafeZoneCandidates,
             List<RankedItemCandidate> rankedExplorationZoneCandidates,
             int totalCandidateCount,
             double safeZoneRatio

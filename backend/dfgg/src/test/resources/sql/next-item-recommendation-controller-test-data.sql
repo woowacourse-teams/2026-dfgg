@@ -15,11 +15,14 @@ INSERT INTO items (item_id, name, tags) VALUES
 -- 최다빈도 빌드가 '3072,3006'이 되도록 한다. mined_sequential_patterns/embeddings/
 -- composition_stats는 비워둬(①④단계가 빈 결과를 내도록) ⑤단계까지 폴백이 실제로
 -- 내려가는지 검증한다.
+-- tier는 요청(PLATINUM)과 일부러 다른 GOLD로 시딩한다: findMostFrequentBuild(⑤)는
+-- tier/patch를 보지 않지만, findNextItemDistribution(①의 anchoring 경로)은 tier/patch로
+-- 걸러내므로 이렇게 해야 ①이 이 데이터를 가로채지 않고 ⑤까지 폴백이 내려간다.
 INSERT INTO normalized_match_participants (
     match_id, patch, queue_id, puuid, participant_id, champion_id, team_id, position, tier, win,
     final_core_item_ids, core_item_purchase_order, core_item_purchase_order_complete
 ) VALUES
-    ('KR_N1', '16.16', 420, 'puuid-n1', 1, 222, 100, 'BOTTOM', 'PLATINUM', true, '3072,3006', '3072,3006', true),
-    ('KR_N2', '16.16', 420, 'puuid-n2', 1, 222, 100, 'BOTTOM', 'PLATINUM', false, '3072,3006', '3072,3006', true),
-    ('KR_N3', '16.16', 420, 'puuid-n3', 1, 222, 100, 'BOTTOM', 'PLATINUM', true, '3072,3006', '3072,3006', true),
-    ('KR_N4', '16.16', 420, 'puuid-n4', 1, 222, 100, 'BOTTOM', 'PLATINUM', false, '3006', '3006', true);
+    ('KR_N1', '16.16', 420, 'puuid-n1', 1, 222, 100, 'BOTTOM', 'GOLD', true, '3072,3006', '3072,3006', true),
+    ('KR_N2', '16.16', 420, 'puuid-n2', 1, 222, 100, 'BOTTOM', 'GOLD', false, '3072,3006', '3072,3006', true),
+    ('KR_N3', '16.16', 420, 'puuid-n3', 1, 222, 100, 'BOTTOM', 'GOLD', true, '3072,3006', '3072,3006', true),
+    ('KR_N4', '16.16', 420, 'puuid-n4', 1, 222, 100, 'BOTTOM', 'GOLD', false, '3006', '3006', true);

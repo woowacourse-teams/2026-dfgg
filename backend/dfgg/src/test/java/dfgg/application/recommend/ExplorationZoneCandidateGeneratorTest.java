@@ -53,8 +53,8 @@ class ExplorationZoneCandidateGeneratorTest {
         // then
         assertThat(ranked).extracting(RankedItemCandidate::itemId)
                 .containsExactly(3001L, 3002L);
-        assertThat(ranked.get(0).maxSimilarity()).isCloseTo(1.0, org.assertj.core.data.Offset.offset(0.0001));
-        assertThat(ranked.get(1).maxSimilarity()).isCloseTo(0.8, org.assertj.core.data.Offset.offset(0.0001));
+        assertThat(ranked.get(0).score()).isCloseTo(1.0, org.assertj.core.data.Offset.offset(0.0001));
+        assertThat(ranked.get(1).score()).isCloseTo(0.8, org.assertj.core.data.Offset.offset(0.0001));
     }
 
     @Test
