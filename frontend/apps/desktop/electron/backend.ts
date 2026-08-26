@@ -12,14 +12,23 @@ const API_BASE = process.env.DFGG_API_BASE ?? DEFAULT_API_BASE;
 
 const TIMEOUT_MS = 10_000;
 
-export async function requestRecommendation(body: unknown): Promise<unknown> {
-  const response = await fetch(`${API_BASE}/recommendations/v2`, {
+async function postRecommendation(path: string, body: unknown): Promise<unknown> {
+  const response = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
 
-  if (!response.ok) throw new Error(`recommendations/v2 ${response.status}`);
+  if (!response.ok) throw new Error(`${path} ${response.status}`);
   return response.json();
+}
+
+export function requestRecommendation(body: unknown): Promise<unknown> {
+  return postRecommendation('/api/recommendations/v2', body);
+}
+
+/** v3는 구매한 아이템 목록을 담아 살 때마다 다시 부르는 방식이다. */
+export function requestRecommendationV3(body: unknown): Promise<unknown> {
+  return postRecommendation('/api/recommendations/v3', body);
 }

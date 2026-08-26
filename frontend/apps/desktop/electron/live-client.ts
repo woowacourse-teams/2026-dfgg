@@ -18,7 +18,12 @@ interface LiveItem {
   itemID?: number;
   /** 와드 토큰처럼 소모되거나 쓰는 아이템. 완성 빌드 체크에는 세지 않는다. */
   consumable?: boolean;
+  /** 0~5 인벤토리, 6 장신구. 장신구는 산 게 아니라 처음부터 끼고 있는 장비다. */
+  slot?: number;
 }
+
+/** 장신구 슬롯 번호. 기본 와드는 consumable: false 라 그 필터로는 안 걸러진다. */
+const TRINKET_SLOT = 6;
 
 interface LivePlayer {
   championName?: string;
@@ -74,10 +79,15 @@ function bareName(name: string | undefined): string {
   return (name ?? '').split('#')[0].trim();
 }
 
-/** 완성 아이템 id만 남긴다. 와드류 소모품은 빌드 체크 대상이 아니다. */
+/**
+ * 완성 아이템 id만 남긴다. 소모품(포션 등)과 장신구(기본 와드)는 빼는데,
+ * 장신구는 consumable이 false라 그 필터만으로는 안 걸러져서 slot도 같이 본다.
+ */
 function completedItemIds(items: LiveItem[] | undefined): number[] {
   return (items ?? [])
-    .filter((item) => !item.consumable && typeof item.itemID === 'number')
+    .filter(
+      (item) => !item.consumable && item.slot !== TRINKET_SLOT && typeof item.itemID === 'number',
+    )
     .map((item) => item.itemID as number);
 }
 
@@ -106,6 +116,13 @@ export async function fetchLiveGame(): Promise<Lineup | null> {
   const myTeam = me.team;
   const allies = players.filter((player) => player.team === myTeam).map(toSlot);
   const enemies = players.filter((player) => player.team !== myTeam).map(toSlot);
+
+  // 미션 완료 후 신발이 별도 칸으로 옮겨지는 것처럼 보이는 문제를 확인하려고
+  // 남겨둔 로그다. LiveItem 타입에 없는 필드(slot, count, displayName 등)까지
+  // Riot이 실제로 뭘 보내는지 그대로 봐야 원인을 알 수 있다. 원인이 확인되면 지운다.
+  if (process.env.DFGG_DEBUG_ITEMS === '1') {
+    console.log('[live-client] 내 아이템 원본', JSON.stringify(me.items));
+  }
 
   return {
     sessionId: 0, // main.ts 가 실제 값으로 덮어쓴다

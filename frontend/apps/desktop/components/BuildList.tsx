@@ -1,4 +1,4 @@
-import { type DDragonData } from '../../../packages/shared/ddragon';
+import { canonicalItemId, type DDragonData } from '../../../packages/shared/ddragon';
 import { type Build, DIRECTION_LABEL } from '../../../packages/shared/types';
 import ItemBuild from './ItemBuild';
 
@@ -25,12 +25,21 @@ export default function BuildList({
   compact = false,
   ownedItemIds = [],
 }: BuildListProps) {
-  if (builds.length === 0) return null;
+  // 문서엔 build가 null이 아니라고 돼 있지만, 실제 응답은 아이템이 없는
+  // 빌드에 build: null을 준다. 걸러내지 않으면 아래 .filter에서 화면이 죽는다.
+  const usableBuilds = builds.filter((build) => build.build?.length);
+  if (usableBuilds.length === 0) return null;
+
+  // 아레나·아람 등은 같은 아이템도 다른 id로 보고하므로, 원래 id로 정규화해서 비교한다.
+  const canonicalOwnedIds = new Set(ownedItemIds.map(canonicalItemId));
 
   return (
     <div className={compact ? 'space-y-1.5' : 'space-y-3'}>
-      {builds.map((build, rank) => {
-        const ownedCount = build.build.filter((item) => ownedItemIds.includes(item.id)).length;
+      {usableBuilds.map((build, rank) => {
+        const items = build.build ?? [];
+        const ownedCount = items.filter((item) =>
+          canonicalOwnedIds.has(canonicalItemId(item.id)),
+        ).length;
 
         return (
           <div
@@ -56,13 +65,13 @@ export default function BuildList({
                 <span
                   className={`shrink-0 tabular-nums text-emerald-400 ${compact ? 'text-[9px]' : 'text-[11px]'}`}
                 >
-                  {ownedCount}/{build.build.length}
+                  {ownedCount}/{items.length}
                 </span>
               )}
             </div>
             <div className={compact ? 'mt-1' : 'mt-1.5'}>
               <ItemBuild
-                items={build.build}
+                items={items}
                 ddragon={ddragon}
                 compact={compact}
                 ownedItemIds={ownedItemIds}

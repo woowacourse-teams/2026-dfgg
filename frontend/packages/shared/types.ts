@@ -69,6 +69,26 @@ export interface RecommendationResponse {
   builds: Build[];
 }
 
+/**
+ * POST /api/recommendations/v3 요청 본문. v2(builds)와 달리 구매한 아이템
+ * 목록을 실어 보내고, 살 때마다 다시 호출해서 다음 추천을 받는 방식이다.
+ */
+export interface RecommendationV3Request {
+  myChampion: Champion;
+  purchasedItemIds: number[];
+  allies: Champion[];
+  enemies: Champion[];
+  tier: string;
+  patch: string;
+}
+
+/** v3 응답. builds처럼 여러 세트로 나뉘지 않고 다음에 살 아이템을 한 줄로 준다. */
+export interface RecommendationV3Response {
+  recommendedItems: Item[];
+  /** 어떤 방식으로 추천했는지 백엔드가 알려주는 값. 그대로 화면에 표시한다. */
+  servedBy: string;
+}
+
 /** direction 코드를 UI에 보여줄 한글 라벨로 바꾼다. API가 한글 설명을 내려주지 않는다. */
 export const DIRECTION_LABEL: Record<Direction, string> = {
   PHYSICAL_DAMAGE: '물리 피해 대응',

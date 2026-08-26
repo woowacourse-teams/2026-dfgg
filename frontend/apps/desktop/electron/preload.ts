@@ -35,6 +35,9 @@ const lcuApi = {
    */
   recommend: <T>(body: unknown): Promise<T> => ipcRenderer.invoke('api:recommend', body),
 
+  /** 2번 추천 방식(v3). 구매한 아이템을 담아 살 때마다 다시 부른다. */
+  recommendV3: <T>(body: unknown): Promise<T> => ipcRenderer.invoke('api:recommendV3', body),
+
   /** 오버레이 표시·크기 조절. 오버레이는 클릭 통과라 메인 창에서만 조작한다. */
   overlay: {
     getState: (): Promise<{ scale: number; visible: boolean }> =>
@@ -49,6 +52,22 @@ const lcuApi = {
       ipcRenderer.on('overlay:state', handler);
       return () => {
         ipcRenderer.removeListener('overlay:state', handler);
+      };
+    },
+  },
+
+  /**
+   * 1번/2번 추천 방식 중 어느 걸 화면에 보여줄지. 오버레이는 버튼을 못 다니까
+   * 메인 프로세스가 값을 들고 있다가, 메인 창에서 바꾸면 오버레이에도 흘려보낸다.
+   */
+  recommendMode: {
+    get: (): Promise<1 | 2> => ipcRenderer.invoke('recommend:getMode'),
+    set: (mode: 1 | 2): Promise<1 | 2> => ipcRenderer.invoke('recommend:setMode', mode),
+    onChange: (callback: (mode: 1 | 2) => void) => {
+      const handler = (_event: unknown, mode: 1 | 2) => callback(mode);
+      ipcRenderer.on('recommend:mode', handler);
+      return () => {
+        ipcRenderer.removeListener('recommend:mode', handler);
       };
     },
   },
