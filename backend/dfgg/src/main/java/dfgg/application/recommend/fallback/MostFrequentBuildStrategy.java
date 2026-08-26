@@ -34,7 +34,8 @@ public class MostFrequentBuildStrategy implements RecommendationStrategy {
     public Optional<List<Long>> recommend(RecommendationContext context) {
         List<String> positions = positionNormalizer.riotValuesOf(context.position());
         return participantRepository.findMostFrequentBuild(context.myChampionId(), positions)
-                .map(this::parseItemIds);
+                .map(this::parseItemIds)
+                .flatMap(build -> NextItemSelector.pick(build, context.purchasedItemIds().size()));
     }
 
     private List<Long> parseItemIds(String commaSeparatedItemIds) {

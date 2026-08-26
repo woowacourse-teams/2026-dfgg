@@ -39,15 +39,15 @@ class CompositionStatsStrategyTest {
         when(championRepository.findAllById(any())).thenReturn(List.of());
     }
 
-    private RecommendationContext contextOf() {
+    private RecommendationContext contextOf(List<Long> purchasedItemIds) {
         return new RecommendationContext(
-                222L, ChampionPosition.BOTTOM, "PLATINUM", "16.16", List.of(412L), List.of(54L)
+                222L, purchasedItemIds, ChampionPosition.BOTTOM, "PLATINUM", "16.16", List.of(412L), List.of(54L)
         );
     }
 
     @Test
-    @DisplayName("조합된 빌드의 아이템 ID를 슬롯 순서 그대로 반환한다")
-    void recommend_WhenStatsAndComposedBuildExist_ReturnsItemIdsInSlotOrder() {
+    @DisplayName("아직 아무것도 안 샀으면(콜드스타트) 조합된 빌드의 첫 아이템 하나만 다음 아이템으로 추천한다")
+    void recommend_WhenNoPurchasedItems_RecommendsFirstItemOfComposedBuild() {
         // given
         when(statsRepository.findAllMatchingStats(
                 anyLong(), anyString(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean()
@@ -58,11 +58,45 @@ class CompositionStatsStrategyTest {
         ));
 
         // when
-        Optional<List<Long>> itemIds = strategy.recommend(contextOf());
+        Optional<List<Long>> itemIds = strategy.recommend(contextOf(List.of()));
 
         // then
-        assertThat(itemIds).isPresent();
-        assertThat(itemIds.get()).containsExactly(3006L, 3031L);
+        assertThat(itemIds).contains(List.of(3006L));
+    }
+
+    @Test
+    @DisplayName("이미 산 아이템 개수만큼 조합된 빌드에서 인덱스로 다음 아이템 하나만 추천한다")
+    void recommend_WhenSomeItemsAlreadyPurchased_RecommendsNextItemByPurchasedCount() {
+        // given: 조합된 빌드는 [3006, 3031], 이미 3006을 샀으니(1개) 다음은 인덱스 1인 3031
+        when(statsRepository.findAllMatchingStats(
+                anyLong(), anyString(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean()
+        )).thenReturn(List.of(mock(ChampionBuildStats.class)));
+        when(buildComposer.compose(any(), any())).thenReturn(List.of(
+                new Item(3006L, "광전사의 군화"),
+                new Item(3031L, "무한의 대검")
+        ));
+
+        // when
+        Optional<List<Long>> itemIds = strategy.recommend(contextOf(List.of(3006L)));
+
+        // then
+        assertThat(itemIds).contains(List.of(3031L));
+    }
+
+    @Test
+    @DisplayName("이미 산 아이템 수가 조합된 빌드 길이 이상이면(빌드 완료) 빈 Optional을 반환한다")
+    void recommend_WhenPurchasedItemCountReachesComposedBuildLength_ReturnsEmptyOptional() {
+        // given
+        when(statsRepository.findAllMatchingStats(
+                anyLong(), anyString(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean()
+        )).thenReturn(List.of(mock(ChampionBuildStats.class)));
+        when(buildComposer.compose(any(), any())).thenReturn(List.of(new Item(3006L, "광전사의 군화")));
+
+        // when
+        Optional<List<Long>> itemIds = strategy.recommend(contextOf(List.of(3006L)));
+
+        // then
+        assertThat(itemIds).isEmpty();
     }
 
     @Test
@@ -74,7 +108,7 @@ class CompositionStatsStrategyTest {
         )).thenReturn(List.of());
 
         // when
-        Optional<List<Long>> itemIds = strategy.recommend(contextOf());
+        Optional<List<Long>> itemIds = strategy.recommend(contextOf(List.of()));
 
         // then
         assertThat(itemIds).isEmpty();
@@ -91,7 +125,7 @@ class CompositionStatsStrategyTest {
         when(buildComposer.compose(any(), any())).thenReturn(List.of());
 
         // when
-        Optional<List<Long>> itemIds = strategy.recommend(contextOf());
+        Optional<List<Long>> itemIds = strategy.recommend(contextOf(List.of()));
 
         // then
         assertThat(itemIds).isEmpty();
@@ -111,7 +145,7 @@ class CompositionStatsStrategyTest {
         )).thenReturn(List.of());
 
         RecommendationContext context = new RecommendationContext(
-                222L, ChampionPosition.BOTTOM, "PLATINUM", "16.16", List.of(), List.of(54L, 517L)
+                222L, List.of(), ChampionPosition.BOTTOM, "PLATINUM", "16.16", List.of(), List.of(54L, 517L)
         );
 
         // when

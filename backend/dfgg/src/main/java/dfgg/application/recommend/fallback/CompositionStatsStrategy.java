@@ -55,11 +55,10 @@ public class CompositionStatsStrategy implements RecommendationStrategy {
             return Optional.empty();
         }
 
-        List<Item> composedBuild = buildComposer.compose(matchingStats, context.position());
-        if (composedBuild.isEmpty()) {
-            return Optional.empty();
-        }
-        return Optional.of(composedBuild.stream().map(Item::getItemId).toList());
+        List<Long> composedBuildItemIds = buildComposer.compose(matchingStats, context.position()).stream()
+                .map(Item::getItemId)
+                .toList();
+        return NextItemSelector.pick(composedBuildItemIds, context.purchasedItemIds().size());
     }
 
     private CombinationContext analyzeCombination(RecommendationContext context) {

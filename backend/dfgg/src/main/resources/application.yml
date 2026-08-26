@@ -28,6 +28,13 @@ mining:
 recommendation:
   identity-algorithm-version: "${RECOMMENDATION_IDENTITY_ALGORITHM_VERSION:checkpoint-a-4}"
   counter-algorithm-version: "${RECOMMENDATION_COUNTER_ALGORITHM_VERSION:checkpoint-c-1-counter}"
+  pattern-algorithm-version: "${RECOMMENDATION_PATTERN_ALGORITHM_VERSION:checkpoint-d-1}"
+  total-candidate-count: "${RECOMMENDATION_TOTAL_CANDIDATE_COUNT:10}"
+  safe-zone-ratio: "${RECOMMENDATION_SAFE_ZONE_RATIO:0.8}"
+  wilson-weight: "${RECOMMENDATION_WILSON_WEIGHT:1.0}"
+  my-champion-weight: "${RECOMMENDATION_MY_CHAMPION_WEIGHT:1.0}"
+  ally-weight: "${RECOMMENDATION_ALLY_WEIGHT:1.0}"
+  enemy-weight: "${RECOMMENDATION_ENEMY_WEIGHT:1.0}"
 
 collection:
   scheduler:

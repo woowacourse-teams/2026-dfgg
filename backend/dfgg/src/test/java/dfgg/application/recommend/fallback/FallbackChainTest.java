@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 class FallbackChainTest {
 
     private static final RecommendationContext CONTEXT = new RecommendationContext(
-            222L, ChampionPosition.BOTTOM, "PLATINUM", "16.16", List.of(412L), List.of(54L)
+            222L, List.of(), ChampionPosition.BOTTOM, "PLATINUM", "16.16", List.of(412L), List.of(54L)
     );
 
     /**

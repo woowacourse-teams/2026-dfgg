@@ -27,23 +27,54 @@ class MostFrequentBuildStrategyTest {
         strategy = new MostFrequentBuildStrategy(participantRepository, new ChampionPositionNormalizer());
     }
 
-    private RecommendationContext contextOf(Long championId, ChampionPosition position) {
-        return new RecommendationContext(championId, position, "PLATINUM", "16.16", List.of(), List.of());
+    private RecommendationContext contextOf(Long championId, ChampionPosition position, List<Long> purchasedItemIds) {
+        return new RecommendationContext(
+                championId, purchasedItemIds, position, "PLATINUM", "16.16", List.of(), List.of()
+        );
     }
 
     @Test
-    @DisplayName("최다빈도 빌드 문자열을 아이템 ID 목록으로 구매 순서 그대로 변환한다")
-    void recommend_WhenMostFrequentBuildExists_ParsesItIntoOrderedItemIds() {
+    @DisplayName("아직 아무것도 안 샀으면(콜드스타트) 최다빈도 빌드의 첫 아이템 하나만 다음 아이템으로 추천한다")
+    void recommend_WhenNoPurchasedItems_RecommendsFirstItemOfMostFrequentBuild() {
         // given
         when(participantRepository.findMostFrequentBuild(anyLong(), any()))
                 .thenReturn(Optional.of("3031,3072,3006"));
 
         // when
-        Optional<List<Long>> itemIds = strategy.recommend(contextOf(222L, ChampionPosition.BOTTOM));
+        Optional<List<Long>> itemIds = strategy.recommend(contextOf(222L, ChampionPosition.BOTTOM, List.of()));
 
         // then
-        assertThat(itemIds).isPresent();
-        assertThat(itemIds.get()).containsExactly(3031L, 3072L, 3006L);
+        assertThat(itemIds).contains(List.of(3031L));
+    }
+
+    @Test
+    @DisplayName("이미 산 아이템 개수만큼 최다빈도 빌드에서 인덱스로 다음 아이템 하나만 추천한다")
+    void recommend_WhenSomeItemsAlreadyPurchased_RecommendsNextItemByPurchasedCount() {
+        // given: 최다빈도 빌드는 '3031,3072,3006', 이미 3031을 샀으니(1개) 다음은 인덱스 1인 3072
+        when(participantRepository.findMostFrequentBuild(anyLong(), any()))
+                .thenReturn(Optional.of("3031,3072,3006"));
+
+        // when
+        Optional<List<Long>> itemIds = strategy.recommend(contextOf(222L, ChampionPosition.BOTTOM, List.of(3031L)));
+
+        // then
+        assertThat(itemIds).contains(List.of(3072L));
+    }
+
+    @Test
+    @DisplayName("이미 산 아이템 수가 최다빈도 빌드 길이 이상이면(빌드 완료) 빈 Optional을 반환한다")
+    void recommend_WhenPurchasedItemCountReachesBuildLength_ReturnsEmptyOptional() {
+        // given: 최다빈도 빌드는 아이템 2개뿐인데 이미 2개를 다 샀음
+        when(participantRepository.findMostFrequentBuild(anyLong(), any()))
+                .thenReturn(Optional.of("3031,3072"));
+
+        // when
+        Optional<List<Long>> itemIds = strategy.recommend(
+                contextOf(222L, ChampionPosition.BOTTOM, List.of(3031L, 3072L))
+        );
+
+        // then
+        assertThat(itemIds).isEmpty();
     }
 
     @Test
@@ -54,7 +85,7 @@ class MostFrequentBuildStrategyTest {
                 .thenReturn(Optional.of("3020"));
 
         // when
-        strategy.recommend(contextOf(103L, ChampionPosition.MID));
+        strategy.recommend(contextOf(103L, ChampionPosition.MID, List.of()));
 
         // then: 별칭을 안 넘기면 MIDDLE로 저장된 실 데이터를 한 건도 못 찾는다
         org.mockito.ArgumentCaptor<List<String>> positionsCaptor =
@@ -71,7 +102,7 @@ class MostFrequentBuildStrategyTest {
         when(participantRepository.findMostFrequentBuild(anyLong(), any())).thenReturn(Optional.empty());
 
         // when
-        Optional<List<Long>> itemIds = strategy.recommend(contextOf(99999L, ChampionPosition.TOP));
+        Optional<List<Long>> itemIds = strategy.recommend(contextOf(99999L, ChampionPosition.TOP, List.of()));
 
         // then
         assertThat(itemIds).isEmpty();

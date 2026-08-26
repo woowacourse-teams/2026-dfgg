@@ -10,6 +10,7 @@ import java.util.List;
  */
 public record RecommendationContext(
         Long myChampionId,
+        List<Long> purchasedItemIds,
         ChampionPosition position,
         String tier,
         String patch,
