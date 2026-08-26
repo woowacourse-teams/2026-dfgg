@@ -2,6 +2,7 @@ package dfgg.domain.match;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -46,4 +47,25 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
             GROUP BY item_id
             """, nativeQuery = true)
     List<Object[]> countItemOccurrences();
+
+    /**
+     * 챔피언·포지션에서 가장 많이 등장한 코어 아이템 빌드를 콤마 구분 문자열로 반환한다.
+     *
+     * <p>{@code position}에는 Riot 원시값이 저장되므로(정규화는 마이닝 시점에만 일어남)
+     * 호출자가 {@code ChampionPositionNormalizer.riotValuesOf(...)}로 별칭까지 넘겨야 한다.
+     */
+    @Query(value = """
+            SELECT final_core_item_ids
+            FROM normalized_match_participants
+            WHERE champion_id = :championId
+              AND position IN (:positions)
+              AND final_core_item_ids <> ''
+            GROUP BY final_core_item_ids
+            ORDER BY count(*) DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<String> findMostFrequentBuild(
+            @Param("championId") Long championId,
+            @Param("positions") Collection<String> positions
+    );
 }

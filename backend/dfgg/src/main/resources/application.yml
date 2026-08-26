@@ -25,6 +25,10 @@ mining:
   batch:
     match-page-size: "${MINING_BATCH_MATCH_PAGE_SIZE:200}"
 
+recommendation:
+  identity-algorithm-version: "${RECOMMENDATION_IDENTITY_ALGORITHM_VERSION:checkpoint-a-4}"
+  counter-algorithm-version: "${RECOMMENDATION_COUNTER_ALGORITHM_VERSION:checkpoint-c-1-counter}"
+
 collection:
   scheduler:
     enabled: "${COLLECTION_SCHEDULER_ENABLED:false}"

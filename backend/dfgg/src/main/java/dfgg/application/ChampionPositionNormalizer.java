@@ -1,6 +1,7 @@
 package dfgg.application;
 
 import dfgg.domain.champion.ChampionPosition;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,14 @@ public class ChampionPositionNormalizer {
                     yield Optional.empty();
                 }
             }
+        };
+    }
+
+    public List<String> riotValuesOf(ChampionPosition position) {
+        return switch (position) {
+            case MID -> List.of("MID", "MIDDLE");
+            case SUPPORT -> List.of("SUPPORT", "UTILITY");
+            default -> List.of(position.name());
         };
     }
 }

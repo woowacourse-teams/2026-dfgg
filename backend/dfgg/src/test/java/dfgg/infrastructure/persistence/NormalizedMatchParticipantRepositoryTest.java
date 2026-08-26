@@ -7,6 +7,7 @@ import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -75,5 +76,44 @@ class NormalizedMatchParticipantRepositoryTest {
                 .collect(Collectors.toMap(row -> String.valueOf(row[0]), row -> ((Number) row[1]).longValue()));
         assertThat(occurrenceCountByItem).containsEntry("1001", 3L);
         assertThat(occurrenceCountByItem).containsEntry("2002", 2L);
+    }
+
+    @Test
+    @DisplayName("챔피언과 포지션에서 가장 많이 등장한 빌드를 반환한다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findMostFrequentBuild_WhenMultipleBuildsExist_ReturnsTheMostFrequentOne() {
+        // given: 챔피언 222(BOTTOM)는 '3031,3072'를 3번, '3006,3031'을 1번 샀다
+
+        // when
+        Optional<String> build = participantRepository.findMostFrequentBuild(222L, List.of("BOTTOM"));
+
+        // then
+        assertThat(build).contains("3031,3072");
+    }
+
+    @Test
+    @DisplayName("Riot 원시값(MIDDLE)으로 저장된 행도 MID의 별칭 목록으로 조회하면 매칭된다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findMostFrequentBuild_WhenPositionStoredAsRiotAlias_MatchesViaAliasList() {
+        // given: 챔피언 103은 position이 Riot 원시값 'MIDDLE'로 저장돼 있다
+
+        // when
+        Optional<String> build = participantRepository.findMostFrequentBuild(103L, List.of("MID", "MIDDLE"));
+
+        // then
+        assertThat(build).contains("3020,3089");
+    }
+
+    @Test
+    @DisplayName("해당 챔피언과 포지션의 데이터가 없으면 빈 값을 반환한다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findMostFrequentBuild_WhenNoDataForChampionAndPosition_ReturnsEmpty() {
+        // given: 픽스처에 없는 챔피언
+
+        // when
+        Optional<String> build = participantRepository.findMostFrequentBuild(99999L, List.of("TOP"));
+
+        // then
+        assertThat(build).isEmpty();
     }
 }
