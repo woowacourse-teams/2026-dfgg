@@ -1,0 +1,216 @@
+package dfgg.domain.recommendation;
+
+import dfgg.domain.champion.Champion;
+import dfgg.domain.champion.ChampionTag;
+import dfgg.domain.item.Item;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * MARKSMAN 챔피언의 첫 3코어 군집을 대표 방향으로 분류하고,
+ * 적 챔피언 조합에 대한 적합도를 계산한다.
+ */
+public final class MarksmanBuildPolicy {
+
+    private static final String CRITICAL_STRIKE_DAMAGE = "CRITICAL_STRIKE_DAMAGE";
+    private static final String ANTI_TANK_SUSTAINED_DAMAGE = "ANTI_TANK_SUSTAINED_DAMAGE";
+    private static final String SURVIVAL_KITING = "SURVIVAL_KITING";
+
+    private static final String CRITICAL_STRIKE_TAG = "CriticalStrike";
+    private static final String DAMAGE_TAG = "Damage";
+    private static final String ATTACK_SPEED_TAG = "AttackSpeed";
+    private static final String ARMOR_PENETRATION_TAG = "ArmorPenetration";
+    private static final String ON_HIT_TAG = "OnHit";
+    private static final String MAGIC_PENETRATION_TAG = "MagicPenetration";
+    private static final String LIFE_STEAL_TAG = "LifeSteal";
+    private static final String NONBOOTS_MOVEMENT_TAG = "NonbootsMovement";
+    private static final String HEALTH_TAG = "Health";
+    private static final String ARMOR_TAG = "Armor";
+    private static final String SPELL_BLOCK_TAG = "SpellBlock";
+    private static final String MAGIC_RESIST_TAG = "MagicResist";
+    private static final String TENACITY_TAG = "Tenacity";
+    private static final String SLOW_TAG = "Slow";
+
+    private static final Set<ChampionTag> CRITICAL_STRIKE_ENEMY_TAGS = Set.of(
+            ChampionTag.MAGE,
+            ChampionTag.MARKSMAN
+    );
+
+    private static final Set<ChampionTag> ANTI_TANK_ENEMY_TAGS = Set.of(
+            ChampionTag.TANK,
+            ChampionTag.FIGHTER
+    );
+
+    private static final Set<ChampionTag> SURVIVAL_KITING_ENEMY_TAGS = Set.of(
+            ChampionTag.ASSASSIN,
+            ChampionTag.FIGHTER
+    );
+
+    /**
+     * 실제 관측된 빌드 군집을 MARKSMAN 빌드 후보로 변환한다.
+     *
+     * <p>대표 방향을 하나로 결정할 수 없는 군집은 후보에 포함하지 않는다.
+     */
+    public List<BuildCandidate> evaluate(
+            List<CoreBuildCluster> clusters,
+            List<Champion> enemies
+    ) {
+        Objects.requireNonNull(clusters, "빌드 군집 목록은 null일 수 없습니다.");
+        Objects.requireNonNull(enemies, "적 챔피언 목록은 null일 수 없습니다.");
+
+        int criticalStrikeThreat = countThreat(enemies, CRITICAL_STRIKE_ENEMY_TAGS);
+        int antiTankThreat = countThreat(enemies, ANTI_TANK_ENEMY_TAGS);
+        int survivalKitingThreat = countThreat(enemies, SURVIVAL_KITING_ENEMY_TAGS);
+
+        return clusters.stream()
+                .map(cluster -> toCandidate(
+                        cluster,
+                        criticalStrikeThreat,
+                        antiTankThreat,
+                        survivalKitingThreat
+                ))
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
+    private Optional<BuildCandidate> toCandidate(
+            CoreBuildCluster cluster,
+            int criticalStrikeThreat,
+            int antiTankThreat,
+            int survivalKitingThreat
+    ) {
+        Objects.requireNonNull(cluster, "빌드 군집은 null일 수 없습니다.");
+
+        List<Item> coreItems = cluster.getRepresentativeSequence().getOrderedItems();
+        int criticalStrikeScore = countCriticalStrikeScore(coreItems);
+        int antiTankScore = countAntiTankScore(coreItems);
+        int survivalKitingScore = countSurvivalKitingScore(coreItems);
+
+        Optional<String> directionCode = selectRepresentativeDirection(
+                criticalStrikeScore,
+                antiTankScore,
+                survivalKitingScore
+        );
+
+        if (directionCode.isEmpty()) {
+            return Optional.empty();
+        }
+
+        double suitabilityScore = calculateSuitabilityScore(
+                directionCode.get(),
+                criticalStrikeScore,
+                antiTankScore,
+                survivalKitingScore,
+                criticalStrikeThreat,
+                antiTankThreat,
+                survivalKitingThreat
+        );
+
+        return Optional.of(new BuildCandidate(
+                new BuildDirection(ChampionTag.MARKSMAN, directionCode.get()),
+                cluster,
+                suitabilityScore
+        ));
+    }
+
+    private int countCriticalStrikeScore(List<Item> items) {
+        return items.stream()
+                .mapToInt(item -> score(item, CRITICAL_STRIKE_TAG)
+                        + score(item, DAMAGE_TAG)
+                        + score(item, ATTACK_SPEED_TAG)
+                        + score(item, ARMOR_PENETRATION_TAG))
+                .sum();
+    }
+
+    private int countAntiTankScore(List<Item> items) {
+        return items.stream()
+                .mapToInt(item -> score(item, ON_HIT_TAG)
+                        + score(item, ATTACK_SPEED_TAG)
+                        + score(item, ARMOR_PENETRATION_TAG)
+                        + score(item, MAGIC_PENETRATION_TAG)
+                        + score(item, LIFE_STEAL_TAG))
+                .sum();
+    }
+
+    private int countSurvivalKitingScore(List<Item> items) {
+        return items.stream()
+                .mapToInt(item -> score(item, LIFE_STEAL_TAG)
+                        + score(item, NONBOOTS_MOVEMENT_TAG)
+                        + score(item, HEALTH_TAG)
+                        + score(item, ARMOR_TAG)
+                        + score(item, SPELL_BLOCK_TAG, MAGIC_RESIST_TAG)
+                        + score(item, TENACITY_TAG)
+                        + score(item, SLOW_TAG))
+                .sum();
+    }
+
+    private int score(Item item, String... sameMeaningTags) {
+        for (String tag : sameMeaningTags) {
+            if (item.hasTag(tag)) {
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    private Optional<String> selectRepresentativeDirection(
+            int criticalStrikeScore,
+            int antiTankScore,
+            int survivalKitingScore
+    ) {
+        int highestScore = Math.max(
+                criticalStrikeScore,
+                Math.max(antiTankScore, survivalKitingScore)
+        );
+
+        if (highestScore == 0) {
+            return Optional.empty();
+        }
+
+        int highestDirectionCount = 0;
+        highestDirectionCount += criticalStrikeScore == highestScore ? 1 : 0;
+        highestDirectionCount += antiTankScore == highestScore ? 1 : 0;
+        highestDirectionCount += survivalKitingScore == highestScore ? 1 : 0;
+
+        // 최고점 방향이 여러 개면 임의의 대표 방향을 선택하지 않는다.
+        if (highestDirectionCount > 1) {
+            return Optional.empty();
+        }
+
+        if (criticalStrikeScore == highestScore) {
+            return Optional.of(CRITICAL_STRIKE_DAMAGE);
+        }
+        if (antiTankScore == highestScore) {
+            return Optional.of(ANTI_TANK_SUSTAINED_DAMAGE);
+        }
+        return Optional.of(SURVIVAL_KITING);
+    }
+
+    private double calculateSuitabilityScore(
+            String directionCode,
+            int criticalStrikeScore,
+            int antiTankScore,
+            int survivalKitingScore,
+            int criticalStrikeThreat,
+            int antiTankThreat,
+            int survivalKitingThreat
+    ) {
+        // 초기 기준은 관련 아이템 태그와 적 챔피언 태그에 동일한 가중치를 적용한다.
+        return switch (directionCode) {
+            case CRITICAL_STRIKE_DAMAGE -> criticalStrikeScore * (criticalStrikeThreat + 1);
+            case ANTI_TANK_SUSTAINED_DAMAGE -> antiTankScore * (antiTankThreat + 1);
+            case SURVIVAL_KITING -> survivalKitingScore * (survivalKitingThreat + 1);
+            default -> throw new IllegalArgumentException("알 수 없는 MARKSMAN 빌드 방향입니다.");
+        };
+    }
+
+    private int countThreat(List<Champion> enemies, Set<ChampionTag> threatTags) {
+        // 대표 태그 하나만 고르지 않고 각 적 챔피언이 가진 모든 태그를 확인한다.
+        return (int) enemies.stream()
+                .flatMap(enemy -> enemy.getChampionTags().stream())
+                .filter(threatTags::contains)
+                .count();
+    }
+}
