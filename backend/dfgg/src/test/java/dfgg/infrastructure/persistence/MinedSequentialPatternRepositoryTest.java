@@ -89,4 +89,39 @@ class MinedSequentialPatternRepositoryTest {
         assertThat(minedSequentialPatternRepository.countByAlgorithmVersion("v2")).isEqualTo(1);
         assertThat(minedSequentialPatternRepository.countByAlgorithmVersion("v3")).isEqualTo(0);
     }
+
+    @Test
+    @DisplayName("스코프(챔피언, 포지션, 티어, 패치)와 algorithmVersion이 모두 일치하는 패턴만 조회한다")
+    @Sql("/sql/mined-sequential-pattern-repository-test-data.sql")
+    void findByAlgorithmVersionAndChampionIdAndPositionAndTierAndPatch_WhenScopeMatches_ReturnsOnlyMatchingPatterns() {
+        // given: data.sql이 (championId=266, TOP, GOLD, 14.1, v1) 패턴 2건과
+        // (championId=99, MID, GOLD, 14.1, v2) 패턴 1건을 적재해둔다
+
+        // when
+        List<MinedSequentialPattern> found = minedSequentialPatternRepository
+                .findByAlgorithmVersionAndChampionIdAndPositionAndTierAndPatch(
+                        "v1", 266L, ChampionPosition.TOP, "GOLD", "14.1"
+                );
+
+        // then
+        assertThat(found).hasSize(2);
+        assertThat(found).allMatch(pattern -> pattern.getChampionId().equals(266L));
+        assertThat(found).allMatch(pattern -> pattern.getAlgorithmVersion().equals("v1"));
+    }
+
+    @Test
+    @DisplayName("스코프가 일치하지 않으면 빈 리스트를 반환한다")
+    @Sql("/sql/mined-sequential-pattern-repository-test-data.sql")
+    void findByAlgorithmVersionAndChampionIdAndPositionAndTierAndPatch_WhenScopeDoesNotMatch_ReturnsEmptyList() {
+        // given: data.sql에는 championId=266인 패턴이 GOLD 티어로만 존재한다
+
+        // when
+        List<MinedSequentialPattern> found = minedSequentialPatternRepository
+                .findByAlgorithmVersionAndChampionIdAndPositionAndTierAndPatch(
+                        "v1", 266L, ChampionPosition.TOP, "PLATINUM", "14.1"
+                );
+
+        // then
+        assertThat(found).isEmpty();
+    }
 }
