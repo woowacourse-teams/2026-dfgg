@@ -25,12 +25,12 @@ public class RecommendationController {
 
     public RecommendationController(
             RecommendationService recommendationService,
-            MultiBuildRecommendationService multiBuildRecommendationService
+            MultiBuildRecommendationService multiBuildRecommendationService,
+            NextItemRecommendationService nextItemRecommendationService
     ) {
-    public RecommendationController(RecommendationService recommendationService, NextItemRecommendationService nextItemRecommendationService) {
         this.recommendationService = recommendationService;
-        this.nextItemRecommendationService = nextItemRecommendationService;
         this.multiBuildRecommendationService = multiBuildRecommendationService;
+        this.nextItemRecommendationService = nextItemRecommendationService;
     }
 
     @PostMapping("/v1")
