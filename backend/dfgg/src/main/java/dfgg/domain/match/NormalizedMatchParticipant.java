@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.util.List;
@@ -17,6 +18,13 @@ import java.util.List;
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_normalized_match_participant",
                 columnNames = {"match_id", "puuid"}
+        ),
+        // 추천 안전 구역 조회(findNextItemDistribution)는 1~2코어 추천마다 호출되는 핫패스인데,
+        // champion_id/position/tier/patch로 필터링한다. 이 인덱스가 없으면 매 요청이 참가자
+        // 테이블 전체를 순차 스캔한다. 선택도가 가장 높은 champion_id를 선두 컬럼으로 둔다.
+        indexes = @Index(
+                name = "idx_nmp_champion_position_tier_patch",
+                columnList = "champion_id, position, tier, patch"
         )
 )
 public class NormalizedMatchParticipant {
