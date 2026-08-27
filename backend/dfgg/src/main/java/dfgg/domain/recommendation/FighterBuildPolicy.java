@@ -185,17 +185,17 @@ public final class FighterBuildPolicy implements ChampionBuildPolicy {
     ) {
         // 대표 방향은 raw 점수로 유지하되, 정책 간 비교 점수는 최대 가능 점수로 정규화한다.
         return switch (directionCode) {
-            case ANTI_TANK -> BuildScoreNormalizer.normalizeItemEvidence(
+            case ANTI_TANK -> ChampionBuildPolicy.normalizeItemEvidence(
                     antiTankScore,
                     coreItemCount,
                     ANTI_TANK_CRITERIA_COUNT
             ) * (antiTankThreat + 1);
-            case BURST_SURVIVAL -> BuildScoreNormalizer.normalizeItemEvidence(
+            case BURST_SURVIVAL -> ChampionBuildPolicy.normalizeItemEvidence(
                     burstSurvivalScore,
                     coreItemCount,
                     BURST_SURVIVAL_CRITERIA_COUNT
             ) * (burstThreat + 1);
-            case SUSTAINED_COMBAT -> BuildScoreNormalizer.normalizeItemEvidence(
+            case SUSTAINED_COMBAT -> ChampionBuildPolicy.normalizeItemEvidence(
                     sustainedCombatScore,
                     coreItemCount,
                     SUSTAINED_COMBAT_CRITERIA_COUNT

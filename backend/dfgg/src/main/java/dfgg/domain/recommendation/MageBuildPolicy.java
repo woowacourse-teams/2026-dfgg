@@ -105,17 +105,17 @@ public final class MageBuildPolicy implements ChampionBuildPolicy {
             return Optional.empty();
         }
 
-        double burstDamageScore = BuildScoreNormalizer.normalizeItemEvidence(
+        double burstDamageScore = ChampionBuildPolicy.normalizeItemEvidence(
                 countBurstDamageScore(coreItems),
                 coreItems.size(),
                 BURST_DAMAGE_CRITERIA_COUNT
         );
-        double sustainedDamageScore = BuildScoreNormalizer.normalizeItemEvidence(
+        double sustainedDamageScore = ChampionBuildPolicy.normalizeItemEvidence(
                 countSustainedDamageScore(coreItems),
                 coreItems.size(),
                 SUSTAINED_DAMAGE_CRITERIA_COUNT
         );
-        double survivalResponseScore = BuildScoreNormalizer.normalizeItemEvidence(
+        double survivalResponseScore = ChampionBuildPolicy.normalizeItemEvidence(
                 countSurvivalResponseScore(coreItems),
                 coreItems.size(),
                 SURVIVAL_RESPONSE_CRITERIA_COUNT

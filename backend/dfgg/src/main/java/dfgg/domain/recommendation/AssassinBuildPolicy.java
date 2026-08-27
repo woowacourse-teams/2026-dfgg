@@ -221,18 +221,18 @@ public final class AssassinBuildPolicy implements ChampionBuildPolicy {
     ) {
         // 대표 방향은 raw 점수로 유지하되, 정책 간 비교 점수는 최대 가능 점수로 정규화한다.
         return switch (directionCode) {
-            case BURST_ASSASSINATION -> BuildScoreNormalizer.normalizeItemEvidence(
+            case BURST_ASSASSINATION -> ChampionBuildPolicy.normalizeItemEvidence(
                     burstAssassinationScore,
                     coreItemCount,
                     BURST_ASSASSINATION_CRITERIA_COUNT
             ) * (burstAssassinationThreat + 1);
             case DEFENSE_NEUTRALIZATION ->
-                    BuildScoreNormalizer.normalizeItemEvidence(
+                    ChampionBuildPolicy.normalizeItemEvidence(
                             defenseNeutralizationScore,
                             coreItemCount,
                             DEFENSE_NEUTRALIZATION_CRITERIA_COUNT
                     ) * (defenseNeutralizationThreat + 1);
-            case ENGAGE_SURVIVAL -> BuildScoreNormalizer.normalizeItemEvidence(
+            case ENGAGE_SURVIVAL -> ChampionBuildPolicy.normalizeItemEvidence(
                     engageSurvivalScore,
                     coreItemCount,
                     ENGAGE_SURVIVAL_CRITERIA_COUNT

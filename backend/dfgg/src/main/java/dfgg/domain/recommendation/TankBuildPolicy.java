@@ -119,17 +119,17 @@ public final class TankBuildPolicy implements ChampionBuildPolicy {
             int physicalThreat,
             int magicThreat
     ) {
-        double physicalEvidence = BuildScoreNormalizer.normalizeItemEvidence(
+        double physicalEvidence = ChampionBuildPolicy.normalizeItemEvidence(
                 armorCount + healthCount,
                 coreItemCount,
                 2
         );
-        double magicEvidence = BuildScoreNormalizer.normalizeItemEvidence(
+        double magicEvidence = ChampionBuildPolicy.normalizeItemEvidence(
                 spellBlockCount + healthCount,
                 coreItemCount,
                 2
         );
-        double mixedEvidence = BuildScoreNormalizer.normalizeItemEvidence(
+        double mixedEvidence = ChampionBuildPolicy.normalizeItemEvidence(
                 armorCount + spellBlockCount + healthCount,
                 coreItemCount,
                 3

@@ -220,17 +220,17 @@ public final class MarksmanBuildPolicy implements ChampionBuildPolicy {
     ) {
         // 대표 방향은 raw 점수로 유지하되, 정책 간 비교 점수는 최대 가능 점수로 정규화한다.
         return switch (directionCode) {
-            case CRITICAL_STRIKE_DAMAGE -> BuildScoreNormalizer.normalizeItemEvidence(
+            case CRITICAL_STRIKE_DAMAGE -> ChampionBuildPolicy.normalizeItemEvidence(
                     criticalStrikeScore,
                     coreItemCount,
                     CRITICAL_STRIKE_CRITERIA_COUNT
             ) * (criticalStrikeThreat + 1);
-            case ANTI_TANK_SUSTAINED_DAMAGE -> BuildScoreNormalizer.normalizeItemEvidence(
+            case ANTI_TANK_SUSTAINED_DAMAGE -> ChampionBuildPolicy.normalizeItemEvidence(
                     antiTankScore,
                     coreItemCount,
                     ANTI_TANK_CRITERIA_COUNT
             ) * (antiTankThreat + 1);
-            case SURVIVAL_KITING -> BuildScoreNormalizer.normalizeItemEvidence(
+            case SURVIVAL_KITING -> ChampionBuildPolicy.normalizeItemEvidence(
                     survivalKitingScore,
                     coreItemCount,
                     SURVIVAL_KITING_CRITERIA_COUNT

@@ -251,18 +251,18 @@ public final class SupportBuildPolicy implements ChampionBuildPolicy {
             int healingEnhancementThreat
     ) {
         return switch (directionCode) {
-            case ENGAGE_INITIATION -> BuildScoreNormalizer.normalizeItemEvidence(
+            case ENGAGE_INITIATION -> ChampionBuildPolicy.normalizeItemEvidence(
                     engageScore,
                     coreItemCount,
                     ENGAGE_CRITERIA_SCORE
             ) * (engageThreat + 1);
-            case ALLY_PROTECTION -> BuildScoreNormalizer.normalizeItemEvidence(
+            case ALLY_PROTECTION -> ChampionBuildPolicy.normalizeItemEvidence(
                     allyProtectionScore,
                     coreItemCount,
                     ALLY_PROTECTION_CRITERIA_SCORE
             ) * (allyProtectionThreat + 1);
             case HEALING_ENHANCEMENT ->
-                    BuildScoreNormalizer.normalizeItemEvidence(
+                    ChampionBuildPolicy.normalizeItemEvidence(
                             healingEnhancementScore,
                             coreItemCount,
                             HEALING_ENHANCEMENT_CRITERIA_SCORE
