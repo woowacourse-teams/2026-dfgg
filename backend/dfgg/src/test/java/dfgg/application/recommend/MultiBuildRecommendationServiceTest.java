@@ -336,6 +336,65 @@ class MultiBuildRecommendationServiceTest {
                 });
     }
 
+    @Test
+    @DisplayName("다중 태그 챔피언의 일반 원딜 빌드는 MARKSMAN 정책을 유지한다")
+    void recommend_MultiTagChampion_KeepsMarksmanPolicyForCriticalStrikeBuild() {
+        // given
+        myChampion = new Champion(
+                1L,
+                "Kaisa",
+                "카이사",
+                List.of(ChampionTag.MAGE, ChampionTag.MARKSMAN)
+        );
+        RecommendationRequest request = prepareRequest(ChampionPosition.BOTTOM);
+        List<Item> criticalStrikeBuild = List.of(
+                new Item(
+                        501L,
+                        "치명타 주문 아이템",
+                        List.of(
+                                "SpellDamage",
+                                "MagicPenetration",
+                                "CriticalStrike",
+                                "Damage",
+                                "AttackSpeed",
+                                "ArmorPenetration"
+                        )
+                ),
+                new Item(
+                        502L,
+                        "치명타 아이템 A",
+                        List.of("CriticalStrike", "Damage", "AttackSpeed", "ArmorPenetration")
+                ),
+                new Item(
+                        503L,
+                        "치명타 아이템 B",
+                        List.of("CriticalStrike", "Damage", "AttackSpeed", "ArmorPenetration")
+                ),
+                new Item(504L, "신발", List.of("Boots")),
+                new Item(505L, "후반 아이템 A"),
+                new Item(506L, "후반 아이템 B"),
+                new Item(507L, "후반 아이템 C")
+        );
+        ChampionBuildStats observedBuild = stats(
+                ChampionPosition.BOTTOM,
+                "CRITICAL_STRIKE_COMPLETE",
+                criticalStrikeBuild,
+                30
+        );
+        givenMatchingStats(ChampionPosition.BOTTOM, List.of(observedBuild));
+
+        // when
+        MultiBuildRecommendationResponse response = recommendationService.recommend(request);
+
+        // then
+        assertThat(response.builds().getFirst())
+                .satisfies(build -> {
+                    assertThat(build.championTag()).isEqualTo("MARKSMAN");
+                    assertThat(build.direction()).isEqualTo("CRITICAL_STRIKE_DAMAGE");
+                    assertThat(build.build()).hasSize(7);
+                });
+    }
+
     private RecommendationRequest prepareRequest(ChampionPosition position) {
         Champion ally = champion(2L, "아군", ChampionTag.MARKSMAN);
         Champion enemy = champion(3L, "적군", ChampionTag.FIGHTER);
