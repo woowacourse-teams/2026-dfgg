@@ -48,3 +48,6 @@ collection:
     league-page-count: "${COLLECTION_SCHEDULER_LEAGUE_PAGE_COUNT:1}"
     player-page-size: "${COLLECTION_SCHEDULER_PLAYER_PAGE_SIZE:100}"
     match-count: "${COLLECTION_SCHEDULER_MATCH_COUNT:20}"
+
+server:
+  forward-headers-strategy: framework
