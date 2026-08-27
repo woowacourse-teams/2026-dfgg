@@ -3,6 +3,7 @@ name: BE CD - EC2(BE/Dev)
 on:
   push:
     branches: [ "BE/dev" ]
+  workflow_dispatch:
 
 jobs:
   deploy:
