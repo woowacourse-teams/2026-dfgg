@@ -4,7 +4,21 @@ import { Link } from 'react-router-dom';
 import ChampionCombobox from '../../components/ChampionCombobox';
 import DesktopAppButton from '../../components/DesktopAppButton';
 import { itemImageUrl, useChampions } from '../../hooks/useChampions';
-import { type Position, POSITIONS, type RecommendationResponse } from '../../types/recommendation';
+import {
+  type Position,
+  POSITIONS,
+  type RecommendationBuild,
+  type RecommendationResponse,
+  type RecommendationV3Response,
+} from '../../types/recommendation';
+
+/** 지금은 랭크 조회 기능이 없어 고정값을 보낸다. */
+const TIER = 'PLATINUM';
+
+/** Data Dragon 버전(예: "16.17.1")을 실제 패치 번호("16.17")로 줄인다. */
+function toPatch(version: string): string {
+  return version.split('.').slice(0, 2).join('.');
+}
 
 const POSITION_LABEL: Record<Position, string> = {
   TOP: '탑',
@@ -57,6 +71,20 @@ export default function ChampionSelect() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // 1번(빌드 세트) / 2번(하나씩 골라 다음 후보 받기) 중 어느 걸 보여줄지.
+  const [mode, setMode] = useState<1 | 2>(1);
+  const [resultV3, setResultV3] = useState<RecommendationV3Response | null>(null);
+  const [loadingV3, setLoadingV3] = useState(false);
+  const [errorV3, setErrorV3] = useState('');
+  // 2번에서 지금까지 고른 아이템. 이름도 같이 들고 있어야 진행 목록을 보여줄 수 있다.
+  const [chosenItems, setChosenItems] = useState<RecommendationBuild[]>([]);
+  // 처음 제출한 조합. 폼을 더 건드려도 2번 재요청은 항상 이 조합 기준으로 나가야 한다.
+  const [championBody, setChampionBody] = useState<{
+    myChampion: { name: string; position: Position };
+    allies: { name: string; position: Position }[];
+    enemies: { name: string; position: Position }[];
+  } | null>(null);
+
   const { champions, version, failed } = useChampions();
 
   const knownNames = useMemo(() => champions.map((champion) => champion.name), [champions]);
@@ -77,29 +105,7 @@ export default function ChampionSelect() {
   );
   const isReady = filledCount === 10;
 
-  const handleSubmit = async (event: SubmitEvent) => {
-    event.preventDefault();
-    if (!isReady) {
-      setError('목록에서 챔피언 10명을 모두 선택해 주세요.');
-      return;
-    }
-
-    // 화면에는 한글로 두되, 백엔드에는 Data Dragon 영문 id로 보낸다.
-    // 목록을 못 받아온 경우엔 매칭할 대상이 없으므로 입력값을 그대로 쓴다.
-    const toChampion = (position: Position, lineup: Lineup) => {
-      const typed = lineup[position].trim();
-      const matched = champions.find((champion) => champion.name === typed);
-      return { name: matched ? matched.id : typed, position };
-    };
-
-    const body = {
-      myChampion: toChampion(myPosition, allyLineup),
-      allies: POSITIONS.filter((position) => position !== myPosition).map((position) =>
-        toChampion(position, allyLineup),
-      ),
-      enemies: POSITIONS.map((position) => toChampion(position, enemyLineup)),
-    };
-
+  const fetchV2 = async (body: NonNullable<typeof championBody>) => {
     setLoading(true);
     setError('');
     // 직전 결과를 지운다. 이걸 안 지우면 새 요청이 실패했을 때 에러 문구와
@@ -126,6 +132,90 @@ export default function ChampionSelect() {
     }
   };
 
+  /**
+   * 2번 방식. purchasedItemIds가 비어있으면 첫 후보 목록, 하나 골라 넘기면
+   * 그걸 반영한 다음 후보 목록을 받는다. body는 항상 처음 제출한 조합 그대로다.
+   */
+  const fetchV3 = async (body: NonNullable<typeof championBody>, purchasedItemIds: number[]) => {
+    setLoadingV3(true);
+    setErrorV3('');
+    setResultV3(null);
+    try {
+      const response = await fetch('/api/recommendations/v3', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...body,
+          purchasedItemIds,
+          tier: TIER,
+          patch: version ? toPatch(version) : '',
+        }),
+      });
+      if (!response.ok) {
+        window.umami?.track('recommend-v3-fail', { status: response.status });
+        throw new Error(String(response.status));
+      }
+      setResultV3(await response.json());
+      window.umami?.track('recommend-v3-success');
+    } catch (error) {
+      console.error(error);
+      window.umami?.track('recommend-v3-error');
+      setErrorV3('추천을 불러오지 못했어요. 다시 시도해 주세요.');
+    } finally {
+      setLoadingV3(false);
+    }
+  };
+
+  const handleSubmit = async (event: SubmitEvent) => {
+    event.preventDefault();
+    if (!isReady) {
+      setError('목록에서 챔피언 10명을 모두 선택해 주세요.');
+      return;
+    }
+
+    // 화면에는 한글로 두되, 백엔드에는 Data Dragon 영문 id로 보낸다.
+    // 목록을 못 받아온 경우엔 매칭할 대상이 없으므로 입력값을 그대로 쓴다.
+    const toChampion = (position: Position, lineup: Lineup) => {
+      const typed = lineup[position].trim();
+      const matched = champions.find((champion) => champion.name === typed);
+      return { name: matched ? matched.id : typed, position };
+    };
+
+    const body = {
+      myChampion: toChampion(myPosition, allyLineup),
+      allies: POSITIONS.filter((position) => position !== myPosition).map((position) =>
+        toChampion(position, allyLineup),
+      ),
+      enemies: POSITIONS.map((position) => toChampion(position, enemyLineup)),
+    };
+
+    if (mode === 1) {
+      await fetchV2(body);
+      return;
+    }
+
+    setChampionBody(body);
+    setChosenItems([]);
+    await fetchV3(body, []);
+  };
+
+  /** 후보 중 하나를 골랐다. 지금까지 고른 것에 더해서 다음 후보를 다시 받는다. */
+  const handleChooseItem = (item: RecommendationBuild) => {
+    if (!championBody) return;
+    const nextChosen = [...chosenItems, item];
+    setChosenItems(nextChosen);
+    void fetchV3(
+      championBody,
+      nextChosen.map((chosen) => chosen.id),
+    );
+  };
+
+  const handleRestartV3 = () => {
+    if (!championBody) return;
+    setChosenItems([]);
+    void fetchV3(championBody, []);
+  };
+
   return (
     <>
       <div className='flex items-start'>
@@ -142,6 +232,31 @@ export default function ChampionSelect() {
           <span className={isReady ? 'text-win' : 'text-ink-2'}>{filledCount}</span>
           <span> / 10 입력</span>
         </p>
+      </div>
+
+      {/* 두 방식 다 같은 폼으로 조합을 받는다. 버튼은 다음 제출이 어느 쪽으로 갈지만 정한다. */}
+      <div className='mt-4 flex gap-1.5' role='tablist' aria-label='추천 방식'>
+        {(
+          [
+            [1, '1번 · 빌드 추천'],
+            [2, '2번 · 하나씩 골라 추천'],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type='button'
+            role='tab'
+            aria-selected={mode === value}
+            onClick={() => setMode(value)}
+            className={`chamfer-sm cursor-pointer px-3 py-1.5 font-display text-xs font-bold tracking-wide transition-colors ${
+              mode === value
+                ? 'bg-accent-strong text-white'
+                : 'bg-surface-2 text-ink-3 hover:text-ink-2'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/*
@@ -230,20 +345,20 @@ export default function ChampionSelect() {
         <button
           data-umami-event='recommend-item'
           type='submit'
-          disabled={loading || !isReady}
+          disabled={loading || loadingV3 || !isReady}
           className='chamfer-sm mt-4 w-full cursor-pointer bg-accent-strong py-3.5 font-display text-sm font-bold tracking-[0.16em] text-white uppercase transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3'
         >
-          {loading ? '분석 중...' : '아이템 추천받기'}
+          {loading || loadingV3 ? '분석 중...' : '아이템 추천받기'}
         </button>
       </form>
 
-      {error && (
+      {mode === 1 && error && (
         <p className='mt-4 text-sm text-loss' role='alert'>
           {error}
         </p>
       )}
 
-      {loading && (
+      {mode === 1 && loading && (
         <ul className='mt-6 grid grid-cols-6 gap-2' aria-hidden='true'>
           {Array.from({ length: 6 }, (_, index) => (
             <li key={index} className='chamfer-sm aspect-square animate-pulse bg-surface-2' />
@@ -251,7 +366,7 @@ export default function ChampionSelect() {
         </ul>
       )}
 
-      {result && !loading && (
+      {mode === 1 && result && !loading && (
         <section className='mt-6' aria-live='polite'>
           <h2 className='font-display text-lg font-bold'>
             {result.champion}{' '}
@@ -305,7 +420,94 @@ export default function ChampionSelect() {
         </section>
       )}
 
-      {result && (
+      {mode === 2 && errorV3 && (
+        <p className='mt-4 text-sm text-loss' role='alert'>
+          {errorV3}
+        </p>
+      )}
+
+      {mode === 2 && loadingV3 && (
+        <ul className='mt-6 grid grid-cols-6 gap-2' aria-hidden='true'>
+          {Array.from({ length: 6 }, (_, index) => (
+            <li key={index} className='chamfer-sm aspect-square animate-pulse bg-surface-2' />
+          ))}
+        </ul>
+      )}
+
+      {mode === 2 && resultV3 && !loadingV3 && (
+        <section className='mt-6' aria-live='polite'>
+          <div className='flex flex-wrap items-baseline justify-between gap-2'>
+            <h2 className='font-display text-lg font-bold'>
+              다음 코어템 후보
+              <span className='ml-2 text-sm font-normal text-ink-3'>{resultV3.servedBy}</span>
+            </h2>
+            {chosenItems.length > 0 && (
+              <button
+                type='button'
+                onClick={handleRestartV3}
+                className='cursor-pointer text-xs text-ink-3 underline decoration-dotted hover:text-accent'
+              >
+                처음부터 다시 고르기
+              </button>
+            )}
+          </div>
+
+          {chosenItems.length > 0 && (
+            <div className='mt-2 flex flex-wrap items-center gap-1.5'>
+              <span className='text-xs text-ink-3'>지금까지 고른 아이템</span>
+              {chosenItems.map((item, index) => (
+                <div key={`${item.id}-${index}`} className='chamfer-sm bg-surface-2 p-0.5'>
+                  <img
+                    src={version ? itemImageUrl(version, item.id) : undefined}
+                    alt={item.name}
+                    title={item.name}
+                    width={28}
+                    height={28}
+                    className='size-7'
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {resultV3.recommendedItems.length === 0 ? (
+            <p className='mt-3 text-sm text-ink-3'>이 조합은 아직 데이터가 부족해요.</p>
+          ) : (
+            <>
+              <p className='mt-3 text-xs text-ink-3'>
+                이 중 하나를 클릭해서 다음 코어템으로 고르세요. 순서가 아니라 후보예요. 아이템에
+                마우스를 올리면 이름이 보여요.
+              </p>
+              <ol className='mt-2 flex flex-wrap gap-2'>
+                {resultV3.recommendedItems.map((item) => (
+                  <li key={item.id} className='w-14 text-center'>
+                    <button
+                      type='button'
+                      onClick={() => handleChooseItem(item)}
+                      title={item.name}
+                      className='chamfer-sm w-full cursor-pointer bg-surface-2 transition-colors hover:ring-2 hover:ring-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+                    >
+                      <img
+                        src={version ? itemImageUrl(version, item.id) : undefined}
+                        alt={item.name}
+                        width={56}
+                        height={56}
+                        loading='lazy'
+                        className='w-full'
+                      />
+                    </button>
+                    <p className='mt-1 line-clamp-2 text-[10px] leading-tight text-ink-2'>
+                      {item.name}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+        </section>
+      )}
+
+      {(result || resultV3) && (
         <aside className='chamfer mt-6 flex flex-wrap items-center justify-between gap-4 bg-surface-2 p-5 text-left shadow-[inset_0_0_0_1px_var(--color-line)]'>
           <div>
             <p className='font-display font-bold'>추천 템트리 괜찮으셨나요?</p>
