@@ -70,7 +70,7 @@ public class PrimaryRecommendationStrategy implements RecommendationStrategy {
                 recommendationProperties.totalCandidateCount(), recommendationProperties.safeZoneRatio()
         );
 
-        Map<Long, Double> wilsonScoreByItemId = collectWilsonScores(mixed);
+        Map<Long, Double> wilsonScoreByItemId = collectWilsonScores(mixed, context.purchasedItemIds());
         if (wilsonScoreByItemId.isEmpty()) {
             return Optional.empty();
         }
@@ -89,13 +89,17 @@ public class PrimaryRecommendationStrategy implements RecommendationStrategy {
         return Optional.of(ranked);
     }
 
-    private Map<Long, Double> collectWilsonScores(MixedCandidates mixed) {
+    private Map<Long, Double> collectWilsonScores(MixedCandidates mixed, List<Long> purchasedItemIds) {
         Map<Long, Double> wilsonScoreByItemId = new LinkedHashMap<>();
         for (RankedItemCandidate candidate : mixed.safeZoneCandidates()) {
-            wilsonScoreByItemId.putIfAbsent(candidate.itemId(), candidate.score());
+            if (!purchasedItemIds.contains(candidate.itemId())) {
+                wilsonScoreByItemId.putIfAbsent(candidate.itemId(), candidate.score());
+            }
         }
         for (RankedItemCandidate candidate : mixed.explorationZoneCandidates()) {
-            wilsonScoreByItemId.putIfAbsent(candidate.itemId(), 0.0);
+            if (!purchasedItemIds.contains(candidate.itemId())) {
+                wilsonScoreByItemId.putIfAbsent(candidate.itemId(), 0.0);
+            }
         }
         return wilsonScoreByItemId;
     }

@@ -145,6 +145,33 @@ class PrimaryRecommendationStrategyTest {
     }
 
     @Test
+    @DisplayName("탐색 구역 후보가 이미 구매한 아이템이면 결과에서 제외한다")
+    void recommend_WhenExplorationZoneCandidateAlreadyPurchased_ExcludesItFromResult() {
+        // given: 6662는 이미 구매했다. 안전 구역(마이닝)은 prefix가 깊어져 매칭 패턴이 없고
+        //        (실제 관측된 버그 재현: 깊은 prefix에서 안전 구역이 빈 채로 탐색 구역만 남음),
+        //        탐색 구역은 prefix를 모르므로 이미 산 6662를 그대로 후보에 올린다.
+        RankedItemCandidate alreadyPurchased = new RankedItemCandidate(6662L, 0.9);
+        RankedItemCandidate notYetPurchased = new RankedItemCandidate(3047L, 0.5);
+
+        when(safeZoneCandidateGenerator.rankNextItemCandidates(
+                anyList(), any(), any(), anyString(), anyString(), anyString(), anyInt()
+        )).thenReturn(List.of());
+        when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString(), any(), any()))
+                .thenReturn(List.of(alreadyPurchased, notYetPurchased));
+        when(candidateZoneMixer.mix(List.of(), List.of(alreadyPurchased, notYetPurchased), 10, 0.8))
+                .thenReturn(new MixedCandidates(List.of(), List.of(alreadyPurchased, notYetPurchased)));
+        when(candidateSimilarityScorer.scoreItems(
+                List.of(3047L), 222L, List.of(412L), List.of(54L), "checkpoint-a-4", "checkpoint-c-1-counter"
+        )).thenReturn(List.of(new ItemSimilarityScores(3047L, 0.3, 0.3, 0.3)));
+
+        // when
+        Optional<List<Long>> result = strategy.recommend(contextOf(List.of(3031L, 6662L)));
+
+        // then
+        assertThat(result.get()).containsExactly(3047L);
+    }
+
+    @Test
     @DisplayName("자신이 담당하는 폴백 단계를 알려준다")
     void stage_ReturnsPrimaryStage() {
         // given & when & then
