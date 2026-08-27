@@ -102,16 +102,17 @@ class ChampionBuildStatsRebuildMatchServiceTest {
                 "KR_1",
                 normalizedParticipant("p-1", 1)
         );
-        when(matchNormalizationService.normalize(
+        when(matchNormalizationService.normalizeAsTierSample(
                 "KR_1",
                 rawMatch.getRawData(),
                 timeline.getRawData(),
-                Set.of(3071)
+                Set.of(3071),
+                "PLATINUM"
         )).thenReturn(normalized);
         rebuildService.replayOne("KR_1", "PLATINUM");
 
-        verify(matchNormalizationService).normalize(
-                "KR_1", rawMatch.getRawData(), timeline.getRawData(), Set.of(3071)
+        verify(matchNormalizationService).normalizeAsTierSample(
+                "KR_1", rawMatch.getRawData(), timeline.getRawData(), Set.of(3071), "PLATINUM"
         );
         verify(aggregationService).aggregate(normalized, "PLATINUM", List.of("p-1"));
     }

@@ -513,13 +513,15 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
         rebuildService.replayOne("KR_REPLAY", "PLATINUM");
         rebuildService.replayOne("KR_REPLAY", "PLATINUM");
 
-        assertThat(sampleRepository.count()).isEqualTo(1);
+        assertThat(sampleRepository.count()).isEqualTo(2);
         assertThat(sampleRepository.findAll()).allSatisfy(sample -> assertThat(sample.getWin()).isFalse());
         assertThat(statsRepository.findAll().stream()
+                .filter(stats -> stats.getChampion().getChampionId() == 1L)
                 .filter(stats -> stats.getGameCount() == 0))
                 .hasSize(1)
                 .allSatisfy(stats -> assertThat(stats.getBuildKey()).isEqualTo("3071>6610"));
         assertThat(statsRepository.findAll().stream()
+                .filter(stats -> stats.getChampion().getChampionId() == 1L)
                 .filter(stats -> stats.getGameCount() == 1))
                 .hasSize(1)
                 .allSatisfy(stats -> {
@@ -584,11 +586,15 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
         rebuildService.replayOne("KR_BACKFILL", "PLATINUM");
 
         assertThat(sampleRepository.findAll())
-                .hasSize(1)
-                .allSatisfy(sample -> assertThat(sample.getWin()).isTrue());
+                .extracting(CompositionStatsSample::getWin)
+                .containsExactlyInAnyOrder(true, false);
         assertThat(statsRepository.findAll()).allSatisfy(stats -> {
             assertThat(stats.getGameCount()).isEqualTo(1);
-            assertThat(stats.getWinCount()).isEqualTo(1);
+            if (stats.getChampion().getChampionId() == 1L) {
+                assertThat(stats.getWinCount()).isEqualTo(1);
+            } else {
+                assertThat(stats.getWinCount()).isZero();
+            }
         });
     }
 
