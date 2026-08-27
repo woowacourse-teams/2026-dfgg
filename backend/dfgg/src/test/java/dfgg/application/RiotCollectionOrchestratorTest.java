@@ -43,6 +43,8 @@ class RiotCollectionOrchestratorTest {
         statsMatchService = mock(ChampionBuildStatsMatchService.class);
         properties = new RiotSchedulerProperties();
         properties.setPlayerPageSize(2);
+        properties.setPlayerLimit(100);
+        properties.setRecoverMissingTimelines(true);
         when(playerSyncService.syncLeagueEntries(
                 anyString(), anyString(), anyString(), anyInt()
         )).thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of()));
@@ -108,6 +110,31 @@ class RiotCollectionOrchestratorTest {
         verify(matchNormalizationService).normalizeAsTierSample("KR_SHARED", "PLATINUM");
         verify(matchNormalizationService).save(normalized);
         verify(statsMatchService).registerMatchStats(normalized, "PLATINUM");
+    }
+
+    @Test
+    void 설정한_플레이어_수까지만_매치를_수집한다() {
+        properties.setPlayerLimit(1);
+        properties.setMatchCount(47);
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(
+                        2,
+                        List.of("puuid-1", "puuid-2")
+                ));
+
+        orchestrator.runOnce();
+
+        verify(matchSyncService).findMatchIds("puuid-1", 0, 47);
+        verify(matchSyncService, never()).findMatchIds("puuid-2", 0, 47);
+    }
+
+    @Test
+    void 자동_Timeline_복구가_꺼져_있으면_누락_Timeline을_조회하지_않는다() {
+        properties.setRecoverMissingTimelines(false);
+
+        orchestrator.runOnce();
+
+        verify(matchSyncService, never()).syncMissingTimelines();
     }
 
     @Test

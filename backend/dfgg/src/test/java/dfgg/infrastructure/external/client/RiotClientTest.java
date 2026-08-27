@@ -16,6 +16,7 @@ import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +41,7 @@ class RiotClientTest {
     private MockRestServiceServer server;
     private RiotClient client;
     private List<Duration> retryDelays;
+    private MutableClock clock;
 
     @BeforeEach
     void setUp() {
@@ -49,12 +51,18 @@ class RiotClientTest {
         RiotApiProperties properties = new RiotApiProperties(
                 API_KEY,
                 URI.create(PLATFORM_BASE_URL),
-                URI.create(REGIONAL_BASE_URL)
+                URI.create(REGIONAL_BASE_URL),
+                18,
+                95
         );
+        clock = new MutableClock(Instant.parse("2026-08-06T08:00:00Z"), ZoneOffset.UTC);
         retryDelays = new ArrayList<>();
         RiotRateLimitExecutor rateLimitExecutor = new RiotRateLimitExecutor(
-                Clock.fixed(Instant.parse("2026-08-06T08:00:00Z"), ZoneOffset.UTC),
-                retryDelays::add
+                clock,
+                duration -> {
+                    retryDelays.add(duration);
+                    clock.advance(duration);
+                }
         );
         client = new RiotClient(builder, properties, rateLimitExecutor);
     }
@@ -487,10 +495,10 @@ class RiotClientTest {
 
         assertThat(entries).isEmpty();
         assertThat(retryDelays).containsExactly(
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1)
+                Duration.ofMillis(1_264),
+                Duration.ofMillis(1_264),
+                Duration.ofMillis(1_264),
+                Duration.ofMillis(1_264)
         );
 
         server.verify();
@@ -526,5 +534,35 @@ class RiotClientTest {
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("page must be greater than zero");
+    }
+
+    private static final class MutableClock extends Clock {
+
+        private Instant instant;
+        private final ZoneId zone;
+
+        private MutableClock(Instant instant, ZoneId zone) {
+            this.instant = instant;
+            this.zone = zone;
+        }
+
+        private void advance(Duration duration) {
+            instant = instant.plus(duration);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new MutableClock(instant, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
     }
 }

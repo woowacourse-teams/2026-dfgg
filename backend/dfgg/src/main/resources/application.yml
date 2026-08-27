@@ -20,6 +20,8 @@ riot:
     key: "${RIOT_API_KEY:}"
     platform-base-url: "${RIOT_PLATFORM_BASE_URL:https://kr.api.riotgames.com}"
     regional-base-url: "${RIOT_REGIONAL_BASE_URL:https://asia.api.riotgames.com}"
+    requests-per-second: "${RIOT_RATE_LIMIT_REQUESTS_PER_SECOND:18}"
+    requests-per-two-minutes: "${RIOT_RATE_LIMIT_REQUESTS_PER_2_MINUTES:95}"
 
 mining:
   batch:
@@ -47,7 +49,9 @@ collection:
     divisions: "${COLLECTION_SCHEDULER_DIVISIONS:I}"
     league-page-count: "${COLLECTION_SCHEDULER_LEAGUE_PAGE_COUNT:1}"
     player-page-size: "${COLLECTION_SCHEDULER_PLAYER_PAGE_SIZE:100}"
+    player-limit: "${COLLECTION_SCHEDULER_PLAYER_LIMIT:1}"
     match-count: "${COLLECTION_SCHEDULER_MATCH_COUNT:20}"
+    recover-missing-timelines: "${COLLECTION_SCHEDULER_RECOVER_MISSING_TIMELINES:false}"
 
 server:
   forward-headers-strategy: framework

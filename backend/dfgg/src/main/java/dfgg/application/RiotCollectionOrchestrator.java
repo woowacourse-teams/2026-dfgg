@@ -66,8 +66,10 @@ public class RiotCollectionOrchestrator {
         String sampleTier = properties.getTiers().getFirst();
         List<String> collectedPuuids = collectPlayers();
         collectMatches(collectedPuuids, sampleTier);
-        // 이번 실행에서 실패했거나 이전 실행에 남은 Timeline을 보완한다.
-        collectMissingTimelines();
+        if (properties.isRecoverMissingTimelines()) {
+            // 호출 예산을 별도로 확보한 경우에만 누락 Timeline을 자동 보완한다.
+            collectMissingTimelines();
+        }
     }
 
     private List<String> collectPlayers() {
@@ -127,10 +129,13 @@ public class RiotCollectionOrchestrator {
     private void collectMatches(List<String> puuids, String sampleTier) {
         Set<String> processedMatchIds = new LinkedHashSet<>();
         int playerCount = properties.getPlayerPageSize();
-        for (int fromIndex = 0; fromIndex < puuids.size(); fromIndex += playerCount) {
-            List<String> targets = puuids.subList(
+        List<String> limitedPuuids = puuids.stream()
+                .limit(properties.getPlayerLimit())
+                .toList();
+        for (int fromIndex = 0; fromIndex < limitedPuuids.size(); fromIndex += playerCount) {
+            List<String> targets = limitedPuuids.subList(
                     fromIndex,
-                    Math.min(fromIndex + playerCount, puuids.size())
+                    Math.min(fromIndex + playerCount, limitedPuuids.size())
             );
             for (String puuid : targets) {
                 collectPlayerMatches(puuid, sampleTier, processedMatchIds);
@@ -396,6 +401,9 @@ public class RiotCollectionOrchestrator {
         }
         if (properties.getPlayerPageSize() < 1 || properties.getPlayerPageSize() > 100) {
             throw new IllegalArgumentException("collection scheduler player page size must be between 1 and 100");
+        }
+        if (properties.getPlayerLimit() < 1 || properties.getPlayerLimit() > 100) {
+            throw new IllegalArgumentException("collection scheduler player limit must be between 1 and 100");
         }
         if (properties.getMatchCount() < 1 || properties.getMatchCount() > 100) {
             throw new IllegalArgumentException("collection scheduler match count must be between 1 and 100");

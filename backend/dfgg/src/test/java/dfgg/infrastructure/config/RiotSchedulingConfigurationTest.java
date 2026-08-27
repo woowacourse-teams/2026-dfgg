@@ -65,7 +65,9 @@ class RiotSchedulingConfigurationTest {
                         "collection.scheduler.zone=UTC",
                         "collection.scheduler.tiers=PLATINUM,EMERALD",
                         "collection.scheduler.divisions=I,II",
-                        "collection.scheduler.match-count=50"
+                        "collection.scheduler.player-limit=3",
+                        "collection.scheduler.match-count=50",
+                        "collection.scheduler.recover-missing-timelines=true"
                 )
                 .run(context -> {
                     RiotSchedulerProperties properties = context.getBean(RiotSchedulerProperties.class);
@@ -74,7 +76,9 @@ class RiotSchedulingConfigurationTest {
                     assertThat(properties.getZone()).isEqualTo("UTC");
                     assertThat(properties.getTiers()).containsExactly("PLATINUM", "EMERALD");
                     assertThat(properties.getDivisions()).containsExactly("I", "II");
+                    assertThat(properties.getPlayerLimit()).isEqualTo(3);
                     assertThat(properties.getMatchCount()).isEqualTo(50);
+                    assertThat(properties.isRecoverMissingTimelines()).isTrue();
                 });
     }
 
