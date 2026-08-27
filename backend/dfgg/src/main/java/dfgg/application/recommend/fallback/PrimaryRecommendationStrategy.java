@@ -60,7 +60,10 @@ public class PrimaryRecommendationStrategy implements RecommendationStrategy {
                 recommendationProperties.anchoredPrefixLimit()
         );
         List<RankedItemCandidate> explorationZoneRanked = explorationZoneCandidateGenerator
-                .rankByMaxSimilarityToEnemies(context.enemyChampionIds(), recommendationProperties.counterAlgorithmVersion());
+                .rankByMaxSimilarityToEnemies(
+                        context.enemyChampionIds(), recommendationProperties.counterAlgorithmVersion(),
+                        context.myChampionId(), context.position()
+                );
 
         MixedCandidates mixed = candidateZoneMixer.mix(
                 safeZoneRanked, explorationZoneRanked,

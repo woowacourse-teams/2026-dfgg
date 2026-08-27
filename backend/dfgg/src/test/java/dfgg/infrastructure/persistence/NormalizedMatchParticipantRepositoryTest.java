@@ -206,4 +206,41 @@ class NormalizedMatchParticipantRepositoryTest {
         assertThat(byItem).containsOnlyKeys("3031", "3006", "3078");
         assertThat(byItem.get("3078")).containsExactly(1L, 1L);
     }
+
+    @Test
+    @DisplayName("이 챔피언·포지션이 코어 아이템으로 산 적 있는 모든 아이템을 중복 없이 반환한다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findDistinctPurchasedItemIds_WhenChampionHasMultipleBuilds_ReturnsAllItemsEverPurchased() {
+        // given: 챔피언 222(BOTTOM)의 빌드는 '3031,3072'(3건), '3006,3031'(1건), '3078,3072'(1건)
+
+        // when
+        List<String> itemIds = participantRepository.findDistinctPurchasedItemIds(222L, List.of("BOTTOM"));
+
+        // then
+        assertThat(itemIds).containsExactlyInAnyOrder("3031", "3072", "3006", "3078");
+    }
+
+    @Test
+    @DisplayName("MID 포지션은 Riot 원시값 MIDDLE까지 조회 대상에 포함해야 데이터를 찾는다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findDistinctPurchasedItemIds_WhenPositionIsMid_RequiresRiotAliasToFindData() {
+        // given: 챔피언 103은 position이 Riot 원시값 'MIDDLE'로 저장돼 있다
+
+        // when
+        List<String> itemIds = participantRepository.findDistinctPurchasedItemIds(103L, List.of("MID", "MIDDLE"));
+
+        // then
+        assertThat(itemIds).containsExactlyInAnyOrder("3020", "3089");
+    }
+
+    @Test
+    @DisplayName("해당 챔피언·포지션의 데이터가 없으면 빈 리스트를 반환한다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findDistinctPurchasedItemIds_WhenNoDataForScope_ReturnsEmptyList() {
+        // given & when
+        List<String> itemIds = participantRepository.findDistinctPurchasedItemIds(999L, List.of("TOP"));
+
+        // then
+        assertThat(itemIds).isEmpty();
+    }
 }

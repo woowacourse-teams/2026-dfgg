@@ -49,6 +49,31 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
     List<Object[]> countItemOccurrences();
 
     /**
+     * 이 챔피언·포지션이 실제로 코어 아이템으로 산 적 있는 아이템 ID를 중복 없이 반환한다.
+     *
+     * <p>탐색 구역(카운터 임베딩 공간)은 태그를 학습하지 않는다(콘텐츠 문맥은 정체성 공간
+     * 전용). 그래서 "이 챔피언이 애초에 살 수 없는/안 사는 아이템"인지를 카운터 공간의
+     * 코사인 유사도만으로는 판단할 수 없다 — 적과의 유사도가 아무리 높아도, 실측 구매
+     * 이력에 없는 아이템은 이 결과로 걸러낸다. {@code position}에는 Riot 원시값이
+     * 저장되므로 호출자가 {@code ChampionPositionNormalizer.riotValuesOf(...)}로 별칭까지
+     * 넘겨야 한다.
+     */
+    @Query(value = """
+            SELECT DISTINCT item_id
+            FROM (
+                SELECT unnest(string_to_array(final_core_item_ids, ',')) AS item_id
+                FROM normalized_match_participants
+                WHERE champion_id = :championId
+                  AND position IN (:positions)
+            ) AS purchased_items
+            WHERE item_id <> ''
+            """, nativeQuery = true)
+    List<String> findDistinctPurchasedItemIds(
+            @Param("championId") Long championId,
+            @Param("positions") Collection<String> positions
+    );
+
+    /**
      * 챔피언·포지션에서 가장 많이 등장한 코어 아이템 빌드를 콤마 구분 문자열로 반환한다.
      *
      * <p>{@code position}에는 Riot 원시값이 저장되므로(정규화는 마이닝 시점에만 일어남)

@@ -69,7 +69,7 @@ class PrimaryRecommendationStrategyTest {
         when(safeZoneCandidateGenerator.rankNextItemCandidates(
                 anyList(), any(), any(), anyString(), anyString(), anyString(), anyInt()
         )).thenReturn(List.of(safeZoneCandidate));
-        when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString()))
+        when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString(), any(), any()))
                 .thenReturn(List.of(explorationZoneCandidate));
         when(candidateZoneMixer.mix(List.of(safeZoneCandidate), List.of(explorationZoneCandidate), 10, 0.8))
                 .thenReturn(new MixedCandidates(List.of(safeZoneCandidate), List.of(explorationZoneCandidate)));
@@ -98,7 +98,7 @@ class PrimaryRecommendationStrategyTest {
         when(safeZoneCandidateGenerator.rankNextItemCandidates(
                 anyList(), any(), any(), anyString(), anyString(), anyString(), anyInt()
         )).thenReturn(List.of());
-        when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString()))
+        when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString(), any(), any()))
                 .thenReturn(List.of());
         when(candidateZoneMixer.mix(List.of(), List.of(), 10, 0.8))
                 .thenReturn(new MixedCandidates(List.of(), List.of()));
@@ -123,7 +123,7 @@ class PrimaryRecommendationStrategyTest {
         when(safeZoneCandidateGenerator.rankNextItemCandidates(
                 anyList(), any(), any(), anyString(), anyString(), anyString(), anyInt()
         )).thenReturn(List.of(safeZoneCandidate));
-        when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString()))
+        when(explorationZoneCandidateGenerator.rankByMaxSimilarityToEnemies(anyList(), anyString(), any(), any()))
                 .thenReturn(List.of(explorationZoneOverlap, explorationZoneUnique));
         when(candidateZoneMixer.mix(
                 List.of(safeZoneCandidate), List.of(explorationZoneOverlap, explorationZoneUnique), 10, 0.8
