@@ -33,6 +33,18 @@ public record RecommendationProperties (
     @DefaultValue("10")
     int totalCandidateCount,
 
+    /**
+     * 안전 구역+탐색 구역을 합친(이미 구매한 아이템 제외 후) 후보 수가 이 값 이하로
+     * 내려가면, prefix를 한 칸씩 줄여가며(prefix 백오프) 안전 구역 후보를 추가로
+     * 채운다. 깊은 prefix일수록 정확히 일치하는 실측/마이닝 표본이 급격히 줄어(특정
+     * 챔피언 하나로 좁히면 4~5코어 시점엔 매칭이 0건인 경우도 흔함) 탐색 구역만으로
+     * 응답을 채우게 되는데, 이때 더 얕은(더 흔한) prefix의 통계를 보조로 섞어 후보를
+     * 두텁게 한다. 같은 아이템이 여러 깊이에서 나오면 더 깊은(정밀한) prefix의 점수를
+     * 우선한다.
+     */
+    @DefaultValue("5")
+    int prefixBackoffThreshold,
+
     @DefaultValue("0.8")
     double safeZoneRatio,
 
