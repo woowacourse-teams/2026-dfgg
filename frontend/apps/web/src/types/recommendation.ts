@@ -19,8 +19,17 @@ export interface RecommendationRequest {
   enemies: Champion[];
 }
 
+interface RecommendationBuild {
+  id: number;
+  name: string;
+}
+
 export interface RecommendationResponse {
   champion: string;
   position: Position;
-  items: Item[];
+  builds: {
+    championTag: string;
+    direction: string;
+    build: RecommendationBuild[];
+  }[];
 }
