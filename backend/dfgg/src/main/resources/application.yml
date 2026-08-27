@@ -31,6 +31,7 @@ recommendation:
   pattern-algorithm-version: "${RECOMMENDATION_PATTERN_ALGORITHM_VERSION:checkpoint-d-1}"
   anchored-prefix-limit: "${RECOMMENDATION_ANCHORED_PREFIX_LIMIT:2}"
   total-candidate-count: "${RECOMMENDATION_TOTAL_CANDIDATE_COUNT:10}"
+  prefix-backoff-threshold: "${RECOMMENDATION_PREFIX_BACKOFF_THRESHOLD:5}"
   safe-zone-ratio: "${RECOMMENDATION_SAFE_ZONE_RATIO:0.8}"
   wilson-weight: "${RECOMMENDATION_WILSON_WEIGHT:1.0}"
   my-champion-weight: "${RECOMMENDATION_MY_CHAMPION_WEIGHT:1.0}"
@@ -47,3 +48,6 @@ collection:
     league-page-count: "${COLLECTION_SCHEDULER_LEAGUE_PAGE_COUNT:1}"
     player-page-size: "${COLLECTION_SCHEDULER_PLAYER_PAGE_SIZE:100}"
     match-count: "${COLLECTION_SCHEDULER_MATCH_COUNT:20}"
+
+server:
+  forward-headers-strategy: framework

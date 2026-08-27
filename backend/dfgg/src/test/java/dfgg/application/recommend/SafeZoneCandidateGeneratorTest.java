@@ -1,6 +1,7 @@
 package dfgg.application.recommend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -44,6 +45,49 @@ class SafeZoneCandidateGeneratorTest {
         );
     }
 
+    // ── 집계 행 → 점수 매핑 (컬럼 순서가 조용히 뒤바뀌는 걸 막는다) ──
+
+    @Test
+    @DisplayName("집계 행의 2번째 열은 표본수, 3번째 열은 승수로 해석해 Wilson 하한을 계산한다")
+    void rankNextItemCandidates_WhenMappingDistributionRow_ReadsSecondColumnAsSupportAndThirdAsWinCount() {
+        // given: 표본 100 중 40승 → Wilson 하한 0.30939974...
+        //        두 열을 뒤바꾸면 successes > total이라 NaN이 되고,
+        //        승수를 표본수로 뭉개면 승률 100%가 되어 0.96300...으로 벌어진다.
+        //        count(*)/sum(...)은 Postgres에서 bigint로 오므로 Long으로 넘겨 실제 타입도 함께 검증한다.
+        when(participantRepository.findNextItemDistribution(
+                222L, List.of("BOTTOM"), "16.16", "", 1
+        )).thenReturn(List.<Object[]>of(new Object[]{"3031", 100L, 40L}));
+
+        // when
+        List<RankedItemCandidate> ranked = rank(List.of());
+
+        // then
+        assertThat(ranked).singleElement().satisfies(candidate -> {
+            assertThat(candidate.itemId()).isEqualTo(3031L);
+            assertThat(candidate.score()).isCloseTo(0.3093997461136029, within(1e-12));
+        });
+    }
+
+    @Test
+    @DisplayName("표본이 10배 커도 승률이 낮으면 승률 높은 후보보다 뒤로 밀린다")
+    void rankNextItemCandidates_WhenLargeSampleHasLowWinRate_RanksHighWinRateCandidateFirst() {
+        // given: 승률 낮은 쪽(1000표본 30% → 0.2724)을 일부러 먼저 반환한다.
+        //        매핑이 어긋나 점수가 NaN이 되면 정렬이 입력 순서를 그대로 두므로 이 순서가 남는다.
+        when(participantRepository.findNextItemDistribution(
+                222L, List.of("BOTTOM"), "16.16", "", 1
+        )).thenReturn(List.of(
+                new Object[]{"3006", 1000L, 300L},
+                new Object[]{"3031", 100L, 90L}
+        ));
+
+        // when
+        List<RankedItemCandidate> ranked = rank(List.of());
+
+        // then: 100표본 90%(0.8256)가 1000표본 30%(0.2724)를 앞선다
+        assertThat(ranked).extracting(RankedItemCandidate::itemId).containsExactly(3031L, 3006L);
+        assertThat(ranked).extracting(RankedItemCandidate::score).doesNotContain(Double.NaN);
+    }
+
     // ── anchoredPrefixLimit(2) 미만 — 실제 구매 순서에 정확히 anchoring된 원본 집계 ──
 
     @Test
@@ -51,7 +95,7 @@ class SafeZoneCandidateGeneratorTest {
     void rankNextItemCandidates_WhenBelowAnchoredPrefixLimit_UsesActualPurchaseOrderData() {
         // given: 3031은 표본 크기가 커서(1000명 중 600승) 승률은 같아도 Wilson 하한이 더 높다
         when(participantRepository.findNextItemDistribution(
-                222L, List.of("BOTTOM"), "PLATINUM", "16.16", "", 1
+                222L, List.of("BOTTOM"), "16.16", "", 1
         )).thenReturn(List.of(
                 new Object[]{"3006", 10, 6},
                 new Object[]{"3031", 1000, 600}
@@ -69,7 +113,7 @@ class SafeZoneCandidateGeneratorTest {
     void rankNextItemCandidates_WhenOnePurchasedItem_QueriesActualDataWithExactPrefix() {
         // given
         when(participantRepository.findNextItemDistribution(
-                222L, List.of("BOTTOM"), "PLATINUM", "16.16", "3031", 2
+                222L, List.of("BOTTOM"), "16.16", "3031", 2
         )).thenReturn(List.<Object[]>of(new Object[]{"3072", 50, 30}));
 
         // when
@@ -84,7 +128,7 @@ class SafeZoneCandidateGeneratorTest {
     void rankNextItemCandidates_WhenPositionIsMid_QueriesWithRiotAliasIncluded() {
         // given
         when(participantRepository.findNextItemDistribution(
-                any(), any(), anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.anyInt()
+                any(), any(), anyString(), anyString(), org.mockito.ArgumentMatchers.anyInt()
         )).thenReturn(List.of());
 
         // when
@@ -97,7 +141,7 @@ class SafeZoneCandidateGeneratorTest {
         org.mockito.ArgumentCaptor<List<String>> positionsCaptor = org.mockito.ArgumentCaptor.forClass(List.class);
         org.mockito.Mockito.verify(participantRepository).findNextItemDistribution(
                 org.mockito.ArgumentMatchers.eq(103L), positionsCaptor.capture(),
-                anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.eq(1)
+                anyString(), anyString(), org.mockito.ArgumentMatchers.eq(1)
         );
         assertThat(positionsCaptor.getValue()).containsExactlyInAnyOrder("MID", "MIDDLE");
     }
@@ -107,7 +151,7 @@ class SafeZoneCandidateGeneratorTest {
     void rankNextItemCandidates_WhenNoActualPurchaseData_ReturnsEmptyList() {
         // given
         when(participantRepository.findNextItemDistribution(
-                anyLong(), any(), anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.anyInt()
+                anyLong(), any(), anyString(), anyString(), org.mockito.ArgumentMatchers.anyInt()
         )).thenReturn(List.of());
 
         // when

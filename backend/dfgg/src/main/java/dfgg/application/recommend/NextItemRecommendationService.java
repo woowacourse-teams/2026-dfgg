@@ -27,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class NextItemRecommendationService {
 
+    private static final String BOOTS_TAG = "Boots";
+
     private final ChampionService championService;
     private final ItemService itemService;
     private final FallbackChain fallbackChain;
@@ -60,7 +62,7 @@ public class NextItemRecommendationService {
         FallbackRecommendation recommendation = fallbackChain.recommend(context)
                 .orElseThrow(() -> new NextItemRecommendationNotFoundException(myChampion.getName(), position.name()));
 
-        List<ItemDto> orderedItems = toOrderedItemDtos(recommendation.itemIds());
+        List<ItemDto> orderedItems = toOrderedItemDtos(recommendation.itemIds(), request.purchasedItemIds());
         return new NextItemRecommendationResponse(orderedItems, recommendation.servedBy().name());
     }
 
@@ -73,13 +75,22 @@ public class NextItemRecommendationService {
     /**
      * {@code findItemsByIds}는 요청한 순서를 보장하지 않으므로, 랭킹 순서(추천 순위)를
      * 그대로 유지하기 위해 원래 itemIds 순서대로 다시 정렬한다.
+     *
+     * <p>신발은 한 켤레만 신을 수 있다 — 이미 산 아이템 중 신발이 있으면, 폴백 체인이
+     * 추천한 후보 중 신발은 전부 제외한다. 안전/탐색 구역 어느 쪽도 "신발 슬롯"이라는
+     * 게임 규칙 자체를 모르고 아이템 단위로만 후보를 매기기 때문에, 이미 산 신발과
+     * 다른 신발이 여전히 후보에 낄 수 있어 여기서 마지막으로 걸러낸다.
      */
-    private List<ItemDto> toOrderedItemDtos(List<Long> rankedItemIds) {
+    private List<ItemDto> toOrderedItemDtos(List<Long> rankedItemIds, List<Long> purchasedItemIds) {
         Map<Long, Item> itemById = itemService.findItemsByIds(rankedItemIds).stream()
                 .collect(Collectors.toMap(Item::getItemId, Function.identity()));
+        boolean bootsAlreadyPurchased = itemService.findItemsByIds(purchasedItemIds).stream()
+                .anyMatch(item -> item.hasTag(BOOTS_TAG));
+
         return rankedItemIds.stream()
                 .map(itemById::get)
                 .filter(java.util.Objects::nonNull)
+                .filter(item -> !bootsAlreadyPurchased || !item.hasTag(BOOTS_TAG))
                 .map(ItemDto::from)
                 .toList();
     }

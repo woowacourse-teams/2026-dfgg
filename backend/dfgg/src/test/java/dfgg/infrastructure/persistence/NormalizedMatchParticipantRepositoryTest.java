@@ -125,7 +125,7 @@ class NormalizedMatchParticipantRepositoryTest {
 
         // when
         List<Object[]> rows = participantRepository.findNextItemDistribution(
-                222L, List.of("BOTTOM"), "PLATINUM", "16.16", "", 1
+                222L, List.of("BOTTOM"), "16.16","", 1
         );
 
         // then
@@ -145,7 +145,7 @@ class NormalizedMatchParticipantRepositoryTest {
 
         // when
         List<Object[]> rows = participantRepository.findNextItemDistribution(
-                222L, List.of("BOTTOM"), "PLATINUM", "16.16", "3031", 2
+                222L, List.of("BOTTOM"), "16.16","3031", 2
         );
 
         // then
@@ -161,7 +161,7 @@ class NormalizedMatchParticipantRepositoryTest {
     void findNextItemDistribution_WhenNoOneMatchesPrefix_ReturnsEmptyList() {
         // given & when
         List<Object[]> rows = participantRepository.findNextItemDistribution(
-                222L, List.of("BOTTOM"), "PLATINUM", "16.16", "9999", 2
+                222L, List.of("BOTTOM"), "16.16","9999", 2
         );
 
         // then
@@ -176,7 +176,7 @@ class NormalizedMatchParticipantRepositoryTest {
 
         // when
         List<Object[]> rows = participantRepository.findNextItemDistribution(
-                103L, List.of("MID", "MIDDLE"), "PLATINUM", "16.16", "", 1
+                103L, List.of("MID", "MIDDLE"), "16.16","", 1
         );
 
         // then
@@ -184,5 +184,63 @@ class NormalizedMatchParticipantRepositoryTest {
         assertThat(rows.get(0)[0]).isEqualTo("3020");
         assertThat(((Number) rows.get(0)[1]).longValue()).isEqualTo(2L);
         assertThat(((Number) rows.get(0)[2]).longValue()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("티어가 다른 참가자도 집계에 포함한다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findNextItemDistribution_WhenParticipantsHaveDifferentTiers_AggregatesAcrossAllTiers() {
+        // given: 챔피언 222(BOTTOM)에 PLATINUM 4건과 GOLD 1건('3078,3072')이 섞여 있다.
+        //        추천은 요청자 티어와 무관하게 수집된 전 티어 데이터를 근거로 삼는다.
+
+        // when
+        List<Object[]> rows = participantRepository.findNextItemDistribution(
+                222L, List.of("BOTTOM"), "16.16", "", 1
+        );
+
+        // then: GOLD 참가자의 1코어(3078)가 PLATINUM 참가자들과 나란히 집계된다
+        Map<String, long[]> byItem = rows.stream().collect(Collectors.toMap(
+                row -> (String) row[0],
+                row -> new long[]{((Number) row[1]).longValue(), ((Number) row[2]).longValue()}
+        ));
+        assertThat(byItem).containsOnlyKeys("3031", "3006", "3078");
+        assertThat(byItem.get("3078")).containsExactly(1L, 1L);
+    }
+
+    @Test
+    @DisplayName("이 챔피언·포지션이 코어 아이템으로 산 적 있는 모든 아이템을 중복 없이 반환한다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findDistinctPurchasedItemIds_WhenChampionHasMultipleBuilds_ReturnsAllItemsEverPurchased() {
+        // given: 챔피언 222(BOTTOM)의 빌드는 '3031,3072'(3건), '3006,3031'(1건), '3078,3072'(1건)
+
+        // when
+        List<String> itemIds = participantRepository.findDistinctPurchasedItemIds(222L, List.of("BOTTOM"));
+
+        // then
+        assertThat(itemIds).containsExactlyInAnyOrder("3031", "3072", "3006", "3078");
+    }
+
+    @Test
+    @DisplayName("MID 포지션은 Riot 원시값 MIDDLE까지 조회 대상에 포함해야 데이터를 찾는다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findDistinctPurchasedItemIds_WhenPositionIsMid_RequiresRiotAliasToFindData() {
+        // given: 챔피언 103은 position이 Riot 원시값 'MIDDLE'로 저장돼 있다
+
+        // when
+        List<String> itemIds = participantRepository.findDistinctPurchasedItemIds(103L, List.of("MID", "MIDDLE"));
+
+        // then
+        assertThat(itemIds).containsExactlyInAnyOrder("3020", "3089");
+    }
+
+    @Test
+    @DisplayName("해당 챔피언·포지션의 데이터가 없으면 빈 리스트를 반환한다")
+    @Sql("/sql/most-frequent-build-test-data.sql")
+    void findDistinctPurchasedItemIds_WhenNoDataForScope_ReturnsEmptyList() {
+        // given & when
+        List<String> itemIds = participantRepository.findDistinctPurchasedItemIds(999L, List.of("TOP"));
+
+        // then
+        assertThat(itemIds).isEmpty();
     }
 }

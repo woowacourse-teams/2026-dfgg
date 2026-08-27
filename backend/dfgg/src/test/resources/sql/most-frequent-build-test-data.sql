@@ -10,6 +10,9 @@ INSERT INTO normalized_match_participants (
     ('KR_M2', '16.16', 420, 'puuid-2', 1, 222, 100, 'BOTTOM', 'PLATINUM', false, '3031,3072', '3031,3072', true),
     ('KR_M3', '16.16', 420, 'puuid-3', 1, 222, 100, 'BOTTOM', 'PLATINUM', true, '3031,3072', '3031,3072', true),
     ('KR_M4', '16.16', 420, 'puuid-4', 1, 222, 100, 'BOTTOM', 'PLATINUM', false, '3006,3031', '3006,3031', true),
+    -- GOLD 참가자. 다른 티어도 집계에 포함되는지 보기 위한 행으로, 기존 단언과 겹치지 않도록
+    -- 1코어를 3078로 둔다(추천은 요청자 티어와 무관하게 전 티어 데이터를 쓴다).
+    ('KR_M8', '16.16', 420, 'puuid-8', 1, 222, 100, 'BOTTOM', 'GOLD', true, '3078,3072', '3078,3072', true),
     ('KR_M5', '16.16', 420, 'puuid-5', 1, 103, 200, 'MIDDLE', 'PLATINUM', true, '3020,3089', '3020,3089', true),
     ('KR_M6', '16.16', 420, 'puuid-6', 1, 103, 200, 'MIDDLE', 'PLATINUM', true, '3020,3089', '3020,3089', true),
     ('KR_M7', '16.16', 420, 'puuid-7', 1, 517, 200, 'UTILITY', 'PLATINUM', true, '3853,3011', '3853,3011', true);
