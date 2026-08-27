@@ -96,6 +96,35 @@ class NextItemRecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("이미 신발을 샀으면 폴백 체인이 다른 신발을 추천해도 결과에서 제외한다")
+    void recommendNextItem_WhenBootsAlreadyPurchased_ExcludesAnotherBootsFromResult() {
+        // given: 이미 산 3006(광전사의 군화)도 신발(Boots 태그)이라, 폴백 체인이 추천한
+        // 다른 신발 3047(판금 장화)은 빼고 일반 아이템 3072만 남아야 한다.
+        Champion myChampion = championOf(222L, "징크스");
+        Champion allyChampion = championOf(412L, "럭스");
+        Champion enemyChampion = championOf(54L, "말파이트");
+        when(championService.findChampionByName("Jinx")).thenReturn(myChampion);
+        when(championService.findChampionByName("Ally1")).thenReturn(allyChampion);
+        when(championService.findChampionByName("Enemy1")).thenReturn(enemyChampion);
+        when(fallbackChain.recommend(any(RecommendationContext.class))).thenReturn(
+                Optional.of(new FallbackRecommendation(List.of(3047L, 3072L), FallbackStage.PRIMARY))
+        );
+        when(itemService.findItemsByIds(List.of(3047L, 3072L))).thenReturn(List.of(
+                new Item(3047L, "판금 장화", List.of("Boots")),
+                new Item(3072L, "루난의 허리케인", List.of())
+        ));
+        when(itemService.findItemsByIds(List.of(3006L))).thenReturn(List.of(
+                new Item(3006L, "광전사의 군화", List.of("Boots"))
+        ));
+
+        // when
+        NextItemRecommendationResponse response = service.recommendNextItem(requestOf(List.of(3006L)));
+
+        // then
+        assertThat(response.recommendedItems()).extracting("name").containsExactly("루난의 허리케인");
+    }
+
+    @Test
     @DisplayName("요청의 챔피언 이름을 정확히 ID로 변환해 폴백 체인에 전달한다")
     void recommendNextItem_WhenCalled_BuildsContextWithResolvedChampionIdsAndPurchasedItems() {
         // given
