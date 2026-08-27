@@ -1,6 +1,7 @@
 package dfgg.domain.recommendation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -120,7 +121,8 @@ class AssassinBuildPolicyTest {
                 .singleElement()
                 .satisfies(candidate -> {
                     assertThat(candidate.direction().code()).isEqualTo("ENGAGE_SURVIVAL");
-                    assertThat(candidate.suitabilityScore()).isEqualTo(1.0);
+                    assertThat(candidate.suitabilityScore())
+                            .isCloseTo(1.0 / 18.0, within(1.0e-10));
                 });
     }
 
@@ -168,7 +170,7 @@ class AssassinBuildPolicyTest {
         // then
         assertThat(candidates)
                 .extracting(BuildCandidate::suitabilityScore)
-                .containsExactly(3.0, 3.0, 3.0);
+                .containsExactly(1.0 / 5.0, 1.0 / 5.0, 1.0 / 6.0);
     }
 
     private CoreBuildCluster cluster(Item... items) {

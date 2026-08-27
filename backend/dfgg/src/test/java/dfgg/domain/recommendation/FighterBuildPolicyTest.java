@@ -128,7 +128,7 @@ class FighterBuildPolicyTest {
         // then
         assertThat(candidates)
                 .extracting(BuildCandidate::suitabilityScore)
-                .containsExactly(2.0, 2.0, 3.0);
+                .containsExactly(1.0 / 6.0, 2.0 / 15.0, 1.0 / 4.0);
     }
 
     private CoreBuildCluster cluster(Item... items) {

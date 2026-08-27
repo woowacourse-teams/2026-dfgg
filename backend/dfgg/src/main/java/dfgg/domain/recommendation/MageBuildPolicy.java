@@ -105,17 +105,17 @@ public final class MageBuildPolicy implements ChampionBuildPolicy {
             return Optional.empty();
         }
 
-        double burstDamageScore = normalize(
+        double burstDamageScore = ChampionBuildPolicy.normalizeItemEvidence(
                 countBurstDamageScore(coreItems),
                 coreItems.size(),
                 BURST_DAMAGE_CRITERIA_COUNT
         );
-        double sustainedDamageScore = normalize(
+        double sustainedDamageScore = ChampionBuildPolicy.normalizeItemEvidence(
                 countSustainedDamageScore(coreItems),
                 coreItems.size(),
                 SUSTAINED_DAMAGE_CRITERIA_COUNT
         );
-        double survivalResponseScore = normalize(
+        double survivalResponseScore = ChampionBuildPolicy.normalizeItemEvidence(
                 countSurvivalResponseScore(coreItems),
                 coreItems.size(),
                 SURVIVAL_RESPONSE_CRITERIA_COUNT
@@ -181,10 +181,6 @@ public final class MageBuildPolicy implements ChampionBuildPolicy {
             }
         }
         return 0;
-    }
-
-    private double normalize(int rawScore, int coreItemCount, int criteriaCount) {
-        return (double) rawScore / (coreItemCount * criteriaCount);
     }
 
     private Optional<String> selectRepresentativeDirection(

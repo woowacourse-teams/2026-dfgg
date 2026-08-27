@@ -34,6 +34,10 @@ public final class AssassinBuildPolicy implements ChampionBuildPolicy {
     private static final String LIFE_STEAL_TAG = "LifeSteal";
     private static final String SPELL_VAMP_TAG = "SpellVamp";
 
+    private static final int BURST_ASSASSINATION_CRITERIA_COUNT = 5;
+    private static final int DEFENSE_NEUTRALIZATION_CRITERIA_COUNT = 5;
+    private static final int ENGAGE_SURVIVAL_CRITERIA_COUNT = 6;
+
     private static final Set<ChampionTag> BURST_ASSASSINATION_ENEMY_TAGS = Set.of(
             ChampionTag.MAGE,
             ChampionTag.MARKSMAN
@@ -116,6 +120,7 @@ public final class AssassinBuildPolicy implements ChampionBuildPolicy {
 
         double suitabilityScore = calculateSuitabilityScore(
                 directionCode.get(),
+                coreItems.size(),
                 burstAssassinationScore,
                 defenseNeutralizationScore,
                 engageSurvivalScore,
@@ -206,6 +211,7 @@ public final class AssassinBuildPolicy implements ChampionBuildPolicy {
 
     private double calculateSuitabilityScore(
             String directionCode,
+            int coreItemCount,
             int burstAssassinationScore,
             int defenseNeutralizationScore,
             int engageSurvivalScore,
@@ -213,12 +219,24 @@ public final class AssassinBuildPolicy implements ChampionBuildPolicy {
             int defenseNeutralizationThreat,
             int engageSurvivalThreat
     ) {
-        // 초기 기준은 관련 아이템 태그와 적 챔피언 태그에 동일한 가중치를 적용한다.
+        // 대표 방향은 raw 점수로 유지하되, 정책 간 비교 점수는 최대 가능 점수로 정규화한다.
         return switch (directionCode) {
-            case BURST_ASSASSINATION -> burstAssassinationScore * (burstAssassinationThreat + 1);
+            case BURST_ASSASSINATION -> ChampionBuildPolicy.normalizeItemEvidence(
+                    burstAssassinationScore,
+                    coreItemCount,
+                    BURST_ASSASSINATION_CRITERIA_COUNT
+            ) * (burstAssassinationThreat + 1);
             case DEFENSE_NEUTRALIZATION ->
-                    defenseNeutralizationScore * (defenseNeutralizationThreat + 1);
-            case ENGAGE_SURVIVAL -> engageSurvivalScore * (engageSurvivalThreat + 1);
+                    ChampionBuildPolicy.normalizeItemEvidence(
+                            defenseNeutralizationScore,
+                            coreItemCount,
+                            DEFENSE_NEUTRALIZATION_CRITERIA_COUNT
+                    ) * (defenseNeutralizationThreat + 1);
+            case ENGAGE_SURVIVAL -> ChampionBuildPolicy.normalizeItemEvidence(
+                    engageSurvivalScore,
+                    coreItemCount,
+                    ENGAGE_SURVIVAL_CRITERIA_COUNT
+            ) * (engageSurvivalThreat + 1);
             default -> throw new IllegalArgumentException("알 수 없는 ASSASSIN 빌드 방향입니다.");
         };
     }

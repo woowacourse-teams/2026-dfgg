@@ -37,6 +37,11 @@ public final class SupportBuildPolicy implements ChampionBuildPolicy {
 
     private static final int ITEM_TAG_WEIGHT = 1;
     private static final int ITEM_TRAIT_WEIGHT = 2;
+    private static final int ENGAGE_CRITERIA_SCORE = 7 * ITEM_TAG_WEIGHT + ITEM_TRAIT_WEIGHT;
+    private static final int ALLY_PROTECTION_CRITERIA_SCORE =
+            7 * ITEM_TAG_WEIGHT + ITEM_TRAIT_WEIGHT;
+    private static final int HEALING_ENHANCEMENT_CRITERIA_SCORE =
+            5 * ITEM_TAG_WEIGHT + 3 * ITEM_TRAIT_WEIGHT;
 
     private static final Set<ChampionTag> ENGAGE_ENEMY_TAGS = Set.of(
             ChampionTag.MAGE,
@@ -134,6 +139,7 @@ public final class SupportBuildPolicy implements ChampionBuildPolicy {
 
         double suitabilityScore = calculateSuitabilityScore(
                 directionCode.get(),
+                coreItems.size(),
                 engageScore,
                 allyProtectionScore,
                 healingEnhancementScore,
@@ -236,6 +242,7 @@ public final class SupportBuildPolicy implements ChampionBuildPolicy {
 
     private double calculateSuitabilityScore(
             String directionCode,
+            int coreItemCount,
             int engageScore,
             int allyProtectionScore,
             int healingEnhancementScore,
@@ -244,10 +251,22 @@ public final class SupportBuildPolicy implements ChampionBuildPolicy {
             int healingEnhancementThreat
     ) {
         return switch (directionCode) {
-            case ENGAGE_INITIATION -> engageScore * (engageThreat + 1);
-            case ALLY_PROTECTION -> allyProtectionScore * (allyProtectionThreat + 1);
+            case ENGAGE_INITIATION -> ChampionBuildPolicy.normalizeItemEvidence(
+                    engageScore,
+                    coreItemCount,
+                    ENGAGE_CRITERIA_SCORE
+            ) * (engageThreat + 1);
+            case ALLY_PROTECTION -> ChampionBuildPolicy.normalizeItemEvidence(
+                    allyProtectionScore,
+                    coreItemCount,
+                    ALLY_PROTECTION_CRITERIA_SCORE
+            ) * (allyProtectionThreat + 1);
             case HEALING_ENHANCEMENT ->
-                    healingEnhancementScore * (healingEnhancementThreat + 1);
+                    ChampionBuildPolicy.normalizeItemEvidence(
+                            healingEnhancementScore,
+                            coreItemCount,
+                            HEALING_ENHANCEMENT_CRITERIA_SCORE
+                    ) * (healingEnhancementThreat + 1);
             default -> throw new IllegalArgumentException("알 수 없는 SUPPORT 빌드 방향입니다.");
         };
     }

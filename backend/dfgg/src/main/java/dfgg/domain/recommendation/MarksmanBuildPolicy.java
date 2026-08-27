@@ -33,6 +33,10 @@ public final class MarksmanBuildPolicy implements ChampionBuildPolicy {
     private static final String TENACITY_TAG = "Tenacity";
     private static final String SLOW_TAG = "Slow";
 
+    private static final int CRITICAL_STRIKE_CRITERIA_COUNT = 4;
+    private static final int ANTI_TANK_CRITERIA_COUNT = 5;
+    private static final int SURVIVAL_KITING_CRITERIA_COUNT = 7;
+
     private static final Set<ChampionTag> CRITICAL_STRIKE_ENEMY_TAGS = Set.of(
             ChampionTag.MAGE,
             ChampionTag.MARKSMAN
@@ -115,6 +119,7 @@ public final class MarksmanBuildPolicy implements ChampionBuildPolicy {
 
         double suitabilityScore = calculateSuitabilityScore(
                 directionCode.get(),
+                coreItems.size(),
                 criticalStrikeScore,
                 antiTankScore,
                 survivalKitingScore,
@@ -205,6 +210,7 @@ public final class MarksmanBuildPolicy implements ChampionBuildPolicy {
 
     private double calculateSuitabilityScore(
             String directionCode,
+            int coreItemCount,
             int criticalStrikeScore,
             int antiTankScore,
             int survivalKitingScore,
@@ -212,11 +218,23 @@ public final class MarksmanBuildPolicy implements ChampionBuildPolicy {
             int antiTankThreat,
             int survivalKitingThreat
     ) {
-        // 초기 기준은 관련 아이템 태그와 적 챔피언 태그에 동일한 가중치를 적용한다.
+        // 대표 방향은 raw 점수로 유지하되, 정책 간 비교 점수는 최대 가능 점수로 정규화한다.
         return switch (directionCode) {
-            case CRITICAL_STRIKE_DAMAGE -> criticalStrikeScore * (criticalStrikeThreat + 1);
-            case ANTI_TANK_SUSTAINED_DAMAGE -> antiTankScore * (antiTankThreat + 1);
-            case SURVIVAL_KITING -> survivalKitingScore * (survivalKitingThreat + 1);
+            case CRITICAL_STRIKE_DAMAGE -> ChampionBuildPolicy.normalizeItemEvidence(
+                    criticalStrikeScore,
+                    coreItemCount,
+                    CRITICAL_STRIKE_CRITERIA_COUNT
+            ) * (criticalStrikeThreat + 1);
+            case ANTI_TANK_SUSTAINED_DAMAGE -> ChampionBuildPolicy.normalizeItemEvidence(
+                    antiTankScore,
+                    coreItemCount,
+                    ANTI_TANK_CRITERIA_COUNT
+            ) * (antiTankThreat + 1);
+            case SURVIVAL_KITING -> ChampionBuildPolicy.normalizeItemEvidence(
+                    survivalKitingScore,
+                    coreItemCount,
+                    SURVIVAL_KITING_CRITERIA_COUNT
+            ) * (survivalKitingThreat + 1);
             default -> throw new IllegalArgumentException("알 수 없는 MARKSMAN 빌드 방향입니다.");
         };
     }

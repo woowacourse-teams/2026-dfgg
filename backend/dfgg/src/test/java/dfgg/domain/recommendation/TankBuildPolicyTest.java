@@ -126,7 +126,7 @@ class TankBuildPolicyTest {
         // then
         assertThat(candidates)
                 .extracting(BuildCandidate::suitabilityScore)
-                .containsExactly(3.0, 3.0);
+                .containsExactly(2.0 / 3.0, 2.0 / 3.0);
     }
 
     @Test
