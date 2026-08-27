@@ -293,6 +293,49 @@ class MultiBuildRecommendationServiceTest {
         verify(fighterPolicy, never()).evaluate(anyList(), anyList());
     }
 
+    @Test
+    @DisplayName("다중 태그 챔피언의 동일 군집은 정규화된 적합도로 정책을 선택한다")
+    void recommend_MultiTagChampion_SelectsPolicyByNormalizedSuitability() {
+        // given
+        myChampion = new Champion(
+                1L,
+                "TwistedFate",
+                "트위스티드 페이트",
+                List.of(ChampionTag.MAGE, ChampionTag.MARKSMAN)
+        );
+        RecommendationRequest request = prepareRequest(ChampionPosition.MID);
+        List<Item> hybridBuild = List.of(
+                new Item(401L, "성장 아이템", List.of("SpellDamage", "Mana", "Health")),
+                new Item(
+                        402L,
+                        "가속 아이템",
+                        List.of("SpellDamage", "AbilityHaste", "NonbootsMovement")
+                ),
+                new Item(403L, "유틸 아이템", List.of("SpellDamage", "Mana", "Slow")),
+                new Item(404L, "신발", List.of("Boots")),
+                new Item(405L, "후반 아이템 A"),
+                new Item(406L, "후반 아이템 B")
+        );
+        ChampionBuildStats observedBuild = stats(
+                ChampionPosition.MID,
+                "HYBRID_COMPLETE",
+                hybridBuild,
+                30
+        );
+        givenMatchingStats(ChampionPosition.MID, List.of(observedBuild));
+
+        // when
+        MultiBuildRecommendationResponse response = recommendationService.recommend(request);
+
+        // then
+        assertThat(response.builds().getFirst())
+                .satisfies(build -> {
+                    assertThat(build.championTag()).isEqualTo("MAGE");
+                    assertThat(build.direction()).isEqualTo("SUSTAINED_DAMAGE");
+                    assertThat(build.build()).hasSize(6);
+                });
+    }
+
     private RecommendationRequest prepareRequest(ChampionPosition position) {
         Champion ally = champion(2L, "아군", ChampionTag.MARKSMAN);
         Champion enemy = champion(3L, "적군", ChampionTag.FIGHTER);
