@@ -40,6 +40,10 @@ public final class FighterBuildPolicy implements ChampionBuildPolicy {
             "HealthRegen"
     );
 
+    private static final int ANTI_TANK_CRITERIA_COUNT = ANTI_TANK_ITEM_TAGS.size();
+    private static final int BURST_SURVIVAL_CRITERIA_COUNT = BURST_SURVIVAL_ITEM_TAGS.size();
+    private static final int SUSTAINED_COMBAT_CRITERIA_COUNT = SUSTAINED_COMBAT_ITEM_TAGS.size();
+
     private static final Set<ChampionTag> ANTI_TANK_ENEMY_TAGS = Set.of(
             ChampionTag.TANK
     );
@@ -120,6 +124,7 @@ public final class FighterBuildPolicy implements ChampionBuildPolicy {
 
         double suitabilityScore = calculateSuitabilityScore(
                 directionCode.get(),
+                coreItems.size(),
                 antiTankScore,
                 burstSurvivalScore,
                 sustainedCombatScore,
@@ -170,6 +175,7 @@ public final class FighterBuildPolicy implements ChampionBuildPolicy {
 
     private double calculateSuitabilityScore(
             String directionCode,
+            int coreItemCount,
             int antiTankScore,
             int burstSurvivalScore,
             int sustainedCombatScore,
@@ -177,11 +183,23 @@ public final class FighterBuildPolicy implements ChampionBuildPolicy {
             int burstThreat,
             int sustainedCombatThreat
     ) {
-        // 초기 기준은 관련 아이템 태그와 적 챔피언 태그에 동일한 가중치를 적용한다.
+        // 대표 방향은 raw 점수로 유지하되, 정책 간 비교 점수는 최대 가능 점수로 정규화한다.
         return switch (directionCode) {
-            case ANTI_TANK -> antiTankScore * (antiTankThreat + 1);
-            case BURST_SURVIVAL -> burstSurvivalScore * (burstThreat + 1);
-            case SUSTAINED_COMBAT -> sustainedCombatScore * (sustainedCombatThreat + 1);
+            case ANTI_TANK -> BuildScoreNormalizer.normalizeItemEvidence(
+                    antiTankScore,
+                    coreItemCount,
+                    ANTI_TANK_CRITERIA_COUNT
+            ) * (antiTankThreat + 1);
+            case BURST_SURVIVAL -> BuildScoreNormalizer.normalizeItemEvidence(
+                    burstSurvivalScore,
+                    coreItemCount,
+                    BURST_SURVIVAL_CRITERIA_COUNT
+            ) * (burstThreat + 1);
+            case SUSTAINED_COMBAT -> BuildScoreNormalizer.normalizeItemEvidence(
+                    sustainedCombatScore,
+                    coreItemCount,
+                    SUSTAINED_COMBAT_CRITERIA_COUNT
+            ) * (sustainedCombatThreat + 1);
             default -> throw new IllegalArgumentException("알 수 없는 FIGHTER 빌드 방향입니다.");
         };
     }

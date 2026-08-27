@@ -220,27 +220,23 @@ public final class MarksmanBuildPolicy implements ChampionBuildPolicy {
     ) {
         // 대표 방향은 raw 점수로 유지하되, 정책 간 비교 점수는 최대 가능 점수로 정규화한다.
         return switch (directionCode) {
-            case CRITICAL_STRIKE_DAMAGE -> normalize(
+            case CRITICAL_STRIKE_DAMAGE -> BuildScoreNormalizer.normalizeItemEvidence(
                     criticalStrikeScore,
                     coreItemCount,
                     CRITICAL_STRIKE_CRITERIA_COUNT
             ) * (criticalStrikeThreat + 1);
-            case ANTI_TANK_SUSTAINED_DAMAGE -> normalize(
+            case ANTI_TANK_SUSTAINED_DAMAGE -> BuildScoreNormalizer.normalizeItemEvidence(
                     antiTankScore,
                     coreItemCount,
                     ANTI_TANK_CRITERIA_COUNT
             ) * (antiTankThreat + 1);
-            case SURVIVAL_KITING -> normalize(
+            case SURVIVAL_KITING -> BuildScoreNormalizer.normalizeItemEvidence(
                     survivalKitingScore,
                     coreItemCount,
                     SURVIVAL_KITING_CRITERIA_COUNT
             ) * (survivalKitingThreat + 1);
             default -> throw new IllegalArgumentException("알 수 없는 MARKSMAN 빌드 방향입니다.");
         };
-    }
-
-    private double normalize(int rawScore, int coreItemCount, int criteriaCount) {
-        return (double) rawScore / (coreItemCount * criteriaCount);
     }
 
     private int countThreat(List<Champion> enemies, Set<ChampionTag> threatTags) {

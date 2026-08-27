@@ -4,6 +4,7 @@ import static dfgg.domain.item.ItemTrait.ENGAGE;
 import static dfgg.domain.item.ItemTrait.HEAL;
 import static dfgg.domain.item.ItemTrait.PEEL;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -92,7 +93,7 @@ class SupportBuildPolicyTest {
                 .containsExactly("ENGAGE_INITIATION", "ALLY_PROTECTION", "HEALING_ENHANCEMENT");
         assertThat(candidates)
                 .extracting(BuildCandidate::suitabilityScore)
-                .containsExactly(2.0, 2.0, 2.0);
+                .containsExactly(2.0 / 27.0, 2.0 / 27.0, 2.0 / 33.0);
     }
 
     @Test
@@ -114,7 +115,8 @@ class SupportBuildPolicyTest {
                 .singleElement()
                 .satisfies(candidate -> {
                     assertThat(candidate.direction().code()).isEqualTo("HEALING_ENHANCEMENT");
-                    assertThat(candidate.suitabilityScore()).isEqualTo(3.0);
+                    assertThat(candidate.suitabilityScore())
+                            .isCloseTo(1.0 / 11.0, within(1.0e-10));
                 });
     }
 
@@ -144,7 +146,8 @@ class SupportBuildPolicyTest {
                 .singleElement()
                 .satisfies(candidate -> {
                     assertThat(candidate.direction().code()).isEqualTo("ENGAGE_INITIATION");
-                    assertThat(candidate.suitabilityScore()).isEqualTo(3.0);
+                    assertThat(candidate.suitabilityScore())
+                            .isCloseTo(1.0 / 9.0, within(1.0e-10));
                 });
     }
 
@@ -208,7 +211,7 @@ class SupportBuildPolicyTest {
         // then
         assertThat(candidates)
                 .extracting(BuildCandidate::suitabilityScore)
-                .containsExactly(3.0, 6.0, 4.0);
+                .containsExactly(1.0 / 9.0, 2.0 / 9.0, 4.0 / 33.0);
     }
 
     private CoreBuildCluster cluster(Item... items) {

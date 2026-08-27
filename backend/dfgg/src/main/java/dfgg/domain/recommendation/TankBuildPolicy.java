@@ -95,6 +95,7 @@ public final class TankBuildPolicy implements ChampionBuildPolicy {
 
         double suitabilityScore = calculateScore(
                 directionCode,
+                coreItems.size(),
                 armorCount,
                 spellBlockCount,
                 healthCount,
@@ -111,19 +112,34 @@ public final class TankBuildPolicy implements ChampionBuildPolicy {
 
     private double calculateScore(
             String directionCode,
+            int coreItemCount,
             int armorCount,
             int spellBlockCount,
             int healthCount,
             int physicalThreat,
             int magicThreat
     ) {
-        // 방향과 일치하는 적 위협을 중심으로 계산하고 Health는 공통 생존 점수로 반영한다.
+        double physicalEvidence = BuildScoreNormalizer.normalizeItemEvidence(
+                armorCount + healthCount,
+                coreItemCount,
+                2
+        );
+        double magicEvidence = BuildScoreNormalizer.normalizeItemEvidence(
+                spellBlockCount + healthCount,
+                coreItemCount,
+                2
+        );
+        double mixedEvidence = BuildScoreNormalizer.normalizeItemEvidence(
+                armorCount + spellBlockCount + healthCount,
+                coreItemCount,
+                3
+        );
+
+        // 방어 태그 근거를 정규화한 뒤 방향과 일치하는 적 위협을 반영한다.
         return switch (directionCode) {
-            case PHYSICAL_DAMAGE -> armorCount * (physicalThreat + 1) + healthCount;
-            case MAGIC_DAMAGE -> spellBlockCount * (magicThreat + 1) + healthCount;
-            case MIXED_DAMAGE -> armorCount * physicalThreat
-                    + spellBlockCount * magicThreat
-                    + healthCount;
+            case PHYSICAL_DAMAGE -> physicalEvidence * (physicalThreat + 1);
+            case MAGIC_DAMAGE -> magicEvidence * (magicThreat + 1);
+            case MIXED_DAMAGE -> mixedEvidence * (physicalThreat + magicThreat + 1);
             default -> throw new IllegalArgumentException("알 수 없는 TANK 빌드 방향입니다.");
         };
     }
