@@ -1,11 +1,14 @@
 import type { DDragonData } from '../../../../packages/shared/ddragon';
 import type { Position } from '../../../../packages/shared/types';
+import BuildList from '../../components/BuildList';
 import ItemBuild from '../../components/ItemBuild';
 import OverlayControls from '../../components/OverlayControls';
 import UpdateBanner from '../../components/UpdateBanner';
 import { useAnalyticsBridge } from '../../components/useAnalyticsBridge';
 import { WINDOW_MODE_FULLSCREEN } from '../../components/useLineup';
 import { findChampion, isPicked, useRecommendation } from '../../components/useRecommendation';
+import { useRecommendationV3 } from '../../components/useRecommendationV3';
+import { useRecommendMode } from '../../components/useRecommendMode';
 import type { LineupSlot } from '../../electron/types';
 
 const POSITION_LABEL: Record<Position, string> = {
@@ -51,6 +54,12 @@ function ChampionRow({ slots, ddragon }: { slots: LineupSlot[]; ddragon: DDragon
 export default function App() {
   useAnalyticsBridge();
 
+  // 1번(빌드 세트)과 2번(구매할 때마다 갱신) 두 방식을 항상 같이 돌려두고,
+  // 버튼은 어느 결과를 보여줄지만 바꾼다 — 전환할 때마다 다시 기다리지 않아도 된다.
+  // 둘 다 내부에서 useLineup·ddragon을 따로 불러오므로 약간의 중복 호출이 있다.
+  // mode 값은 메인 프로세스가 들고 있어서, 여기서 바꾸면 오버레이도 따라간다.
+  const [mode, setMode] = useRecommendMode();
+
   const {
     lineup,
     status,
@@ -63,6 +72,8 @@ export default function App() {
     allyPicked,
     enemyPicked,
   } = useRecommendation();
+
+  const { result: resultV3, error: errorV3, loading: loadingV3 } = useRecommendationV3();
 
   return (
     <div className='min-h-dvh bg-neutral-950 text-neutral-100'>
@@ -82,6 +93,31 @@ export default function App() {
           <h1 className='text-xl font-bold'>밴픽 아이템 추천</h1>
           <p className='text-sm text-neutral-400'>{STATUS_LABEL[status]}</p>
         </header>
+
+        {/* 두 추천 방식은 항상 같이 돌고 있다. 버튼은 결과 표시만 바꾼다. */}
+        <div className='mt-3 flex gap-1.5' role='tablist' aria-label='추천 방식'>
+          {(
+            [
+              [1, '1번 · 빌드 추천'],
+              [2, '2번 · 실시간 추천'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type='button'
+              role='tab'
+              aria-selected={mode === value}
+              onClick={() => setMode(value)}
+              className={`cursor-pointer rounded px-3 py-1.5 text-xs font-bold transition-colors ${
+                mode === value
+                  ? 'bg-emerald-500 text-neutral-950'
+                  : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         <UpdateBanner />
 
@@ -143,28 +179,84 @@ export default function App() {
           </>
         )}
 
-        {loading && <p className='mt-6 text-sm text-neutral-400'>분석 중...</p>}
+        {mode === 1 && (
+          <>
+            {loading && <p className='mt-6 text-sm text-neutral-400'>분석 중...</p>}
 
-        {error && (
-          <p className='mt-6 text-sm text-rose-400' role='alert'>
-            {error}
-          </p>
+            {error && (
+              <p className='mt-6 text-sm text-rose-400' role='alert'>
+                {error}
+              </p>
+            )}
+
+            {/* 빌드가 아예 없거나(빈 배열) 다 있는데 아이템(build)이 null인 경우 모두 포함한다. */}
+            {result && result.builds.every((build) => !build.build?.length) && !loading && (
+              <p className='mt-8 text-sm text-neutral-400'>이 조합은 아직 데이터가 부족해요.</p>
+            )}
+
+            {result &&
+              ddragon &&
+              !loading &&
+              result.builds.some((build) => build.build?.length) && (
+                <section className='mt-8' aria-live='polite'>
+                  <h2 className='text-lg font-bold'>
+                    {(lineup &&
+                      findChampion(ddragon, lineup.myChampionId, lineup.myChampionName)?.name) ??
+                      result.champion}
+                    <span className='ml-2 text-sm font-normal text-neutral-400'>
+                      {POSITION_LABEL[result.position] ?? result.position}
+                    </span>
+                  </h2>
+                  <div className='mt-3'>
+                    <BuildList
+                      builds={result.builds}
+                      ddragon={ddragon}
+                      ownedItemIds={lineup?.myItemIds}
+                    />
+                  </div>
+                </section>
+              )}
+          </>
         )}
 
-        {result && ddragon && !loading && (
-          <section className='mt-8' aria-live='polite'>
-            <h2 className='text-lg font-bold'>
-              {(lineup &&
-                findChampion(ddragon, lineup.myChampionId, lineup.myChampionName)?.name) ??
-                result.champion}
-              <span className='ml-2 text-sm font-normal text-neutral-400'>
-                {POSITION_LABEL[result.position] ?? result.position}
-              </span>
-            </h2>
-            <div className='mt-3'>
-              <ItemBuild items={result.items} ddragon={ddragon} />
-            </div>
-          </section>
+        {mode === 2 && (
+          <>
+            {loadingV3 && <p className='mt-6 text-sm text-neutral-400'>분석 중...</p>}
+
+            {errorV3 && (
+              <p className='mt-6 text-sm text-rose-400' role='alert'>
+                {errorV3}
+              </p>
+            )}
+
+            {resultV3 && resultV3.recommendedItems.length === 0 && !loadingV3 && (
+              <p className='mt-8 text-sm text-neutral-400'>이 조합은 아직 데이터가 부족해요.</p>
+            )}
+
+            {resultV3 && ddragon && !loadingV3 && resultV3.recommendedItems.length > 0 && (
+              <section className='mt-8' aria-live='polite'>
+                <h2 className='text-lg font-bold'>
+                  {(lineup &&
+                    findChampion(ddragon, lineup.myChampionId, lineup.myChampionName)?.name) ??
+                    '추천 아이템'}
+                  <span className='ml-2 text-sm font-normal text-neutral-400'>
+                    {resultV3.servedBy}
+                  </span>
+                </h2>
+                <p className='mt-1 text-xs text-neutral-500'>
+                  이 중 하나를 다음 코어템으로 선택하세요. 순서가 아니라 후보예요.
+                </p>
+                <div className='mt-3'>
+                  <ItemBuild
+                    items={resultV3.recommendedItems}
+                    ddragon={ddragon}
+                    ownedItemIds={lineup?.myItemIds}
+                    showRank={false}
+                  />
+                </div>
+              </section>
+            )}
+          </>
         )}
 
         <footer className='mt-10 border-t border-neutral-800 pt-4 text-xs text-neutral-500'>
