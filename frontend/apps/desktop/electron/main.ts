@@ -2,7 +2,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, Menu, screen, shell } from
 import path from 'node:path';
 
 import { trackEvent } from './analytics';
-import { requestRecommendation } from './backend';
+import { requestRecommendation, requestRecommendationV3 } from './backend';
 import { parseChampSelect } from './champ-select';
 import { type ClientWindowRect, watchClientWindow } from './client-window';
 import { fetchLiveGame } from './live-client';
@@ -36,8 +36,14 @@ const TOGGLE_OVERLAY = 'Alt+D';
  * 아이콘 w-8(32px) 에 gap-1(4px) 이므로 6*32 + 5*4 = 212. 여기에 카드 안쪽
  * 여백 p-2.5(10*2) 와 바깥 여백 p-2(8*2) 를 더해 248, 반올림 여유로 252.
  * ItemBuild 의 크기를 바꾸면 이 값도 같이 고쳐야 한다.
+ *
+ * 높이는 builds가 최대 3개까지 세로로 쌓이는 걸 기준으로 잡는다. 오버레이는
+ * 스크롤을 못 받는 클릭-통과 창이라, 창 자체가 낮으면 두 번째·세 번째 빌드는
+ * 그려지긴 해도 창 바깥이라 아예 안 보인다. 빌드 하나당 대략 65px(라벨+아이콘
+ * 한 줄+카드 여백) + 빌드 사이 간격 6px 이고, 여기에 헤더 줄과 바깥 여백을
+ * 더하면 3빌드 기준 약 270px. 여유를 두고 300으로 잡는다.
  */
-const OVERLAY_SIZE = { width: 252, height: 96 };
+const OVERLAY_SIZE = { width: 252, height: 300 };
 
 /** 화면 가장자리에서 띄울 여백. */
 const OVERLAY_MARGIN = 24;
@@ -94,8 +100,22 @@ let missCount = 0;
 let sessionId = 0;
 let sessionActive = false;
 
+/**
+ * 이번 판에서 한 번이라도 본 아이템 id를 계속 들고 있는다.
+ *
+ * 신발 미션이 완료돼서 "미션 칸"으로 넘어가면, Riot Live Client API가 그
+ * 아이템을 items 배열에서 아예 빼버린다(슬롯만 바뀌는 게 아니라 자체를 안
+ * 준다). 매 폴링 스냅샷을 그대로 쓰면 그 순간 "구매 안 함"으로 되돌아가
+ * 버리므로, 한 번 본 건 세션이 끝날 때까지 계속 가진 것으로 취급한다.
+ */
+let seenItemIds = new Set<number>();
+let seenItemsSessionId = -1;
+
 let overlayScale = 1;
 let overlayVisible = true;
+
+/** 1번/2번 추천 방식 중 화면에 보여줄 것. 메인 창에서 바꾸면 오버레이도 따라간다. */
+let recommendMode: 1 | 2 = 1;
 
 let unwatchClient: (() => void) | null = null;
 /** 마지막으로 붙여준 클라이언트 좌표. 같은 값이면 창을 건드리지 않는다. */
@@ -149,7 +169,18 @@ function setStatus(status: LcuStatus) {
   broadcast('lcu:status', status);
 }
 
-function publish(lineup: Lineup | null) {
+function publish(rawLineup: Lineup | null) {
+  let lineup = rawLineup;
+  if (lineup) {
+    // 세션이 바뀌면 누적을 새로 시작한다. 지난 판 아이템이 다음 판까지 넘어가면 안 된다.
+    if (lineup.sessionId !== seenItemsSessionId) {
+      seenItemsSessionId = lineup.sessionId;
+      seenItemIds = new Set();
+    }
+    for (const id of lineup.myItemIds) seenItemIds.add(id);
+    lineup = { ...lineup, myItemIds: [...seenItemIds] };
+  }
+
   const serialized = JSON.stringify(lineup);
   if (serialized === lastPublished) return; // 바뀐 게 없으면 조용히 넘어간다
   lastPublished = serialized;
@@ -597,6 +628,11 @@ async function createOverlayWindow() {
     applyOverlayBounds();
     if (overlayVisible) created.showInactive();
     console.log('[overlay] 표시됨', inGame ? '(게임 내 오버레이)' : '(일반 창)');
+    // 오버레이는 메인 창과 별개 렌더러라 콘솔도 따로 뜬다. detach로 열어야
+    // 작고 항상 위에 떠 있는 오버레이 창 안에 끼어들지 않는다.
+    if (isDev && process.env.DFGG_DEVTOOLS === '1') {
+      created.webContents.openDevTools({ mode: 'detach' });
+    }
   });
 
   created.webContents.on('did-finish-load', () => sendCurrentState(created));
@@ -618,6 +654,16 @@ ipcMain.handle('lcu:getStatus', () => lastStatus);
 
 // 렌더러 대신 여기서 백엔드를 호출한다. 패키징된 앱의 CORS·CSP 제약을 피한다.
 ipcMain.handle('api:recommend', (_event, body: unknown) => requestRecommendation(body));
+ipcMain.handle('api:recommendV3', (_event, body: unknown) => requestRecommendationV3(body));
+
+// 오버레이는 버튼을 못 다니 메인 창에서 바꾸면 여기서 오버레이까지 같이 알린다.
+ipcMain.handle('recommend:getMode', () => recommendMode);
+ipcMain.handle('recommend:setMode', (_event, mode: 1 | 2) => {
+  recommendMode = mode;
+  track('recommend-mode-change', { mode });
+  broadcast('recommend:mode', recommendMode);
+  return recommendMode;
+});
 
 // 오버레이는 클릭 통과라 자기 자신에 버튼을 달 수 없다. 메인 창에서 조절한다.
 ipcMain.handle('overlay:getState', () => ({ scale: overlayScale, visible: overlayVisible }));

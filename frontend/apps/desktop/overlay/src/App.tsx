@@ -1,6 +1,9 @@
 import type { Position } from '../../../../packages/shared/types';
+import BuildList from '../../components/BuildList';
 import ItemBuild from '../../components/ItemBuild';
 import { findChampion, useRecommendation } from '../../components/useRecommendation';
+import { useRecommendationV3 } from '../../components/useRecommendationV3';
+import { useRecommendMode } from '../../components/useRecommendMode';
 
 const POSITION_LABEL: Record<Position, string> = {
   TOP: '탑',
@@ -15,25 +18,39 @@ const POSITION_LABEL: Record<Position, string> = {
  * 배경이 투명해야 하므로 바깥 div에 배경색을 주지 않는다 — 카드에만 준다.
  */
 export default function App() {
+  // 오버레이는 클릭이 통과하는 창이라 버튼을 못 단다. 메인 창에서 고른 모드를
+  // 그대로 따라간다. 두 방식 다 항상 돌고 있어서 전환 지연 없이 바로 보인다.
+  const [mode] = useRecommendMode();
+
   const { lineup, ddragon, result, error, loading, enemyPicked, allyPicked } = useRecommendation();
+  const { result: resultV3, error: errorV3, loading: loadingV3 } = useRecommendationV3();
 
   const myChampion =
     ddragon && lineup ? findChampion(ddragon, lineup.myChampionId, lineup.myChampionName) : null;
 
+  const activeError = mode === 1 ? error : errorV3;
+  const activeLoading = mode === 1 ? loading : loadingV3;
+  const hasResult = mode === 1 ? Boolean(result) : Boolean(resultV3);
+
   return (
     <div className='p-2'>
       {/*
-        게임 화면이 그대로 비치도록 배경을 흰색 반투명으로만 얹는다.
-        어두운 판이 없어졌으므로 글자는 전부 흰색으로 올리고, 밝은 장면
-        위에서도 읽히도록 그림자로 윤곽을 만든다.
+        게임 화면을 가리면 안 되므로 카드 배경은 아주 옅게만 쓴다. 블러도 뒤가
+        흐려 보이게 만들어 빼고, 대신 글자에 진한 그림자를 줘서 어떤 배경 위에서도
+        읽히게 한다.
       */}
-      <div className='rounded-lg bg-white/10 p-2.5 ring-1 ring-white/20 [text-shadow:0_1px_2px_rgb(0_0_0/0.95),0_0_6px_rgb(0_0_0/0.8)]'>
+      <div className='rounded-xl bg-black/15 p-2.5 ring-1 ring-white/10 [text-shadow:0_1px_2px_rgb(0_0_0/0.95),0_0_6px_rgb(0_0_0/0.8)]'>
         <header className='flex items-baseline justify-between gap-2'>
           <h1 className='truncate text-xs font-bold text-white'>
             {myChampion?.name ?? 'dfgg'}
-            {result && (
+            {mode === 1 && result && (
               <span className='ml-1 text-[11px] font-normal text-white/80'>
                 {POSITION_LABEL[result.position] ?? result.position}
+              </span>
+            )}
+            {mode === 2 && resultV3 && (
+              <span className='ml-1 text-[11px] font-normal text-white/80'>
+                {resultV3.servedBy}
               </span>
             )}
           </h1>
@@ -42,15 +59,15 @@ export default function App() {
           </span>
         </header>
 
-        {loading && <p className='mt-1.5 text-[11px] text-white/80'>분석 중...</p>}
+        {activeLoading && <p className='mt-1.5 text-[11px] text-white/80'>분석 중...</p>}
 
-        {error && (
+        {activeError && (
           <p className='mt-1.5 text-[11px] font-medium text-rose-300' role='alert'>
-            {error}
+            {activeError}
           </p>
         )}
 
-        {!result && !loading && !error && (
+        {!hasResult && !activeLoading && !activeError && (
           <p className='mt-1.5 text-[11px] text-white/80'>
             {!lineup
               ? '밴픽이나 게임이 시작되면 표시돼요'
@@ -60,10 +77,46 @@ export default function App() {
           </p>
         )}
 
-        {result && ddragon && !loading && (
-          <div className='mt-1.5'>
-            <ItemBuild items={result.items} ddragon={ddragon} compact />
-          </div>
+        {mode === 1 && (
+          <>
+            {result && result.builds.every((build) => !build.build?.length) && !loading && (
+              <p className='mt-1.5 text-[11px] text-white/80'>데이터가 부족해요</p>
+            )}
+
+            {result &&
+              ddragon &&
+              !loading &&
+              result.builds.some((build) => build.build?.length) && (
+                <div className='mt-1.5'>
+                  <BuildList
+                    builds={result.builds}
+                    ddragon={ddragon}
+                    compact
+                    ownedItemIds={lineup?.myItemIds}
+                  />
+                </div>
+              )}
+          </>
+        )}
+
+        {mode === 2 && (
+          <>
+            {resultV3 && resultV3.recommendedItems.length === 0 && !loadingV3 && (
+              <p className='mt-1.5 text-[11px] text-white/80'>데이터가 부족해요</p>
+            )}
+
+            {resultV3 && ddragon && !loadingV3 && resultV3.recommendedItems.length > 0 && (
+              <div className='mt-1.5'>
+                <ItemBuild
+                  items={resultV3.recommendedItems}
+                  ddragon={ddragon}
+                  compact
+                  ownedItemIds={lineup?.myItemIds}
+                  showRank={false}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
