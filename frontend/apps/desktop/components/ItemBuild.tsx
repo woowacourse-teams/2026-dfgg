@@ -10,6 +10,12 @@ interface ItemBuildProps {
   compact?: boolean;
   /** 지금 들고 있는 완성 아이템 id. 이미 산 아이템은 체크 표시로 구분한다. */
   ownedItemIds?: number[];
+  /**
+   * 번호 배지를 보여줄지. 1번 방식(v2)의 builds는 실제 구매 순서라 번호가
+   * 맞지만, 2번 방식(v3)의 목록은 "이 중 하나를 골라 다음 코어템으로 사라"는
+   * 후보들이라 순서가 없다 — 1,2,3...으로 매기면 구매 순서처럼 오해된다.
+   */
+  showRank?: boolean;
 }
 
 /**
@@ -23,12 +29,13 @@ function compactLayout(count: number): { size: string; gap: string } {
   return { size: 'w-7', gap: 'gap-0.5' };
 }
 
-/** 추천 아이템을 순서대로 보여준다. 두 창이 함께 쓴다. */
+/** 추천 아이템을 보여준다. 두 창이 함께 쓴다. */
 export default function ItemBuild({
   items,
   ddragon,
   compact = false,
   ownedItemIds = [],
+  showRank = true,
 }: ItemBuildProps) {
   // 사용자가 순서를 바꿀 수 있게 로컬 상태로 둔다. 새 추천이 오면(items가 바뀌면)
   // 직전에 바꾼 순서를 버리고 서버가 준 순서로 되돌린다. effect 대신 렌더 중에
@@ -144,9 +151,11 @@ export default function ItemBuild({
                   </svg>
                 </span>
               ) : (
-                <span className='absolute top-0 left-0 bg-black/70 px-0.5 text-[9px] leading-tight text-emerald-400'>
-                  {index + 1}
-                </span>
+                showRank && (
+                  <span className='absolute top-0 left-0 bg-black/70 px-0.5 text-[9px] leading-tight text-emerald-400'>
+                    {index + 1}
+                  </span>
+                )
               )}
             </div>
             {!compact && (

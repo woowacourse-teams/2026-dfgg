@@ -112,6 +112,7 @@ export default function App() {
                   ddragon={ddragon}
                   compact
                   ownedItemIds={lineup?.myItemIds}
+                  showRank={false}
                 />
               </div>
             )}

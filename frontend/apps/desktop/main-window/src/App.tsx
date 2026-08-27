@@ -243,11 +243,15 @@ export default function App() {
                     {resultV3.servedBy}
                   </span>
                 </h2>
+                <p className='mt-1 text-xs text-neutral-500'>
+                  이 중 하나를 다음 코어템으로 선택하세요. 순서가 아니라 후보예요.
+                </p>
                 <div className='mt-3'>
                   <ItemBuild
                     items={resultV3.recommendedItems}
                     ddragon={ddragon}
                     ownedItemIds={lineup?.myItemIds}
+                    showRank={false}
                   />
                 </div>
               </section>
