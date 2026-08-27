@@ -108,8 +108,9 @@ public final class CoreBuildCluster {
 
     /**
      * 실제 완성 빌드를 우선 사용하고, 없으면 같은 군집의 관측 통계로 완성한다.
+     * 완성할 수 없으면 대표 첫 3코어 순서와 일치하는 가장 긴 관측 빌드를 반환한다.
      *
-     * <p>fallback은 대표 첫 3코어를 보존하고 가장 많이 관측된 신발과 구매 위치,
+     * <p>완성 빌드 조합은 대표 첫 3코어를 보존하고 가장 많이 관측된 신발과 구매 위치,
      * 첫 3코어 이후 슬롯별 아이템을 gameCount 기준으로 선택한다.
      */
     public Optional<List<Item>> findOrComposeRepresentativeBuild(int expectedItemCount) {
@@ -123,7 +124,35 @@ public final class CoreBuildCluster {
         if (observedBuild.isPresent()) {
             return observedBuild;
         }
-        return composeRepresentativeBuild(expectedItemCount);
+        return composeRepresentativeBuild(expectedItemCount)
+                .or(() -> findLongestObservedBuild(expectedItemCount));
+    }
+
+    private Optional<List<Item>> findLongestObservedBuild(int expectedItemCount) {
+        List<Long> representativeOrder = orderedCoreKey(representativeSequence);
+        ChampionBuildStats selected = null;
+
+        for (ChampionBuildStats stats : observedStats) {
+            List<Item> items = stats.getItems();
+            if (items.size() > expectedItemCount) {
+                continue;
+            }
+
+            Optional<CoreBuildSequence> sequence = CoreBuildSequence.from(items);
+            if (sequence.isEmpty()
+                    || !representativeOrder.equals(orderedCoreKey(sequence.get()))) {
+                continue;
+            }
+
+            if (selected == null
+                    || items.size() > selected.getItems().size()
+                    || items.size() == selected.getItems().size()
+                    && isBetter(stats, selected)) {
+                selected = stats;
+            }
+        }
+        return Optional.ofNullable(selected)
+                .map(ChampionBuildStats::getItems);
     }
 
     private Optional<List<Item>> composeRepresentativeBuild(int expectedItemCount) {

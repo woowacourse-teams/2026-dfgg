@@ -204,8 +204,8 @@ public class CoreBuildClusterTest {
     }
 
     @Test
-    @DisplayName("후반 아이템 슬롯을 모두 채울 수 없으면 완성 빌드를 만들지 않는다")
-    void findOrComposeRepresentativeBuild_WhenLateItemsAreInsufficient_ReturnsEmpty() {
+    @DisplayName("후반 아이템 슬롯을 모두 채울 수 없으면 3코어 이상의 관측 빌드를 반환한다")
+    void findOrComposeRepresentativeBuild_WhenLateItemsAreInsufficient_ReturnsObservedBuild() {
         // given
         ChampionBuildStats partial = stats(
                 10,
@@ -226,7 +226,13 @@ public class CoreBuildClusterTest {
                 cluster.findOrComposeRepresentativeBuild(6);
 
         // then
-        assertThat(completed).isEmpty();
+        assertThat(completed).hasValue(List.of(
+                itemA,
+                boots,
+                itemB,
+                itemC,
+                itemD
+        ));
     }
 
     private ChampionBuildStats stats(Item... items) {

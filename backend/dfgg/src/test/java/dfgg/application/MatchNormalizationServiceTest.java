@@ -192,6 +192,31 @@ class MatchNormalizationServiceTest {
     }
 
     @Test
+    void 표본_티어_정규화는_참가자별_티어를_조회하지_않고_모두_같은_티어를_사용한다() {
+        String rawMatchData = """
+                {"info":{"gameVersion":"16.15.1.1","queueId":420,"participants":[
+                  {"puuid":"seed-puuid","participantId":1,"championId":1,"teamId":100,"win":true},
+                  {"puuid":"other-puuid","participantId":2,"championId":2,"teamId":200,"win":false}
+                ]}}
+                """;
+        String rawTimelineData = """
+                {"metadata":{"participants":["seed-puuid","other-puuid"]},"info":{"frames":[]}}
+                """;
+        when(rawMatchRepository.findById("KR_1"))
+                .thenReturn(Optional.of(new RawMatch("KR_1", rawMatchData)));
+        when(rawMatchTimelineRepository.findById("KR_1"))
+                .thenReturn(Optional.of(new RawMatchTimeline("KR_1", rawTimelineData)));
+        when(itemService.findCoreItemIds()).thenReturn(Set.of());
+
+        NormalizedMatch normalized = normalizer.normalizeAsTierSample("KR_1", "PLATINUM");
+
+        assertThat(normalized.participants())
+                .extracting(NormalizedMatchParticipant::tier)
+                .containsExactly("PLATINUM", "PLATINUM");
+        verifyNoInteractions(playerRepository, riotPlayerSyncService);
+    }
+
+    @Test
     void 매치_상세와_Timeline을_정규화한다() {
         when(playerRepository.findAllById(List.of("blue-puuid"))).thenReturn(List.of(
                 new Player(

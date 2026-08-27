@@ -20,8 +20,8 @@ import org.springframework.web.client.HttpClientErrorException;
 
 /**
  * Riot 데이터 자동 수집의 전체 순서만 조율한다.
- * 플레이어를 조회한 뒤 매치별로 원본 수집 → 정규화 → 통계 집계를 이어서 실행하고,
- * 이전 실행에서 남은 미완료 데이터는 마지막에 보완한다.
+ * 플레이어를 조회한 뒤 새로 수집한 매치별로 원본 수집 → 정규화 → 통계 집계를 이어서 실행한다.
+ * 이전 실행에서 남은 미완료 데이터의 정규화와 집계는 관리자 API가 담당한다.
  */
 @Service
 public class RiotCollectionOrchestrator {
@@ -63,16 +63,13 @@ public class RiotCollectionOrchestrator {
             return;
         }
 
+        String sampleTier = properties.getTiers().getFirst();
         List<String> collectedPuuids = collectPlayers();
-        collectMatches(collectedPuuids);
-        // 이번 실행에서 실패했거나 이전 실행에 남은 Timeline을 보완한다.
-        collectMissingTimelines();
-        // 매치 단위 처리로 끝내지 못한 기존 미완료 매치를 복구한다.
-        normalizePendingMatches(
-                properties.getTiers(),
-                matchNormalizationService::normalize,
-                false
-        );
+        collectMatches(collectedPuuids, sampleTier);
+        if (properties.isRecoverMissingTimelines()) {
+            // 호출 예산을 별도로 확보한 경우에만 누락 Timeline을 자동 보완한다.
+            collectMissingTimelines();
+        }
     }
 
     private List<String> collectPlayers() {
@@ -129,16 +126,19 @@ public class RiotCollectionOrchestrator {
         return DIVISION_ORDER.subList(startIndex, DIVISION_ORDER.size());
     }
 
-    private void collectMatches(List<String> puuids) {
+    private void collectMatches(List<String> puuids, String sampleTier) {
         Set<String> processedMatchIds = new LinkedHashSet<>();
         int playerCount = properties.getPlayerPageSize();
-        for (int fromIndex = 0; fromIndex < puuids.size(); fromIndex += playerCount) {
-            List<String> targets = puuids.subList(
+        List<String> limitedPuuids = puuids.stream()
+                .limit(properties.getPlayerLimit())
+                .toList();
+        for (int fromIndex = 0; fromIndex < limitedPuuids.size(); fromIndex += playerCount) {
+            List<String> targets = limitedPuuids.subList(
                     fromIndex,
-                    Math.min(fromIndex + playerCount, puuids.size())
+                    Math.min(fromIndex + playerCount, limitedPuuids.size())
             );
             for (String puuid : targets) {
-                collectPlayerMatches(puuid, processedMatchIds);
+                collectPlayerMatches(puuid, sampleTier, processedMatchIds);
             }
         }
     }
@@ -147,7 +147,7 @@ public class RiotCollectionOrchestrator {
      * 한 플레이어의 매치 ID를 조회하고, 각 매치를 원본 수집부터 통계 집계까지 처리한다.
      * 매치 ID 조회가 실패해도 다른 플레이어의 수집은 계속한다.
      */
-    private void collectPlayerMatches(String puuid, Set<String> processedMatchIds) {
+    private void collectPlayerMatches(String puuid, String sampleTier, Set<String> processedMatchIds) {
         List<String> matchIds;
         try {
             matchIds = matchSyncService.findMatchIds(
@@ -162,7 +162,7 @@ public class RiotCollectionOrchestrator {
         for (String matchId : matchIds) {
             // 여러 플레이어가 같은 매치를 조회할 수 있으므로 한 스케줄 실행 안에서는 한 번만 처리한다.
             if (processedMatchIds.add(matchId)) {
-                processMatch(matchId);
+                processMatch(matchId, sampleTier);
             }
         }
     }
@@ -171,7 +171,7 @@ public class RiotCollectionOrchestrator {
      * 한 매치를 Raw Match → Timeline → 정규화 → 통계 순서로 처리한다.
      * 원본 수집에 실패한 매치는 정규화하지 않고 다음 실행의 복구 대상으로 남긴다.
      */
-    private void processMatch(String matchId) {
+    private void processMatch(String matchId, String sampleTier) {
         boolean collected;
         try {
             collected = matchSyncService.syncMatch(matchId);
@@ -179,17 +179,18 @@ public class RiotCollectionOrchestrator {
             return;
         }
 
-        // 이미 원본이 모두 있던 매치는 마지막 복구 단계에서 미정규화 여부를 확인한다.
+        // 이미 원본이 모두 있던 매치는 자동 재처리하지 않고 관리자 재집계 대상으로 남긴다.
         if (!collected) {
             return;
         }
 
         try {
-            NormalizedMatch normalized = matchNormalizationService.normalize(matchId);
+            NormalizedMatch normalized = matchNormalizationService.normalizeAsTierSample(matchId, sampleTier);
             matchNormalizationService.save(normalized);
-            aggregateStats(normalized, properties.getTiers(), new ArrayList<>());
-        } catch (RuntimeException ignored) {
-            // 실패한 매치는 Raw 데이터와 함께 남겨 다음 실행의 복구 단계에서 다시 처리한다.
+            aggregateStats(normalized, List.of(sampleTier), new ArrayList<>());
+        } catch (RuntimeException exception) {
+            // 자동 재시도하지 않는다. 운영자가 수집을 중단한 뒤 관리자 재집계 API로 복구한다.
+            log.error("매치 정규화 또는 통계 집계 실패: matchId={}", matchId, exception);
         }
     }
 
@@ -197,7 +198,7 @@ public class RiotCollectionOrchestrator {
         try {
             matchSyncService.syncMissingTimelines();
         } catch (RuntimeException ignored) {
-            // 누락 Timeline 보완이 실패해도 준비된 매치의 정규화는 계속한다.
+            // 누락 Timeline 보완이 실패해도 수집 실행 자체는 종료한다.
         }
     }
 
@@ -212,10 +213,10 @@ public class RiotCollectionOrchestrator {
         if (tier == null || tier.isBlank()) {
             throw new IllegalArgumentException("tier must not be blank");
         }
-        // 관리자 재집계는 복원된 Player 티어를 우선 사용하고, 누락된 참가자만 동기화한다.
+        // 관리자 재집계도 전달받은 티어를 매치 전체의 표본 티어로 사용한다.
         List<Failure> failures = normalizePendingMatches(
                 List.of(tier),
-                matchNormalizationService::normalizeForRebuild,
+                matchId -> matchNormalizationService.normalizeAsTierSample(matchId, tier),
                 true
         );
         if (!failures.isEmpty()) {
@@ -386,6 +387,9 @@ public class RiotCollectionOrchestrator {
         if (properties.getTiers().isEmpty()) {
             throw new IllegalArgumentException("collection scheduler tiers must not be empty");
         }
+        if (properties.getTiers().size() != 1) {
+            throw new IllegalArgumentException("tier sample collection requires exactly one scheduler tier");
+        }
         if (properties.getDivisions().isEmpty()) {
             throw new IllegalArgumentException("collection scheduler divisions must not be empty");
         }
@@ -397,6 +401,9 @@ public class RiotCollectionOrchestrator {
         }
         if (properties.getPlayerPageSize() < 1 || properties.getPlayerPageSize() > 100) {
             throw new IllegalArgumentException("collection scheduler player page size must be between 1 and 100");
+        }
+        if (properties.getPlayerLimit() < 1 || properties.getPlayerLimit() > 100) {
+            throw new IllegalArgumentException("collection scheduler player limit must be between 1 and 100");
         }
         if (properties.getMatchCount() < 1 || properties.getMatchCount() > 100) {
             throw new IllegalArgumentException("collection scheduler match count must be between 1 and 100");

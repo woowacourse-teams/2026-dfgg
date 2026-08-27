@@ -133,6 +133,16 @@ public class MatchNormalizationService {
         return normalizeStoredMatch(matchId, storedMatch);
     }
 
+    /**
+     * 참가자별 실제 티어를 조회하지 않고, 수집 시작점의 티어를 매치 전체의 표본 티어로 사용한다.
+     * 기존 실제 티어 기반 정규화 경로는 정책을 되돌릴 수 있도록 그대로 유지한다.
+     */
+    public NormalizedMatch normalizeAsTierSample(String matchId, String sampleTier) {
+        validateSampleTier(sampleTier);
+        StoredMatchData storedMatch = loadStoredMatch(matchId);
+        return normalizeStoredMatch(matchId, storedMatch, sampleTier);
+    }
+
     private void syncMissingPlayerTiers(List<String> participantPuuids) {
         List<String> missingTierPuuids = findMissingTierPuuids(participantPuuids);
         if (!missingTierPuuids.isEmpty()) {
@@ -155,6 +165,21 @@ public class MatchNormalizationService {
                 storedMatch.rawMatchData(),
                 storedMatch.rawTimelineData(),
                 coreItemIds
+        );
+    }
+
+    private NormalizedMatch normalizeStoredMatch(
+            String matchId,
+            StoredMatchData storedMatch,
+            String sampleTier
+    ) {
+        Set<Integer> coreItemIds = itemService.findCoreItemIds();
+        return normalizeAsTierSample(
+                matchId,
+                storedMatch.rawMatchData(),
+                storedMatch.rawTimelineData(),
+                coreItemIds,
+                sampleTier
         );
     }
 
@@ -185,6 +210,43 @@ public class MatchNormalizationService {
             String rawTimelineData,
             Collection<Integer> coreItemIds
     ) {
+        return normalize(
+                matchId,
+                rawMatchData,
+                rawTimelineData,
+                coreItemIds,
+                null
+        );
+    }
+
+    /**
+     * 원본 매치 참가자 모두에게 동일한 표본 티어를 적용한다.
+     * Player 조회나 Riot 참가자별 티어 API 호출은 수행하지 않는다.
+     */
+    public NormalizedMatch normalizeAsTierSample(
+            String matchId,
+            String rawMatchData,
+            String rawTimelineData,
+            Collection<Integer> coreItemIds,
+            String sampleTier
+    ) {
+        validateSampleTier(sampleTier);
+        return normalize(
+                matchId,
+                rawMatchData,
+                rawTimelineData,
+                coreItemIds,
+                sampleTier
+        );
+    }
+
+    private NormalizedMatch normalize(
+            String matchId,
+            String rawMatchData,
+            String rawTimelineData,
+            Collection<Integer> coreItemIds,
+            String sampleTier
+    ) {
         // 참가자마다 같은 목록을 조회하므로 한 번만 Set으로 만들어 빠르게 포함 여부를 검사한다.
         Set<Integer> coreItems = Set.copyOf(coreItemIds);
 
@@ -196,9 +258,11 @@ public class MatchNormalizationService {
             throw new IllegalArgumentException("match participants must not be empty");
         }
 
-        // 정규화 시점에 players 테이블에 저장된 티어를 참가자 PUUID별로 준비한다.
-        // 조회되지 않은 참가자는 아래 normalizeParticipant()에서 UNRANKED로 처리한다.
-        Map<String, String> tiersByPuuid = findTiersByPuuid(matchParticipants);
+        // sampleTier가 주어지면 참가자별 Player 조회를 건너뛰고 매치 전체에 같은 티어를 적용한다.
+        // 주어지지 않은 기존 경로에서는 저장된 실제 티어를 계속 사용한다.
+        Map<String, String> tiersByPuuid = sampleTier == null
+                ? findTiersByPuuid(matchParticipants)
+                : Map.of();
 
         // Match 참가자 배열의 순서를 유지한다.
         // 배열 위치(index + 1)는 participantId가 없을 때 사용하는 마지막 보완값이다.
@@ -210,7 +274,8 @@ public class MatchNormalizationService {
                         index + 1,
                         timeline,
                         coreItems,
-                        tiersByPuuid
+                        tiersByPuuid,
+                        sampleTier
                 ))
                 .toList();
 
@@ -228,7 +293,8 @@ public class MatchNormalizationService {
             int fallbackParticipantId,
             MatchTimelineResponse timeline,
             Set<Integer> coreItemIds,
-            Map<String, String> tiersByPuuid
+            Map<String, String> tiersByPuuid,
+            String sampleTier
     ) {
         // participantId 결정 우선순위:
         // 1. Match 응답의 participantId
@@ -258,7 +324,9 @@ public class MatchNormalizationService {
                 participant.championId(),
                 participant.teamId(),
                 participant.teamPosition(),
-                tiersByPuuid.getOrDefault(participant.puuid(), UNRANKED_TIER),
+                sampleTier != null
+                        ? sampleTier
+                        : tiersByPuuid.getOrDefault(participant.puuid(), UNRANKED_TIER),
                 participant.win(),
                 finalCoreItems,
                 // 구매 순서를 완전히 복원하지 못한 경우 빈 목록으로 저장하고,
@@ -319,6 +387,12 @@ public class MatchNormalizationService {
             }
         }
         return tiersByPuuid;
+    }
+
+    private void validateSampleTier(String sampleTier) {
+        if (sampleTier == null || sampleTier.isBlank()) {
+            throw new IllegalArgumentException("sampleTier must not be blank");
+        }
     }
 
     private Stream<Integer> itemIds(MatchParticipant participant) {

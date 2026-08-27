@@ -118,8 +118,8 @@ class MultiBuildRecommendationServiceTest {
     }
 
     @Test
-    @DisplayName("완성된 관측 빌드가 없으면 방향은 유지하고 build를 null로 반환한다")
-    void recommend_WhenCompletedBuildDoesNotExist_ReturnsUnavailableDirection() {
+    @DisplayName("완성된 관측 빌드가 없으면 3코어 빌드를 반환한다")
+    void recommend_WhenCompletedBuildDoesNotExist_ReturnsThreeCoreBuild() {
         // given
         RecommendationRequest request = prepareRequest(ChampionPosition.TOP);
         ChampionBuildStats incompleteBuild = stats(
@@ -145,9 +145,9 @@ class MultiBuildRecommendationServiceTest {
                         "MAGIC_DAMAGE",
                         "MIXED_DAMAGE"
         );
-        assertThat(response.builds()).allSatisfy(option -> {
-            assertThat(option.build()).isNull();
-        });
+        assertThat(response.builds().getFirst().build()).hasSize(3);
+        assertThat(response.builds().subList(1, 3))
+                .allSatisfy(option -> assertThat(option.build()).isNull());
     }
 
     @Test
@@ -209,8 +209,8 @@ class MultiBuildRecommendationServiceTest {
     }
 
     @Test
-    @DisplayName("가장 높은 후보가 미완성이면 사용 가능한 후보 중 가장 적합한 빌드를 추천한다")
-    void recommend_WhenHighestCandidateIsUnavailable_RecommendsBestAvailableCandidate() {
+    @DisplayName("가장 높은 후보가 3코어 이상이면 미완성 빌드도 추천한다")
+    void recommend_WhenHighestCandidateHasThreeCores_RecommendsPartialBuild() {
         // given
         RecommendationRequest request = prepareRequest(ChampionPosition.TOP);
         ChampionBuildStats highScoreIncomplete = stats(
@@ -239,7 +239,7 @@ class MultiBuildRecommendationServiceTest {
 
         // then
         assertThat(response.builds()).hasSize(3);
-        assertThat(response.builds().getFirst().build()).hasSize(6);
+        assertThat(response.builds().getFirst().build()).hasSize(3);
         assertThat(response.builds().subList(1, 3))
                 .allSatisfy(option -> assertThat(option.build()).isNull());
         assertThat(response.builds())

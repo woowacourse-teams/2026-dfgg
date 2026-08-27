@@ -33,7 +33,10 @@ public class RiotClient {
 
     @Autowired
     public RiotClient(RestClient.Builder builder, RiotApiProperties properties) {
-        this(builder, properties, new RiotRateLimitExecutor());
+        this(builder, properties, new RiotRateLimitExecutor(
+                properties.requestsPerSecond(),
+                properties.requestsPerTwoMinutes()
+        ));
     }
 
     RiotClient(
@@ -73,7 +76,7 @@ public class RiotClient {
         Assert.hasText(division, "division must not be blank");
         Assert.isTrue(page > 0, "page must be greater than zero");
 
-        List<LeagueEntryResponse> response = rateLimitExecutor.execute(() ->
+        List<LeagueEntryResponse> response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.PLATFORM, () ->
                 platformRestClient.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/league/v4/entries/{queue}/{tier}/{division}")
@@ -92,7 +95,7 @@ public class RiotClient {
     public List<LeagueEntryResponse> getLeagueEntriesByPuuid(String puuid) {
         Assert.hasText(puuid, "puuid must not be blank");
 
-        List<LeagueEntryResponse> response = rateLimitExecutor.execute(() ->
+        List<LeagueEntryResponse> response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.PLATFORM, () ->
                 platformRestClient.get()
                         .uri("/lol/league/v4/entries/by-puuid/{puuid}", puuid)
                         .retrieve()
@@ -114,7 +117,7 @@ public class RiotClient {
         Assert.isTrue(start >= 0, "start must not be negative");
         Assert.isTrue(count >= 0 && count <= 100, "count must be between 0 and 100");
 
-        List<String> response = rateLimitExecutor.execute(() ->
+        List<String> response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.REGIONAL, () ->
                 regionalRestClient.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/match/v5/matches/by-puuid/{puuid}/ids")
@@ -135,7 +138,7 @@ public class RiotClient {
     public MatchResponse getMatch(String matchId) {
         Assert.hasText(matchId, "matchId must not be blank");
 
-        MatchResponse response = rateLimitExecutor.execute(() ->
+        MatchResponse response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.REGIONAL, () ->
                 regionalRestClient.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/match/v5/matches/{matchId}")
@@ -153,7 +156,7 @@ public class RiotClient {
     public String getRawMatch(String matchId) {
         Assert.hasText(matchId, "matchId must not be blank");
 
-        String response = rateLimitExecutor.execute(() ->
+        String response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.REGIONAL, () ->
                 regionalRestClient.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/match/v5/matches/{matchId}")
@@ -171,7 +174,7 @@ public class RiotClient {
     public String getRawMatchTimeline(String matchId) {
         Assert.hasText(matchId, "matchId must not be blank");
 
-        String response = rateLimitExecutor.execute(() ->
+        String response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.REGIONAL, () ->
                 regionalRestClient.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/match/v5/matches/{matchId}/timeline")
@@ -189,7 +192,7 @@ public class RiotClient {
     public MatchTimelineResponse getMatchTimeline(String matchId) {
         Assert.hasText(matchId, "matchId must not be blank");
 
-        MatchTimelineResponse response = rateLimitExecutor.execute(() ->
+        MatchTimelineResponse response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.REGIONAL, () ->
                 regionalRestClient.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/match/v5/matches/{matchId}/timeline")

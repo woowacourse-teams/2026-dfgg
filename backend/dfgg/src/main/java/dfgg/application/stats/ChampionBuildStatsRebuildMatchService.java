@@ -179,7 +179,7 @@ public class ChampionBuildStatsRebuildMatchService {
                 .orElseThrow(() -> new IllegalArgumentException("raw match not found: " + matchId));
         RawMatchTimeline timeline = rawMatchTimelineRepository.findById(matchId)
                 .orElseThrow(() -> new IllegalStateException("raw match timeline not found: " + matchId));
-        replaceMatchStats(
+        replaceMatchStatsAsTierSample(
                 rawMatch,
                 timeline,
                 QUEUE_TYPE,
@@ -255,7 +255,32 @@ public class ChampionBuildStatsRebuildMatchService {
                 tier,
                 participantPuuids,
                 coreItemIds,
-                aggregationRevision
+                aggregationRevision,
+                false
+        ));
+    }
+
+    /**
+     * 매치 전체를 지정한 표본 티어로 다시 정규화하고 모든 참가자의 통계 기여를 교체한다.
+     */
+    private void replaceMatchStatsAsTierSample(
+            RawMatch rawMatch,
+            RawMatchTimeline timeline,
+            String queueType,
+            String tier,
+            Collection<String> participantPuuids,
+            Set<Integer> coreItemIds,
+            String aggregationRevision
+    ) {
+        runInNewTransaction(() -> replaceMatchStatsInternal(
+                rawMatch,
+                timeline,
+                queueType,
+                tier,
+                participantPuuids,
+                coreItemIds,
+                aggregationRevision,
+                true
         ));
     }
 
@@ -269,22 +294,39 @@ public class ChampionBuildStatsRebuildMatchService {
             String tier,
             Collection<String> participantPuuids,
             Set<Integer> coreItemIds,
-            String aggregationRevision
+            String aggregationRevision,
+            boolean useTierSample
     ) {
         validateScope(queueType, tier, participantPuuids, aggregationRevision);
 
-        List<String> targetPuuids = participantPuuids.stream().distinct().sorted().toList();
-        if (targetPuuids.isEmpty()) {
+        List<String> requestedPuuids = participantPuuids.stream().distinct().sorted().toList();
+        if (requestedPuuids.isEmpty()) {
             throw new IllegalArgumentException("participantPuuids must not be empty");
         }
         // 관리자 replay 동시성 제어와 매치 단위 트랜잭션은 추후 고도화 시 고려한다.
-        NormalizedMatch normalized = matchNormalizationService.normalize(
-                rawMatch.getMatchId(),
-                rawMatch.getRawData(),
-                timeline.getRawData(),
-                coreItemIds
-        );
-        ensureParticipantsExist(normalized, targetPuuids);
+        NormalizedMatch normalized = useTierSample
+                ? matchNormalizationService.normalizeAsTierSample(
+                        rawMatch.getMatchId(),
+                        rawMatch.getRawData(),
+                        timeline.getRawData(),
+                        coreItemIds,
+                        tier
+                )
+                : matchNormalizationService.normalize(
+                        rawMatch.getMatchId(),
+                        rawMatch.getRawData(),
+                        timeline.getRawData(),
+                        coreItemIds
+                );
+        ensureParticipantsExist(normalized, requestedPuuids);
+
+        List<String> targetPuuids = useTierSample
+                ? normalized.participants().stream()
+                        .map(NormalizedMatchParticipant::puuid)
+                        .distinct()
+                        .sorted()
+                        .toList()
+                : requestedPuuids;
 
         // 기존 기여를 삭제한 뒤 정규화 데이터와 새 통계를 반영한다.
         for (String puuid : targetPuuids) {

@@ -14,7 +14,9 @@ public class RiotSchedulerProperties {
     private List<String> divisions = new ArrayList<>(List.of("I"));
     private int leaguePageCount = 1;
     private int playerPageSize = 100;
+    private int playerLimit = 1;
     private int matchCount = 20;
+    private boolean recoverMissingTimelines;
 
     public boolean isEnabled() {
         return enabled;
@@ -72,11 +74,27 @@ public class RiotSchedulerProperties {
         this.playerPageSize = playerPageSize;
     }
 
+    public int getPlayerLimit() {
+        return playerLimit;
+    }
+
+    public void setPlayerLimit(int playerLimit) {
+        this.playerLimit = playerLimit;
+    }
+
     public int getMatchCount() {
         return matchCount;
     }
 
     public void setMatchCount(int matchCount) {
         this.matchCount = matchCount;
+    }
+
+    public boolean isRecoverMissingTimelines() {
+        return recoverMissingTimelines;
+    }
+
+    public void setRecoverMissingTimelines(boolean recoverMissingTimelines) {
+        this.recoverMissingTimelines = recoverMissingTimelines;
     }
 }
