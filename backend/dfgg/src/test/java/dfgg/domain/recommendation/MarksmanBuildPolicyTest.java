@@ -1,6 +1,7 @@
 package dfgg.domain.recommendation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -154,8 +155,59 @@ class MarksmanBuildPolicyTest {
                 .singleElement()
                 .satisfies(candidate -> {
                     assertThat(candidate.direction().code()).isEqualTo("SURVIVAL_KITING");
-                    assertThat(candidate.suitabilityScore()).isEqualTo(1.0);
+                    assertThat(candidate.suitabilityScore())
+                            .isCloseTo(1.0 / 21.0, within(1.0e-10));
                 });
+    }
+
+    @Test
+    @DisplayName("각 MARKSMAN 방향의 최대 아이템 점수를 1로 정규화한다")
+    void evaluate_NormalizesMaximumItemScoreForEveryDirection() {
+        // given
+        Item criticalStrikeItem = new Item(
+                18L,
+                "치명타 최대 점수 아이템",
+                List.of("CriticalStrike", "Damage", "AttackSpeed", "ArmorPenetration")
+        );
+        Item antiTankItem = new Item(
+                19L,
+                "대탱커 최대 점수 아이템",
+                List.of(
+                        "OnHit",
+                        "AttackSpeed",
+                        "ArmorPenetration",
+                        "MagicPenetration",
+                        "LifeSteal"
+                )
+        );
+        Item survivalItem = new Item(
+                20L,
+                "생존 최대 점수 아이템",
+                List.of(
+                        "LifeSteal",
+                        "NonbootsMovement",
+                        "Health",
+                        "Armor",
+                        "SpellBlock",
+                        "Tenacity",
+                        "Slow"
+                )
+        );
+
+        // when
+        List<BuildCandidate> candidates = policy.evaluate(
+                List.of(
+                        cluster(criticalStrikeItem, criticalStrikeItem, criticalStrikeItem),
+                        cluster(antiTankItem, antiTankItem, antiTankItem),
+                        cluster(survivalItem, survivalItem, survivalItem)
+                ),
+                List.of()
+        );
+
+        // then
+        assertThat(candidates)
+                .extracting(BuildCandidate::suitabilityScore)
+                .containsExactly(1.0, 1.0, 1.0);
     }
 
     @Test
@@ -206,7 +258,11 @@ class MarksmanBuildPolicyTest {
         // then
         assertThat(candidates)
                 .extracting(BuildCandidate::suitabilityScore)
-                .containsExactly(3.0, 3.0, 3.0);
+                .containsExactly(
+                        1.0 / 4.0,
+                        1.0 / 5.0,
+                        1.0 / 7.0
+                );
     }
 
     private CoreBuildCluster cluster(Item... items) {
