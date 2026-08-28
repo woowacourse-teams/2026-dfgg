@@ -6,6 +6,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -19,6 +21,8 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(prefix = "collection.scheduler", name = "enabled", havingValue = "true")
 public class RiotCollectionScheduler {
+
+    private static final Logger log = LoggerFactory.getLogger(RiotCollectionScheduler.class);
 
     // 모든 애플리케이션 인스턴스가 공유하는 스케줄러 잠금 식별자다.
     private static final long SCHEDULER_LOCK_ID = 0x44464747L;
@@ -43,20 +47,35 @@ public class RiotCollectionScheduler {
             zone = "${collection.scheduler.zone:Asia/Seoul}"
     )
     public void collect() {
+        long startedAt = System.nanoTime();
         // 잠금의 소유권이 연결에 묶이므로, 획득부터 해제까지 같은 Connection을 유지한다.
         try (Connection connection = dataSource.getConnection()) {
             // 다른 인스턴스가 이미 수집 중이면 이번 실행은 건너뛰고 다음 스케줄을 기다린다.
             if (!executeLockQuery(connection, TRY_LOCK_SQL)) {
+                log.info("Riot 데이터 수집 스케줄 실행 건너뜀: 다른 인스턴스가 실행 중입니다.");
                 return;
             }
             try {
                 // 수집 흐름의 세부 단계는 Orchestrator에 위임한다.
+                log.info("Riot 데이터 수집 스케줄 실행 시작");
                 orchestrator.runOnce();
+                log.info(
+                        "Riot 데이터 수집 스케줄 실행 완료: elapsedMs={}",
+                        elapsedMillis(startedAt)
+                );
+            } catch (RuntimeException exception) {
+                log.error(
+                        "Riot 데이터 수집 스케줄 실행 실패: elapsedMs={}",
+                        elapsedMillis(startedAt),
+                        exception
+                );
+                throw exception;
             } finally {
                 // 수집 성공 여부와 관계없이 세션 잠금을 해제한다.
                 unlock(connection);
             }
         } catch (SQLException exception) {
+            log.error("Riot 데이터 수집 스케줄 조정 실패", exception);
             throw new IllegalStateException("Failed to coordinate Riot collection scheduler", exception);
         }
     }
@@ -66,10 +85,17 @@ public class RiotCollectionScheduler {
      */
     private void unlock(Connection connection) {
         try {
-            executeLockQuery(connection, UNLOCK_SQL);
+            if (!executeLockQuery(connection, UNLOCK_SQL)) {
+                log.warn("Riot 데이터 수집 스케줄 분산 락을 해제하지 못했습니다: lock not held");
+            }
         } catch (SQLException exception) {
+            log.error("Riot 데이터 수집 스케줄 분산 락 해제 실패", exception);
             abortConnection(connection, exception);
         }
+    }
+
+    private long elapsedMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
     }
 
     /**
