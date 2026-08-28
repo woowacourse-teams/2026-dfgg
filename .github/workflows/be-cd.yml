@@ -31,13 +31,10 @@ jobs:
           build-root-directory: ./backend/dfgg
           arguments: clean build --no-daemon -x test
 
-      - name: Deploy with nohup
+      - name: Restart service
+        run: sudo systemctl restart dfgg.service
+
+      - name: Check service status
         run: |
-          PID=$(pgrep -f "dfgg-.*\.jar" || true)
-          if [ -n "$PID" ]; then
-            echo "Stopping existing process: $PID"
-            kill -15 $PID
-            sleep 3
-          fi
-          
-          BUILD_ID=dontKillMe nohup java -jar build/libs/dfgg-0.0.1-SNAPSHOT.jar </dev/null >app.log 2>&1 &
+          sleep 3
+          sudo systemctl status dfgg.service --no-pager
