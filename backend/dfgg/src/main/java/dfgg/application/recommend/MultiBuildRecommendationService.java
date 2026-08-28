@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,7 @@ public class MultiBuildRecommendationService {
 
     private static final int NORMAL_BUILD_ITEM_COUNT = 6;
     private static final int BOTTOM_BUILD_ITEM_COUNT = 7;
+    private static final String BOOTS_TAG = "Boots";
 
     private final ChampionService championService;
     private final ChampionBuildStatsRepository statsRepository;
@@ -91,13 +93,24 @@ public class MultiBuildRecommendationService {
         );
         int expectedItemCount = expectedItemCount(position);
         List<BuildCandidate> availableCandidates = candidates.stream()
-                .filter(candidate -> findCompletedBuild(
+                .filter(candidate -> resolveBuild(
                         candidate,
                         expectedItemCount
                 ).isPresent())
                 .toList();
+        Set<List<Long>> completedClusterKeys = availableCandidates.stream()
+                .filter(candidate -> resolveBuild(candidate, expectedItemCount)
+                        .filter(build -> isCompleteBuild(build, expectedItemCount))
+                        .isPresent())
+                .map(candidate -> candidate.cluster().getClusterKey())
+                .collect(Collectors.toUnmodifiableSet());
         List<SelectedBuildCandidate> selectedCandidates =
-                candidateSelectService.select(availableCandidates);
+                candidateSelectService.select(
+                        availableCandidates,
+                        candidate -> completedClusterKeys.contains(
+                                candidate.cluster().getClusterKey()
+                        )
+                );
         List<BuildDirection> supportedDirections = collectSupportedDirections(
                 myChampion.getChampionTags()
         );
@@ -192,7 +205,7 @@ public class MultiBuildRecommendationService {
             int expectedItemCount
     ) {
         List<Optional<List<Item>>> completedBuilds = selectedCandidates.stream()
-                .map(selected -> findCompletedBuild(
+                .map(selected -> resolveBuild(
                         selected.candidate(),
                         expectedItemCount
                 ))
@@ -234,12 +247,17 @@ public class MultiBuildRecommendationService {
         );
     }
 
-    private Optional<List<Item>> findCompletedBuild(
+    private Optional<List<Item>> resolveBuild(
             BuildCandidate candidate,
             int expectedItemCount
     ) {
         return candidate.cluster()
                 .findOrComposeRepresentativeBuild(expectedItemCount);
+    }
+
+    private boolean isCompleteBuild(List<Item> items, int expectedItemCount) {
+        return items.size() == expectedItemCount
+                && items.stream().filter(item -> item.hasTag(BOOTS_TAG)).count() == 1;
     }
 
     private int expectedItemCount(ChampionPosition position) {
