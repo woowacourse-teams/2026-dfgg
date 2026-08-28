@@ -32,7 +32,7 @@ jobs:
           arguments: clean build --no-daemon -x test
 
       - name: Restart service
-        run: sudo systemctl restart dfgg-be.service
+        run: sudo systemctl restart dfgg.service
 
       - name: Check service status
         run: |
