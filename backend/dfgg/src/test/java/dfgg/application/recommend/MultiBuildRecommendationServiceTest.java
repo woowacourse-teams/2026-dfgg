@@ -209,24 +209,31 @@ class MultiBuildRecommendationServiceTest {
     }
 
     @Test
-    @DisplayName("가장 높은 후보가 3코어 이상이면 미완성 빌드도 추천한다")
-    void recommend_WhenHighestCandidateHasThreeCores_RecommendsPartialBuild() {
+    @DisplayName("완성 빌드를 먼저 추천하고 남는 슬롯에는 미완성 빌드도 포함한다")
+    void recommend_WhenCompleteAndPartialBuildsExist_PrioritizesCompleteBuild() {
         // given
         RecommendationRequest request = prepareRequest(ChampionPosition.TOP);
         ChampionBuildStats highScoreIncomplete = stats(
                 ChampionPosition.TOP,
                 "HIGH_INCOMPLETE",
                 List.of(
-                        armorItem(201L),
-                        armorItem(202L),
-                        armorItem(203L)
+                        new Item(201L, "고득점 방어 아이템 201", List.of("Armor", "Health")),
+                        new Item(202L, "고득점 방어 아이템 202", List.of("Armor", "Health")),
+                        new Item(203L, "고득점 방어 아이템 203", List.of("Armor", "Health"))
                 ),
                 100
         );
         ChampionBuildStats lowerScoreComplete = stats(
                 ChampionPosition.TOP,
                 "LOW_COMPLETE",
-                completeItems(6, 301L),
+                List.of(
+                        new Item(301L, "마법 방어 아이템 301", List.of("SpellBlock")),
+                        new Item(302L, "마법 방어 아이템 302", List.of("SpellBlock")),
+                        new Item(303L, "마법 방어 아이템 303", List.of("SpellBlock")),
+                        new Item(304L, "신발", List.of("Boots")),
+                        new Item(305L, "후반 아이템 4"),
+                        new Item(306L, "후반 아이템 5")
+                ),
                 10
         );
         givenMatchingStats(
@@ -239,14 +246,14 @@ class MultiBuildRecommendationServiceTest {
 
         // then
         assertThat(response.builds()).hasSize(3);
-        assertThat(response.builds().getFirst().build()).hasSize(3);
-        assertThat(response.builds().subList(1, 3))
-                .allSatisfy(option -> assertThat(option.build()).isNull());
+        assertThat(response.builds().get(0).build()).hasSize(6);
+        assertThat(response.builds().get(1).build()).hasSize(3);
+        assertThat(response.builds().get(2).build()).isNull();
         assertThat(response.builds())
                 .extracting(BuildOptionResponse::direction)
                 .containsExactly(
-                        "PHYSICAL_DAMAGE",
                         "MAGIC_DAMAGE",
+                        "PHYSICAL_DAMAGE",
                         "MIXED_DAMAGE"
                 );
     }

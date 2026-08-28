@@ -109,6 +109,28 @@ class BuildCandidateSelectServiceTest {
     }
 
     @Test
+    @DisplayName("우선 후보를 점수가 더 높은 일반 후보보다 먼저 추천한다")
+    void select_WithPreferredCandidate_PrioritizesPreferredCandidate() {
+        // given
+        BuildCandidate preferred = candidate(ChampionTag.TANK, "MAGIC_DAMAGE", 1.0, 40L);
+        BuildCandidate higherScore = candidate(ChampionTag.TANK, "PHYSICAL_DAMAGE", 10.0, 41L);
+
+        // when
+        List<SelectedBuildCandidate> selected = selector.select(
+                List.of(higherScore, preferred),
+                candidate -> candidate == preferred
+        );
+
+        // then
+        assertThat(selected)
+                .extracting(item -> item.candidate().direction().code())
+                .containsExactly("MAGIC_DAMAGE", "PHYSICAL_DAMAGE");
+        assertThat(selected)
+                .extracting(SelectedBuildCandidate::recommended)
+                .containsExactly(true, false);
+    }
+
+    @Test
     @DisplayName("후보가 없으면 빈 선택 결과를 반환한다")
     void select_WhenCandidatesAreEmpty_ReturnsEmptyList() {
         // given & when

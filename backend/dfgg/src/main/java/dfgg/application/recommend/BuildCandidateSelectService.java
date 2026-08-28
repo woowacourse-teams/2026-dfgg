@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import org.springframework.stereotype.Service;
 
 /**
@@ -25,16 +26,37 @@ public final class BuildCandidateSelectService {
      * 실제 군집이 서로 다르고 방향도 서로 다른 후보를 최대 3개 선택한다.
      */
     public List<SelectedBuildCandidate> select(List<BuildCandidate> candidates) {
-        Objects.requireNonNull(candidates, "빌드 후보 목록은 null일 수 없습니다.");
+        return select(candidates, ignored -> true);
+    }
 
-        List<BuildCandidate> deduplicatedCandidates = deduplicateByCluster(candidates);
+    /**
+     * 우선 후보를 먼저 배치하고, 각 그룹 안에서는 적합도 점수가 높은 순서로 선택한다.
+     */
+    public List<SelectedBuildCandidate> select(
+            List<BuildCandidate> candidates,
+            Predicate<BuildCandidate> preferredCandidate
+    ) {
+        Objects.requireNonNull(candidates, "빌드 후보 목록은 null일 수 없습니다.");
+        Objects.requireNonNull(preferredCandidate, "우선 후보 조건은 null일 수 없습니다.");
+
+        List<BuildCandidate> deduplicatedCandidates = deduplicateByCluster(
+                candidates,
+                preferredCandidate
+        );
+        Comparator<BuildCandidate> ranking = Comparator
+                .comparing((BuildCandidate candidate) -> preferredCandidate.test(candidate))
+                .reversed()
+                .thenComparing(
+                        Comparator.comparingDouble(BuildCandidate::suitabilityScore)
+                                .reversed()
+                );
         List<BuildCandidate> rankedCandidates = deduplicatedCandidates.stream()
-                .sorted(Comparator.comparingDouble(BuildCandidate::suitabilityScore).reversed())
+                .sorted(ranking)
                 .toList();
 
         List<BuildCandidate> selectedCandidates = selectDistinctDirections(rankedCandidates);
 
-        int recommendedIndex = findRecommendedIndex(selectedCandidates);
+        int recommendedIndex = selectedCandidates.isEmpty() ? -1 : 0;
         List<SelectedBuildCandidate> result = new ArrayList<>(selectedCandidates.size());
         for (int index = 0; index < selectedCandidates.size(); index++) {
             result.add(new SelectedBuildCandidate(
@@ -45,18 +67,34 @@ public final class BuildCandidateSelectService {
         return List.copyOf(result);
     }
 
-    private List<BuildCandidate> deduplicateByCluster(List<BuildCandidate> candidates) {
+    private List<BuildCandidate> deduplicateByCluster(
+            List<BuildCandidate> candidates,
+            Predicate<BuildCandidate> preferredCandidate
+    ) {
         Map<List<Long>, BuildCandidate> candidatesByCluster = new LinkedHashMap<>();
         for (BuildCandidate candidate : candidates) {
             Objects.requireNonNull(candidate, "빌드 후보는 null일 수 없습니다.");
 
             List<Long> clusterKey = candidate.cluster().getClusterKey();
             BuildCandidate current = candidatesByCluster.get(clusterKey);
-            if (current == null || candidate.suitabilityScore() > current.suitabilityScore()) {
+            if (current == null || isBetter(candidate, current, preferredCandidate)) {
                 candidatesByCluster.put(clusterKey, candidate);
             }
         }
         return List.copyOf(candidatesByCluster.values());
+    }
+
+    private boolean isBetter(
+            BuildCandidate candidate,
+            BuildCandidate current,
+            Predicate<BuildCandidate> preferredCandidate
+    ) {
+        boolean candidatePreferred = preferredCandidate.test(candidate);
+        boolean currentPreferred = preferredCandidate.test(current);
+        if (candidatePreferred != currentPreferred) {
+            return candidatePreferred;
+        }
+        return candidate.suitabilityScore() > current.suitabilityScore();
     }
 
     private List<BuildCandidate> selectDistinctDirections(List<BuildCandidate> rankedCandidates) {
@@ -74,21 +112,6 @@ public final class BuildCandidateSelectService {
             }
         }
         return selectedCandidates;
-    }
-
-    private int findRecommendedIndex(List<BuildCandidate> selectedCandidates) {
-        if (selectedCandidates.isEmpty()) {
-            return -1;
-        }
-
-        int recommendedIndex = 0;
-        for (int index = 1; index < selectedCandidates.size(); index++) {
-            if (selectedCandidates.get(index).suitabilityScore()
-                    > selectedCandidates.get(recommendedIndex).suitabilityScore()) {
-                recommendedIndex = index;
-            }
-        }
-        return recommendedIndex;
     }
 
     private record DirectionKey(ChampionTag championTag, String code) {
