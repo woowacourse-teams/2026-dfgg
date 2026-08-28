@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import ChampionCombobox from '../../components/ChampionCombobox';
 import DesktopAppButton from '../../components/DesktopAppButton';
+import { champion as CHAMPION_POOL } from '../../data/Champion';
 import { itemImageUrl, useChampions } from '../../hooks/useChampions';
 import {
   type Position,
@@ -27,6 +28,28 @@ const POSITION_LABEL: Record<Position, string> = {
   BOTTOM: '원딜',
   SUPPORT: '서폿',
 };
+
+/** 라인별 후보 챔피언. op.gg 라인별 페이지를 기준으로 손으로 정리한 목록이다. */
+const POSITION_POOL: Record<Position, string[]> = {
+  TOP: CHAMPION_POOL.top,
+  JUNGLE: CHAMPION_POOL.jungle,
+  MID: CHAMPION_POOL.mid,
+  BOTTOM: CHAMPION_POOL.adc,
+  SUPPORT: CHAMPION_POOL.support,
+};
+
+/**
+ * 라인에 맞는 후보 중 아직 안 쓴 챔피언을 하나 랜덤으로 고른다.
+ * 후보가 다 떨어지면(거의 없음) 전체 챔피언 중 안 쓴 아무 이름으로 대신한다.
+ */
+function pickRandomChampion(position: Position, used: Set<string>): string {
+  const pool = POSITION_POOL[position].filter((name) => !used.has(name));
+  if (pool.length > 0) return pool[Math.floor(Math.random() * pool.length)];
+
+  const allNames = Object.values(CHAMPION_POOL).flat();
+  const fallback = allNames.filter((name) => !used.has(name));
+  return fallback.length > 0 ? fallback[Math.floor(Math.random() * fallback.length)] : '';
+}
 
 const CHAMPION_TAG_LABEL: Record<string, string> = {
   TANK: '탱커',
@@ -216,6 +239,27 @@ export default function ChampionSelect() {
     void fetchV3(championBody, []);
   };
 
+  /** 10명 전체를 라인에 맞는 챔피언으로 한 번에 채운다. 겹치는 챔피언은 없다. */
+  const handleRandomChampion = () => {
+    const used = new Set<string>();
+    const nextAlly: Lineup = { ...EMPTY_LINEUP };
+    const nextEnemy: Lineup = { ...EMPTY_LINEUP };
+
+    for (const position of POSITIONS) {
+      const allyChampion = pickRandomChampion(position, used);
+      if (allyChampion) used.add(allyChampion);
+      nextAlly[position] = allyChampion;
+
+      const enemyChampion = pickRandomChampion(position, used);
+      if (enemyChampion) used.add(enemyChampion);
+      nextEnemy[position] = enemyChampion;
+    }
+
+    setAllyLineup(nextAlly);
+    setEnemyLineup(nextEnemy);
+    window.umami?.track('champion-select-random');
+  };
+
   return (
     <>
       <div className='flex items-start'>
@@ -263,16 +307,30 @@ export default function ChampionSelect() {
           아래 두 열이 각각 아군·상대라는 걸 색으로만 알리고 있었다.
           강조 색을 열 머리글(win/loss)과 맞춰야 문구와 칸이 눈으로 이어진다.
         */}
-      <p className='mt-3 text-sm text-ink-2'>
-        왼쪽 칸에 <strong className='font-semibold text-win'>아군</strong> 5명, 오른쪽 칸에{' '}
-        <strong className='font-semibold text-loss'>상대</strong> 5명을 포지션에 맞춰 입력해 주세요.
-      </p>
-
+      <div className='mt-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1'>
+        <p className='mt-3 text-sm text-ink-2'>
+          왼쪽 칸에 <strong className='font-semibold text-win'>아군</strong> 5명, 오른쪽 칸에{' '}
+          <strong className='font-semibold text-loss'>상대</strong> 5명을 포지션에 맞춰 입력해
+          주세요.
+        </p>
+        <button
+          type='button'
+          onClick={handleRandomChampion}
+          className='cursor-pointer rounded-xl bg-linear-to-br from-accent-deep to-accent-mid px-4 py-1 font-bold text-white transition-opacity hover:opacity-90'
+        >
+          랜덤 챔피언 뽑기
+        </button>
+      </div>
       {failed && (
         <p className='mt-3 text-sm text-loss' role='alert'>
           챔피언 목록을 불러오지 못했어요. 이름을 직접 입력해 주세요.
         </p>
       )}
+
+      <p className='mt-3 text-xs text-ink-3'>
+        가운데 포지션 버튼을 눌러 내 포지션을 정하세요. 현재{' '}
+        <span className='text-mine'>{POSITION_LABEL[myPosition]}</span> 기준으로 추천해요.
+      </p>
 
       <form onSubmit={handleSubmit} className='mt-5'>
         <div className='flex items-baseline justify-between px-1 pb-1.5 font-display text-xs font-bold tracking-wider'>
@@ -336,11 +394,6 @@ export default function ChampionSelect() {
             );
           })}
         </div>
-
-        <p className='mt-3 text-xs text-ink-3'>
-          가운데 포지션 버튼을 눌러 내 포지션을 정하세요. 현재{' '}
-          <span className='text-mine'>{POSITION_LABEL[myPosition]}</span> 기준으로 추천해요.
-        </p>
 
         <button
           data-umami-event='recommend-item'
