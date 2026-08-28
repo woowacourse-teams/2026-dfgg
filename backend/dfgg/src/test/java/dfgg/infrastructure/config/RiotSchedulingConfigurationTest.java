@@ -102,6 +102,17 @@ class RiotSchedulingConfigurationTest {
                 .thenReturn(unlockStatement);
         when(lockStatement.executeQuery()).thenReturn(lockResult);
         when(unlockStatement.executeQuery()).thenReturn(unlockResult);
+        when(orchestrator.runOnce()).thenReturn(new RiotCollectionOrchestrator.RunResult(
+                1,
+                100,
+                1,
+                1,
+                20,
+                1,
+                19,
+                1,
+                0
+        ));
 
         new RiotCollectionScheduler(orchestrator, dataSource).collect();
 
@@ -109,7 +120,16 @@ class RiotSchedulingConfigurationTest {
         verify(connection).prepareStatement("SELECT pg_advisory_unlock(?)");
         assertThat(output).contains(
                 "Riot 데이터 수집 스케줄 실행 시작",
-                "Riot 데이터 수집 스케줄 실행 완료: elapsedMs="
+                "Riot 데이터 수집 스케줄 실행 완료: elapsedMs=",
+                "leagueRequests=1",
+                "discoveredPlayers=100",
+                "selectedPlayers=1",
+                "matchIdRequests=1",
+                "discoveredMatchIds=20",
+                "newOrRecoveredMatches=1",
+                "alreadyCompleteMatches=19",
+                "normalizedMatches=1",
+                "failures=0"
         );
     }
 
@@ -173,6 +193,17 @@ class RiotSchedulingConfigurationTest {
                 .thenReturn(unlockStatement);
         when(lockStatement.executeQuery()).thenReturn(lockResult);
         when(unlockStatement.executeQuery()).thenThrow(new java.sql.SQLException("unlock failed"));
+        when(orchestrator.runOnce()).thenReturn(new RiotCollectionOrchestrator.RunResult(
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+        ));
 
         new RiotCollectionScheduler(orchestrator, dataSource).collect();
 

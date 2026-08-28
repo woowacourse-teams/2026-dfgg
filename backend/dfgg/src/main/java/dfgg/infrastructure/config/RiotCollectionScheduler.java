@@ -58,11 +58,8 @@ public class RiotCollectionScheduler {
             try {
                 // 수집 흐름의 세부 단계는 Orchestrator에 위임한다.
                 log.info("Riot 데이터 수집 스케줄 실행 시작");
-                orchestrator.runOnce();
-                log.info(
-                        "Riot 데이터 수집 스케줄 실행 완료: elapsedMs={}",
-                        elapsedMillis(startedAt)
-                );
+                RiotCollectionOrchestrator.RunResult result = orchestrator.runOnce();
+                logRunResult(result, elapsedMillis(startedAt));
             } catch (RuntimeException exception) {
                 log.error(
                         "Riot 데이터 수집 스케줄 실행 실패: elapsedMs={}",
@@ -96,6 +93,31 @@ public class RiotCollectionScheduler {
 
     private long elapsedMillis(long startedAt) {
         return (System.nanoTime() - startedAt) / 1_000_000;
+    }
+
+    private void logRunResult(RiotCollectionOrchestrator.RunResult result, long elapsedMillis) {
+        String message = "Riot 데이터 수집 스케줄 실행 {}: elapsedMs={}, leagueRequests={}, "
+                + "discoveredPlayers={}, selectedPlayers={}, matchIdRequests={}, "
+                + "discoveredMatchIds={}, newOrRecoveredMatches={}, "
+                + "alreadyCompleteMatches={}, normalizedMatches={}, failures={}";
+        Object[] arguments = {
+                result.failures() == 0 ? "완료" : "부분 실패",
+                elapsedMillis,
+                result.leagueRequests(),
+                result.discoveredPlayers(),
+                result.selectedPlayers(),
+                result.matchIdRequests(),
+                result.discoveredMatchIds(),
+                result.newOrRecoveredMatches(),
+                result.alreadyCompleteMatches(),
+                result.normalizedMatches(),
+                result.failures()
+        };
+        if (result.failures() == 0) {
+            log.info(message, arguments);
+            return;
+        }
+        log.warn(message, arguments);
     }
 
     /**

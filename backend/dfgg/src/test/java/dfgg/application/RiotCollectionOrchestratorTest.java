@@ -1,5 +1,6 @@
 package dfgg.application;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -72,7 +73,19 @@ class RiotCollectionOrchestratorTest {
         when(matchSyncService.syncMatch("KR_1")).thenReturn(true);
         NormalizedMatch normalized = normalizedMatch("KR_1");
         when(matchNormalizationService.normalizeAsTierSample("KR_1", "PLATINUM")).thenReturn(normalized);
-        orchestrator.runOnce();
+        RiotCollectionOrchestrator.RunResult result = orchestrator.runOnce();
+
+        assertThat(result).isEqualTo(new RiotCollectionOrchestrator.RunResult(
+                1,
+                2,
+                2,
+                2,
+                1,
+                1,
+                0,
+                1,
+                0
+        ));
 
         InOrder order = inOrder(
                 playerSyncService,
@@ -110,6 +123,23 @@ class RiotCollectionOrchestratorTest {
         verify(matchNormalizationService).normalizeAsTierSample("KR_SHARED", "PLATINUM");
         verify(matchNormalizationService).save(normalized);
         verify(statsMatchService).registerMatchStats(normalized, "PLATINUM");
+    }
+
+    @Test
+    void 이미_원본이_모두_있는_매치는_기존_매치로_집계한다() {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
+        when(matchSyncService.findMatchIds("puuid-1", 0, 20))
+                .thenReturn(List.of("KR_EXISTING"));
+        when(matchSyncService.syncMatch("KR_EXISTING")).thenReturn(false);
+
+        RiotCollectionOrchestrator.RunResult result = orchestrator.runOnce();
+
+        assertThat(result.newOrRecoveredMatches()).isZero();
+        assertThat(result.alreadyCompleteMatches()).isEqualTo(1);
+        assertThat(result.normalizedMatches()).isZero();
+        assertThat(result.failures()).isZero();
+        verifyNoInteractions(matchNormalizationService, statsMatchService);
     }
 
     @Test
@@ -313,7 +343,11 @@ class RiotCollectionOrchestratorTest {
     void 한_단계가_실패해도_후속_단계를_계속한다() {
         when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
                 .thenThrow(new IllegalStateException("league unavailable"));
-        orchestrator.runOnce();
+        RiotCollectionOrchestrator.RunResult result = orchestrator.runOnce();
+
+        assertThat(result.leagueRequests()).isEqualTo(1);
+        assertThat(result.discoveredPlayers()).isZero();
+        assertThat(result.failures()).isEqualTo(1);
         verify(matchSyncService, never()).findMatchIds(anyString(), eq(0), eq(20));
         verify(matchSyncService).syncMissingTimelines();
         verifyNoInteractions(statsMatchService);

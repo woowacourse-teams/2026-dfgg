@@ -56,36 +56,50 @@ public class RiotCollectionOrchestrator {
         this.currentLeagueRangeHasPlayers = false;
     }
 
-    public void runOnce() {
+    public RunResult runOnce() {
+        RunStats stats = new RunStats();
         try {
             validateProperties();
-        } catch (RuntimeException ignored) {
-            return;
+        } catch (RuntimeException exception) {
+            stats.failures++;
+            log.warn("Riot 데이터 수집 설정 오류", exception);
+            return stats.toResult();
         }
 
         String sampleTier = properties.getTiers().getFirst();
-        List<String> collectedPuuids = collectPlayers();
-        collectMatches(collectedPuuids, sampleTier);
+        List<String> collectedPuuids = collectPlayers(stats);
+        stats.discoveredPlayers = collectedPuuids.size();
+        collectMatches(collectedPuuids, sampleTier, stats);
         if (properties.isRecoverMissingTimelines()) {
             // 호출 예산을 별도로 확보한 경우에만 누락 Timeline을 자동 보완한다.
-            collectMissingTimelines();
+            collectMissingTimelines(stats);
         }
+        return stats.toResult();
     }
 
-    private List<String> collectPlayers() {
+    private List<String> collectPlayers(RunStats stats) {
         boolean completed = true;
         LinkedHashSet<String> collectedPuuids = new LinkedHashSet<>();
         String division = currentDivision();
         for (String tier : properties.getTiers()) {
             int pageEnd = nextLeaguePage + properties.getLeaguePageCount();
             for (int page = nextLeaguePage; page < pageEnd; page++) {
+                stats.leagueRequests++;
                 try {
                     RiotPlayerSyncService.SyncResult syncResult = playerSyncService.syncLeagueEntries(
                             QUEUE_TYPE, tier, division, page
                     );
                     collectedPuuids.addAll(syncResult.puuids());
-                } catch (RuntimeException ignored) {
+                } catch (RuntimeException exception) {
                     completed = false;
+                    stats.failures++;
+                    log.warn(
+                            "Riot League Entry 수집 실패: tier={}, division={}, page={}",
+                            tier,
+                            division,
+                            page,
+                            exception
+                    );
                 }
             }
         }
@@ -126,19 +140,20 @@ public class RiotCollectionOrchestrator {
         return DIVISION_ORDER.subList(startIndex, DIVISION_ORDER.size());
     }
 
-    private void collectMatches(List<String> puuids, String sampleTier) {
+    private void collectMatches(List<String> puuids, String sampleTier, RunStats stats) {
         Set<String> processedMatchIds = new LinkedHashSet<>();
         int playerCount = properties.getPlayerPageSize();
         List<String> limitedPuuids = puuids.stream()
                 .limit(properties.getPlayerLimit())
                 .toList();
+        stats.selectedPlayers = limitedPuuids.size();
         for (int fromIndex = 0; fromIndex < limitedPuuids.size(); fromIndex += playerCount) {
             List<String> targets = limitedPuuids.subList(
                     fromIndex,
                     Math.min(fromIndex + playerCount, limitedPuuids.size())
             );
             for (String puuid : targets) {
-                collectPlayerMatches(puuid, sampleTier, processedMatchIds);
+                collectPlayerMatches(puuid, sampleTier, processedMatchIds, stats);
             }
         }
     }
@@ -147,22 +162,31 @@ public class RiotCollectionOrchestrator {
      * 한 플레이어의 매치 ID를 조회하고, 각 매치를 원본 수집부터 통계 집계까지 처리한다.
      * 매치 ID 조회가 실패해도 다른 플레이어의 수집은 계속한다.
      */
-    private void collectPlayerMatches(String puuid, String sampleTier, Set<String> processedMatchIds) {
+    private void collectPlayerMatches(
+            String puuid,
+            String sampleTier,
+            Set<String> processedMatchIds,
+            RunStats stats
+    ) {
         List<String> matchIds;
+        stats.matchIdRequests++;
         try {
             matchIds = matchSyncService.findMatchIds(
                     puuid,
                     0,
                     properties.getMatchCount()
             );
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            stats.failures++;
+            log.warn("Riot Match ID 수집 실패: puuid={}", puuid, exception);
             return;
         }
 
         for (String matchId : matchIds) {
             // 여러 플레이어가 같은 매치를 조회할 수 있으므로 한 스케줄 실행 안에서는 한 번만 처리한다.
             if (processedMatchIds.add(matchId)) {
-                processMatch(matchId, sampleTier);
+                stats.discoveredMatchIds++;
+                processMatch(matchId, sampleTier, stats);
             }
         }
     }
@@ -171,34 +195,44 @@ public class RiotCollectionOrchestrator {
      * 한 매치를 Raw Match → Timeline → 정규화 → 통계 순서로 처리한다.
      * 원본 수집에 실패한 매치는 정규화하지 않고 다음 실행의 복구 대상으로 남긴다.
      */
-    private void processMatch(String matchId, String sampleTier) {
+    private void processMatch(String matchId, String sampleTier, RunStats stats) {
         boolean collected;
         try {
             collected = matchSyncService.syncMatch(matchId);
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            stats.failures++;
+            log.warn("Riot Match 원본 수집 실패: matchId={}", matchId, exception);
             return;
         }
 
         // 이미 원본이 모두 있던 매치는 자동 재처리하지 않고 관리자 재집계 대상으로 남긴다.
         if (!collected) {
+            stats.alreadyCompleteMatches++;
             return;
         }
+        stats.newOrRecoveredMatches++;
 
         try {
             NormalizedMatch normalized = matchNormalizationService.normalizeAsTierSample(matchId, sampleTier);
             matchNormalizationService.save(normalized);
-            aggregateStats(normalized, List.of(sampleTier), new ArrayList<>());
+            stats.normalizedMatches++;
+            List<Failure> failures = new ArrayList<>();
+            aggregateStats(normalized, List.of(sampleTier), failures);
+            stats.failures += failures.size();
         } catch (RuntimeException exception) {
             // 자동 재시도하지 않는다. 운영자가 수집을 중단한 뒤 관리자 재집계 API로 복구한다.
+            stats.failures++;
             log.error("매치 정규화 또는 통계 집계 실패: matchId={}", matchId, exception);
         }
     }
 
-    private void collectMissingTimelines() {
+    private void collectMissingTimelines(RunStats stats) {
         try {
             matchSyncService.syncMissingTimelines();
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
             // 누락 Timeline 보완이 실패해도 수집 실행 자체는 종료한다.
+            stats.failures++;
+            log.warn("누락 Riot Timeline 복구 실패", exception);
         }
     }
 
@@ -424,5 +458,45 @@ public class RiotCollectionOrchestrator {
     }
 
     private record StatsRetry(NormalizedMatch normalized, String tier) {
+    }
+
+    public record RunResult(
+            int leagueRequests,
+            int discoveredPlayers,
+            int selectedPlayers,
+            int matchIdRequests,
+            int discoveredMatchIds,
+            int newOrRecoveredMatches,
+            int alreadyCompleteMatches,
+            int normalizedMatches,
+            int failures
+    ) {
+    }
+
+    private static final class RunStats {
+
+        private int leagueRequests;
+        private int discoveredPlayers;
+        private int selectedPlayers;
+        private int matchIdRequests;
+        private int discoveredMatchIds;
+        private int newOrRecoveredMatches;
+        private int alreadyCompleteMatches;
+        private int normalizedMatches;
+        private int failures;
+
+        private RunResult toResult() {
+            return new RunResult(
+                    leagueRequests,
+                    discoveredPlayers,
+                    selectedPlayers,
+                    matchIdRequests,
+                    discoveredMatchIds,
+                    newOrRecoveredMatches,
+                    alreadyCompleteMatches,
+                    normalizedMatches,
+                    failures
+            );
+        }
     }
 }
