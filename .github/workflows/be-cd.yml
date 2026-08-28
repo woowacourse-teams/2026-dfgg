@@ -37,4 +37,4 @@ jobs:
       - name: Check service status
         run: |
           sleep 3
-          sudo systemctl status dfgg-be.service --no-pager
+          sudo systemctl status dfgg.service --no-pager
