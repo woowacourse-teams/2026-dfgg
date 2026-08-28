@@ -15,11 +15,15 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
 
+@ExtendWith(OutputCaptureExtension.class)
 class RiotSchedulingConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
@@ -83,7 +87,7 @@ class RiotSchedulingConfigurationTest {
     }
 
     @Test
-    void 분산_락을_획득한_인스턴스만_수집한다() throws Exception {
+    void 분산_락을_획득한_인스턴스만_수집한다(CapturedOutput output) throws Exception {
         RiotCollectionOrchestrator orchestrator = mock(RiotCollectionOrchestrator.class);
         DataSource dataSource = mock(DataSource.class);
         Connection connection = mock(Connection.class);
@@ -103,10 +107,14 @@ class RiotSchedulingConfigurationTest {
 
         verify(orchestrator).runOnce();
         verify(connection).prepareStatement("SELECT pg_advisory_unlock(?)");
+        assertThat(output).contains(
+                "Riot 데이터 수집 스케줄 실행 시작",
+                "Riot 데이터 수집 스케줄 실행 완료: elapsedMs="
+        );
     }
 
     @Test
-    void 다른_인스턴스가_분산_락을_보유하면_수집하지_않는다() throws Exception {
+    void 다른_인스턴스가_분산_락을_보유하면_수집하지_않는다(CapturedOutput output) throws Exception {
         RiotCollectionOrchestrator orchestrator = mock(RiotCollectionOrchestrator.class);
         DataSource dataSource = mock(DataSource.class);
         Connection connection = mock(Connection.class);
@@ -120,6 +128,9 @@ class RiotSchedulingConfigurationTest {
         new RiotCollectionScheduler(orchestrator, dataSource).collect();
 
         verifyNoInteractions(orchestrator);
+        assertThat(output).contains(
+                "Riot 데이터 수집 스케줄 실행 건너뜀: 다른 인스턴스가 실행 중입니다."
+        );
     }
 
     @Test
