@@ -11,6 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,10 @@ public class RiotCollectionOrchestrator {
 
     private static final Logger log = LoggerFactory.getLogger(RiotCollectionOrchestrator.class);
     private static final String QUEUE_TYPE = "RANKED_SOLO_5x5";
+    private static final String MASTER_TIER = "MASTER";
+    private static final Set<String> SUPPORTED_TIERS = Set.of(
+            "IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", MASTER_TIER
+    );
     private static final List<String> DIVISION_ORDER = List.of("IV", "III", "II", "I");
 
     private final RiotSchedulerProperties properties;
@@ -38,6 +43,7 @@ public class RiotCollectionOrchestrator {
     private int nextLeaguePage;
     private int nextDivisionIndex;
     private boolean currentLeagueRangeHasPlayers;
+    private int nextMasterPlayerIndex;
 
     public RiotCollectionOrchestrator(
             RiotSchedulerProperties properties,
@@ -54,12 +60,14 @@ public class RiotCollectionOrchestrator {
         this.nextLeaguePage = 1;
         this.nextDivisionIndex = 0;
         this.currentLeagueRangeHasPlayers = false;
+        this.nextMasterPlayerIndex = 0;
     }
 
     public void runOnce() {
         try {
             validateProperties();
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            log.error("Riot 수집 스케줄러 설정이 올바르지 않습니다.", exception);
             return;
         }
 
@@ -73,20 +81,23 @@ public class RiotCollectionOrchestrator {
     }
 
     private List<String> collectPlayers() {
+        String tier = properties.getTiers().getFirst();
+        if (MASTER_TIER.equals(tier)) {
+            return collectMasterPlayers(tier);
+        }
+
         boolean completed = true;
         LinkedHashSet<String> collectedPuuids = new LinkedHashSet<>();
         String division = currentDivision();
-        for (String tier : properties.getTiers()) {
-            int pageEnd = nextLeaguePage + properties.getLeaguePageCount();
-            for (int page = nextLeaguePage; page < pageEnd; page++) {
-                try {
-                    RiotPlayerSyncService.SyncResult syncResult = playerSyncService.syncLeagueEntries(
-                            QUEUE_TYPE, tier, division, page
-                    );
-                    collectedPuuids.addAll(syncResult.puuids());
-                } catch (RuntimeException ignored) {
-                    completed = false;
-                }
+        int pageEnd = nextLeaguePage + properties.getLeaguePageCount();
+        for (int page = nextLeaguePage; page < pageEnd; page++) {
+            try {
+                RiotPlayerSyncService.SyncResult syncResult = playerSyncService.syncLeagueEntries(
+                        QUEUE_TYPE, tier, division, page
+                );
+                collectedPuuids.addAll(syncResult.puuids());
+            } catch (RuntimeException ignored) {
+                completed = false;
             }
         }
         currentLeagueRangeHasPlayers |= !collectedPuuids.isEmpty();
@@ -94,6 +105,33 @@ public class RiotCollectionOrchestrator {
             moveToNextLeagueRange();
         }
         return List.copyOf(collectedPuuids);
+    }
+
+    private List<String> collectMasterPlayers(String tier) {
+        RiotPlayerSyncService.SyncResult syncResult;
+        try {
+            // Master API에는 division과 page가 없으며 서비스가 이 두 인자를 사용하지 않는다.
+            syncResult = playerSyncService.syncLeagueEntries(QUEUE_TYPE, tier, "I", 1);
+        } catch (RuntimeException ignored) {
+            return List.of();
+        }
+
+        List<String> puuids = syncResult.puuids().stream()
+                .distinct()
+                .sorted()
+                .toList();
+        if (puuids.isEmpty()) {
+            nextMasterPlayerIndex = 0;
+            return List.of();
+        }
+
+        int start = Math.floorMod(nextMasterPlayerIndex, puuids.size());
+        int count = Math.min(properties.getPlayerLimit(), puuids.size());
+        List<String> selected = IntStream.range(0, count)
+                .mapToObj(offset -> puuids.get((start + offset) % puuids.size()))
+                .toList();
+        nextMasterPlayerIndex = (start + count) % puuids.size();
+        return selected;
     }
 
     private void moveToNextLeagueRange() {
@@ -390,14 +428,19 @@ public class RiotCollectionOrchestrator {
         if (properties.getTiers().size() != 1) {
             throw new IllegalArgumentException("tier sample collection requires exactly one scheduler tier");
         }
-        if (properties.getDivisions().isEmpty()) {
-            throw new IllegalArgumentException("collection scheduler divisions must not be empty");
+        if (!SUPPORTED_TIERS.contains(properties.getTiers().getFirst())) {
+            throw new IllegalArgumentException("collection scheduler tier is not supported");
         }
-        if (properties.getDivisions().stream().anyMatch(division -> !DIVISION_ORDER.contains(division))) {
-            throw new IllegalArgumentException("collection scheduler divisions must be one of IV, III, II, I");
-        }
-        if (properties.getLeaguePageCount() < 1) {
-            throw new IllegalArgumentException("collection scheduler league page count must be positive");
+        if (!MASTER_TIER.equals(properties.getTiers().getFirst())) {
+            if (properties.getDivisions().isEmpty()) {
+                throw new IllegalArgumentException("collection scheduler divisions must not be empty");
+            }
+            if (properties.getDivisions().stream().anyMatch(division -> !DIVISION_ORDER.contains(division))) {
+                throw new IllegalArgumentException("collection scheduler divisions must be one of IV, III, II, I");
+            }
+            if (properties.getLeaguePageCount() < 1) {
+                throw new IllegalArgumentException("collection scheduler league page count must be positive");
+            }
         }
         if (properties.getPlayerPageSize() < 1 || properties.getPlayerPageSize() > 100) {
             throw new IllegalArgumentException("collection scheduler player page size must be between 1 and 100");
