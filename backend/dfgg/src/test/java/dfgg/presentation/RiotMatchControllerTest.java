@@ -134,9 +134,20 @@ class RiotMatchControllerTest {
     }
 
     @Test
-    void 지원하지_않는_티어의_빌드_통계_재생성을_거부한다() throws Exception {
+    void Challenger_티어의_빌드_통계를_재생성한다() throws Exception {
         mockMvc.perform(post("/admin/riot/matches/stats")
                         .param("tier", "CHALLENGER"))
+                .andExpect(status().isNoContent());
+
+        InOrder order = inOrder(collectionOrchestrator, statsRebuildService);
+        order.verify(collectionOrchestrator).normalizeAndAggregatePendingMatches("CHALLENGER");
+        order.verify(statsRebuildService).rebuildAll("CHALLENGER");
+    }
+
+    @Test
+    void 지원하지_않는_티어의_빌드_통계_재생성을_거부한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches/stats")
+                        .param("tier", "MYTHIC"))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(collectionOrchestrator, statsRebuildService);
