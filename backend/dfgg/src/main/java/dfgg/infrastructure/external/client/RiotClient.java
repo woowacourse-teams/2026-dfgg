@@ -2,8 +2,6 @@ package dfgg.infrastructure.external.client;
 
 import dfgg.infrastructure.external.config.RiotApiProperties;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
-import dfgg.infrastructure.external.dto.MatchResponse;
-import dfgg.infrastructure.external.dto.MatchTimelineResponse;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
@@ -135,24 +133,6 @@ public class RiotClient {
         return List.copyOf(response);
     }
 
-    public MatchResponse getMatch(String matchId) {
-        Assert.hasText(matchId, "matchId must not be blank");
-
-        MatchResponse response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.REGIONAL, () ->
-                regionalRestClient.get()
-                        .uri(uriBuilder -> uriBuilder
-                                .path("/lol/match/v5/matches/{matchId}")
-                                .build(matchId))
-                        .retrieve()
-                        .body(MatchResponse.class)
-        );
-
-        if (response == null) {
-            throw new IllegalStateException("[Error] Riot Match response is empty");
-        }
-        return response;
-    }
-
     public String getRawMatch(String matchId) {
         Assert.hasText(matchId, "matchId must not be blank");
 
@@ -189,21 +169,4 @@ public class RiotClient {
         return response;
     }
 
-    public MatchTimelineResponse getMatchTimeline(String matchId) {
-        Assert.hasText(matchId, "matchId must not be blank");
-
-        MatchTimelineResponse response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.REGIONAL, () ->
-                regionalRestClient.get()
-                        .uri(uriBuilder -> uriBuilder
-                                .path("/lol/match/v5/matches/{matchId}/timeline")
-                                .build(matchId))
-                        .retrieve()
-                        .body(MatchTimelineResponse.class)
-        );
-
-        if (response == null) {
-            throw new IllegalStateException("[Error] Riot Match timeline response is empty");
-        }
-        return response;
-    }
 }
