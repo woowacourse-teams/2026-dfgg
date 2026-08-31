@@ -4,7 +4,7 @@ import dfgg.domain.player.Player;
 import dfgg.domain.player.PlayerRepository;
 import dfgg.infrastructure.external.client.RiotClient;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
-import dfgg.infrastructure.external.dto.MasterLeagueResponse;
+import dfgg.infrastructure.external.dto.LeagueListResponse;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -60,7 +60,7 @@ public class RiotPlayerSyncService {
     }
 
     private List<LeagueEntryResponse> getMasterLeagueEntries(String queue) {
-        MasterLeagueResponse league = riotClient.getMasterLeague(queue);
+        LeagueListResponse league = riotClient.getMasterLeague(queue);
         return league.entries().stream()
                 .map(entry -> new LeagueEntryResponse(
                         entry.puuid(),

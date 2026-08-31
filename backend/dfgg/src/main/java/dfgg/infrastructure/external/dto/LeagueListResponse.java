@@ -3,13 +3,13 @@ package dfgg.infrastructure.external.dto;
 import java.util.List;
 import java.util.Objects;
 
-public record MasterLeagueResponse(
+public record LeagueListResponse(
         String tier,
         String queue,
         List<LeagueEntryResponse> entries
 ) {
 
-    public MasterLeagueResponse {
+    public LeagueListResponse {
         entries = List.copyOf(Objects.requireNonNull(entries, "entries must not be null"));
     }
 }

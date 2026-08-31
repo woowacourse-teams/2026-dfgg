@@ -10,7 +10,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import dfgg.infrastructure.external.config.RiotApiProperties;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
-import dfgg.infrastructure.external.dto.MasterLeagueResponse;
+import dfgg.infrastructure.external.dto.LeagueListResponse;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -138,7 +138,7 @@ class RiotClientTest {
                         }
                         """, MediaType.APPLICATION_JSON));
 
-        MasterLeagueResponse league = client.getMasterLeague("RANKED_SOLO_5x5");
+        LeagueListResponse league = client.getMasterLeague("RANKED_SOLO_5x5");
 
         assertThat(league.tier()).isEqualTo("MASTER");
         assertThat(league.queue()).isEqualTo("RANKED_SOLO_5x5");

@@ -17,7 +17,7 @@ import dfgg.domain.player.Player;
 import dfgg.domain.player.PlayerRepository;
 import dfgg.infrastructure.external.client.RiotClient;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
-import dfgg.infrastructure.external.dto.MasterLeagueResponse;
+import dfgg.infrastructure.external.dto.LeagueListResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -88,7 +88,7 @@ class RiotPlayerSyncServiceTest {
                 183
         );
         when(riotClient.getMasterLeague("RANKED_SOLO_5x5"))
-                .thenReturn(new MasterLeagueResponse(
+                .thenReturn(new LeagueListResponse(
                         "MASTER",
                         "RANKED_SOLO_5x5",
                         List.of(entry)
