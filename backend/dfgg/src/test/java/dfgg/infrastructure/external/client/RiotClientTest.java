@@ -168,6 +168,61 @@ class RiotClientTest {
     }
 
     @Test
+    void Grandmaster_리그를_조회한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/grandmasterleagues/by-queue/RANKED_SOLO_5x5"))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
+                .andRespond(withSuccess("""
+                        {
+                          "tier": "GRANDMASTER",
+                          "queue": "RANKED_SOLO_5x5",
+                          "entries": [
+                            {
+                              "puuid": "grandmaster-puuid",
+                              "leaguePoints": 821,
+                              "rank": "I",
+                              "wins": 190,
+                              "losses": 151,
+                              "veteran": true,
+                              "inactive": false,
+                              "freshBlood": false,
+                              "hotStreak": true
+                            }
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        LeagueListResponse league = client.getGrandmasterLeague("RANKED_SOLO_5x5");
+
+        assertThat(league.tier()).isEqualTo("GRANDMASTER");
+        assertThat(league.queue()).isEqualTo("RANKED_SOLO_5x5");
+        assertThat(league.entries()).containsExactly(new LeagueEntryResponse(
+                "grandmaster-puuid",
+                null,
+                null,
+                "I",
+                821,
+                190,
+                151
+        ));
+        server.verify();
+    }
+
+    @Test
+    void Grandmaster_리그_응답_본문이_없으면_예외가_발생한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/grandmasterleagues/by-queue/RANKED_SOLO_5x5"))
+                .andRespond(withNoContent());
+
+        assertThatThrownBy(() -> client.getGrandmasterLeague("RANKED_SOLO_5x5"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Riot Grandmaster league response is empty");
+
+        server.verify();
+    }
+
+    @Test
     void 매치_ID_호출이_제한되면_Retry_After_이후에_재시도한다() {
         String requestUrl = REGIONAL_BASE_URL
                 + "/lol/match/v5/matches/by-puuid/encrypted-puuid/ids?queue=420&start=0&count=20";

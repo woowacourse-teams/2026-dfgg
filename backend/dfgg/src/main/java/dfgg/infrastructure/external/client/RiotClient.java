@@ -108,17 +108,25 @@ public class RiotClient {
     }
 
     public LeagueListResponse getMasterLeague(String queue) {
+        return getApexLeague(queue, "masterleagues", "Master");
+    }
+
+    public LeagueListResponse getGrandmasterLeague(String queue) {
+        return getApexLeague(queue, "grandmasterleagues", "Grandmaster");
+    }
+
+    private LeagueListResponse getApexLeague(String queue, String leaguePath, String tierName) {
         Assert.hasText(queue, "queue must not be blank");
 
         LeagueListResponse response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.PLATFORM, () ->
                 platformRestClient.get()
-                        .uri("/lol/league/v4/masterleagues/by-queue/{queue}", queue)
+                        .uri("/lol/league/v4/{leaguePath}/by-queue/{queue}", leaguePath, queue)
                         .retrieve()
                         .body(LeagueListResponse.class)
         );
 
         if (response == null) {
-            throw new IllegalStateException("[Error] Riot Master league response is empty");
+            throw new IllegalStateException("[Error] Riot " + tierName + " league response is empty");
         }
         return response;
     }
