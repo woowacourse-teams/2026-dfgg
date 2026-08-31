@@ -37,6 +37,12 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
             """)
     Slice<String> findDistinctMatchIds(Pageable pageable);
 
+    @Query("""
+            SELECT DISTINCT p.patch
+            FROM NormalizedMatchParticipant p
+            """)
+    List<String> findDistinctPatches();
+
     @Query(value = """
             SELECT item_id, count(*)
             FROM (
