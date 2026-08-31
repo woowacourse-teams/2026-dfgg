@@ -21,6 +21,7 @@ public class RiotPlayerSyncService {
     private static final String SOLO_QUEUE_TYPE = "RANKED_SOLO_5x5";
     private static final String MASTER_TIER = "MASTER";
     private static final String GRANDMASTER_TIER = "GRANDMASTER";
+    private static final String CHALLENGER_TIER = "CHALLENGER";
     private static final String UNRANKED_TIER = "UNRANKED";
     private static final String UNRANKED_DIVISION = "NONE";
 
@@ -44,6 +45,7 @@ public class RiotPlayerSyncService {
         List<LeagueEntryResponse> entries = switch (tier) {
             case MASTER_TIER -> enrichLeagueEntries(riotClient.getMasterLeague(queue));
             case GRANDMASTER_TIER -> enrichLeagueEntries(riotClient.getGrandmasterLeague(queue));
+            case CHALLENGER_TIER -> enrichLeagueEntries(riotClient.getChallengerLeague(queue));
             default -> riotClient.getLeagueEntries(queue, tier, division, page);
         };
 
