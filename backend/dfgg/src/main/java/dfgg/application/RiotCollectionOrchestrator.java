@@ -30,8 +30,11 @@ public class RiotCollectionOrchestrator {
     private static final Logger log = LoggerFactory.getLogger(RiotCollectionOrchestrator.class);
     private static final String QUEUE_TYPE = "RANKED_SOLO_5x5";
     private static final String MASTER_TIER = "MASTER";
+    private static final String GRANDMASTER_TIER = "GRANDMASTER";
+    private static final Set<String> APEX_TIERS = Set.of(MASTER_TIER, GRANDMASTER_TIER);
     private static final Set<String> SUPPORTED_TIERS = Set.of(
-            "IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", MASTER_TIER
+            "IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND",
+            MASTER_TIER, GRANDMASTER_TIER
     );
     private static final List<String> DIVISION_ORDER = List.of("IV", "III", "II", "I");
 
@@ -43,7 +46,7 @@ public class RiotCollectionOrchestrator {
     private int nextLeaguePage;
     private int nextDivisionIndex;
     private boolean currentLeagueRangeHasPlayers;
-    private int nextMasterPlayerIndex;
+    private int nextApexPlayerIndex;
 
     public RiotCollectionOrchestrator(
             RiotSchedulerProperties properties,
@@ -60,7 +63,7 @@ public class RiotCollectionOrchestrator {
         this.nextLeaguePage = 1;
         this.nextDivisionIndex = 0;
         this.currentLeagueRangeHasPlayers = false;
-        this.nextMasterPlayerIndex = 0;
+        this.nextApexPlayerIndex = 0;
     }
 
     public void runOnce() {
@@ -82,8 +85,8 @@ public class RiotCollectionOrchestrator {
 
     private List<String> collectPlayers() {
         String tier = properties.getTiers().getFirst();
-        if (MASTER_TIER.equals(tier)) {
-            return collectMasterPlayers(tier);
+        if (APEX_TIERS.contains(tier)) {
+            return collectApexPlayers(tier);
         }
 
         boolean completed = true;
@@ -107,10 +110,10 @@ public class RiotCollectionOrchestrator {
         return List.copyOf(collectedPuuids);
     }
 
-    private List<String> collectMasterPlayers(String tier) {
+    private List<String> collectApexPlayers(String tier) {
         RiotPlayerSyncService.SyncResult syncResult;
         try {
-            // Master API에는 division과 page가 없으며 서비스가 이 두 인자를 사용하지 않는다.
+            // 최상위 리그 API에는 division과 page가 없으며 서비스가 이 두 인자를 사용하지 않는다.
             syncResult = playerSyncService.syncLeagueEntries(QUEUE_TYPE, tier, "I", 1);
         } catch (RuntimeException ignored) {
             return List.of();
@@ -121,16 +124,16 @@ public class RiotCollectionOrchestrator {
                 .sorted()
                 .toList();
         if (puuids.isEmpty()) {
-            nextMasterPlayerIndex = 0;
+            nextApexPlayerIndex = 0;
             return List.of();
         }
 
-        int start = Math.floorMod(nextMasterPlayerIndex, puuids.size());
+        int start = Math.floorMod(nextApexPlayerIndex, puuids.size());
         int count = Math.min(properties.getPlayerLimit(), puuids.size());
         List<String> selected = IntStream.range(0, count)
                 .mapToObj(offset -> puuids.get((start + offset) % puuids.size()))
                 .toList();
-        nextMasterPlayerIndex = (start + count) % puuids.size();
+        nextApexPlayerIndex = (start + count) % puuids.size();
         return selected;
     }
 
@@ -431,7 +434,7 @@ public class RiotCollectionOrchestrator {
         if (!SUPPORTED_TIERS.contains(properties.getTiers().getFirst())) {
             throw new IllegalArgumentException("collection scheduler tier is not supported");
         }
-        if (!MASTER_TIER.equals(properties.getTiers().getFirst())) {
+        if (!APEX_TIERS.contains(properties.getTiers().getFirst())) {
             if (properties.getDivisions().isEmpty()) {
                 throw new IllegalArgumentException("collection scheduler divisions must not be empty");
             }

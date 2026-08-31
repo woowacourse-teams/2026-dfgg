@@ -187,6 +187,29 @@ class RiotCollectionOrchestratorTest {
     }
 
     @Test
+    void Grandmaster_매치를_Grandmaster_표본으로_정규화하고_집계한다() {
+        properties.setTiers(List.of("GRANDMASTER"));
+        properties.setDivisions(List.of());
+        properties.setLeaguePageCount(0);
+        properties.setPlayerLimit(1);
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "GRANDMASTER", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("grandmaster-puuid")));
+        when(matchSyncService.findMatchIds("grandmaster-puuid", 0, 20))
+                .thenReturn(List.of("KR_GRANDMASTER"));
+        when(matchSyncService.syncMatch("KR_GRANDMASTER")).thenReturn(true);
+        NormalizedMatch normalized = normalizedMatch("KR_GRANDMASTER");
+        when(matchNormalizationService.normalizeAsTierSample("KR_GRANDMASTER", "GRANDMASTER"))
+                .thenReturn(normalized);
+
+        orchestrator.runOnce();
+
+        verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "GRANDMASTER", "I", 1);
+        verify(matchNormalizationService).normalizeAsTierSample("KR_GRANDMASTER", "GRANDMASTER");
+        verify(matchNormalizationService).save(normalized);
+        verify(statsMatchService).registerMatchStats(normalized, "GRANDMASTER");
+    }
+
+    @Test
     void 자동_Timeline_복구가_꺼져_있으면_누락_Timeline을_조회하지_않는다() {
         properties.setRecoverMissingTimelines(false);
 

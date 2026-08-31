@@ -98,6 +98,17 @@ class RiotSchedulingConfigurationTest {
     }
 
     @Test
+    void Grandmaster_티어를_수집_설정으로_bind한다() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(PropertiesConfiguration.class)
+                .withPropertyValues("collection.scheduler.tiers=GRANDMASTER")
+                .run(context -> {
+                    RiotSchedulerProperties properties = context.getBean(RiotSchedulerProperties.class);
+                    assertThat(properties.getTiers()).containsExactly("GRANDMASTER");
+                });
+    }
+
+    @Test
     void 분산_락을_획득한_인스턴스만_수집한다(CapturedOutput output) throws Exception {
         RiotCollectionOrchestrator orchestrator = mock(RiotCollectionOrchestrator.class);
         DataSource dataSource = mock(DataSource.class);
