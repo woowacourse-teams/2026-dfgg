@@ -115,6 +115,10 @@ public class RiotClient {
         return getApexLeague(queue, "grandmasterleagues", "Grandmaster");
     }
 
+    public LeagueListResponse getChallengerLeague(String queue) {
+        return getApexLeague(queue, "challengerleagues", "Challenger");
+    }
+
     private LeagueListResponse getApexLeague(String queue, String leaguePath, String tierName) {
         Assert.hasText(queue, "queue must not be blank");
 

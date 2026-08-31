@@ -223,6 +223,61 @@ class RiotClientTest {
     }
 
     @Test
+    void Challenger_리그를_조회한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5"))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
+                .andRespond(withSuccess("""
+                        {
+                          "tier": "CHALLENGER",
+                          "queue": "RANKED_SOLO_5x5",
+                          "entries": [
+                            {
+                              "puuid": "challenger-puuid",
+                              "leaguePoints": 1604,
+                              "rank": "I",
+                              "wins": 271,
+                              "losses": 211,
+                              "veteran": true,
+                              "inactive": false,
+                              "freshBlood": false,
+                              "hotStreak": true
+                            }
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        LeagueListResponse league = client.getChallengerLeague("RANKED_SOLO_5x5");
+
+        assertThat(league.tier()).isEqualTo("CHALLENGER");
+        assertThat(league.queue()).isEqualTo("RANKED_SOLO_5x5");
+        assertThat(league.entries()).containsExactly(new LeagueEntryResponse(
+                "challenger-puuid",
+                null,
+                null,
+                "I",
+                1604,
+                271,
+                211
+        ));
+        server.verify();
+    }
+
+    @Test
+    void Challenger_리그_응답_본문이_없으면_예외가_발생한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5"))
+                .andRespond(withNoContent());
+
+        assertThatThrownBy(() -> client.getChallengerLeague("RANKED_SOLO_5x5"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Riot Challenger league response is empty");
+
+        server.verify();
+    }
+
+    @Test
     void 매치_ID_호출이_제한되면_Retry_After_이후에_재시도한다() {
         String requestUrl = REGIONAL_BASE_URL
                 + "/lol/match/v5/matches/by-puuid/encrypted-puuid/ids?queue=420&start=0&count=20";
