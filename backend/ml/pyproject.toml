@@ -1,0 +1,21 @@
+[project]
+name = "dfgg-ltr"
+version = "0.1.0"
+description = "LambdaMART LTR training for dfgg next-item recommendation (v3)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "lightgbm>=4.5",
+    "numpy>=2.0",
+]
+
+# 분석 전용(T15). shap은 빌드가 무거워 기본 설치에서 분리한다.
+#   uv sync --extra analysis
+[project.optional-dependencies]
+analysis = [
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "shap>=0.46",
+]
+
+[tool.uv]
+package = false
