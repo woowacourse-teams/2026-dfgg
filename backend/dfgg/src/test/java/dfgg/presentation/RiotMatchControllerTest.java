@@ -123,6 +123,17 @@ class RiotMatchControllerTest {
     }
 
     @Test
+    void Grandmaster_티어의_빌드_통계를_재생성한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches/stats")
+                        .param("tier", "GRANDMASTER"))
+                .andExpect(status().isNoContent());
+
+        InOrder order = inOrder(collectionOrchestrator, statsRebuildService);
+        order.verify(collectionOrchestrator).normalizeAndAggregatePendingMatches("GRANDMASTER");
+        order.verify(statsRebuildService).rebuildAll("GRANDMASTER");
+    }
+
+    @Test
     void 지원하지_않는_티어의_빌드_통계_재생성을_거부한다() throws Exception {
         mockMvc.perform(post("/admin/riot/matches/stats")
                         .param("tier", "CHALLENGER"))

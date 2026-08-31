@@ -53,7 +53,7 @@ public class RiotMatchController {
     @PostMapping("/riot/matches/stats")
     public ResponseEntity<Void> rebuildStats(
             @RequestParam
-            @Pattern(regexp = "IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND|MASTER")
+            @Pattern(regexp = "IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND|MASTER|GRANDMASTER")
             String tier
     ) {
         // 신규 매치는 정규화 객체를 바로 집계하고, 과거 미완료 데이터는 DB에서 찾아 복구한다.
@@ -70,7 +70,7 @@ public class RiotMatchController {
     public ResponseEntity<Void> replayStats(
             @PathVariable String matchId,
             @RequestParam
-            @Pattern(regexp = "IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND|MASTER")
+            @Pattern(regexp = "IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND|MASTER|GRANDMASTER")
             String tier
     ) {
         statsRebuildService.replayOne(matchId, tier);
