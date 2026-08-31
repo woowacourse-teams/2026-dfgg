@@ -24,7 +24,7 @@ public class RiotPlayerController {
             @RequestParam(defaultValue = "RANKED_SOLO_5x5")
             @Pattern(regexp = "RANKED_SOLO_5x5|RANKED_FLEX_SR") String queue,
             @RequestParam(defaultValue = "PLATINUM")
-            @Pattern(regexp = "IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND") String tier,
+            @Pattern(regexp = "IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND|MASTER") String tier,
             @RequestParam(defaultValue = "I")
             @Pattern(regexp = "I|II|III|IV") String division,
             @RequestParam(defaultValue = "1") @Positive int page
