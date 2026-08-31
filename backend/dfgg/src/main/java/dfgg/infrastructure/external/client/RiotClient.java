@@ -2,6 +2,7 @@ package dfgg.infrastructure.external.client;
 
 import dfgg.infrastructure.external.config.RiotApiProperties;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
+import dfgg.infrastructure.external.dto.MasterLeagueResponse;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
@@ -104,6 +105,22 @@ public class RiotClient {
             throw new IllegalStateException("[Error] Riot League entries response is empty");
         }
         return List.copyOf(response);
+    }
+
+    public MasterLeagueResponse getMasterLeague(String queue) {
+        Assert.hasText(queue, "queue must not be blank");
+
+        MasterLeagueResponse response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.PLATFORM, () ->
+                platformRestClient.get()
+                        .uri("/lol/league/v4/masterleagues/by-queue/{queue}", queue)
+                        .retrieve()
+                        .body(MasterLeagueResponse.class)
+        );
+
+        if (response == null) {
+            throw new IllegalStateException("[Error] Riot Master league response is empty");
+        }
+        return response;
     }
 
     public List<String> getMatchIds(String puuid) {

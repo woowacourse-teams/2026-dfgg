@@ -10,6 +10,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import dfgg.infrastructure.external.config.RiotApiProperties;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
+import dfgg.infrastructure.external.dto.MasterLeagueResponse;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -108,6 +109,61 @@ class RiotClientTest {
             assertThat(entry.tier()).isEqualTo("PLATINUM");
             assertThat(entry.rank()).isEqualTo("I");
         });
+        server.verify();
+    }
+
+    @Test
+    void Master_리그를_조회한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/masterleagues/by-queue/RANKED_SOLO_5x5"))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
+                .andRespond(withSuccess("""
+                        {
+                          "tier": "MASTER",
+                          "queue": "RANKED_SOLO_5x5",
+                          "entries": [
+                            {
+                              "puuid": "master-puuid",
+                              "leaguePoints": 1399,
+                              "rank": "I",
+                              "wins": 242,
+                              "losses": 183,
+                              "veteran": false,
+                              "inactive": false,
+                              "freshBlood": false,
+                              "hotStreak": false
+                            }
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        MasterLeagueResponse league = client.getMasterLeague("RANKED_SOLO_5x5");
+
+        assertThat(league.tier()).isEqualTo("MASTER");
+        assertThat(league.queue()).isEqualTo("RANKED_SOLO_5x5");
+        assertThat(league.entries()).containsExactly(new LeagueEntryResponse(
+                "master-puuid",
+                null,
+                null,
+                "I",
+                1399,
+                242,
+                183
+        ));
+        server.verify();
+    }
+
+    @Test
+    void Master_리그_응답_본문이_없으면_예외가_발생한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/masterleagues/by-queue/RANKED_SOLO_5x5"))
+                .andRespond(withNoContent());
+
+        assertThatThrownBy(() -> client.getMasterLeague("RANKED_SOLO_5x5"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Riot Master league response is empty");
+
         server.verify();
     }
 
