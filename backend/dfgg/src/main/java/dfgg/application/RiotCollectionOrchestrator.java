@@ -31,10 +31,11 @@ public class RiotCollectionOrchestrator {
     private static final String QUEUE_TYPE = "RANKED_SOLO_5x5";
     private static final String MASTER_TIER = "MASTER";
     private static final String GRANDMASTER_TIER = "GRANDMASTER";
-    private static final Set<String> APEX_TIERS = Set.of(MASTER_TIER, GRANDMASTER_TIER);
+    private static final String CHALLENGER_TIER = "CHALLENGER";
+    private static final Set<String> APEX_TIERS = Set.of(MASTER_TIER, GRANDMASTER_TIER, CHALLENGER_TIER);
     private static final Set<String> SUPPORTED_TIERS = Set.of(
             "IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND",
-            MASTER_TIER, GRANDMASTER_TIER
+            MASTER_TIER, GRANDMASTER_TIER, CHALLENGER_TIER
     );
     private static final List<String> DIVISION_ORDER = List.of("IV", "III", "II", "I");
 

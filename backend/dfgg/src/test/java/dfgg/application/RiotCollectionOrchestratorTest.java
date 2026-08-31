@@ -210,6 +210,29 @@ class RiotCollectionOrchestratorTest {
     }
 
     @Test
+    void Challenger_매치를_Challenger_표본으로_정규화하고_집계한다() {
+        properties.setTiers(List.of("CHALLENGER"));
+        properties.setDivisions(List.of());
+        properties.setLeaguePageCount(0);
+        properties.setPlayerLimit(1);
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "CHALLENGER", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("challenger-puuid")));
+        when(matchSyncService.findMatchIds("challenger-puuid", 0, 20))
+                .thenReturn(List.of("KR_CHALLENGER"));
+        when(matchSyncService.syncMatch("KR_CHALLENGER")).thenReturn(true);
+        NormalizedMatch normalized = normalizedMatch("KR_CHALLENGER");
+        when(matchNormalizationService.normalizeAsTierSample("KR_CHALLENGER", "CHALLENGER"))
+                .thenReturn(normalized);
+
+        orchestrator.runOnce();
+
+        verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "CHALLENGER", "I", 1);
+        verify(matchNormalizationService).normalizeAsTierSample("KR_CHALLENGER", "CHALLENGER");
+        verify(matchNormalizationService).save(normalized);
+        verify(statsMatchService).registerMatchStats(normalized, "CHALLENGER");
+    }
+
+    @Test
     void 자동_Timeline_복구가_꺼져_있으면_누락_Timeline을_조회하지_않는다() {
         properties.setRecoverMissingTimelines(false);
 
