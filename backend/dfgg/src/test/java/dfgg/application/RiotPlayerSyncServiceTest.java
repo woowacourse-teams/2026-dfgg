@@ -111,6 +111,41 @@ class RiotPlayerSyncServiceTest {
     }
 
     @Test
+    void Grandmaster_리그의_wrapper_정보로_플레이어를_저장한다() {
+        LeagueEntryResponse entry = new LeagueEntryResponse(
+                "grandmaster-puuid",
+                null,
+                null,
+                "I",
+                821,
+                190,
+                151
+        );
+        when(riotClient.getGrandmasterLeague("RANKED_SOLO_5x5"))
+                .thenReturn(new LeagueListResponse(
+                        "GRANDMASTER",
+                        "RANKED_SOLO_5x5",
+                        List.of(entry)
+                ));
+        when(playerRepository.findById("grandmaster-puuid")).thenReturn(Optional.empty());
+
+        RiotPlayerSyncService.SyncResult result = riotPlayerSyncService.syncLeagueEntries(
+                "RANKED_SOLO_5x5", "GRANDMASTER", "IV", 7
+        );
+
+        ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepository).save(playerCaptor.capture());
+        assertThat(playerCaptor.getValue()).satisfies(player -> {
+            assertThat(player.getPuuid()).isEqualTo("grandmaster-puuid");
+            assertThat(player.getTier()).isEqualTo("GRANDMASTER");
+            assertThat(player.getDivision()).isEqualTo("I");
+        });
+        assertThat(result.puuids()).containsExactly("grandmaster-puuid");
+        verify(riotClient, never()).getLeagueEntries(any(), any(), any(), anyInt());
+        verify(riotClient, never()).getMasterLeague(any());
+    }
+
+    @Test
     void Riot_API_조회가_실패하면_저장하지_않는다() {
         IllegalStateException exception = new IllegalStateException("API failure");
         when(riotClient.getLeagueEntries(any(), any(), any(), eq(1)))
