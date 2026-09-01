@@ -32,6 +32,8 @@ mining:
 
 recommendation:
   recent-patch-window-size: "${RECOMMENDATION_RECENT_PATCH_WINDOW_SIZE:3}"
+  pair-synergy:
+    minimum-pair-games: "${RECOMMENDATION_PAIR_SYNERGY_MIN_GAMES:5}"
   self-synergy:
     minimum-position-sample: "${RECOMMENDATION_SELF_SYNERGY_MIN_POSITION_SAMPLE:10}"
   candidate-top-k:

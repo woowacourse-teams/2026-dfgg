@@ -28,6 +28,8 @@ collection:
     enabled: false
 recommendation:
   recent-patch-window-size: 3
+  pair-synergy:
+    minimum-pair-games: 5
   self-synergy:
     minimum-position-sample: 10
   candidate-top-k:
