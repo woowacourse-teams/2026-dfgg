@@ -58,6 +58,10 @@ public record RecommendationProperties (
     double allyWeight,
 
     @DefaultValue("1.0")
-    double enemyWeight
+    double enemyWeight,
+
+    /** v2가 최신 패치 통계를 사용하기 위해 필요한 최소 게임 표본 수다. */
+    @DefaultValue("30")
+    int v2MinSampleCount
 ) {
 }

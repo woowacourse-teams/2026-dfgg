@@ -39,6 +39,7 @@ recommendation:
   my-champion-weight: "${RECOMMENDATION_MY_CHAMPION_WEIGHT:1.0}"
   ally-weight: "${RECOMMENDATION_ALLY_WEIGHT:1.0}"
   enemy-weight: "${RECOMMENDATION_ENEMY_WEIGHT:1.0}"
+  v2-min-sample-count: "${RECOMMENDATION_V2_MIN_SAMPLE_COUNT:30}"
 
 collection:
   scheduler:
