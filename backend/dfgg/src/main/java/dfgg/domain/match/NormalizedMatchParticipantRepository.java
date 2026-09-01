@@ -37,6 +37,73 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
             """)
     Slice<String> findDistinctMatchIds(Pageable pageable);
 
+    /**
+     * 구매 순서가 {@code prefix}로 정확히 시작하는 표본에서 {@code nextPosition}번째 아이템 분포.
+     * 전체 집계와 최근 윈도 집계를 한 번에 돌려준다 — 후보 검색이 둘의 union이라 두 값이 모두 필요하다.
+     *
+     * <p>gap을 허용하지 않는다. "빌드 어딘가에 있음"과 "그 자리에 정확히 있음"은 다른 통계이고,
+     * 1~2코어에서 이 차이가 크게 벌어진다.
+     *
+     * <p>반환: {@code [item_id, support_all, win_all, support_recent, win_recent]}
+     */
+    @Query(value = """
+            SELECT item_id,
+                   count(*) AS support_all,
+                   count(*) FILTER (WHERE win) AS win_all,
+                   count(*) FILTER (WHERE patch IN (:recentPatches)) AS support_recent,
+                   count(*) FILTER (WHERE win AND patch IN (:recentPatches)) AS win_recent
+            FROM (
+                SELECT split_part(core_item_purchase_order, ',', :nextPosition) AS item_id, patch, win
+                FROM normalized_match_participants
+                WHERE champion_id = :championId
+                  AND position IN (:positions)
+                  AND core_item_purchase_order_complete
+                  AND (:prefix = '' OR core_item_purchase_order LIKE :prefix || ',%')
+            ) AS next_items
+            WHERE item_id <> ''
+            GROUP BY item_id
+            """, nativeQuery = true)
+    List<Object[]> findNextItemAfterExactPrefix(
+            @Param("championId") Long championId,
+            @Param("positions") Collection<String> positions,
+            @Param("prefix") String prefix,
+            @Param("nextPosition") int nextPosition,
+            @Param("recentPatches") Collection<String> recentPatches
+    );
+
+    /**
+     * {@code lastItemId} 바로 다음에 산 아이템의 분포(빌드 내 위치는 따지지 않는다).
+     * 정확 prefix가 표본을 못 찾을 때 한 단계 물러설 자리다.
+     *
+     * <p>반환: {@code [item_id, support_all, win_all, support_recent, win_recent]}
+     */
+    @Query(value = """
+            SELECT item_id,
+                   count(*) AS support_all,
+                   count(*) FILTER (WHERE win) AS win_all,
+                   count(*) FILTER (WHERE patch IN (:recentPatches)) AS support_recent,
+                   count(*) FILTER (WHERE win AND patch IN (:recentPatches)) AS win_recent
+            FROM (
+                SELECT items[array_position(items, cast(:lastItemId AS text)) + 1] AS item_id, patch, win
+                FROM (
+                    SELECT string_to_array(core_item_purchase_order, ',') AS items, patch, win
+                    FROM normalized_match_participants
+                    WHERE champion_id = :championId
+                      AND position IN (:positions)
+                      AND core_item_purchase_order_complete
+                ) AS sequences
+                WHERE array_position(items, cast(:lastItemId AS text)) IS NOT NULL
+            ) AS next_items
+            WHERE item_id IS NOT NULL AND item_id <> ''
+            GROUP BY item_id
+            """, nativeQuery = true)
+    List<Object[]> findNextItemAfterLastItem(
+            @Param("championId") Long championId,
+            @Param("positions") Collection<String> positions,
+            @Param("lastItemId") Long lastItemId,
+            @Param("recentPatches") Collection<String> recentPatches
+    );
+
     @Query("""
             SELECT DISTINCT p.patch
             FROM NormalizedMatchParticipant p

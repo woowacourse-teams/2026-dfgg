@@ -11,16 +11,28 @@ import java.util.Set;
  * <p>정렬을 여기서 대신 해주지 않고 어긋나면 거부한다. 조용히 재정렬하면 generator가
  * 잘못된 순서를 내보내도 드러나지 않는데, 그 순서는 곧 LTR의 rank feature가 된다.
  */
-public record GeneratorResult(CandidateSource source, List<ScoredItem> rankedItems) {
+public record GeneratorResult(CandidateSource source, List<ScoredItem> rankedItems, int backoffLevel) {
 
     public GeneratorResult {
         validateDescendingByScore(rankedItems);
         validateNoDuplicateItem(rankedItems);
+        if (backoffLevel < 0) {
+            throw new IllegalArgumentException("backoff level은 0 이상이어야 합니다: " + backoffLevel);
+        }
         rankedItems = List.copyOf(rankedItems);
     }
 
     public static GeneratorResult of(CandidateSource source, List<ScoredItem> rankedItems) {
-        return new GeneratorResult(source, rankedItems);
+        return new GeneratorResult(source, rankedItems, 0);
+    }
+
+    /**
+     * backoff
+     * 네 generator 모두 표본이 얇으면 조건을 완화하는데,
+     * 얼마나 완화했는지는 그 점수를 얼마나 믿을지의 근거라 LTR feature가 된다.
+     */
+    public static GeneratorResult of(CandidateSource source, List<ScoredItem> rankedItems, int backoffLevel) {
+        return new GeneratorResult(source, rankedItems, backoffLevel);
     }
 
     /** 1부터 시작하는 rank. 목록에 없는 아이템이면 예외. */

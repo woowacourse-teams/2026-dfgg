@@ -5,8 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationResult;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
+import dfgg.domain.itemstats.ChampionItemRollupRepository;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
+import dfgg.domain.itemstats.ItemMetaStatsRepository;
+import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import io.restassured.RestAssured;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,9 +34,26 @@ class ItemStatsMiningControllerTest {
     @Autowired
     private ChampionPairItemStatsRepository championPairItemStatsRepository;
 
+    @Autowired
+    private ChampionItemRollupRepository championItemRollupRepository;
+    @Autowired
+    private ItemMetaStatsRepository itemMetaStatsRepository;
+    @Autowired
+    private NormalizedMatchParticipantRepository participantRepository;
+
     @BeforeEach
     void setUp() {
         RestAssured.port = port;
+    }
+
+    /** {@code @SpringBootTest}는 롤백하지 않는다 — 집계 결과를 남기면 다른 테스트가 오염된다. */
+    @AfterEach
+    void cleanUp() {
+        championItemStatsRepository.deleteAllInBatch();
+        championItemRollupRepository.deleteAllInBatch();
+        championPairItemStatsRepository.deleteAllInBatch();
+        itemMetaStatsRepository.deleteAllInBatch();
+        participantRepository.deleteAllInBatch();
     }
 
     @Test
