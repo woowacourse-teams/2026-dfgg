@@ -205,4 +205,33 @@ public interface ChampionBuildStatsRepository extends JpaRepository<ChampionBuil
             @Param("allyHasMarksman") boolean allyHasMarksman,
             @Param("allyTankHeavy") boolean allyTankHeavy
     );
+
+    /**
+     * 지정한 패치보다 이전이면서 해당 큐·티어 범위에 통계가 존재하는 가장 최근 패치를 조회한다.
+     */
+    @Query(value = """
+            SELECT patches.patch
+            FROM (
+                SELECT DISTINCT b.patch
+                FROM composition_stats b
+                WHERE b.queue_id = :queueId
+                  AND b.tier IN (:tiers)
+                  AND COALESCE(b.game_count, 0) > 0
+            ) patches
+            WHERE CAST(SPLIT_PART(patches.patch, '.', 1) AS INTEGER) < :major
+               OR (
+                    CAST(SPLIT_PART(patches.patch, '.', 1) AS INTEGER) = :major
+                    AND CAST(SPLIT_PART(patches.patch, '.', 2) AS INTEGER) < :minor
+               )
+            ORDER BY
+              CAST(SPLIT_PART(patches.patch, '.', 1) AS INTEGER) DESC,
+              CAST(SPLIT_PART(patches.patch, '.', 2) AS INTEGER) DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<String> findLatestPatchBefore(
+            @Param("major") int major,
+            @Param("minor") int minor,
+            @Param("queueId") Integer queueId,
+            @Param("tiers") List<String> tiers
+    );
 }
