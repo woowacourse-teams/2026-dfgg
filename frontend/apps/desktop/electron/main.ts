@@ -21,6 +21,9 @@ import type { LcuStatus, Lineup } from './types';
 
 const isDev = !app.isPackaged;
 
+/** 앱을 얼마나 켜두는지 보려고 남겨둔 시각. before-quit에서 이걸로 세션 길이를 잰다. */
+const appLaunchedAt = Date.now();
+
 const DEV_SERVER = 'http://localhost:3000';
 
 /** 클라이언트가 꺼져 있을 때 다시 붙어보는 간격. */
@@ -73,6 +76,13 @@ const DOCK_WIDTH = 460;
 const MIN_DOCK_WIDTH = 320;
 
 /**
+ * 클라이언트 좌표가 이 안에서만 흔들리면 다시 붙이지 않는다. GetWindowRect가
+ * 픽셀 단위로 미세하게(1~2px) 흔들리는 순간이 있어서, 문자열 비교로만 걸러내면
+ * 그때마다 다시 붙어서 창이 계속 떨리듯 따라다니는 것처럼 보인다.
+ */
+const DOCK_JITTER_PX = 3;
+
+/**
  * 조회가 몇 번 연속 실패해야 "끝났다"로 볼지.
  * 인게임 API는 로딩 화면이나 순간적인 부하에서 응답을 거르는 일이 있어,
  * 한 번 실패했다고 화면을 비우면 아이템이 깜빡인다.
@@ -118,8 +128,8 @@ let overlayVisible = true;
 let recommendMode: 1 | 2 = 1;
 
 let unwatchClient: (() => void) | null = null;
-/** 마지막으로 붙여준 클라이언트 좌표. 같은 값이면 창을 건드리지 않는다. */
-let lastDockedTo = '';
+/** 마지막으로 실제로 옮겨 붙인 우리 창의 위치·크기. 흔들림 판단 기준이 된다. */
+let lastDockedBounds: { x: number; y: number; width: number; height: number } | null = null;
 /** 직전 dock 시도가 자리 부족이었는지. 계속 좁은 동안 이벤트를 반복하지 않는다. */
 let wasDockInsufficient = false;
 
@@ -442,10 +452,11 @@ function createMainWindow() {
 }
 
 /**
- * 롤 클라이언트 오른쪽에 메인 창을 붙인다.
- *
- * 클라이언트가 움직였을 때만 부른다. 매번 강제로 붙이면 사용자가 창을 옮겨도
- * 곧바로 되돌아가 버려서 직접 배치할 수가 없다.
+ * 롤 클라이언트 오른쪽에 메인 창을 붙인다. 폴링마다(0.5초) 불리지만,
+ * 실제로 자리가 바뀔 때만 setBounds를 호출한다 — 매번 강제로 다시 붙이면
+ * 사용자가 창을 옮겨도 곧바로 되돌아가 버려서 직접 배치할 수가 없고,
+ * GetWindowRect가 픽셀 단위로 미세하게 흔들리는 순간까지 그대로 반영하면
+ * 창이 계속 떨리듯 따라다니는 것처럼 보인다.
  */
 function dockToClient(rect: ClientWindowRect) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -479,21 +490,34 @@ function dockToClient(rect: ClientWindowRect) {
 
   const y = Math.max(area.y, Math.min(client.y, area.y + area.height - height));
 
-  mainWindow.setBounds({ x, y, width, height });
-  const insufficient = space < MIN_DOCK_WIDTH;
-  console.log(
-    `[dock] 클라이언트 DIP ${client.width}x${client.height}@${client.x},${client.y}` +
-      ` / 여백 좌${leftSpace} 우${rightSpace}` +
-      ` → ${useRight ? '오른쪽' : '왼쪽'} ${width}x${height}@${x},${y}` +
-      (insufficient ? ' (자리 부족 — 일부 겹침)' : ''),
-  );
-  // 자리 부족 상태가 새로 시작될 때만 보낸다. 창을 옮길 때마다 계속 좁으면
-  // dockToClient가 매번 불려도 한 번만 기록한다.
-  if (insufficient && !wasDockInsufficient) track('dock-space-insufficient');
-  wasDockInsufficient = insufficient;
+  // 우리 창이 실제로 옮겨질 계산 결과가 직전과 거의 같으면(흔들림) 그대로 둔다.
+  const moved =
+    !lastDockedBounds ||
+    Math.abs(x - lastDockedBounds.x) > DOCK_JITTER_PX ||
+    Math.abs(y - lastDockedBounds.y) > DOCK_JITTER_PX ||
+    Math.abs(width - lastDockedBounds.width) > DOCK_JITTER_PX ||
+    Math.abs(height - lastDockedBounds.height) > DOCK_JITTER_PX;
+
+  if (moved) {
+    mainWindow.setBounds({ x, y, width, height });
+    lastDockedBounds = { x, y, width, height };
+
+    const insufficient = space < MIN_DOCK_WIDTH;
+    console.log(
+      `[dock] 클라이언트 DIP ${client.width}x${client.height}@${client.x},${client.y}` +
+        ` / 여백 좌${leftSpace} 우${rightSpace}` +
+        ` → ${useRight ? '오른쪽' : '왼쪽'} ${width}x${height}@${x},${y}` +
+        (insufficient ? ' (자리 부족 — 일부 겹침)' : ''),
+    );
+    // 자리 부족 상태가 새로 시작될 때만 보낸다. 창을 옮길 때마다 계속 좁으면
+    // dockToClient가 매번 불려도 한 번만 기록한다.
+    if (insufficient && !wasDockInsufficient) track('dock-space-insufficient');
+    wasDockInsufficient = insufficient;
+  }
 
   // 클라이언트를 클릭하면 그 창이 위로 올라오면서 우리 창을 덮는다. 옆에 붙어
-  // 있으려면 같이 따라 올라와야 한다. 포커스는 뺏지 않는다.
+  // 있으려면 같이 따라 올라와야 한다. 포커스는 뺏지 않는다. 위치가 그대로여도
+  // z-order는 매번 다시 확인해야 클라이언트를 다시 눌렀을 때도 따라 올라온다.
   if (!mainWindow.isMinimized()) {
     mainWindow.showInactive();
     mainWindow.moveTop();
@@ -505,13 +529,10 @@ function startClientDock() {
   unwatchClient = watchClientWindow(
     (rect) => {
       if (!rect) {
-        // 클라이언트가 꺼졌다. 다시 켜지면 그때 한 번 붙인다.
-        lastDockedTo = '';
+        // 클라이언트가 꺼졌다. 다시 켜지면 그때 처음부터 다시 붙인다.
+        lastDockedBounds = null;
         return;
       }
-      const key = `${rect.x},${rect.y},${rect.width},${rect.height},${rect.minimized}`;
-      if (key === lastDockedTo) return;
-      lastDockedTo = key;
       dockToClient(rect);
     },
     () => track('window-watch-spawn-failed'),
@@ -721,6 +742,11 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  // 메인 창이 이미 닫혀 있으면(오버레이만 떠 있다 꺼지는 경우) 이 이벤트는
+  // 유실된다 — analytics.ts와 같은 이유로 재시도하지 않는다.
+  const minutes = Math.round((Date.now() - appLaunchedAt) / 60_000);
+  track('desktop-app-session', { minutes });
+
   stopAutoUpdate();
   unsubscribe?.();
   // 감시용 PowerShell 이 남으면 앱을 꺼도 프로세스가 계속 돈다.
