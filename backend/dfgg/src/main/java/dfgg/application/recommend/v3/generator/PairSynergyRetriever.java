@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  * <p>
  * 상대별 점수를 합쳐서 돌려주지 않는 것이 핵심이다. 5명을 하나의 window로 뭉치면
  * "누구 때문에 이 아이템이 좋은가"가 사라진다.
- * 집계는 {@link AllyScoreAggregate}가 하되 개별 점수를 함께 들고 있는다.
+ * 집계는 {@link PairScoreAggregate}가 하되 개별 점수를 함께 들고 있는다.
  * <p>
  * 함께한 판이 {@code minimumPairGames} 미만인 상대는 아예 제외한다. 한두 판 같이 한 조합에서
  * 나온 100% 구매율은 궁합이 아니라 우연이고, 그걸 점수로 올리면 표본이 얇을수록 강한 신호가 된다.
@@ -42,7 +42,7 @@ public class PairSynergyRetriever {
      * 아이템별로 "상대 챔피언 → 점수" 묶음을 만든다.
      * 반환된 map에 없는 아이템은 어떤 상대와도 유의미하게 관측되지 않았다는 뜻이다.
      */
-    public Map<Long, AllyScoreAggregate> scoresByItem(
+    public Map<Long, PairScoreAggregate> scoresByItem(
             long myChampionId, List<Long> otherChampionIds, PairRelation relation
     ) {
         Map<Long, Map<Long, Double>> scoreByItemAndOther = new HashMap<>();
@@ -55,9 +55,9 @@ public class PairSynergyRetriever {
                     .put(Long.valueOf(stats.getOtherChampionId()), score(stats));
         }
 
-        Map<Long, AllyScoreAggregate> aggregateByItem = new HashMap<>();
+        Map<Long, PairScoreAggregate> aggregateByItem = new HashMap<>();
         scoreByItemAndOther.forEach((itemId, scoreByOther) ->
-                aggregateByItem.put(itemId, AllyScoreAggregate.of(scoreByOther)));
+                aggregateByItem.put(itemId, PairScoreAggregate.of(scoreByOther)));
         return aggregateByItem;
     }
 

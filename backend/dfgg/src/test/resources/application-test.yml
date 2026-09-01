@@ -28,6 +28,9 @@ collection:
     enabled: false
 recommendation:
   recent-patch-window-size: 3
+  counter:
+    lift-smoothing-alpha: 1.0
+    item-vocabulary-size: 159
   pair-synergy:
     minimum-pair-games: 5
   self-synergy:

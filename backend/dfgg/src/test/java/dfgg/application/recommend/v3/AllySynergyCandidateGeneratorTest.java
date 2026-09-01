@@ -3,7 +3,7 @@ package dfgg.application.recommend.v3;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
-import dfgg.application.recommend.v3.generator.AllyScoreAggregate;
+import dfgg.application.recommend.v3.generator.PairScoreAggregate;
 import dfgg.application.recommend.v3.generator.AllySynergyCandidateGenerator;
 import dfgg.application.recommend.v3.generator.PairBackoffLevel;
 import dfgg.application.recommend.v3.generator.PairSynergyRetriever;
@@ -105,11 +105,11 @@ class AllySynergyCandidateGeneratorTest {
     @DisplayName("아군별 점수를 개별 보존한다 — 향로는 징크스 쪽 점수가 코그모 쪽보다 높다")
     void retrieve_WhenScoringPerAlly_KeepsEachAllyScoreSeparately() {
         // when
-        Map<Long, AllyScoreAggregate> byItem =
+        Map<Long, PairScoreAggregate> byItem =
                 retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW), PairRelation.ALLY);
 
         // then: 향로는 징크스와 8/10, 코그모와 1/10
-        AllyScoreAggregate incense = byItem.get(INCENSE);
+        PairScoreAggregate incense = byItem.get(INCENSE);
         assertThat(incense.scoreOf(JINX)).isGreaterThan(incense.scoreOf(KOGMAW));
     }
 

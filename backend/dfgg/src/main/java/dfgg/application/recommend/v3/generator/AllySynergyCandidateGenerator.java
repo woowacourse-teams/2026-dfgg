@@ -55,7 +55,7 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
 
     @Override
     public GeneratorResult generate(RecommendationQuery query, int topK) {
-        Map<Long, AllyScoreAggregate> scoresByItem = pairSynergyRetriever.scoresByItem(
+        Map<Long, PairScoreAggregate> scoresByItem = pairSynergyRetriever.scoresByItem(
                 query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY);
 
         if (!scoresByItem.isEmpty()) {
