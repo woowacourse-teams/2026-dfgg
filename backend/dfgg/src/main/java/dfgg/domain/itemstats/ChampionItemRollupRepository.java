@@ -11,6 +11,8 @@ public interface ChampionItemRollupRepository extends JpaRepository<ChampionItem
 
     Optional<ChampionItemRollup> findByChampionIdAndItemId(Integer championId, Long itemId);
 
+    java.util.List<ChampionItemRollup> findByChampionId(Integer championId);
+
     /**
      * {@link ChampionItemStatsRepository#aggregateFrom}과 같은 집계를 포지션 없이 수행한다.
      * 포지션별 통계를 합산하는 게 아니라 원본에서 다시 센다 — 합산으로 만들면 게임 수 분모가

@@ -28,5 +28,7 @@ collection:
     enabled: false
 recommendation:
   recent-patch-window-size: 3
+  self-synergy:
+    minimum-position-sample: 10
   candidate-top-k:
     build: 50

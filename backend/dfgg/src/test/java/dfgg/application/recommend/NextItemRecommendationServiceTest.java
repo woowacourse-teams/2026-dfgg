@@ -20,6 +20,7 @@ import dfgg.application.recommend.v3.ranker.CandidateRanker;
 import dfgg.common.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.item.Item;
+import dfgg.domain.item.ItemExclusionGroups;
 import dfgg.presentation.dto.ChampionDto;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
@@ -57,7 +58,7 @@ class NextItemRecommendationServiceTest {
 
         service = new NextItemRecommendationService(
                 championService, itemService, List.of(buildGenerator),
-                new HardValidityFilter(), candidateRanker, 50
+                new HardValidityFilter(new ItemExclusionGroups()), candidateRanker, 50
         );
     }
 

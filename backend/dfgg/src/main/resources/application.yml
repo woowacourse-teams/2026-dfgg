@@ -32,6 +32,8 @@ mining:
 
 recommendation:
   recent-patch-window-size: "${RECOMMENDATION_RECENT_PATCH_WINDOW_SIZE:3}"
+  self-synergy:
+    minimum-position-sample: "${RECOMMENDATION_SELF_SYNERGY_MIN_POSITION_SAMPLE:10}"
   candidate-top-k:
     build: "${RECOMMENDATION_CANDIDATE_TOP_K_BUILD:50}"
   identity-algorithm-version: "${RECOMMENDATION_IDENTITY_ALGORITHM_VERSION:checkpoint-a-4}"

@@ -5,6 +5,7 @@ import static dfgg.application.recommend.v3.CandidateSource.COUNTER;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.domain.item.Item;
+import dfgg.domain.item.ItemExclusionGroups;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -17,15 +18,19 @@ class HardValidityFilterTest {
     private static final long PLATED_STEELCAPS = 3047L;
     private static final long INFINITY_EDGE = 3031L;
     private static final long LIANDRY = 6653L;
+    private static final long BLACK_CLEAVER = 3071L;
+    private static final long SERYLDAS_GRUDGE = 6694L;
     private static final long UNKNOWN_ITEM = 99999L;
 
-    private final HardValidityFilter filter = new HardValidityFilter();
+    private final HardValidityFilter filter = new HardValidityFilter(new ItemExclusionGroups());
 
     private final Map<Long, Item> itemById = Map.of(
             BERSERKERS_GREAVES, new Item(BERSERKERS_GREAVES, "광전사의 군화", List.of("Boots")),
             PLATED_STEELCAPS, new Item(PLATED_STEELCAPS, "판금 장화", List.of("Boots")),
             INFINITY_EDGE, new Item(INFINITY_EDGE, "무한의 대검", List.of("Damage", "CriticalStrike")),
-            LIANDRY, new Item(LIANDRY, "리안드리의 고통", List.of("SpellDamage", "Health"))
+            LIANDRY, new Item(LIANDRY, "리안드리의 고통", List.of("SpellDamage", "Health")),
+            BLACK_CLEAVER, new Item(BLACK_CLEAVER, "칠흑의 양날도끼", List.of("Damage", "ArmorPenetration")),
+            SERYLDAS_GRUDGE, new Item(SERYLDAS_GRUDGE, "셰릴다의 원한", List.of("Damage", "ArmorPenetration"))
     ).entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
     private CandidateUnion unionOf(long... itemIds) {
@@ -76,6 +81,32 @@ class HardValidityFilterTest {
 
         // then
         assertThat(itemIdsOf(filtered)).containsExactlyInAnyOrder(BERSERKERS_GREAVES, INFINITY_EDGE);
+    }
+
+    @Test
+    @DisplayName("이미 산 아이템과 상호배타인 아이템도 제거한다 — 칠흑을 들고 있으면 셰릴다를 못 산다")
+    void filter_WhenCandidateIsExclusiveWithOwnedItem_RemovesIt() {
+        // given
+        CandidateUnion union = unionOf(SERYLDAS_GRUDGE, INFINITY_EDGE);
+
+        // when
+        CandidateUnion filtered = filter.filter(union, List.of(BLACK_CLEAVER), itemById);
+
+        // then
+        assertThat(itemIdsOf(filtered)).containsExactly(INFINITY_EDGE);
+    }
+
+    @Test
+    @DisplayName("배타 관계가 아니면 남긴다")
+    void filter_WhenCandidateIsNotExclusiveWithOwnedItem_KeepsIt() {
+        // given
+        CandidateUnion union = unionOf(SERYLDAS_GRUDGE);
+
+        // when: 무한의 대검은 셰릴다와 배타 관계가 아니다
+        CandidateUnion filtered = filter.filter(union, List.of(INFINITY_EDGE), itemById);
+
+        // then
+        assertThat(itemIdsOf(filtered)).containsExactly(SERYLDAS_GRUDGE);
     }
 
     @Test
