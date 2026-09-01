@@ -46,6 +46,7 @@ public class MultiBuildRecommendationService {
     private static final int RANKED_SOLO_QUEUE_ID = 420;
     private static final String BOOTS_TAG = "Boots";
     private static final List<String> RECOMMENDATION_TIERS = List.of(
+            "PLATINUM",
             "EMERALD",
             "DIAMOND",
             "MASTER",

@@ -44,7 +44,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MultiBuildRecommendationServiceTest {
 
     private static final List<String> RECOMMENDATION_TIERS = List.of(
-            "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"
+            "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"
     );
 
     @Mock
