@@ -45,14 +45,6 @@ public class MultiBuildRecommendationService {
     private static final int BOTTOM_BUILD_ITEM_COUNT = 7;
     private static final int RANKED_SOLO_QUEUE_ID = 420;
     private static final String BOOTS_TAG = "Boots";
-    private static final List<String> RECOMMENDATION_TIERS = List.of(
-            "PLATINUM",
-            "EMERALD",
-            "DIAMOND",
-            "MASTER",
-            "GRANDMASTER",
-            "CHALLENGER"
-    );
 
     private final ChampionService championService;
     private final ChampionBuildStatsRepository statsRepository;
@@ -170,7 +162,7 @@ public class MultiBuildRecommendationService {
                         version[0],
                         version[1],
                         RANKED_SOLO_QUEUE_ID,
-                        RECOMMENDATION_TIERS
+                        recommendationProperties.v2Tiers()
                 )
                 .map(patch -> findMatchingStatsForPatch(
                         patch,
@@ -190,7 +182,7 @@ public class MultiBuildRecommendationService {
         return statsRepository.findAllMatchingStatsForScope(
                 patch,
                 RANKED_SOLO_QUEUE_ID,
-                RECOMMENDATION_TIERS,
+                recommendationProperties.v2Tiers(),
                 champion.getChampionId(),
                 position.name(),
                 context.enemyTankHeavy(),

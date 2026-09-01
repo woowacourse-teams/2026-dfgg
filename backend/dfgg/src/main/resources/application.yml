@@ -40,6 +40,7 @@ recommendation:
   ally-weight: "${RECOMMENDATION_ALLY_WEIGHT:1.0}"
   enemy-weight: "${RECOMMENDATION_ENEMY_WEIGHT:1.0}"
   v2-min-sample-count: "${RECOMMENDATION_V2_MIN_SAMPLE_COUNT:30}"
+  v2-tiers: "${RECOMMENDATION_V2_TIERS:PLATINUM,EMERALD,DIAMOND,MASTER,GRANDMASTER,CHALLENGER}"
 
 collection:
   scheduler:

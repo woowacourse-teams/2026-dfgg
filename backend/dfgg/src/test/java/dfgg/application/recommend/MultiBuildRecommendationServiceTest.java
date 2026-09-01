@@ -544,7 +544,8 @@ class MultiBuildRecommendationServiceTest {
                 1.0,
                 1.0,
                 1.0,
-                v2MinSampleCount
+                v2MinSampleCount,
+                RECOMMENDATION_TIERS
         );
     }
 
