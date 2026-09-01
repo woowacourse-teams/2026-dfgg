@@ -112,9 +112,42 @@ class RiotMatchControllerTest {
     }
 
     @Test
-    void 잘못된_티어의_빌드_통계_재생성을_거부한다() throws Exception {
+    void Master_티어의_빌드_통계를_재생성한다() throws Exception {
         mockMvc.perform(post("/admin/riot/matches/stats")
                         .param("tier", "MASTER"))
+                .andExpect(status().isNoContent());
+
+        InOrder order = inOrder(collectionOrchestrator, statsRebuildService);
+        order.verify(collectionOrchestrator).normalizeAndAggregatePendingMatches("MASTER");
+        order.verify(statsRebuildService).rebuildAll("MASTER");
+    }
+
+    @Test
+    void Grandmaster_티어의_빌드_통계를_재생성한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches/stats")
+                        .param("tier", "GRANDMASTER"))
+                .andExpect(status().isNoContent());
+
+        InOrder order = inOrder(collectionOrchestrator, statsRebuildService);
+        order.verify(collectionOrchestrator).normalizeAndAggregatePendingMatches("GRANDMASTER");
+        order.verify(statsRebuildService).rebuildAll("GRANDMASTER");
+    }
+
+    @Test
+    void Challenger_티어의_빌드_통계를_재생성한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches/stats")
+                        .param("tier", "CHALLENGER"))
+                .andExpect(status().isNoContent());
+
+        InOrder order = inOrder(collectionOrchestrator, statsRebuildService);
+        order.verify(collectionOrchestrator).normalizeAndAggregatePendingMatches("CHALLENGER");
+        order.verify(statsRebuildService).rebuildAll("CHALLENGER");
+    }
+
+    @Test
+    void 지원하지_않는_티어의_빌드_통계_재생성을_거부한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches/stats")
+                        .param("tier", "MYTHIC"))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(collectionOrchestrator, statsRebuildService);
@@ -127,6 +160,16 @@ class RiotMatchControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(statsRebuildService).replayOne("KR_1", "PLATINUM");
+        verifyNoInteractions(collectionOrchestrator);
+    }
+
+    @Test
+    void Master_매치의_통계를_재집계한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches/KR_MASTER/stats/replay")
+                        .param("tier", "MASTER"))
+                .andExpect(status().isNoContent());
+
+        verify(statsRebuildService).replayOne("KR_MASTER", "MASTER");
         verifyNoInteractions(collectionOrchestrator);
     }
 }

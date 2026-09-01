@@ -53,4 +53,46 @@ class RiotPlayerControllerTest {
                 3
         );
     }
+
+    @Test
+    void Master_리그를_수동으로_동기화한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/players")
+                        .param("tier", "MASTER"))
+                .andExpect(status().isNoContent());
+
+        verify(riotPlayerSyncService).syncLeagueEntries(
+                "RANKED_SOLO_5x5",
+                "MASTER",
+                "I",
+                1
+        );
+    }
+
+    @Test
+    void Grandmaster_리그를_수동으로_동기화한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/players")
+                        .param("tier", "GRANDMASTER"))
+                .andExpect(status().isNoContent());
+
+        verify(riotPlayerSyncService).syncLeagueEntries(
+                "RANKED_SOLO_5x5",
+                "GRANDMASTER",
+                "I",
+                1
+        );
+    }
+
+    @Test
+    void Challenger_리그를_수동으로_동기화한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/players")
+                        .param("tier", "CHALLENGER"))
+                .andExpect(status().isNoContent());
+
+        verify(riotPlayerSyncService).syncLeagueEntries(
+                "RANKED_SOLO_5x5",
+                "CHALLENGER",
+                "I",
+                1
+        );
+    }
 }

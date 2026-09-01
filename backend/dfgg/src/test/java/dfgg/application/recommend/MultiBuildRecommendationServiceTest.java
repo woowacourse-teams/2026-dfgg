@@ -24,12 +24,15 @@ import dfgg.domain.recommendation.SupportBuildPolicy;
 import dfgg.domain.recommendation.TankBuildPolicy;
 import dfgg.domain.stats.ChampionBuildStats;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
+import dfgg.infrastructure.config.RecommendationProperties;
+import dfgg.infrastructure.external.client.DataDragonClient;
 import dfgg.presentation.dto.ChampionDto;
 import dfgg.presentation.dto.request.RecommendationRequest;
 import dfgg.presentation.dto.response.BuildOptionResponse;
 import dfgg.presentation.dto.response.MultiBuildRecommendationResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,11 +43,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class MultiBuildRecommendationServiceTest {
 
+    private static final List<String> RECOMMENDATION_TIERS = List.of(
+            "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"
+    );
+
     @Mock
     private ChampionService championService;
 
     @Mock
     private ChampionBuildStatsRepository statsRepository;
+
+    @Mock
+    private DataDragonClient dataDragonClient;
 
     private MultiBuildRecommendationService recommendationService;
     private Champion myChampion;
@@ -54,6 +64,8 @@ class MultiBuildRecommendationServiceTest {
         recommendationService = new MultiBuildRecommendationService(
                 championService,
                 statsRepository,
+                dataDragonClient,
+                recommendationProperties(1),
                 new CoreBuildClusterService(),
                 new BuildCandidateSelectService(),
                 buildPolicies()
@@ -276,6 +288,8 @@ class MultiBuildRecommendationServiceTest {
         recommendationService = new MultiBuildRecommendationService(
                 championService,
                 statsRepository,
+                dataDragonClient,
+                recommendationProperties(1),
                 clusterService,
                 new BuildCandidateSelectService(),
                 List.of(tankPolicy, magePolicy, fighterPolicy)
@@ -402,6 +416,80 @@ class MultiBuildRecommendationServiceTest {
                 });
     }
 
+    @Test
+    @DisplayName("최신 패치의 표본 수가 기준 이상이면 최신 패치 통계를 사용한다")
+    void recommend_WhenLatestPatchHasEnoughSamples_UsesLatestPatchStats() {
+        recommendationService = new MultiBuildRecommendationService(
+                championService,
+                statsRepository,
+                dataDragonClient,
+                recommendationProperties(30),
+                new CoreBuildClusterService(),
+                new BuildCandidateSelectService(),
+                buildPolicies()
+        );
+        RecommendationRequest request = prepareRequest(ChampionPosition.TOP);
+        ChampionBuildStats latestStats = stats(
+                ChampionPosition.TOP,
+                "LATEST",
+                completeItems(6),
+                30
+        );
+        givenMatchingStats(ChampionPosition.TOP, List.of(latestStats));
+
+        MultiBuildRecommendationResponse response = recommendationService.recommend(request);
+
+        assertThat(response.builds().getFirst().build()).hasSize(6);
+        verify(statsRepository, never()).findLatestPatchBefore(
+                16,
+                17,
+                420,
+                RECOMMENDATION_TIERS
+        );
+    }
+
+    @Test
+    @DisplayName("최신 패치의 표본 수가 기준 미만이면 직전 패치 통계를 사용한다")
+    void recommend_WhenLatestPatchHasInsufficientSamples_UsesPreviousPatchStats() {
+        recommendationService = new MultiBuildRecommendationService(
+                championService,
+                statsRepository,
+                dataDragonClient,
+                recommendationProperties(30),
+                new CoreBuildClusterService(),
+                new BuildCandidateSelectService(),
+                buildPolicies()
+        );
+        RecommendationRequest request = prepareRequest(ChampionPosition.TOP);
+        ChampionBuildStats latestStats = stats(
+                ChampionPosition.TOP,
+                "LATEST",
+                completeItems(6),
+                29
+        );
+        ChampionBuildStats previousStats = stats(
+                ChampionPosition.TOP,
+                "PREVIOUS",
+                completeItems(6, 101L),
+                40
+        );
+        given(dataDragonClient.getLatestVersion()).willReturn("16.17");
+        givenMatchingStats("16.17", ChampionPosition.TOP, List.of(latestStats));
+        given(statsRepository.findLatestPatchBefore(
+                16,
+                17,
+                420,
+                RECOMMENDATION_TIERS
+        )).willReturn(Optional.of("16.16"));
+        givenMatchingStats("16.16", ChampionPosition.TOP, List.of(previousStats));
+
+        MultiBuildRecommendationResponse response = recommendationService.recommend(request);
+
+        assertThat(response.builds().getFirst().build())
+                .extracting(item -> item.id())
+                .containsExactly(101L, 102L, 103L, 104L, 105L, 106L);
+    }
+
     private RecommendationRequest prepareRequest(ChampionPosition position) {
         Champion ally = champion(2L, "아군", ChampionTag.MARKSMAN);
         Champion enemy = champion(3L, "적군", ChampionTag.FIGHTER);
@@ -420,7 +508,19 @@ class MultiBuildRecommendationServiceTest {
             ChampionPosition position,
             List<ChampionBuildStats> stats
     ) {
-        given(statsRepository.findAllMatchingStats(
+        given(dataDragonClient.getLatestVersion()).willReturn("16.17");
+        givenMatchingStats("16.17", position, stats);
+    }
+
+    private void givenMatchingStats(
+            String patch,
+            ChampionPosition position,
+            List<ChampionBuildStats> stats
+    ) {
+        given(statsRepository.findAllMatchingStatsForScope(
+                eq(patch),
+                eq(420),
+                eq(RECOMMENDATION_TIERS),
                 eq(1L),
                 eq(position.name()),
                 anyBoolean(),
@@ -429,6 +529,24 @@ class MultiBuildRecommendationServiceTest {
                 anyBoolean(),
                 anyBoolean()
         )).willReturn(stats);
+    }
+
+    private RecommendationProperties recommendationProperties(int v2MinSampleCount) {
+        return new RecommendationProperties(
+                "checkpoint-a-4",
+                "checkpoint-c-1-counter",
+                "checkpoint-d-1",
+                2,
+                10,
+                5,
+                0.8,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                v2MinSampleCount,
+                RECOMMENDATION_TIERS
+        );
     }
 
     private ChampionBuildStats stats(

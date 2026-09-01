@@ -10,8 +10,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import dfgg.infrastructure.external.config.RiotApiProperties;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
-import dfgg.infrastructure.external.dto.MatchResponse;
-import dfgg.infrastructure.external.dto.MatchTimelineResponse;
+import dfgg.infrastructure.external.dto.LeagueListResponse;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -114,6 +113,171 @@ class RiotClientTest {
     }
 
     @Test
+    void Master_리그를_조회한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/masterleagues/by-queue/RANKED_SOLO_5x5"))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
+                .andRespond(withSuccess("""
+                        {
+                          "tier": "MASTER",
+                          "queue": "RANKED_SOLO_5x5",
+                          "entries": [
+                            {
+                              "puuid": "master-puuid",
+                              "leaguePoints": 1399,
+                              "rank": "I",
+                              "wins": 242,
+                              "losses": 183,
+                              "veteran": false,
+                              "inactive": false,
+                              "freshBlood": false,
+                              "hotStreak": false
+                            }
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        LeagueListResponse league = client.getMasterLeague("RANKED_SOLO_5x5");
+
+        assertThat(league.tier()).isEqualTo("MASTER");
+        assertThat(league.queue()).isEqualTo("RANKED_SOLO_5x5");
+        assertThat(league.entries()).containsExactly(new LeagueEntryResponse(
+                "master-puuid",
+                null,
+                null,
+                "I",
+                1399,
+                242,
+                183
+        ));
+        server.verify();
+    }
+
+    @Test
+    void Master_리그_응답_본문이_없으면_예외가_발생한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/masterleagues/by-queue/RANKED_SOLO_5x5"))
+                .andRespond(withNoContent());
+
+        assertThatThrownBy(() -> client.getMasterLeague("RANKED_SOLO_5x5"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Riot Master league response is empty");
+
+        server.verify();
+    }
+
+    @Test
+    void Grandmaster_리그를_조회한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/grandmasterleagues/by-queue/RANKED_SOLO_5x5"))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
+                .andRespond(withSuccess("""
+                        {
+                          "tier": "GRANDMASTER",
+                          "queue": "RANKED_SOLO_5x5",
+                          "entries": [
+                            {
+                              "puuid": "grandmaster-puuid",
+                              "leaguePoints": 821,
+                              "rank": "I",
+                              "wins": 190,
+                              "losses": 151,
+                              "veteran": true,
+                              "inactive": false,
+                              "freshBlood": false,
+                              "hotStreak": true
+                            }
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        LeagueListResponse league = client.getGrandmasterLeague("RANKED_SOLO_5x5");
+
+        assertThat(league.tier()).isEqualTo("GRANDMASTER");
+        assertThat(league.queue()).isEqualTo("RANKED_SOLO_5x5");
+        assertThat(league.entries()).containsExactly(new LeagueEntryResponse(
+                "grandmaster-puuid",
+                null,
+                null,
+                "I",
+                821,
+                190,
+                151
+        ));
+        server.verify();
+    }
+
+    @Test
+    void Grandmaster_리그_응답_본문이_없으면_예외가_발생한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/grandmasterleagues/by-queue/RANKED_SOLO_5x5"))
+                .andRespond(withNoContent());
+
+        assertThatThrownBy(() -> client.getGrandmasterLeague("RANKED_SOLO_5x5"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Riot Grandmaster league response is empty");
+
+        server.verify();
+    }
+
+    @Test
+    void Challenger_리그를_조회한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5"))
+                .andExpect(header("X-Riot-Token", API_KEY))
+                .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
+                .andRespond(withSuccess("""
+                        {
+                          "tier": "CHALLENGER",
+                          "queue": "RANKED_SOLO_5x5",
+                          "entries": [
+                            {
+                              "puuid": "challenger-puuid",
+                              "leaguePoints": 1604,
+                              "rank": "I",
+                              "wins": 271,
+                              "losses": 211,
+                              "veteran": true,
+                              "inactive": false,
+                              "freshBlood": false,
+                              "hotStreak": true
+                            }
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        LeagueListResponse league = client.getChallengerLeague("RANKED_SOLO_5x5");
+
+        assertThat(league.tier()).isEqualTo("CHALLENGER");
+        assertThat(league.queue()).isEqualTo("RANKED_SOLO_5x5");
+        assertThat(league.entries()).containsExactly(new LeagueEntryResponse(
+                "challenger-puuid",
+                null,
+                null,
+                "I",
+                1604,
+                271,
+                211
+        ));
+        server.verify();
+    }
+
+    @Test
+    void Challenger_리그_응답_본문이_없으면_예외가_발생한다() {
+        server.expect(requestTo(PLATFORM_BASE_URL
+                        + "/lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5"))
+                .andRespond(withNoContent());
+
+        assertThatThrownBy(() -> client.getChallengerLeague("RANKED_SOLO_5x5"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Riot Challenger league response is empty");
+
+        server.verify();
+    }
+
+    @Test
     void 매치_ID_호출이_제한되면_Retry_After_이후에_재시도한다() {
         String requestUrl = REGIONAL_BASE_URL
                 + "/lol/match/v5/matches/by-puuid/encrypted-puuid/ids?queue=420&start=0&count=20";
@@ -164,138 +328,6 @@ class RiotClientTest {
         assertThatThrownBy(() -> client.getMatchIds("encrypted-puuid", 0, 101))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("count must be between 0 and 100");
-    }
-
-    @Test
-    void 매치_ID로_매치_상세를_조회한다() {
-        server.expect(requestTo(REGIONAL_BASE_URL + "/lol/match/v5/matches/KR_1234567890"))
-                .andExpect(header("X-Riot-Token", API_KEY))
-                .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
-                .andRespond(withSuccess("""
-                        {
-                          "metadata": {
-                            "dataVersion": "2",
-                            "matchId": "KR_1234567890",
-                            "participants": ["blue-puuid"]
-                          },
-                          "info": {
-                            "gameDuration": 1832,
-                            "participants": [
-                              {
-                                "puuid": "blue-puuid",
-                                "participantId": 1,
-                                "championId": 266,
-                                "championName": "Aatrox",
-                                "teamId": 100,
-                                "teamPosition": "TOP",
-                                "kills": 8,
-                                "item0": 3071,
-                                "item1": 6610,
-                                "item2": 3053,
-                                "item3": 3111,
-                                "item4": 6333,
-                                "item5": 0,
-                                "item6": 3364,
-                                "roleBoundItem": 3006,
-                                "win": true
-                              }
-                            ],
-                            "queueId": 420
-                          }
-                        }
-                        """, MediaType.APPLICATION_JSON));
-
-        MatchResponse match = client.getMatch("KR_1234567890");
-
-        assertThat(match.info().participants()).singleElement().satisfies(participant -> {
-            assertThat(participant.puuid()).isEqualTo("blue-puuid");
-            assertThat(participant.participantId()).isEqualTo(1);
-            assertThat(participant.championId()).isEqualTo(266);
-            assertThat(participant.teamId()).isEqualTo(100);
-            assertThat(participant.teamPosition()).isEqualTo("TOP");
-            assertThat(participant.item0()).isEqualTo(3071);
-            assertThat(participant.roleBoundItem()).isEqualTo(3006);
-            assertThat(participant.win()).isTrue();
-        });
-        assertThat(match.info().gameVersion()).isNull();
-        assertThat(match.info().queueId()).isEqualTo(420);
-        server.verify();
-    }
-
-    @Test
-    void 매치_Timeline을_파싱한다() {
-        server.expect(requestTo(
-                        REGIONAL_BASE_URL + "/lol/match/v5/matches/KR_1234567890/timeline"))
-                .andRespond(withSuccess("""
-                        {
-                          "metadata": {
-                            "dataVersion": "2",
-                            "matchId": "KR_1234567890",
-                            "participants": ["blue-puuid", "red-puuid"]
-                          },
-                          "info": {
-                            "frameInterval": 60000,
-                            "frames": [
-                              {
-                                "events": [
-                                  {
-                                    "timestamp": 1234,
-                                    "type": "ITEM_PURCHASED",
-                                    "participantId": 1,
-                                    "itemId": 3071
-                                  },
-                                  {
-                                    "timestamp": 2345,
-                                    "type": "ITEM_SOLD",
-                                    "participantId": 1,
-                                    "itemId": 1036
-                                  },
-                                  {
-                                    "timestamp": 3456,
-                                    "type": "ITEM_UNDO",
-                                    "participantId": 1,
-                                    "beforeId": 3071,
-                                    "afterId": 0
-                                  }
-                                ]
-                              }
-                            ]
-                          }
-                        }
-                        """, MediaType.APPLICATION_JSON));
-
-        MatchTimelineResponse timeline = client.getMatchTimeline("KR_1234567890");
-
-        assertThat(timeline.metadata().participants())
-                .containsExactly("blue-puuid", "red-puuid");
-        assertThat(timeline.puuidForParticipantId(1)).contains("blue-puuid");
-        assertThat(timeline.puuidForParticipantId(3)).isEmpty();
-        assertThat(timeline.info().frameInterval()).isEqualTo(60000L);
-        List<MatchTimelineResponse.Event> parsedEvents = timeline.info().frames().get(0).events();
-        assertThat(parsedEvents).hasSize(3);
-        assertThat(parsedEvents.get(0).itemId()).isEqualTo(3071);
-        assertThat(parsedEvents.get(2).beforeId()).isEqualTo(3071);
-        assertThat(parsedEvents.get(2).afterId()).isEqualTo(0);
-        server.verify();
-    }
-
-    @Test
-    void 매치_상세_응답_본문이_없으면_예외가_발생한다() {
-        server.expect(requestTo(REGIONAL_BASE_URL + "/lol/match/v5/matches/KR_1234567890"))
-                .andRespond(withNoContent());
-
-        assertThatThrownBy(() -> client.getMatch("KR_1234567890"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("[Error] Riot Match response is empty");
-
-        server.verify();
-    }
-
-    @Test
-    void 매치_ID는_비어_있을_수_없다() {
-        assertThatThrownBy(() -> client.getMatch(" "))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("matchId must not be blank");
     }
 
     @Test

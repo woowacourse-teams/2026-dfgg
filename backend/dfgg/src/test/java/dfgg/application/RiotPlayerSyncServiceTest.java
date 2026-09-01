@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -15,6 +17,7 @@ import dfgg.domain.player.Player;
 import dfgg.domain.player.PlayerRepository;
 import dfgg.infrastructure.external.client.RiotClient;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
+import dfgg.infrastructure.external.dto.LeagueListResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +74,111 @@ class RiotPlayerSyncServiceTest {
         });
         assertThat(result.newPlayers()).isEqualTo(1);
         assertThat(result.puuids()).containsExactly("puuid-1");
+    }
+
+    @Test
+    void Master_리그의_wrapper_정보로_플레이어를_저장한다() {
+        LeagueEntryResponse entry = new LeagueEntryResponse(
+                "master-puuid",
+                null,
+                null,
+                "I",
+                1399,
+                242,
+                183
+        );
+        when(riotClient.getMasterLeague("RANKED_SOLO_5x5"))
+                .thenReturn(new LeagueListResponse(
+                        "MASTER",
+                        "RANKED_SOLO_5x5",
+                        List.of(entry)
+                ));
+        when(playerRepository.findById("master-puuid")).thenReturn(Optional.empty());
+
+        RiotPlayerSyncService.SyncResult result = riotPlayerSyncService.syncLeagueEntries(
+                "RANKED_SOLO_5x5", "MASTER", "IV", 7
+        );
+
+        ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepository).save(playerCaptor.capture());
+        assertThat(playerCaptor.getValue()).satisfies(player -> {
+            assertThat(player.getPuuid()).isEqualTo("master-puuid");
+            assertThat(player.getTier()).isEqualTo("MASTER");
+            assertThat(player.getDivision()).isEqualTo("I");
+        });
+        assertThat(result.puuids()).containsExactly("master-puuid");
+        verify(riotClient, never()).getLeagueEntries(any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void Grandmaster_리그의_wrapper_정보로_플레이어를_저장한다() {
+        LeagueEntryResponse entry = new LeagueEntryResponse(
+                "grandmaster-puuid",
+                null,
+                null,
+                "I",
+                821,
+                190,
+                151
+        );
+        when(riotClient.getGrandmasterLeague("RANKED_SOLO_5x5"))
+                .thenReturn(new LeagueListResponse(
+                        "GRANDMASTER",
+                        "RANKED_SOLO_5x5",
+                        List.of(entry)
+                ));
+        when(playerRepository.findById("grandmaster-puuid")).thenReturn(Optional.empty());
+
+        RiotPlayerSyncService.SyncResult result = riotPlayerSyncService.syncLeagueEntries(
+                "RANKED_SOLO_5x5", "GRANDMASTER", "IV", 7
+        );
+
+        ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepository).save(playerCaptor.capture());
+        assertThat(playerCaptor.getValue()).satisfies(player -> {
+            assertThat(player.getPuuid()).isEqualTo("grandmaster-puuid");
+            assertThat(player.getTier()).isEqualTo("GRANDMASTER");
+            assertThat(player.getDivision()).isEqualTo("I");
+        });
+        assertThat(result.puuids()).containsExactly("grandmaster-puuid");
+        verify(riotClient, never()).getLeagueEntries(any(), any(), any(), anyInt());
+        verify(riotClient, never()).getMasterLeague(any());
+    }
+
+    @Test
+    void Challenger_리그의_wrapper_정보로_플레이어를_저장한다() {
+        LeagueEntryResponse entry = new LeagueEntryResponse(
+                "challenger-puuid",
+                null,
+                null,
+                "I",
+                1604,
+                271,
+                211
+        );
+        when(riotClient.getChallengerLeague("RANKED_SOLO_5x5"))
+                .thenReturn(new LeagueListResponse(
+                        "CHALLENGER",
+                        "RANKED_SOLO_5x5",
+                        List.of(entry)
+                ));
+        when(playerRepository.findById("challenger-puuid")).thenReturn(Optional.empty());
+
+        RiotPlayerSyncService.SyncResult result = riotPlayerSyncService.syncLeagueEntries(
+                "RANKED_SOLO_5x5", "CHALLENGER", "IV", 7
+        );
+
+        ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepository).save(playerCaptor.capture());
+        assertThat(playerCaptor.getValue()).satisfies(player -> {
+            assertThat(player.getPuuid()).isEqualTo("challenger-puuid");
+            assertThat(player.getTier()).isEqualTo("CHALLENGER");
+            assertThat(player.getDivision()).isEqualTo("I");
+        });
+        assertThat(result.puuids()).containsExactly("challenger-puuid");
+        verify(riotClient, never()).getLeagueEntries(any(), any(), any(), anyInt());
+        verify(riotClient, never()).getMasterLeague(any());
+        verify(riotClient, never()).getGrandmasterLeague(any());
     }
 
     @Test

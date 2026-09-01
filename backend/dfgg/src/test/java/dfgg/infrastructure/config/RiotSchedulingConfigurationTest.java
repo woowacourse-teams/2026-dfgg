@@ -67,7 +67,7 @@ class RiotSchedulingConfigurationTest {
                         "collection.scheduler.enabled=true",
                         "collection.scheduler.cron=0 30 4 * * *",
                         "collection.scheduler.zone=UTC",
-                        "collection.scheduler.tiers=PLATINUM,EMERALD",
+                        "collection.scheduler.tiers=EMERALD",
                         "collection.scheduler.divisions=I,II",
                         "collection.scheduler.player-limit=3",
                         "collection.scheduler.match-count=50",
@@ -78,11 +78,44 @@ class RiotSchedulingConfigurationTest {
                     assertThat(properties.isEnabled()).isTrue();
                     assertThat(properties.getCron()).isEqualTo("0 30 4 * * *");
                     assertThat(properties.getZone()).isEqualTo("UTC");
-                    assertThat(properties.getTiers()).containsExactly("PLATINUM", "EMERALD");
+                    assertThat(properties.getTiers()).containsExactly("EMERALD");
                     assertThat(properties.getDivisions()).containsExactly("I", "II");
                     assertThat(properties.getPlayerLimit()).isEqualTo(3);
                     assertThat(properties.getMatchCount()).isEqualTo(50);
                     assertThat(properties.isRecoverMissingTimelines()).isTrue();
+                });
+    }
+
+    @Test
+    void Master_티어를_수집_설정으로_bind한다() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(PropertiesConfiguration.class)
+                .withPropertyValues("collection.scheduler.tiers=MASTER")
+                .run(context -> {
+                    RiotSchedulerProperties properties = context.getBean(RiotSchedulerProperties.class);
+                    assertThat(properties.getTiers()).containsExactly("MASTER");
+                });
+    }
+
+    @Test
+    void Grandmaster_티어를_수집_설정으로_bind한다() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(PropertiesConfiguration.class)
+                .withPropertyValues("collection.scheduler.tiers=GRANDMASTER")
+                .run(context -> {
+                    RiotSchedulerProperties properties = context.getBean(RiotSchedulerProperties.class);
+                    assertThat(properties.getTiers()).containsExactly("GRANDMASTER");
+                });
+    }
+
+    @Test
+    void Challenger_티어를_수집_설정으로_bind한다() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(PropertiesConfiguration.class)
+                .withPropertyValues("collection.scheduler.tiers=CHALLENGER")
+                .run(context -> {
+                    RiotSchedulerProperties properties = context.getBean(RiotSchedulerProperties.class);
+                    assertThat(properties.getTiers()).containsExactly("CHALLENGER");
                 });
     }
 

@@ -38,7 +38,8 @@ class PrimaryRecommendationStrategyTest {
 
     private static final RecommendationProperties PROPERTIES = new RecommendationProperties(
             "checkpoint-a-4", "checkpoint-c-1-counter", "checkpoint-d-1", 2,
-            10, 5, 0.8, 1.0, 1.0, 1.0, 1.0
+            10, 5, 0.8, 1.0, 1.0, 1.0, 1.0, 30,
+            List.of("PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER")
     );
 
     @BeforeEach

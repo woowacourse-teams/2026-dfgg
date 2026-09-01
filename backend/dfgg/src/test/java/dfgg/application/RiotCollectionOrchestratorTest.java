@@ -129,6 +129,110 @@ class RiotCollectionOrchestratorTest {
     }
 
     @Test
+    void Master_리그는_디비전과_페이지_없이_수집한다() {
+        properties.setTiers(List.of("MASTER"));
+        properties.setDivisions(List.of());
+        properties.setLeaguePageCount(0);
+        properties.setPlayerLimit(2);
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "MASTER", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(
+                        3,
+                        List.of("puuid-c", "puuid-a", "puuid-b")
+                ));
+
+        orchestrator.runOnce();
+
+        verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "MASTER", "I", 1);
+        verify(matchSyncService).findMatchIds("puuid-a", 0, 20);
+        verify(matchSyncService).findMatchIds("puuid-b", 0, 20);
+        verify(matchSyncService, never()).findMatchIds("puuid-c", 0, 20);
+    }
+
+    @Test
+    void Master_리그_플레이어를_실행마다_순환한다() {
+        properties.setTiers(List.of("MASTER"));
+        properties.setPlayerLimit(2);
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "MASTER", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(
+                        3,
+                        List.of("puuid-c", "puuid-a", "puuid-b")
+                ));
+
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+
+        verify(matchSyncService, times(2)).findMatchIds("puuid-a", 0, 20);
+        verify(matchSyncService).findMatchIds("puuid-b", 0, 20);
+        verify(matchSyncService).findMatchIds("puuid-c", 0, 20);
+    }
+
+    @Test
+    void Master_매치를_Master_표본으로_정규화하고_집계한다() {
+        properties.setTiers(List.of("MASTER"));
+        properties.setPlayerLimit(1);
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "MASTER", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("master-puuid")));
+        when(matchSyncService.findMatchIds("master-puuid", 0, 20))
+                .thenReturn(List.of("KR_MASTER"));
+        when(matchSyncService.syncMatch("KR_MASTER")).thenReturn(true);
+        NormalizedMatch normalized = normalizedMatch("KR_MASTER");
+        when(matchNormalizationService.normalizeAsTierSample("KR_MASTER", "MASTER"))
+                .thenReturn(normalized);
+
+        orchestrator.runOnce();
+
+        verify(matchNormalizationService).normalizeAsTierSample("KR_MASTER", "MASTER");
+        verify(matchNormalizationService).save(normalized);
+        verify(statsMatchService).registerMatchStats(normalized, "MASTER");
+    }
+
+    @Test
+    void Grandmaster_매치를_Grandmaster_표본으로_정규화하고_집계한다() {
+        properties.setTiers(List.of("GRANDMASTER"));
+        properties.setDivisions(List.of());
+        properties.setLeaguePageCount(0);
+        properties.setPlayerLimit(1);
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "GRANDMASTER", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("grandmaster-puuid")));
+        when(matchSyncService.findMatchIds("grandmaster-puuid", 0, 20))
+                .thenReturn(List.of("KR_GRANDMASTER"));
+        when(matchSyncService.syncMatch("KR_GRANDMASTER")).thenReturn(true);
+        NormalizedMatch normalized = normalizedMatch("KR_GRANDMASTER");
+        when(matchNormalizationService.normalizeAsTierSample("KR_GRANDMASTER", "GRANDMASTER"))
+                .thenReturn(normalized);
+
+        orchestrator.runOnce();
+
+        verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "GRANDMASTER", "I", 1);
+        verify(matchNormalizationService).normalizeAsTierSample("KR_GRANDMASTER", "GRANDMASTER");
+        verify(matchNormalizationService).save(normalized);
+        verify(statsMatchService).registerMatchStats(normalized, "GRANDMASTER");
+    }
+
+    @Test
+    void Challenger_매치를_Challenger_표본으로_정규화하고_집계한다() {
+        properties.setTiers(List.of("CHALLENGER"));
+        properties.setDivisions(List.of());
+        properties.setLeaguePageCount(0);
+        properties.setPlayerLimit(1);
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "CHALLENGER", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("challenger-puuid")));
+        when(matchSyncService.findMatchIds("challenger-puuid", 0, 20))
+                .thenReturn(List.of("KR_CHALLENGER"));
+        when(matchSyncService.syncMatch("KR_CHALLENGER")).thenReturn(true);
+        NormalizedMatch normalized = normalizedMatch("KR_CHALLENGER");
+        when(matchNormalizationService.normalizeAsTierSample("KR_CHALLENGER", "CHALLENGER"))
+                .thenReturn(normalized);
+
+        orchestrator.runOnce();
+
+        verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "CHALLENGER", "I", 1);
+        verify(matchNormalizationService).normalizeAsTierSample("KR_CHALLENGER", "CHALLENGER");
+        verify(matchNormalizationService).save(normalized);
+        verify(statsMatchService).registerMatchStats(normalized, "CHALLENGER");
+    }
+
+    @Test
     void 자동_Timeline_복구가_꺼져_있으면_누락_Timeline을_조회하지_않는다() {
         properties.setRecoverMissingTimelines(false);
 

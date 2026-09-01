@@ -2,8 +2,7 @@ package dfgg.infrastructure.external.client;
 
 import dfgg.infrastructure.external.config.RiotApiProperties;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
-import dfgg.infrastructure.external.dto.MatchResponse;
-import dfgg.infrastructure.external.dto.MatchTimelineResponse;
+import dfgg.infrastructure.external.dto.LeagueListResponse;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
@@ -108,6 +107,34 @@ public class RiotClient {
         return List.copyOf(response);
     }
 
+    public LeagueListResponse getMasterLeague(String queue) {
+        return getApexLeague(queue, "masterleagues", "Master");
+    }
+
+    public LeagueListResponse getGrandmasterLeague(String queue) {
+        return getApexLeague(queue, "grandmasterleagues", "Grandmaster");
+    }
+
+    public LeagueListResponse getChallengerLeague(String queue) {
+        return getApexLeague(queue, "challengerleagues", "Challenger");
+    }
+
+    private LeagueListResponse getApexLeague(String queue, String leaguePath, String tierName) {
+        Assert.hasText(queue, "queue must not be blank");
+
+        LeagueListResponse response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.PLATFORM, () ->
+                platformRestClient.get()
+                        .uri("/lol/league/v4/{leaguePath}/by-queue/{queue}", leaguePath, queue)
+                        .retrieve()
+                        .body(LeagueListResponse.class)
+        );
+
+        if (response == null) {
+            throw new IllegalStateException("[Error] Riot " + tierName + " league response is empty");
+        }
+        return response;
+    }
+
     public List<String> getMatchIds(String puuid) {
         return getMatchIds(puuid, DEFAULT_MATCH_START, DEFAULT_MATCH_COUNT);
     }
@@ -133,24 +160,6 @@ public class RiotClient {
             throw new IllegalStateException("[Error] Riot Match IDs response is empty");
         }
         return List.copyOf(response);
-    }
-
-    public MatchResponse getMatch(String matchId) {
-        Assert.hasText(matchId, "matchId must not be blank");
-
-        MatchResponse response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.REGIONAL, () ->
-                regionalRestClient.get()
-                        .uri(uriBuilder -> uriBuilder
-                                .path("/lol/match/v5/matches/{matchId}")
-                                .build(matchId))
-                        .retrieve()
-                        .body(MatchResponse.class)
-        );
-
-        if (response == null) {
-            throw new IllegalStateException("[Error] Riot Match response is empty");
-        }
-        return response;
     }
 
     public String getRawMatch(String matchId) {
@@ -189,21 +198,4 @@ public class RiotClient {
         return response;
     }
 
-    public MatchTimelineResponse getMatchTimeline(String matchId) {
-        Assert.hasText(matchId, "matchId must not be blank");
-
-        MatchTimelineResponse response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.REGIONAL, () ->
-                regionalRestClient.get()
-                        .uri(uriBuilder -> uriBuilder
-                                .path("/lol/match/v5/matches/{matchId}/timeline")
-                                .build(matchId))
-                        .retrieve()
-                        .body(MatchTimelineResponse.class)
-        );
-
-        if (response == null) {
-            throw new IllegalStateException("[Error] Riot Match timeline response is empty");
-        }
-        return response;
-    }
 }

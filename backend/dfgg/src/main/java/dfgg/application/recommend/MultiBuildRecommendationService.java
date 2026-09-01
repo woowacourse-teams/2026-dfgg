@@ -15,6 +15,8 @@ import dfgg.domain.stats.ChampionBuildStats;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.stats.CombinationContext;
 import dfgg.domain.team.Team;
+import dfgg.infrastructure.config.RecommendationProperties;
+import dfgg.infrastructure.external.client.DataDragonClient;
 import dfgg.presentation.dto.ChampionDto;
 import dfgg.presentation.dto.ItemDto;
 import dfgg.presentation.dto.request.RecommendationRequest;
@@ -41,10 +43,13 @@ public class MultiBuildRecommendationService {
 
     private static final int NORMAL_BUILD_ITEM_COUNT = 6;
     private static final int BOTTOM_BUILD_ITEM_COUNT = 7;
+    private static final int RANKED_SOLO_QUEUE_ID = 420;
     private static final String BOOTS_TAG = "Boots";
 
     private final ChampionService championService;
     private final ChampionBuildStatsRepository statsRepository;
+    private final DataDragonClient dataDragonClient;
+    private final RecommendationProperties recommendationProperties;
     private final CoreBuildClusterService clusterService;
     private final BuildCandidateSelectService candidateSelectService;
     private final Map<ChampionTag, ChampionBuildPolicy> policies;
@@ -52,12 +57,16 @@ public class MultiBuildRecommendationService {
     public MultiBuildRecommendationService(
             ChampionService championService,
             ChampionBuildStatsRepository statsRepository,
+            DataDragonClient dataDragonClient,
+            RecommendationProperties recommendationProperties,
             CoreBuildClusterService clusterService,
             BuildCandidateSelectService candidateSelectService,
             List<ChampionBuildPolicy> policies
     ) {
         this.championService = championService;
         this.statsRepository = statsRepository;
+        this.dataDragonClient = dataDragonClient;
+        this.recommendationProperties = recommendationProperties;
         this.clusterService = clusterService;
         this.candidateSelectService = candidateSelectService;
         this.policies = createPolicyMap(policies);
@@ -137,7 +146,43 @@ public class MultiBuildRecommendationService {
             ChampionPosition position,
             CombinationContext context
     ) {
-        return statsRepository.findAllMatchingStats(
+        String latestPatch = dataDragonClient.getLatestVersion();
+        List<ChampionBuildStats> latestStats = findMatchingStatsForPatch(
+                latestPatch,
+                champion,
+                position,
+                context
+        );
+        if (totalGameCount(latestStats) >= recommendationProperties.v2MinSampleCount()) {
+            return latestStats;
+        }
+
+        int[] version = parsePatch(latestPatch);
+        return statsRepository.findLatestPatchBefore(
+                        version[0],
+                        version[1],
+                        RANKED_SOLO_QUEUE_ID,
+                        recommendationProperties.v2Tiers()
+                )
+                .map(patch -> findMatchingStatsForPatch(
+                        patch,
+                        champion,
+                        position,
+                        context
+                ))
+                .orElseGet(List::of);
+    }
+
+    private List<ChampionBuildStats> findMatchingStatsForPatch(
+            String patch,
+            Champion champion,
+            ChampionPosition position,
+            CombinationContext context
+    ) {
+        return statsRepository.findAllMatchingStatsForScope(
+                patch,
+                RANKED_SOLO_QUEUE_ID,
+                recommendationProperties.v2Tiers(),
                 champion.getChampionId(),
                 position.name(),
                 context.enemyTankHeavy(),
@@ -146,6 +191,29 @@ public class MultiBuildRecommendationService {
                 context.allyHasMarksman(),
                 context.allyTankHeavy()
         );
+    }
+
+    private int totalGameCount(List<ChampionBuildStats> stats) {
+        return stats.stream()
+                .map(ChampionBuildStats::getGameCount)
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+    }
+
+    private int[] parsePatch(String patch) {
+        String[] components = patch.split("\\.");
+        if (components.length != 2) {
+            throw new IllegalStateException("Latest patch must use major.minor format: " + patch);
+        }
+        try {
+            return new int[]{
+                    Integer.parseInt(components[0]),
+                    Integer.parseInt(components[1])
+            };
+        } catch (NumberFormatException exception) {
+            throw new IllegalStateException("Latest patch must use major.minor format: " + patch, exception);
+        }
     }
 
     private List<BuildCandidate> collectCandidates(

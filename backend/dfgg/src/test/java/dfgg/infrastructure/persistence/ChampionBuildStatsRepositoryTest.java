@@ -219,4 +219,110 @@ class ChampionBuildStatsRepositoryTest {
                 .extracting(ChampionBuildStats::getGameCount)
                 .isEqualTo(0);
     }
+
+    @Test
+    @DisplayName("패치·큐·티어 범위와 조합 조건이 모두 일치하는 통계만 반환한다")
+    void findAllMatchingStatsForScope_ReturnOnlyStatsWithinScope() {
+        Champion champion = championRepository.save(new Champion(
+                266L,
+                "Aatrox",
+                "아트록스",
+                List.of(ChampionTag.FIGHTER)
+        ));
+        ChampionBuildStats emerald = stats(
+                champion, "16.17", 420, "EMERALD", "EMERALD", false, 10
+        );
+        ChampionBuildStats challenger = stats(
+                champion, "16.17", 420, "CHALLENGER", "CHALLENGER", false, 5
+        );
+        ChampionBuildStats lowerTier = stats(
+                champion, "16.17", 420, "PLATINUM", "LOWER_TIER", false, 20
+        );
+        ChampionBuildStats previousPatch = stats(
+                champion, "16.16", 420, "EMERALD", "PREVIOUS_PATCH", false, 20
+        );
+        ChampionBuildStats otherQueue = stats(
+                champion, "16.17", 440, "EMERALD", "OTHER_QUEUE", false, 20
+        );
+        ChampionBuildStats otherComposition = stats(
+                champion, "16.17", 420, "EMERALD", "OTHER_COMPOSITION", true, 20
+        );
+        ChampionBuildStats empty = stats(
+                champion, "16.17", 420, "DIAMOND", "EMPTY", false, 0
+        );
+        statsRepository.flush();
+
+        List<ChampionBuildStats> matched = statsRepository.findAllMatchingStatsForScope(
+                "16.17",
+                420,
+                List.of("EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"),
+                266L,
+                "TOP",
+                false,
+                false,
+                false,
+                false,
+                false
+        );
+
+        assertThat(matched).containsExactly(challenger, emerald);
+        assertThat(matched).doesNotContain(
+                lowerTier,
+                previousPatch,
+                otherQueue,
+                otherComposition,
+                empty
+        );
+    }
+
+    @Test
+    @DisplayName("큐·티어 범위에 데이터가 있는 직전 패치를 숫자 버전 순서로 반환한다")
+    void findLatestPatchBefore_ReturnLatestPreviousPatchWithinScope() {
+        Champion champion = championRepository.save(new Champion(
+                266L,
+                "Aatrox",
+                "아트록스",
+                List.of(ChampionTag.FIGHTER)
+        ));
+        stats(champion, "16.9", 420, "EMERALD", "PATCH_16_9", false, 10);
+        stats(champion, "16.10", 420, "MASTER", "PATCH_16_10", false, 10);
+        stats(champion, "16.12", 420, "CHALLENGER", "FUTURE_PATCH", false, 10);
+        stats(champion, "16.11", 420, "PLATINUM", "LOWER_TIER", false, 10);
+        stats(champion, "16.11", 440, "EMERALD", "OTHER_QUEUE", false, 10);
+        statsRepository.flush();
+
+        assertThat(statsRepository.findLatestPatchBefore(
+                16,
+                11,
+                420,
+                List.of("EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER")
+        )).contains("16.10");
+    }
+
+    private ChampionBuildStats stats(
+            Champion champion,
+            String patch,
+            int queueId,
+            String tier,
+            String buildKey,
+            boolean enemyTankHeavy,
+            int gameCount
+    ) {
+        return statsRepository.save(new ChampionBuildStats(
+                patch,
+                queueId,
+                champion,
+                ChampionPosition.TOP,
+                enemyTankHeavy,
+                false,
+                false,
+                false,
+                false,
+                tier,
+                buildKey,
+                List.of(),
+                gameCount / 2,
+                gameCount
+        ));
+    }
 }

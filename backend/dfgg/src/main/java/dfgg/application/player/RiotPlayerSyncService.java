@@ -4,6 +4,7 @@ import dfgg.domain.player.Player;
 import dfgg.domain.player.PlayerRepository;
 import dfgg.infrastructure.external.client.RiotClient;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
+import dfgg.infrastructure.external.dto.LeagueListResponse;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -18,6 +19,9 @@ public class RiotPlayerSyncService {
 
     private static final String PLATFORM = "KR";
     private static final String SOLO_QUEUE_TYPE = "RANKED_SOLO_5x5";
+    private static final String MASTER_TIER = "MASTER";
+    private static final String GRANDMASTER_TIER = "GRANDMASTER";
+    private static final String CHALLENGER_TIER = "CHALLENGER";
     private static final String UNRANKED_TIER = "UNRANKED";
     private static final String UNRANKED_DIVISION = "NONE";
 
@@ -38,12 +42,12 @@ public class RiotPlayerSyncService {
             String division,
             int page
     ) {
-        List<LeagueEntryResponse> entries = riotClient.getLeagueEntries(
-                queue,
-                tier,
-                division,
-                page
-        );
+        List<LeagueEntryResponse> entries = switch (tier) {
+            case MASTER_TIER -> enrichLeagueEntries(riotClient.getMasterLeague(queue));
+            case GRANDMASTER_TIER -> enrichLeagueEntries(riotClient.getGrandmasterLeague(queue));
+            case CHALLENGER_TIER -> enrichLeagueEntries(riotClient.getChallengerLeague(queue));
+            default -> riotClient.getLeagueEntries(queue, tier, division, page);
+        };
 
         Instant collectedAt = Instant.now();
         int newPlayers = entries.stream()
@@ -58,6 +62,20 @@ public class RiotPlayerSyncService {
                 newPlayers,
                 entries.stream().map(LeagueEntryResponse::puuid).distinct().toList()
         );
+    }
+
+    private List<LeagueEntryResponse> enrichLeagueEntries(LeagueListResponse league) {
+        return league.entries().stream()
+                .map(entry -> new LeagueEntryResponse(
+                        entry.puuid(),
+                        league.queue(),
+                        league.tier(),
+                        entry.rank(),
+                        entry.leaguePoints(),
+                        entry.wins(),
+                        entry.losses()
+                ))
+                .toList();
     }
 
     public Map<String, String> syncPlayerTiers(Collection<String> puuids) {
