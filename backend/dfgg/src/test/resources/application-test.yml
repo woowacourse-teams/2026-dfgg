@@ -26,3 +26,7 @@ mining:
 collection:
   scheduler:
     enabled: false
+recommendation:
+  recent-patch-window-size: 3
+  candidate-top-k:
+    build: 50
