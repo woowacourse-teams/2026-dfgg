@@ -174,4 +174,35 @@ public interface ChampionBuildStatsRepository extends JpaRepository<ChampionBuil
             @Param("allyHasMarksman") boolean allyHasMarksman,
             @Param("allyTankHeavy") boolean allyTankHeavy
     );
+
+    /**
+     * 지정한 패치·큐·티어 범위에서 챔피언·포지션·조합 조건이 일치하는 빌드 통계를 조회한다.
+     */
+    @Query(value = """
+            SELECT * FROM composition_stats b
+            WHERE b.patch = :patch
+              AND b.queue_id = :queueId
+              AND b.tier IN (:tiers)
+              AND b.champion_id = :championId
+              AND b.position = :position
+              AND COALESCE(b.game_count, 0) > 0
+              AND b.enemy_tank_heavy = :enemyTankHeavy
+              AND b.enemy_ap_heavy = :enemyApHeavy
+              AND b.enemy_assassin_heavy = :enemyAssassinHeavy
+              AND b.ally_has_marksman = :allyHasMarksman
+              AND b.ally_tank_heavy = :allyTankHeavy
+            ORDER BY b.build_key
+            """, nativeQuery = true)
+    List<ChampionBuildStats> findAllMatchingStatsForScope(
+            @Param("patch") String patch,
+            @Param("queueId") Integer queueId,
+            @Param("tiers") List<String> tiers,
+            @Param("championId") Long championId,
+            @Param("position") String position,
+            @Param("enemyTankHeavy") boolean enemyTankHeavy,
+            @Param("enemyApHeavy") boolean enemyApHeavy,
+            @Param("enemyAssassinHeavy") boolean enemyAssassinHeavy,
+            @Param("allyHasMarksman") boolean allyHasMarksman,
+            @Param("allyTankHeavy") boolean allyTankHeavy
+    );
 }
