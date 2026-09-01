@@ -291,7 +291,10 @@ export default function ChampionSelect() {
             type='button'
             role='tab'
             aria-selected={mode === value}
-            onClick={() => setMode(value)}
+            onClick={() => {
+              setMode(value);
+              window.umami?.track('champion-select-mode', { mode: value });
+            }}
             className={`chamfer-sm cursor-pointer px-3 py-1.5 font-display text-xs font-bold tracking-wide transition-colors ${
               mode === value
                 ? 'bg-accent-strong text-white'

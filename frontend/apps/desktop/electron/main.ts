@@ -21,6 +21,9 @@ import type { LcuStatus, Lineup } from './types';
 
 const isDev = !app.isPackaged;
 
+/** 앱을 얼마나 켜두는지 보려고 남겨둔 시각. before-quit에서 이걸로 세션 길이를 잰다. */
+const appLaunchedAt = Date.now();
+
 const DEV_SERVER = 'http://localhost:3000';
 
 /** 클라이언트가 꺼져 있을 때 다시 붙어보는 간격. */
@@ -739,6 +742,11 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  // 메인 창이 이미 닫혀 있으면(오버레이만 떠 있다 꺼지는 경우) 이 이벤트는
+  // 유실된다 — analytics.ts와 같은 이유로 재시도하지 않는다.
+  const minutes = Math.round((Date.now() - appLaunchedAt) / 60_000);
+  track('desktop-app-session', { minutes });
+
   stopAutoUpdate();
   unsubscribe?.();
   // 감시용 PowerShell 이 남으면 앱을 꺼도 프로세스가 계속 돈다.

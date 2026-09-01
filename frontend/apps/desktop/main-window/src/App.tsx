@@ -22,6 +22,9 @@ const POSITION_LABEL: Record<Position, string> = {
 /** 메인 프로세스가 기본 브라우저로 열어준다. 앱 창 안에서는 열리지 않는다. */
 const PRIVACY_URL = 'https://dfgg.pro/privacy';
 
+/** 피드백은 웹 페이지로만 받는다. 앱 안에 폼을 새로 만들지 않고 그대로 연결한다. */
+const FEEDBACK_URL = 'https://www.dfgg.pro/feedback';
+
 /** 서비스를 처음 공개한 해. 해가 바뀌어도 그대로 둔다. */
 const COPYRIGHT_YEAR = 2026;
 
@@ -91,7 +94,19 @@ export default function App() {
       <div className='px-6 pb-6'>
         <header className='flex flex-wrap items-baseline justify-between gap-2'>
           <h1 className='text-xl font-bold'>밴픽 아이템 추천</h1>
-          <p className='text-sm text-neutral-400'>{STATUS_LABEL[status]}</p>
+          <div className='flex items-baseline gap-3'>
+            <p className='text-sm text-neutral-400'>{STATUS_LABEL[status]}</p>
+            {/* 눌러도 앱 창 안에서 열리지 않고 기본 브라우저로 넘어간다. */}
+            <a
+              href={FEEDBACK_URL}
+              target='_blank'
+              rel='noreferrer'
+              onClick={() => window.umami?.track('desktop-feedback-click')}
+              className='cursor-pointer rounded bg-neutral-800 px-2.5 py-1 text-xs font-bold text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-neutral-100'
+            >
+              피드백 보내기
+            </a>
+          </div>
         </header>
 
         {/* 두 추천 방식은 항상 같이 돌고 있다. 버튼은 결과 표시만 바꾼다. */}
