@@ -97,6 +97,8 @@ class TrainingSetExportTest {
 
         Path outputPath = Path.of(System.getProperty("ltr.export.path", "../ml/data/train.jsonl"));
         Files.createDirectories(outputPath.toAbsolutePath().getParent());
+        // Python은 JSONL만으로는 각 feature 칸이 무엇인지 알 수 없다. 스키마를 함께 내보낸다.
+        new FeatureSchemaExporter().export(outputPath.toAbsolutePath().getParent());
 
         ExportStats stats = new ExportStats();
         long startedAt = System.currentTimeMillis();
