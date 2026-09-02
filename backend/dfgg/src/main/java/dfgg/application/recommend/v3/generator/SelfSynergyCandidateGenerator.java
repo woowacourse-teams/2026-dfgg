@@ -28,8 +28,12 @@ import org.springframework.stereotype.Component;
  *
  * <p>점수는 {@code P(item | champion, position)}의 Wilson 하한이다. 표본이 얇을수록 보수적으로
  * 깎이므로, 두세 판만 관측된 아이템이 100% 구매율로 상위를 차지하는 일이 없다.
- *
- * <p>태그 호환성은 여기서 점수에 섞지 않는다. 섞으려면 가중치가 필요한데, 그 가중치야말로
+ * <p>
+ * 구매 이력은 점수 계산에는 쓰지 않지만, 이미 산 아이템은 후보에서 뺀다. 살 수 없는
+ * 아이템으로 topK 예산을 채우면 실제 살 수 있는 후보가 밀려난다 — 4~5코어 시점에서 이 낭비가
+ * recall을 크게 떨어뜨리는 것을 실측으로 확인했다.
+ * <p>
+ * 태그 호환성은 여기서 점수에 섞지 않는다. 섞으려면 가중치가 필요한데, 그 가중치야말로
  * 이번 작업이 없애려는 수동 랭킹이다. 태그 정보는 feature extraction 단계에서 LTR에 따로 넘긴다.
  */
 @Component
@@ -67,6 +71,7 @@ public class SelfSynergyCandidateGenerator implements CandidateGenerator {
 
         if (hasEnoughSample(positionStats)) {
             List<Compatibility> scores = positionStats.stream()
+                    .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
                     .map(stat -> new Compatibility(
                             stat.getItemId(),
                             wilson(stat.getPurchaseCountAll(), stat.getChampionGameCountAll()),
@@ -78,6 +83,7 @@ public class SelfSynergyCandidateGenerator implements CandidateGenerator {
 
         List<ChampionItemRollup> rollup = championItemRollupRepository.findByChampionId(championId);
         List<Compatibility> scores = rollup.stream()
+                .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
                 .map(stat -> new Compatibility(
                         stat.getItemId(),
                         wilson(stat.getPurchaseCountAll(), stat.getChampionGameCountAll()),

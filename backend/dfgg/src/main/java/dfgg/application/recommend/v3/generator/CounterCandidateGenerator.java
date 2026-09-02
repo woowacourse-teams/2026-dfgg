@@ -72,7 +72,8 @@ public class CounterCandidateGenerator implements CandidateGenerator {
         // 아이템 → (적 챔피언 → lift). 적별 lift를 개별 보존한 뒤 집계한다.
         Map<Long, Map<Long, Double>> liftByItemAndEnemy = new HashMap<>();
         for (ChampionPairItemStats stats : enemyStats(query)) {
-            if (stats.getPairGameCountAll() < minimumPairGames) {
+            if (stats.getPairGameCountAll() < minimumPairGames
+                    || query.purchasedItemIds().contains(stats.getItemId())) {
                 continue;
             }
             CounterLift lift = counterLiftCalculator.calculate(
@@ -172,6 +173,7 @@ public class CounterCandidateGenerator implements CandidateGenerator {
         List<ChampionItemStats> positionStats = positionStats(query.myChampionId(), query.position());
         if (!positionStats.isEmpty()) {
             return positionStats.stream()
+                    .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
                     .map(stat -> new ScoredItem(stat.getItemId(), wilsonScoreCalculator.lowerBound(
                             stat.getPurchaseCountAll(), stat.getChampionGameCountAll())))
                     .sorted(byScoreThenItemId())
@@ -179,6 +181,7 @@ public class CounterCandidateGenerator implements CandidateGenerator {
                     .toList();
         }
         return championItemRollupRepository.findByChampionId(Math.toIntExact(query.myChampionId())).stream()
+                .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
                 .map(stat -> new ScoredItem(stat.getItemId(), wilsonScoreCalculator.lowerBound(
                         stat.getPurchaseCountAll(), stat.getChampionGameCountAll())))
                 .sorted(byScoreThenItemId())

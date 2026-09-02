@@ -67,16 +67,32 @@ class SelfSynergyCandidateGeneratorTest {
     }
 
     @Test
-    @DisplayName("현재 구매 이력을 전혀 참조하지 않는다 — Build와 책임이 갈리는 지점")
-    void generate_WhenPurchaseHistoryDiffers_ProducesIdenticalResult() {
-        // given: 같은 챔피언·포지션, 구매 이력만 다르다
-        GeneratorResult nothingPurchased =
-                generator.generate(queryFor(157L, ChampionPosition.MID, List.of()), 10);
-        GeneratorResult deepIntoBuild =
-                generator.generate(queryFor(157L, ChampionPosition.MID, List.of(KRAKEN, INFINITY_EDGE, OLD_ITEM)), 10);
+    @DisplayName("점수는 구매 이력과 무관하다 — 이미 산 것을 뺀 나머지의 순서가 그대로 유지된다")
+    void generate_WhenPurchaseHistoryDiffers_KeepsRelativeOrderOfRemainingItems() {
+        // given: 같은 챔피언·포지션, 구매 이력만 다르다.
+        //        Build와 갈리는 지점은 "현재 build를 보고 점수를 바꾸지 않는다"이지,
+        //        "이미 산 아이템을 후보로 낸다"가 아니다.
+        List<Long> purchased = List.of(KRAKEN, INFINITY_EDGE);
+        List<Long> nothingPurchased =
+                itemIdsOf(generator.generate(queryFor(157L, ChampionPosition.MID, List.of()), 10));
+        List<Long> deepIntoBuild =
+                itemIdsOf(generator.generate(queryFor(157L, ChampionPosition.MID, purchased), 10));
+
+        // then: 구매한 것만 빠지고 나머지 순서는 그대로
+        assertThat(deepIntoBuild)
+                .isEqualTo(nothingPurchased.stream().filter(id -> !purchased.contains(id)).toList());
+    }
+
+    @Test
+    @DisplayName("이미 산 아이템은 후보로 내지 않는다 — 살 수 없는 것으로 topK 예산을 쓰면 낭비다")
+    void generate_WhenItemsAlreadyPurchased_ExcludesThemFromCandidates() {
+        // given: 야스오가 가장 많이 사는 6673과 3072를 이미 샀다.
+        //        이걸 후보로 내면 topK가 작을수록 실제 살 수 있는 후보가 밀려난다.
+        GeneratorResult result = generator.generate(
+                queryFor(157L, ChampionPosition.MID, List.of(KRAKEN, OLD_ITEM)), 3);
 
         // then
-        assertThat(itemIdsOf(deepIntoBuild)).isEqualTo(itemIdsOf(nothingPurchased));
+        assertThat(itemIdsOf(result)).doesNotContain(KRAKEN, OLD_ITEM);
     }
 
     @Test

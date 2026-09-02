@@ -3,6 +3,7 @@ package dfgg.application.recommend;
 import dfgg.application.champion.ChampionService;
 import dfgg.application.item.ItemService;
 import dfgg.application.recommend.v3.CandidateGenerator;
+import dfgg.application.recommend.v3.CandidateTopK;
 import dfgg.application.recommend.v3.CandidateUnion;
 import dfgg.application.recommend.v3.GeneratorResult;
 import dfgg.application.recommend.v3.RecommendationQuery;
@@ -47,7 +48,7 @@ public class NextItemRecommendationService {
     private final List<CandidateGenerator> generators;
     private final HardValidityFilter hardValidityFilter;
     private final CandidateRanker candidateRanker;
-    private final int buildTopK;
+    private final CandidateTopK candidateTopK;
 
     public NextItemRecommendationService(
             ChampionService championService,
@@ -55,14 +56,17 @@ public class NextItemRecommendationService {
             List<CandidateGenerator> generators,
             HardValidityFilter hardValidityFilter,
             CandidateRanker candidateRanker,
-            @Value("${recommendation.candidate-top-k.build}") int buildTopK
+            @Value("${recommendation.candidate-top-k.build}") int buildTopK,
+            @Value("${recommendation.candidate-top-k.self-synergy}") int selfSynergyTopK,
+            @Value("${recommendation.candidate-top-k.ally-synergy}") int allySynergyTopK,
+            @Value("${recommendation.candidate-top-k.counter}") int counterTopK
     ) {
         this.championService = championService;
         this.itemService = itemService;
         this.generators = List.copyOf(generators);
         this.hardValidityFilter = hardValidityFilter;
         this.candidateRanker = candidateRanker;
-        this.buildTopK = buildTopK;
+        this.candidateTopK = new CandidateTopK(buildTopK, selfSynergyTopK, allySynergyTopK, counterTopK);
     }
 
     public NextItemRecommendationResponse recommendNextItem(NextItemRecommendationRequest request) {
@@ -70,7 +74,8 @@ public class NextItemRecommendationService {
 
         List<GeneratorResult> generatorResults = new ArrayList<>();
         for (CandidateGenerator generator : generators) {
-            generatorResults.add(generator.generate(query, topKFor(generator)));
+            generatorResults.add(generator.generate(query, candidateTopK.of(generator.
+                    source())));
         }
 
         CandidateUnion union = CandidateUnion.merge(generatorResults);
@@ -102,17 +107,6 @@ public class NextItemRecommendationService {
                 request.tier(),
                 request.patch()
         );
-    }
-
-    /**
-     * generator마다 후보 수 상한이 다르다. 정확한 값은 Recall@K 실험으로 정하며 설정에서 온다 —
-     * 여기 있는 건 "몇 개를 볼 것인가"이지 "얼마나 믿을 것인가"가 아니다. 후자는 랭커가 학습한다.
-     */
-    private int topKFor(CandidateGenerator generator) {
-        return switch (generator.source()) {
-            case BUILD -> buildTopK;
-            case SELF_SYNERGY, ALLY_SYNERGY, COUNTER -> buildTopK;
-        };
     }
 
     private Map<Long, Item> loadItems(CandidateUnion union, RecommendationQuery query) {

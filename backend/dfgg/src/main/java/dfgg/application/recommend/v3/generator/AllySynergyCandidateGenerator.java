@@ -60,6 +60,7 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
 
         if (!scoresByItem.isEmpty()) {
             List<ScoredItem> ranked = scoresByItem.entrySet().stream()
+                    .filter(entry -> !query.purchasedItemIds().contains(entry.getKey()))
                     .map(entry -> new ScoredItem(entry.getKey(), entry.getValue().max()))
                     .sorted(byScoreThenItemId())
                     .limit(topK)
@@ -81,6 +82,7 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
                 championItemStatsRepository.findByChampionIdAndPosition(championId, query.position());
         if (!positionStats.isEmpty()) {
             return positionStats.stream()
+                    .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
                     .map(stat -> new ScoredItem(stat.getItemId(), wilsonScoreCalculator.lowerBound(
                             stat.getPurchaseCountAll(), stat.getChampionGameCountAll())))
                     .sorted(byScoreThenItemId())
@@ -90,6 +92,7 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
 
         List<ChampionItemRollup> rollup = championItemRollupRepository.findByChampionId(championId);
         return rollup.stream()
+                .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
                 .map(stat -> new ScoredItem(stat.getItemId(), wilsonScoreCalculator.lowerBound(
                         stat.getPurchaseCountAll(), stat.getChampionGameCountAll())))
                 .sorted(byScoreThenItemId())

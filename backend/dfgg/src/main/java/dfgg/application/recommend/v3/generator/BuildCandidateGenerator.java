@@ -130,6 +130,7 @@ public class BuildCandidateGenerator implements CandidateGenerator {
                 .findByChampionIdAndPosition(Math.toIntExact(query.myChampionId()), query.position());
 
         List<TransitionScore> scores = stats.stream()
+                .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
                 .map(stat -> new TransitionScore(
                         stat.getItemId(),
                         wilsonScoreCalculator.lowerBound(
