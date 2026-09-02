@@ -8,25 +8,7 @@ import numpy as np
 import pytest
 
 from dfgg_ltr.model_export import flatten_model
-
-
-def predict_with_flat_trees(trees, row):
-    """Java가 구현할 순회를 Python으로 그대로 흉내낸다."""
-    total = 0.0
-    for tree in trees:
-        if not tree["split_feature"]:
-            total += tree["leaf_value"][0]
-            continue
-        node = 0
-        while node >= 0:
-            value = row[tree["split_feature"][node]]
-            if np.isnan(value):
-                go_left = tree["default_left"][node]
-            else:
-                go_left = value <= tree["threshold"][node]
-            node = tree["left"][node] if go_left else tree["right"][node]
-        total += tree["leaf_value"][-node - 1]
-    return total
+from dfgg_ltr.reference_predict import predict_with_flat_trees
 
 
 @pytest.fixture
