@@ -22,19 +22,30 @@ uv sync --extra analysis   # 분석(T15)까지: pandas, scikit-learn, shap
 
 `uv`가 없으면: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
-## 사용 (미구현 — Task 11)
+## 사용
 
 학습 데이터는 **Java가 만든다**. 먼저 `backend/dfgg`에서:
 
 ```bash
-./gradlew test --tests '*TrainingSetExport*' -Dtest.tags=evaluation
+EVALUATION_DB_URL=jdbc:postgresql://127.0.0.1:5432/dfgg_test_backtest \
+  ./gradlew evaluationTest --tests '*TrainingSetExportTest' -Devaluation.queries=30000
 ```
 
-이 테스트가 `../ml/data/train.jsonl`을 생성한다. 그 다음:
+`../ml/data/`에 두 파일이 생긴다 — `train.jsonl`(학습 데이터)과
+`feature_schema.json`(feature 이름·순서·지문). JSONL의 feature는 이름 없는 배열이라
+스키마 파일이 없으면 Python이 각 칸이 무엇인지 알 수 없다.
+
+그 다음 학습하고 모델을 내보낸다:
 
 ```bash
-uv run python train.py --data data/train.jsonl --split game
-uv run python export_model.py --out ../dfgg/src/main/resources/ltr/model.json
+uv run python -m dfgg_ltr.train --split game --out ../dfgg/src/main/resources/ltr/model.json
+uv run python -m dfgg_ltr.train --split patch    # 최신 패치 일반화 확인
+```
+
+테스트:
+
+```bash
+uv run pytest tests/ -q
 ```
 
 ## 디렉터리 경계
@@ -50,7 +61,10 @@ Java만으로 동작한다(`be-cd.yml`은 `working-directory: ./backend/dfgg`라
 ## Java 추론과의 계약 (Task 12)
 
 - **numeric feature만 사용.** `categorical_feature`, `linear_tree` 금지
-- `export_model.py`가 `dump_model()`의 중첩 트리를 **평탄 배열로 변환**해 내보낸다
+- `dfgg_ltr/model_export.py`가 `dump_model()`의 중첩 트리를 **평탄 배열로 변환**해 내보낸다
+- **자식 인덱스 규약**: 0 이상이면 분기 노드 인덱스, 음수면 잎이며 `-index - 1`이 잎 번호다.
+  이 규약으로 순회하면 LightGBM 예측과 1e-9 이내로 일치한다(`tests/test_flatten_equivalence.py`)
+- 범주형 분기가 섞이면 export 단계에서 **실패시킨다**
 - `feature_names` 순서가 Java `FeatureName` enum과 정확히 일치해야 하며, 다르면 기동 실패
 - NaN은 `default_left` 방향으로 라우팅 (`missing_type`도 함께 확인)
 - parity 테스트: Python 예측과 Java 예측이 **1e-6 이내** 일치
