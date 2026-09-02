@@ -40,7 +40,7 @@ recommendation:
   self-synergy:
     minimum-position-sample: "${RECOMMENDATION_SELF_SYNERGY_MIN_POSITION_SAMPLE:10}"
   candidate-top-k:
-    build: "${RECOMMENDATION_CANDIDATE_TOP_K_BUILD:50}"
+    build: "${RECOMMENDATION_CANDIDATE_TOP_K_BUILD:5}"
     self-synergy: "${RECOMMENDATION_CANDIDATE_TOP_K_SELF_SYNERGY:5}"
     ally-synergy: "${RECOMMENDATION_CANDIDATE_TOP_K_ALLY_SYNERGY:5}"
     counter: "${RECOMMENDATION_CANDIDATE_TOP_K_COUNTER:5}"

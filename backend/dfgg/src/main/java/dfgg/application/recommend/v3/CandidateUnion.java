@@ -76,7 +76,8 @@ public record CandidateUnion(List<ItemCandidate> candidates) {
             ScoredItem scoredItem = rankedItems.get(index);
             evidenceByItemId
                     .computeIfAbsent(scoredItem.itemId(), itemId -> new EnumMap<>(CandidateSource.class))
-                    .put(generatorResult.source(), new SourceEvidence(scoredItem.score(), index + 1));
+                    .put(generatorResult.source(),
+                            new SourceEvidence(scoredItem.score(), index + 1, generatorResult.backoffLevel()));
         }
     }
 }

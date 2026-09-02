@@ -136,6 +136,24 @@ class CandidateUnionTest {
     }
 
     @Test
+    @DisplayName("generator가 얼마나 백오프했는지도 union을 통과해 살아남는다 — 그 점수를 얼마나 믿을지의 근거다")
+    void merge_WhenGeneratorBackedOff_PreservesBackoffLevel() {
+        // given: build는 2단계까지 물러섰고, self는 백오프하지 않았다
+        GeneratorResult backedOffBuild = GeneratorResult.of(
+                BUILD, List.of(new ScoredItem(INFINITY_EDGE, 0.5)), 2);
+        GeneratorResult freshSelf = GeneratorResult.of(
+                SELF_SYNERGY, List.of(new ScoredItem(INFINITY_EDGE, 0.9)));
+
+        // when
+        CandidateUnion union = CandidateUnion.merge(List.of(backedOffBuild, freshSelf));
+
+        // then
+        ItemCandidate candidate = union.candidateOf(INFINITY_EDGE);
+        assertThat(candidate.evidenceOf(BUILD).orElseThrow().backoffLevel()).isEqualTo(2);
+        assertThat(candidate.evidenceOf(SELF_SYNERGY).orElseThrow().backoffLevel()).isZero();
+    }
+
+    @Test
     @DisplayName("같은 source의 결과가 두 번 들어오면 거부한다 — 조용히 덮어쓰면 배선 버그가 드러나지 않는다")
     void merge_WhenSameSourceAppearsTwice_ThrowsException() {
         // given
