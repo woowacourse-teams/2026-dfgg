@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,17 +55,14 @@ public class NextItemRecommendationService {
             List<CandidateGenerator> generators,
             HardValidityFilter hardValidityFilter,
             CandidateRanker candidateRanker,
-            @Value("${recommendation.candidate-top-k.build}") int buildTopK,
-            @Value("${recommendation.candidate-top-k.self-synergy}") int selfSynergyTopK,
-            @Value("${recommendation.candidate-top-k.ally-synergy}") int allySynergyTopK,
-            @Value("${recommendation.candidate-top-k.counter}") int counterTopK
+            CandidateTopK candidateTopK
     ) {
         this.championService = championService;
         this.itemService = itemService;
         this.generators = List.copyOf(generators);
         this.hardValidityFilter = hardValidityFilter;
         this.candidateRanker = candidateRanker;
-        this.candidateTopK = new CandidateTopK(buildTopK, selfSynergyTopK, allySynergyTopK, counterTopK);
+        this.candidateTopK = candidateTopK;
     }
 
     public NextItemRecommendationResponse recommendNextItem(NextItemRecommendationRequest request) {

@@ -43,12 +43,13 @@ public class FeatureExtractionPipeline {
         // 질의 단위 feature는 모든 후보가 공유하므로 한 번만 계산한다.
         FeatureVector queryFeatures = FeatureVector.empty();
         queryFeatureExtractor.extract(query, queryFeatures);
+        StatsFeatureExtractor.StatsContext statsContext = statsFeatureExtractor.prepare(query);
 
         List<CandidateFeatures> extracted = new ArrayList<>(union.size());
         for (ItemCandidate candidate : union.candidates()) {
             FeatureVector vector = FeatureVector.copyOf(queryFeatures);
             candidateFeatureExtractor.extract(candidate, vector);
-            statsFeatureExtractor.extract(candidate.itemId(), query, vector);
+            statsFeatureExtractor.extract(candidate.itemId(), query, statsContext, vector);
             extracted.add(new CandidateFeatures(candidate.itemId(), vector));
         }
         return extracted;

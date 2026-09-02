@@ -7,6 +7,7 @@ import dfgg.application.recommend.v3.generator.PairScoreAggregate;
 import dfgg.application.recommend.v3.generator.PairSynergyRetriever;
 import dfgg.domain.itemstats.ChampionItemStats;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
+import dfgg.domain.itemstats.ChampionPairItemStats;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.domain.itemstats.ItemMetaStats;
 import dfgg.domain.itemstats.ItemMetaStatsRepository;
@@ -17,7 +18,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.springframework.stereotype.Component;
 
@@ -51,11 +51,32 @@ public class StatsFeatureExtractor {
         this.counterLiftCalculator = counterLiftCalculator;
     }
 
+    /**
+     * 질의 단위 조회를 한 번만 수행해 후보마다 재사용한다.
+     *
+     * <p>이걸 후보마다 다시 하면 같은 쿼리를 후보 수만큼 반복한다 — 챔피언 통계·아군 관계·적
+     * 삼중항은 {@code itemId}와 무관하게 질의당 한 벌이다. 실측에서 후보 11개당 4배 낭비였고,
+     * 학습 데이터 30만 query 규모에서는 시간 차이가 몇 시간 단위로 벌어진다.
+     */
+    public StatsContext prepare(RecommendationQuery query) {
+        return new StatsContext(
+                championGameCounts(query),
+                purchaseCountsByItem(query),
+                counterStatsByItem(query),
+                pairSynergyRetriever.scoresByItem(
+                        query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY)
+        );
+    }
+
     public void extract(long itemId, RecommendationQuery query, FeatureVector vector) {
-        ChampionBaseRate baseRate = baseRateOf(itemId, query);
+        extract(itemId, query, prepare(query), vector);
+    }
+
+    public void extract(long itemId, RecommendationQuery query, StatsContext context, FeatureVector vector) {
+        ChampionBaseRate baseRate = context.baseRateOf(itemId);
         setBaseRate(baseRate, vector);
-        setCounter(itemId, query, baseRate, vector);
-        setAlly(itemId, query, vector);
+        setCounter(itemId, context, baseRate, vector);
+        setAlly(itemId, context, vector);
         setMeta(itemId, query, vector);
     }
 
@@ -65,21 +86,39 @@ public class StatsFeatureExtractor {
      * 관측된 챔피언이면 구매 0회도 {@code 0.0}으로 남긴다 — "0번 샀다"는 결측이 아니라
      * 강한 관측이다. 야스오가 9,343판 동안 존야를 한 번도 안 샀다는 사실이 바로 그 신호다.
      */
-    private ChampionBaseRate baseRateOf(long itemId, RecommendationQuery query) {
-        List<ChampionItemStats> stats = championItemStatsRepository
-                .findByChampionIdAndPosition(Math.toIntExact(query.myChampionId()), query.position());
-        if (stats.isEmpty()) {
-            return ChampionBaseRate.UNKNOWN;
-        }
-        int gameCountAll = stats.stream().mapToInt(ChampionItemStats::getChampionGameCountAll).max().orElse(0);
-        int gameCountRecent = stats.stream().mapToInt(ChampionItemStats::getChampionGameCountRecent).max().orElse(0);
+    private int[] championGameCounts(RecommendationQuery query) {
+        List<ChampionItemStats> stats = championStats(query);
+        return new int[]{
+                stats.stream().mapToInt(ChampionItemStats::getChampionGameCountAll).max().orElse(0),
+                stats.stream().mapToInt(ChampionItemStats::getChampionGameCountRecent).max().orElse(0)
+        };
+    }
 
-        Optional<ChampionItemStats> forItem = stats.stream()
-                .filter(stat -> stat.getItemId() == itemId)
-                .findFirst();
-        int purchaseAll = forItem.map(ChampionItemStats::getPurchaseCountAll).orElse(0);
-        int purchaseRecent = forItem.map(ChampionItemStats::getPurchaseCountRecent).orElse(0);
-        return new ChampionBaseRate(purchaseAll, gameCountAll, purchaseRecent, gameCountRecent);
+    private Map<Long, int[]> purchaseCountsByItem(RecommendationQuery query) {
+        Map<Long, int[]> byItem = new HashMap<>();
+        for (ChampionItemStats stats : championStats(query)) {
+            byItem.put(stats.getItemId(),
+                    new int[]{stats.getPurchaseCountAll(), stats.getPurchaseCountRecent()});
+        }
+        return byItem;
+    }
+
+    private List<ChampionItemStats> championStats(RecommendationQuery query) {
+        return championItemStatsRepository
+                .findByChampionIdAndPosition(Math.toIntExact(query.myChampionId()), query.position());
+    }
+
+    private Map<Long, List<ChampionPairItemStats>> counterStatsByItem(RecommendationQuery query) {
+        if (query.enemyChampionIds().isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, List<ChampionPairItemStats>> byItem = new HashMap<>();
+        for (ChampionPairItemStats stats : pairRepository.findByMyChampionIdAndRelationAndOtherChampionIdIn(
+                Math.toIntExact(query.myChampionId()), PairRelation.ENEMY,
+                query.enemyChampionIds().stream().map(Math::toIntExact).toList())) {
+            byItem.computeIfAbsent(stats.getItemId(), itemId -> new java.util.ArrayList<>()).add(stats);
+        }
+        return byItem;
     }
 
     private void setBaseRate(ChampionBaseRate baseRate, FeatureVector vector) {
@@ -99,16 +138,14 @@ public class StatsFeatureExtractor {
     // ── Counter ────────────────────────────────────────────────────────────
 
     private void setCounter(
-            long itemId, RecommendationQuery query, ChampionBaseRate baseRate, FeatureVector vector
+            long itemId, StatsContext context, ChampionBaseRate baseRate, FeatureVector vector
     ) {
-        if (query.enemyChampionIds().isEmpty() || baseRate.gameCountAll() <= 0) {
+        if (baseRate.gameCountAll() <= 0) {
             return;
         }
-        List<CounterLift> lifts = pairRepository.findByMyChampionIdAndRelationAndOtherChampionIdIn(
-                        Math.toIntExact(query.myChampionId()), PairRelation.ENEMY,
-                        query.enemyChampionIds().stream().map(Math::toIntExact).toList())
+        List<CounterLift> lifts = context.counterStatsByItem()
+                .getOrDefault(itemId, List.of())
                 .stream()
-                .filter(stats -> stats.getItemId() == itemId)
                 .map(stats -> counterLiftCalculator.calculate(
                         stats.getCoCountAll(), stats.getPairGameCountAll(),
                         baseRate.purchaseCountAll(), baseRate.gameCountAll()))
@@ -132,10 +169,8 @@ public class StatsFeatureExtractor {
 
     // ── Ally ───────────────────────────────────────────────────────────────
 
-    private void setAlly(long itemId, RecommendationQuery query, FeatureVector vector) {
-        Map<Long, PairScoreAggregate> byItem = pairSynergyRetriever.scoresByItem(
-                query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY);
-        PairScoreAggregate aggregate = byItem.get(itemId);
+    private void setAlly(long itemId, StatsContext context, FeatureVector vector) {
+        PairScoreAggregate aggregate = context.allyScoresByItem().get(itemId);
         if (aggregate == null) {
             return;
         }
@@ -188,6 +223,28 @@ public class StatsFeatureExtractor {
 
     private double winRate(ItemMetaStats stats) {
         return stats.getPickCount() == 0 ? 0.0 : (double) stats.getWinCount() / stats.getPickCount();
+    }
+
+    /**
+     * 질의 단위로 한 번만 읽는 통계 묶음. 후보마다 같은 조회를 반복하지 않기 위한 것이다.
+     *
+     * @param championGameCounts {@code [전체 판수, 최근 판수]}
+     */
+    public record StatsContext(
+            int[] championGameCounts,
+            Map<Long, int[]> purchaseCountsByItem,
+            Map<Long, List<ChampionPairItemStats>> counterStatsByItem,
+            Map<Long, PairScoreAggregate> allyScoresByItem
+    ) {
+
+        private ChampionBaseRate baseRateOf(long itemId) {
+            if (championGameCounts[0] == 0) {
+                return ChampionBaseRate.UNKNOWN;
+            }
+            int[] purchases = purchaseCountsByItem.getOrDefault(itemId, new int[]{0, 0});
+            return new ChampionBaseRate(
+                    purchases[0], championGameCounts[0], purchases[1], championGameCounts[1]);
+        }
     }
 
     private record ChampionBaseRate(

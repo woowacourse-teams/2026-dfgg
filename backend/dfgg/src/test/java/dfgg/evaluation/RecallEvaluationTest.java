@@ -113,9 +113,8 @@ class RecallEvaluationTest {
         int sampledMatches = 0;
 
         while (sampledMatches < SAMPLE_MATCHES) {
-            List<String> matchIds = participantRepository
-                    .findDistinctMatchIds(PageRequest.of(page++, 500))
-                    .getContent();
+            // 해시 순서. match_id 순은 시간순이라 앞에서 자르면 오래된 패치만 표본에 들어간다.
+            List<String> matchIds = participantRepository.findSampledMatchIds(PageRequest.of(page++, 500));
             if (matchIds.isEmpty()) {
                 break;
             }

@@ -58,7 +58,8 @@ class NextItemRecommendationServiceTest {
 
         service = new NextItemRecommendationService(
                 championService, itemService, List.of(buildGenerator),
-                new HardValidityFilter(new ItemExclusionGroups()), candidateRanker, 20, 20, 20, 30
+                new HardValidityFilter(new ItemExclusionGroups()), candidateRanker,
+                new dfgg.application.recommend.v3.CandidateTopK(20, 20, 20, 30)
         );
     }
 
