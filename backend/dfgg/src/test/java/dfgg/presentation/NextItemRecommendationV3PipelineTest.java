@@ -4,7 +4,9 @@ import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
-import dfgg.application.recommend.v3.ranker.BestSourceScoreRanker;
+import dfgg.application.recommend.v3.feature.FeatureName;
+import dfgg.application.recommend.v3.ranker.CandidateRanker;
+import dfgg.application.recommend.v3.ranker.LambdaMartRanker;
 import dfgg.presentation.dto.ChampionDto;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
@@ -41,6 +43,9 @@ class NextItemRecommendationV3PipelineTest {
 
     @LocalServerPort
     private int port;
+
+    @Autowired
+    private CandidateRanker candidateRanker;
 
     @Autowired
     private ItemStatsAggregationService aggregationService;
@@ -163,14 +168,28 @@ class NextItemRecommendationV3PipelineTest {
     }
 
     @Test
-    @DisplayName("폴백 체인이 아니라 랭커가 순위를 정했음을 응답에 남긴다")
-    void recommendV3_WhenServed_ReportsRankerVersionNotFallbackStage() {
+    @DisplayName("폴백 체인이 아니라 학습된 랭커가 순위를 정했음을 응답에 남긴다")
+    void recommendV3_WhenServed_ReportsLtrModelVersionNotFallbackStage() {
         // when
         NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
 
         // then: 구 파이프라인은 FallbackStage 이름(PRIMARY 등)을 돌려줬다
         assertThat(response.servedBy())
-                .isEqualTo(BestSourceScoreRanker.MODEL_VERSION)
+                .contains("lambdamart", FeatureName.schemaFingerprint())
                 .doesNotContain("PRIMARY", "COMPOSITION_STATS", "MOST_FREQUENT_BUILD");
+    }
+
+    @Test
+    @DisplayName("v3의 유일한 랭커가 LambdaMART다 — 임시 랭커가 남아 있으면 빈이 둘이 되어 여기서 걸린다")
+    void candidateRankerBean_IsLambdaMart() {
+        assertThat(candidateRanker).isInstanceOf(LambdaMartRanker.class);
+    }
+
+    @Test
+    @DisplayName("기동 시 모델이 실제로 로드된다 — 스키마가 어긋난 모델이면 컨텍스트가 뜨지 않는다")
+    void applicationContext_LoadsTheCommittedModelAtStartup() {
+        // 이 테스트가 도는 것 자체가 컨텍스트 기동에 성공했다는 뜻이고,
+        // 모델 빈은 기동 시점에 지문·feature 순서를 검증한다.
+        assertThat(candidateRanker.modelVersion()).isNotBlank();
     }
 }
