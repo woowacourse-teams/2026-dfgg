@@ -41,6 +41,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -122,7 +123,10 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
     @MockitoSpyBean
     private ChampionBuildStatsAggregationService aggregationService;
 
+    // @AfterEach도 함께 건다 — 이 테스트는 NOT_SUPPORTED라 커밋하므로, 마지막 테스트가 남긴
+    // composition_stats_items가 다른 클래스의 DELETE FROM items를 FK 위반으로 깨뜨린다.
     @BeforeEach
+    @AfterEach
     void cleanUp() {
         completionRepository.deleteAllInBatch();
         sampleRepository.deleteAllInBatch();

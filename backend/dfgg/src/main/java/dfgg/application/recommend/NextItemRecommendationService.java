@@ -2,16 +2,27 @@ package dfgg.application.recommend;
 
 import dfgg.application.champion.ChampionService;
 import dfgg.application.item.ItemService;
-import dfgg.application.recommend.fallback.FallbackChain;
-import dfgg.application.recommend.fallback.FallbackRecommendation;
-import dfgg.application.recommend.fallback.RecommendationContext;
+import dfgg.application.recommend.v3.CandidateGenerator;
+import dfgg.application.recommend.v3.CandidateTopK;
+import dfgg.application.recommend.v3.CandidateUnion;
+import dfgg.application.recommend.v3.GeneratorResult;
+import dfgg.application.recommend.v3.RecommendationQuery;
+import dfgg.application.recommend.v3.HardValidityFilter;
+import dfgg.application.recommend.v3.ranker.CandidateRanker;
+import dfgg.application.recommend.v3.explanation.DescriptionComposer;
+import dfgg.application.recommend.v3.explanation.ExplanationSelector;
+import dfgg.application.recommend.v3.ranker.RankedCandidate;
+import dfgg.application.recommend.v3.ranker.TreeShapCalculator;
 import dfgg.common.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.item.Item;
-import dfgg.presentation.dto.ItemDto;
+import dfgg.presentation.dto.ChampionDto;
+import dfgg.presentation.dto.RecommendationReasons;
+import dfgg.presentation.dto.RecommendedItemDto;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -20,78 +31,114 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * prefix(이미 구매한 아이템) 조건부 다음 아이템 추천 요청을 폴백 체인에 위임하고,
- * 그 결과를 응답 DTO로 변환한다.
+ * v3 추천 파이프라인.
+ *
+ * <pre>
+ * Game State → 4개 Generator → Candidate Union → Hard Validity Filter → Ranker → Top-5
+ * </pre>
+ *
+ * <p>각 단계의 책임이 겹치지 않는다. generator는 후보를 <b>발견</b>만 하고(목적은 recall),
+ * 필터는 게임 규칙상 <b>못 사는 것</b>만 걷어내며, 최종 순위는 랭커가 단독으로 정한다.
+ * 여기서 점수를 섞거나 context별로 재정렬하지 않는다.
  */
 @Service
 @Transactional(readOnly = true)
 public class NextItemRecommendationService {
 
-    private static final String BOOTS_TAG = "Boots";
+    private static final int TOP_N = 5;
 
     private final ChampionService championService;
     private final ItemService itemService;
-    private final FallbackChain fallbackChain;
+    private final List<CandidateGenerator> generators;
+    private final HardValidityFilter hardValidityFilter;
+    private final CandidateRanker candidateRanker;
+    private final CandidateTopK candidateTopK;
+    private final TreeShapCalculator treeShapCalculator;
+    private final ExplanationSelector explanationSelector;
+    private final DescriptionComposer descriptionComposer;
 
     public NextItemRecommendationService(
             ChampionService championService,
             ItemService itemService,
-            FallbackChain fallbackChain
+            List<CandidateGenerator> generators,
+            HardValidityFilter hardValidityFilter,
+            CandidateRanker candidateRanker,
+            CandidateTopK candidateTopK,
+            TreeShapCalculator treeShapCalculator,
+            ExplanationSelector explanationSelector,
+            DescriptionComposer descriptionComposer
     ) {
         this.championService = championService;
         this.itemService = itemService;
-        this.fallbackChain = fallbackChain;
+        this.generators = List.copyOf(generators);
+        this.hardValidityFilter = hardValidityFilter;
+        this.candidateRanker = candidateRanker;
+        this.candidateTopK = candidateTopK;
+        this.treeShapCalculator = treeShapCalculator;
+        this.explanationSelector = explanationSelector;
+        this.descriptionComposer = descriptionComposer;
     }
 
     public NextItemRecommendationResponse recommendNextItem(NextItemRecommendationRequest request) {
         Champion myChampion = championService.findChampionByName(request.myChampion().name());
-        ChampionPosition position = ChampionPosition.valueOf(request.myChampion().position());
-        List<Long> allyChampionIds = resolveChampionIds(request.allies());
-        List<Long> enemyChampionIds = resolveChampionIds(request.enemies());
+        RecommendationQuery query = toQuery(request, myChampion);
 
-        RecommendationContext context = new RecommendationContext(
+        List<GeneratorResult> generatorResults = new ArrayList<>();
+        for (CandidateGenerator generator : generators) {
+            generatorResults.add(generator.generate(query, candidateTopK.of(generator.
+                    source())));
+        }
+
+        CandidateUnion union = CandidateUnion.merge(generatorResults);
+        Map<Long, Item> itemById = loadItems(union, query);
+        CandidateUnion valid = hardValidityFilter.filter(union, query.purchasedItemIds(), itemById);
+
+        List<RankedCandidate> ranked = candidateRanker.rank(valid, query, TOP_N);
+        if (ranked.isEmpty()) {
+            // 기존 v3와 같은 404 계약을 유지한다. 파이프라인을 갈아끼운 것이지
+            // "추천할 게 없다"를 표현하는 방식까지 바꿀 이유는 없다.
+            throw new NextItemRecommendationNotFoundException(
+                    request.myChampion().name(), query.position().name());
+        }
+        List<RecommendedItemDto> recommendedItems = new ArrayList<>();
+        for (int index = 0; index < ranked.size(); index++) {
+            RankedCandidate candidate = ranked.get(index);
+            // 순위를 매길 때 쓴 feature 벡터를 그대로 넘긴다. 다시 계산하면 서빙 점수와
+            // 이유가 어긋날 수 있다.
+            RecommendationReasons reasons = RecommendationReasons.of(
+                    treeShapCalculator.contributions(candidate.features().values()));
+            String description = descriptionComposer.compose(
+                    explanationSelector.select(reasons.byGroup(), index + 1), myChampion.getName());
+            recommendedItems.add(RecommendedItemDto.of(
+                    itemById.get(candidate.itemId()), description, reasons));
+        }
+        return new NextItemRecommendationResponse(recommendedItems, candidateRanker.modelVersion());
+    }
+
+    private RecommendationQuery toQuery(NextItemRecommendationRequest request, Champion myChampion) {
+        return new RecommendationQuery(
                 myChampion.getChampionId(),
+                ChampionPosition.valueOf(request.myChampion().position()),
                 request.purchasedItemIds(),
-                position,
+                resolveChampionIds(request.allies()),
+                resolveChampionIds(request.enemies()),
                 request.tier(),
-                request.patch(),
-                allyChampionIds,
-                enemyChampionIds
+                request.patch()
         );
-
-        FallbackRecommendation recommendation = fallbackChain.recommend(context)
-                .orElseThrow(() -> new NextItemRecommendationNotFoundException(myChampion.getName(), position.name()));
-
-        List<ItemDto> orderedItems = toOrderedItemDtos(recommendation.itemIds(), request.purchasedItemIds());
-        return new NextItemRecommendationResponse(orderedItems, recommendation.servedBy().name());
     }
 
-    private List<Long> resolveChampionIds(List<dfgg.presentation.dto.ChampionDto> champions) {
+    private Map<Long, Item> loadItems(CandidateUnion union, RecommendationQuery query) {
+        List<Long> itemIds = new ArrayList<>(union.candidates().stream()
+                .map(candidate -> candidate.itemId())
+                .toList());
+        itemIds.addAll(query.purchasedItemIds());
+        return itemService.findItemsByIds(itemIds).stream()
+                .collect(Collectors.toMap(Item::getItemId, Function.identity(), (first, second) -> first));
+    }
+
+    private List<Long> resolveChampionIds(List<ChampionDto> champions) {
         return champions.stream()
-                .map(dto -> championService.findChampionByName(dto.name()).getChampionId())
-                .toList();
-    }
-
-    /**
-     * {@code findItemsByIds}는 요청한 순서를 보장하지 않으므로, 랭킹 순서(추천 순위)를
-     * 그대로 유지하기 위해 원래 itemIds 순서대로 다시 정렬한다.
-     *
-     * <p>신발은 한 켤레만 신을 수 있다 — 이미 산 아이템 중 신발이 있으면, 폴백 체인이
-     * 추천한 후보 중 신발은 전부 제외한다. 안전/탐색 구역 어느 쪽도 "신발 슬롯"이라는
-     * 게임 규칙 자체를 모르고 아이템 단위로만 후보를 매기기 때문에, 이미 산 신발과
-     * 다른 신발이 여전히 후보에 낄 수 있어 여기서 마지막으로 걸러낸다.
-     */
-    private List<ItemDto> toOrderedItemDtos(List<Long> rankedItemIds, List<Long> purchasedItemIds) {
-        Map<Long, Item> itemById = itemService.findItemsByIds(rankedItemIds).stream()
-                .collect(Collectors.toMap(Item::getItemId, Function.identity()));
-        boolean bootsAlreadyPurchased = itemService.findItemsByIds(purchasedItemIds).stream()
-                .anyMatch(item -> item.hasTag(BOOTS_TAG));
-
-        return rankedItemIds.stream()
-                .map(itemById::get)
-                .filter(java.util.Objects::nonNull)
-                .filter(item -> !bootsAlreadyPurchased || !item.hasTag(BOOTS_TAG))
-                .map(ItemDto::from)
+                .map(champion -> championService.findChampionByName(champion.name()).getChampionId())
                 .toList();
     }
 }

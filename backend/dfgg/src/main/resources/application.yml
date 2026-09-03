@@ -31,17 +31,19 @@ mining:
     match-page-size: "${MINING_BATCH_MATCH_PAGE_SIZE:200}"
 
 recommendation:
-  identity-algorithm-version: "${RECOMMENDATION_IDENTITY_ALGORITHM_VERSION:checkpoint-a-4}"
-  counter-algorithm-version: "${RECOMMENDATION_COUNTER_ALGORITHM_VERSION:checkpoint-c-1-counter}"
-  pattern-algorithm-version: "${RECOMMENDATION_PATTERN_ALGORITHM_VERSION:checkpoint-d-1}"
-  anchored-prefix-limit: "${RECOMMENDATION_ANCHORED_PREFIX_LIMIT:2}"
-  total-candidate-count: "${RECOMMENDATION_TOTAL_CANDIDATE_COUNT:10}"
-  prefix-backoff-threshold: "${RECOMMENDATION_PREFIX_BACKOFF_THRESHOLD:5}"
-  safe-zone-ratio: "${RECOMMENDATION_SAFE_ZONE_RATIO:0.8}"
-  wilson-weight: "${RECOMMENDATION_WILSON_WEIGHT:1.0}"
-  my-champion-weight: "${RECOMMENDATION_MY_CHAMPION_WEIGHT:1.0}"
-  ally-weight: "${RECOMMENDATION_ALLY_WEIGHT:1.0}"
-  enemy-weight: "${RECOMMENDATION_ENEMY_WEIGHT:1.0}"
+  recent-patch-window-size: "${RECOMMENDATION_RECENT_PATCH_WINDOW_SIZE:3}"
+  counter:
+    lift-smoothing-alpha: "${RECOMMENDATION_COUNTER_LIFT_ALPHA:1.0}"
+    item-vocabulary-size: "${RECOMMENDATION_COUNTER_ITEM_VOCABULARY_SIZE:159}"
+  pair-synergy:
+    minimum-pair-games: "${RECOMMENDATION_PAIR_SYNERGY_MIN_GAMES:5}"
+  self-synergy:
+    minimum-position-sample: "${RECOMMENDATION_SELF_SYNERGY_MIN_POSITION_SAMPLE:10}"
+  candidate-top-k:
+    build: "${RECOMMENDATION_CANDIDATE_TOP_K_BUILD:5}"
+    self-synergy: "${RECOMMENDATION_CANDIDATE_TOP_K_SELF_SYNERGY:5}"
+    ally-synergy: "${RECOMMENDATION_CANDIDATE_TOP_K_ALLY_SYNERGY:5}"
+    counter: "${RECOMMENDATION_CANDIDATE_TOP_K_COUNTER:5}"
   v2-min-sample-count: "${RECOMMENDATION_V2_MIN_SAMPLE_COUNT:30}"
   v2-tiers: "${RECOMMENDATION_V2_TIERS:PLATINUM,EMERALD,DIAMOND,MASTER,GRANDMASTER,CHALLENGER}"
 

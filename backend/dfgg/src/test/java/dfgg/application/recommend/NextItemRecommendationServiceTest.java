@@ -3,173 +3,170 @@ package dfgg.application.recommend;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import dfgg.application.champion.ChampionService;
 import dfgg.application.item.ItemService;
-import dfgg.application.recommend.fallback.FallbackChain;
-import dfgg.application.recommend.fallback.FallbackRecommendation;
-import dfgg.application.recommend.fallback.FallbackStage;
-import dfgg.application.recommend.fallback.RecommendationContext;
+import dfgg.application.recommend.v3.CandidateGenerator;
+import dfgg.application.recommend.v3.CandidateSource;
+import dfgg.application.recommend.v3.CandidateUnion;
+import dfgg.application.recommend.v3.GeneratorResult;
+import dfgg.application.recommend.v3.HardValidityFilter;
+import dfgg.application.recommend.v3.RecommendationQuery;
+import dfgg.application.recommend.v3.feature.FeatureVector;
+import dfgg.application.recommend.v3.ranker.RankedCandidate;
+import dfgg.application.recommend.v3.ScoredItem;
+import dfgg.application.recommend.v3.ranker.CandidateRanker;
 import dfgg.common.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
-import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
+import dfgg.domain.item.ItemExclusionGroups;
 import dfgg.presentation.dto.ChampionDto;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class NextItemRecommendationServiceTest {
 
+    private static final long KRAKEN = 6673L;
+    private static final long INFINITY_EDGE = 3031L;
+    private static final long LIANDRY = 6653L;
+
     private ChampionService championService;
     private ItemService itemService;
-    private FallbackChain fallbackChain;
+    private CandidateGenerator buildGenerator;
+    private CandidateRanker candidateRanker;
     private NextItemRecommendationService service;
 
     @BeforeEach
     void setUp() {
         championService = mock(ChampionService.class);
         itemService = mock(ItemService.class);
-        fallbackChain = mock(FallbackChain.class);
-        service = new NextItemRecommendationService(championService, itemService, fallbackChain);
+        buildGenerator = mock(CandidateGenerator.class);
+        candidateRanker = mock(CandidateRanker.class);
+
+        when(championService.findChampionByName(any())).thenAnswer(invocation -> {
+            Champion champion = mock(Champion.class);
+            when(champion.getChampionId()).thenReturn(championIdOf(invocation.getArgument(0)));
+            return champion;
+        });
+        when(buildGenerator.source()).thenReturn(CandidateSource.BUILD);
+        when(candidateRanker.modelVersion()).thenReturn("test-ranker");
+
+        service = new NextItemRecommendationService(
+                championService, itemService, List.of(buildGenerator),
+                new HardValidityFilter(new ItemExclusionGroups()), candidateRanker,
+                new dfgg.application.recommend.v3.CandidateTopK(20, 20, 20, 30),
+                trivialShapCalculator(),
+                new dfgg.application.recommend.v3.explanation.ExplanationSelector(),
+                new dfgg.application.recommend.v3.explanation.DescriptionComposer()
+        );
     }
 
-    private Champion championOf(Long id, String name) {
-        Champion champion = mock(Champion.class);
-        when(champion.getChampionId()).thenReturn(id);
-        when(champion.getName()).thenReturn(name);
-        when(champion.getChampionTags()).thenReturn(List.of(ChampionTag.MARKSMAN));
-        return champion;
+    /** 이유 계산은 여기 관심사가 아니다. 분기 없는 트리라 기여도가 전부 0이 된다. */
+    private dfgg.application.recommend.v3.ranker.TreeShapCalculator trivialShapCalculator() {
+        var tree = new dfgg.application.recommend.v3.ranker.DecisionTree(
+                new int[]{}, new double[]{}, new boolean[]{},
+                new int[]{}, new int[]{}, new double[]{0.0},
+                new double[]{}, new double[]{1.0});
+        return new dfgg.application.recommend.v3.ranker.TreeShapCalculator(
+                new dfgg.application.recommend.v3.ranker.GradientBoostedTrees(List.of(tree)),
+                dfgg.application.recommend.v3.feature.FeatureName.values().length);
     }
 
-    private NextItemRecommendationRequest requestOf(List<Long> purchasedItemIds) {
+    private long championIdOf(String name) {
+        return switch (name) {
+            case "야스오" -> 157L;
+            case "징크스" -> 222L;
+            case "쓰레쉬" -> 412L;
+            case "리신" -> 64L;
+            case "오른" -> 516L;
+            case "람머스" -> 33L;
+            case "아리" -> 103L;
+            case "케이틀린" -> 51L;
+            case "레오나" -> 89L;
+            default -> 60L;
+        };
+    }
+
+    private NextItemRecommendationRequest request() {
         return new NextItemRecommendationRequest(
-                new ChampionDto("Jinx", "BOTTOM"),
-                purchasedItemIds,
-                List.of(
-                        new ChampionDto("Ally1", "TOP"), new ChampionDto("Ally1", "JUNGLE"),
-                        new ChampionDto("Ally1", "MID"), new ChampionDto("Ally1", "SUPPORT")
-                ),
-                List.of(
-                        new ChampionDto("Enemy1", "TOP"), new ChampionDto("Enemy1", "JUNGLE"),
-                        new ChampionDto("Enemy1", "MID"), new ChampionDto("Enemy1", "BOTTOM"),
-                        new ChampionDto("Enemy1", "SUPPORT")
-                ),
-                "PLATINUM",
-                "16.16"
+                new ChampionDto("야스오", "MID"), List.of(),
+                List.of(new ChampionDto("징크스", "BOTTOM"), new ChampionDto("쓰레쉬", "SUPPORT"),
+                        new ChampionDto("리신", "JUNGLE"), new ChampionDto("오른", "TOP")),
+                List.of(new ChampionDto("람머스", "TOP"), new ChampionDto("아리", "MID"),
+                        new ChampionDto("케이틀린", "BOTTOM"), new ChampionDto("레오나", "SUPPORT"),
+                        new ChampionDto("엘리스", "JUNGLE")),
+                "EMERALD", "16.17"
         );
     }
 
-    @Test
-    @DisplayName("폴백 체인이 추천을 반환하면 아이템 순서를 그대로 유지해 응답으로 변환한다")
-    void recommendNextItem_WhenFallbackChainSucceeds_ReturnsItemsInRankedOrder() {
-        // given
-        Champion myChampion = championOf(222L, "징크스");
-        Champion allyChampion = championOf(412L, "럭스");
-        Champion enemyChampion = championOf(54L, "말파이트");
-        when(championService.findChampionByName("Jinx")).thenReturn(myChampion);
-        when(championService.findChampionByName("Ally1")).thenReturn(allyChampion);
-        when(championService.findChampionByName("Enemy1")).thenReturn(enemyChampion);
-
-        when(fallbackChain.recommend(any(RecommendationContext.class))).thenReturn(
-                Optional.of(new FallbackRecommendation(List.of(3072L, 3006L), FallbackStage.MOST_FREQUENT_BUILD))
+    private void givenCandidates(long... itemIds) {
+        List<ScoredItem> scored = java.util.stream.LongStream.of(itemIds)
+                .mapToObj(id -> new ScoredItem(id, 0.5))
+                .toList();
+        when(buildGenerator.generate(any(RecommendationQuery.class), anyInt()))
+                .thenReturn(GeneratorResult.of(CandidateSource.BUILD, scored));
+        when(itemService.findItemsByIds(any())).thenReturn(
+                java.util.stream.LongStream.of(itemIds)
+                        .mapToObj(id -> new Item(id, "아이템" + id, List.of()))
+                        .toList()
         );
-        // findItemsByIds는 순서를 보장하지 않으므로 일부러 반대 순서로 반환해 재정렬 로직을 검증한다
-        when(itemService.findItemsByIds(List.of(3072L, 3006L))).thenReturn(List.of(
-                new Item(3006L, "광전사의 군화"),
-                new Item(3072L, "루난의 허리케인")
-        ));
+    }
 
-        // when
-        NextItemRecommendationResponse response = service.recommendNextItem(requestOf(List.of(3031L)));
-
-        // then
-        assertThat(response.recommendedItems()).extracting("name")
-                .containsExactly("루난의 허리케인", "광전사의 군화");
-        assertThat(response.servedBy()).isEqualTo("MOST_FREQUENT_BUILD");
+    /** 랭커는 순위와 함께 feature를 돌려준다. 여기서는 순서만 보므로 빈 벡터로 채운다. */
+    private List<RankedCandidate> rankedOf(long... itemIds) {
+        return java.util.stream.LongStream.of(itemIds)
+                .mapToObj(id -> new RankedCandidate(id, 0.0, FeatureVector.empty()))
+                .toList();
     }
 
     @Test
-    @DisplayName("이미 신발을 샀으면 폴백 체인이 다른 신발을 추천해도 결과에서 제외한다")
-    void recommendNextItem_WhenBootsAlreadyPurchased_ExcludesAnotherBootsFromResult() {
-        // given: 이미 산 3006(광전사의 군화)도 신발(Boots 태그)이라, 폴백 체인이 추천한
-        // 다른 신발 3047(판금 장화)은 빼고 일반 아이템 3072만 남아야 한다.
-        Champion myChampion = championOf(222L, "징크스");
-        Champion allyChampion = championOf(412L, "럭스");
-        Champion enemyChampion = championOf(54L, "말파이트");
-        when(championService.findChampionByName("Jinx")).thenReturn(myChampion);
-        when(championService.findChampionByName("Ally1")).thenReturn(allyChampion);
-        when(championService.findChampionByName("Enemy1")).thenReturn(enemyChampion);
-        when(fallbackChain.recommend(any(RecommendationContext.class))).thenReturn(
-                Optional.of(new FallbackRecommendation(List.of(3047L, 3072L), FallbackStage.PRIMARY))
-        );
-        when(itemService.findItemsByIds(List.of(3047L, 3072L))).thenReturn(List.of(
-                new Item(3047L, "판금 장화", List.of("Boots")),
-                new Item(3072L, "루난의 허리케인", List.of())
-        ));
-        when(itemService.findItemsByIds(List.of(3006L))).thenReturn(List.of(
-                new Item(3006L, "광전사의 군화", List.of("Boots"))
-        ));
+    @DisplayName("최종 순서는 랭커가 정한 그대로다 — 서비스가 다시 정렬하지 않는다")
+    void recommendNextItem_WhenRankerReturnsOrder_PreservesItExactly() {
+        // given: 랭커가 generator 점수 순서와 다른 순서를 돌려줘도 그대로 따라야 한다
+        givenCandidates(KRAKEN, INFINITY_EDGE, LIANDRY);
+        when(candidateRanker.rank(any(CandidateUnion.class), any(RecommendationQuery.class), anyInt()))
+                .thenReturn(rankedOf(LIANDRY, KRAKEN, INFINITY_EDGE));
 
         // when
-        NextItemRecommendationResponse response = service.recommendNextItem(requestOf(List.of(3006L)));
+        NextItemRecommendationResponse response = service.recommendNextItem(request());
 
         // then
-        assertThat(response.recommendedItems()).extracting("name").containsExactly("루난의 허리케인");
+        assertThat(response.recommendedItems()).extracting(item -> item.id())
+                .containsExactly(LIANDRY, KRAKEN, INFINITY_EDGE);
     }
 
     @Test
-    @DisplayName("요청의 챔피언 이름을 정확히 ID로 변환해 폴백 체인에 전달한다")
-    void recommendNextItem_WhenCalled_BuildsContextWithResolvedChampionIdsAndPurchasedItems() {
+    @DisplayName("어떤 랭커가 순위를 냈는지 응답에 담는다")
+    void recommendNextItem_WhenServed_ReportsRankerModelVersion() {
         // given
-        Champion myChampion = championOf(222L, "징크스");
-        Champion allyChampion = championOf(412L, "럭스");
-        Champion enemyChampion = championOf(54L, "말파이트");
-        when(championService.findChampionByName("Jinx")).thenReturn(myChampion);
-        when(championService.findChampionByName("Ally1")).thenReturn(allyChampion);
-        when(championService.findChampionByName("Enemy1")).thenReturn(enemyChampion);
-        when(fallbackChain.recommend(any(RecommendationContext.class)))
-                .thenReturn(Optional.of(new FallbackRecommendation(List.of(3072L), FallbackStage.PRIMARY)));
-        when(itemService.findItemsByIds(List.of(3072L))).thenReturn(List.of(new Item(3072L, "루난의 허리케인")));
+        givenCandidates(KRAKEN);
+        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(KRAKEN));
 
         // when
-        service.recommendNextItem(requestOf(List.of(3031L)));
+        NextItemRecommendationResponse response = service.recommendNextItem(request());
 
         // then
-        org.mockito.ArgumentCaptor<RecommendationContext> captor =
-                org.mockito.ArgumentCaptor.forClass(RecommendationContext.class);
-        org.mockito.Mockito.verify(fallbackChain).recommend(captor.capture());
-        RecommendationContext context = captor.getValue();
-        assertThat(context.myChampionId()).isEqualTo(222L);
-        assertThat(context.purchasedItemIds()).containsExactly(3031L);
-        assertThat(context.allyChampionIds()).containsExactly(412L, 412L, 412L, 412L);
-        assertThat(context.enemyChampionIds()).containsExactly(54L, 54L, 54L, 54L, 54L);
-        assertThat(context.tier()).isEqualTo("PLATINUM");
-        assertThat(context.patch()).isEqualTo("16.16");
+        assertThat(response.servedBy()).isEqualTo("test-ranker");
     }
 
     @Test
-    @DisplayName("폴백 체인이 끝까지 추천을 못 만들면 예외를 던진다")
-    void recommendNextItem_WhenFallbackChainReturnsEmpty_ThrowsNextItemRecommendationNotFoundException() {
+    @DisplayName("후보가 하나도 없으면 기존과 같이 NotFound를 던진다 — 404 계약을 유지한다")
+    void recommendNextItem_WhenNoCandidates_ThrowsNotFound() {
         // given
-        Champion myChampion = championOf(222L, "징크스");
-        Champion allyChampion = championOf(412L, "럭스");
-        Champion enemyChampion = championOf(54L, "말파이트");
-        when(championService.findChampionByName("Jinx")).thenReturn(myChampion);
-        when(championService.findChampionByName("Ally1")).thenReturn(allyChampion);
-        when(championService.findChampionByName("Enemy1")).thenReturn(enemyChampion);
-        when(fallbackChain.recommend(any(RecommendationContext.class))).thenReturn(Optional.empty());
+        when(buildGenerator.generate(any(RecommendationQuery.class), anyInt()))
+                .thenReturn(GeneratorResult.of(CandidateSource.BUILD, List.of()));
+        when(itemService.findItemsByIds(any())).thenReturn(List.of());
+        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(List.of());
 
         // when & then
-        assertThatThrownBy(() -> service.recommendNextItem(requestOf(List.of())))
-                .isInstanceOf(NextItemRecommendationNotFoundException.class)
-                .hasMessageContaining("징크스")
-                .hasMessageContaining("BOTTOM");
+        assertThatThrownBy(() -> service.recommendNextItem(request()))
+                .isInstanceOf(NextItemRecommendationNotFoundException.class);
     }
 }

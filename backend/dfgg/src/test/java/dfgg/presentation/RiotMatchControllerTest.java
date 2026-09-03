@@ -32,11 +32,9 @@ class RiotMatchControllerTest {
         collectionOrchestrator = mock(RiotCollectionOrchestrator.class);
         statsRebuildService = mock(ChampionBuildStatsRebuildMatchService.class);
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new RiotMatchController(
-                        riotMatchSyncService,
+                .standaloneSetup(new RiotMatchController(riotMatchSyncService,
                         collectionOrchestrator,
-                        statsRebuildService
-                ))
+                        statsRebuildService, mock(dfgg.application.match.MatchRenormalizationService.class)))
                 .build();
     }
 
@@ -99,11 +97,9 @@ class RiotMatchControllerTest {
         doThrow(new IllegalStateException("statistics unavailable"))
                 .when(collectionOrchestrator)
                 .normalizeAndAggregatePendingMatches("PLATINUM");
-        RiotMatchController controller = new RiotMatchController(
-                riotMatchSyncService,
+        RiotMatchController controller = new RiotMatchController(riotMatchSyncService,
                 collectionOrchestrator,
-                statsRebuildService
-        );
+                statsRebuildService, mock(dfgg.application.match.MatchRenormalizationService.class));
 
         assertThatThrownBy(() -> controller.rebuildStats("PLATINUM"))
                 .isInstanceOf(IllegalStateException.class);
