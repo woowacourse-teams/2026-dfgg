@@ -13,7 +13,9 @@ public record DecisionTree(
         boolean[] defaultLeft,
         int[] left,
         int[] right,
-        double[] leafValue
+        double[] leafValue,
+        double[] nodeCover,
+        double[] leafCover
 ) {
 
     public DecisionTree {
@@ -28,6 +30,12 @@ public record DecisionTree(
         }
         if (leafValue.length == 0) {
             throw new IllegalArgumentException("트리에 잎이 하나도 없습니다.");
+        }
+        // cover(노드를 지난 학습 표본 수)는 예측에는 쓰이지 않지만 TreeSHAP에 반드시 필요하다.
+        if (nodeCover.length != nodeCount || leafCover.length != leafValue.length) {
+            throw new IllegalArgumentException(
+                    "cover 배열 길이가 트리와 맞지 않습니다: nodeCover=%d(노드 %d), leafCover=%d(잎 %d)"
+                            .formatted(nodeCover.length, nodeCount, leafCover.length, leafValue.length));
         }
     }
 
@@ -48,6 +56,11 @@ public record DecisionTree(
             node = goLeft ? left[node] : right[node];
         }
         return leafValue[-node - 1];
+    }
+
+    /** 자식 인덱스 규약에 맞춰 cover를 읽는다. 음수면 잎이다. */
+    public double coverOf(int childIndex) {
+        return childIndex >= 0 ? nodeCover[childIndex] : leafCover[-childIndex - 1];
     }
 
     public int maxFeatureIndex() {

@@ -9,12 +9,15 @@ import dfgg.application.recommend.v3.GeneratorResult;
 import dfgg.application.recommend.v3.RecommendationQuery;
 import dfgg.application.recommend.v3.HardValidityFilter;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
+import dfgg.application.recommend.v3.ranker.TreeShapCalculator;
+import dfgg.application.recommend.v3.ranker.RankedCandidate;
 import dfgg.common.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.item.Item;
 import dfgg.presentation.dto.ChampionDto;
-import dfgg.presentation.dto.ItemDto;
+import dfgg.presentation.dto.RecommendationReasons;
+import dfgg.presentation.dto.RecommendedItemDto;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
 import java.util.ArrayList;
@@ -48,6 +51,7 @@ public class NextItemRecommendationService {
     private final HardValidityFilter hardValidityFilter;
     private final CandidateRanker candidateRanker;
     private final CandidateTopK candidateTopK;
+    private final TreeShapCalculator treeShapCalculator;
 
     public NextItemRecommendationService(
             ChampionService championService,
@@ -55,7 +59,8 @@ public class NextItemRecommendationService {
             List<CandidateGenerator> generators,
             HardValidityFilter hardValidityFilter,
             CandidateRanker candidateRanker,
-            CandidateTopK candidateTopK
+            CandidateTopK candidateTopK,
+            TreeShapCalculator treeShapCalculator
     ) {
         this.championService = championService;
         this.itemService = itemService;
@@ -63,6 +68,7 @@ public class NextItemRecommendationService {
         this.hardValidityFilter = hardValidityFilter;
         this.candidateRanker = candidateRanker;
         this.candidateTopK = candidateTopK;
+        this.treeShapCalculator = treeShapCalculator;
     }
 
     public NextItemRecommendationResponse recommendNextItem(NextItemRecommendationRequest request) {
@@ -78,16 +84,20 @@ public class NextItemRecommendationService {
         Map<Long, Item> itemById = loadItems(union, query);
         CandidateUnion valid = hardValidityFilter.filter(union, query.purchasedItemIds(), itemById);
 
-        List<Long> rankedItemIds = candidateRanker.rank(valid, query, TOP_N);
-        if (rankedItemIds.isEmpty()) {
+        List<RankedCandidate> ranked = candidateRanker.rank(valid, query, TOP_N);
+        if (ranked.isEmpty()) {
             // 기존 v3와 같은 404 계약을 유지한다. 파이프라인을 갈아끼운 것이지
             // "추천할 게 없다"를 표현하는 방식까지 바꿀 이유는 없다.
             throw new NextItemRecommendationNotFoundException(
                     request.myChampion().name(), query.position().name());
         }
-        List<ItemDto> recommendedItems = rankedItemIds.stream()
-                .map(itemById::get)
-                .map(ItemDto::from)
+        List<RecommendedItemDto> recommendedItems = ranked.stream()
+                .map(candidate -> RecommendedItemDto.of(
+                        itemById.get(candidate.itemId()),
+                        // 순위를 매길 때 쓴 feature 벡터를 그대로 넘긴다. 다시 계산하면
+                        // 서빙 점수와 이유가 어긋날 수 있다.
+                        RecommendationReasons.of(
+                                treeShapCalculator.contributions(candidate.features().values()))))
                 .toList();
         return new NextItemRecommendationResponse(recommendedItems, candidateRanker.modelVersion());
     }

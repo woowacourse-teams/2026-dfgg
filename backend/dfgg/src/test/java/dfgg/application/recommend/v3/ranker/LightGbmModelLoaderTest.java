@@ -38,7 +38,8 @@ class LightGbmModelLoaderTest {
     /** f0 <= 0.5 → 1.0, 아니면 2.0. */
     private static final String ONE_TREE = """
             [{"split_feature": [0], "threshold": [0.5], "default_left": [true],
-              "left": [-1], "right": [-2], "leaf_value": [1.0, 2.0]}]
+              "left": [-1], "right": [-2], "leaf_value": [1.0, 2.0],
+              "node_cover": [10.0], "leaf_cover": [6.0, 4.0]}]
             """;
 
     private static InputStream stream(String json) {
@@ -97,7 +98,8 @@ class LightGbmModelLoaderTest {
     void load_WhenTreeSplitsOnUnknownFeatureIndex_ThrowsException() {
         String outOfRange = """
                 [{"split_feature": [999], "threshold": [0.5], "default_left": [true],
-                  "left": [-1], "right": [-2], "leaf_value": [1.0, 2.0]}]
+                  "left": [-1], "right": [-2], "leaf_value": [1.0, 2.0],
+              "node_cover": [10.0], "leaf_cover": [6.0, 4.0]}]
                 """;
         String json = modelJson(FeatureName.schemaFingerprint(), FeatureName.exportNames(), outOfRange);
 

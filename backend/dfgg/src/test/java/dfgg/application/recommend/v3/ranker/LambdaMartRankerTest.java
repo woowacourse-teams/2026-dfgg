@@ -37,13 +37,18 @@ class LambdaMartRankerTest {
         // f0 <= 0.5 → 0.0, 아니면 1.0. 첫 feature만으로 점수가 갈린다.
         scoreIsFirstFeature = new GradientBoostedTrees(List.of(new DecisionTree(
                 new int[]{0}, new double[]{0.5}, new boolean[]{true},
-                new int[]{-1}, new int[]{-2}, new double[]{0.0, 1.0})));
+                new int[]{-1}, new int[]{-2}, new double[]{0.0, 1.0},
+                new double[]{10.0}, new double[]{6.0, 4.0})));
     }
 
     private CandidateFeatures candidate(long itemId, double firstFeature) {
         FeatureVector vector = FeatureVector.empty();
         vector.set(FeatureName.values()[0], firstFeature);
         return new CandidateFeatures(itemId, vector);
+    }
+
+    private List<Long> itemIdsOf(List<RankedCandidate> ranked) {
+        return ranked.stream().map(RankedCandidate::itemId).toList();
     }
 
     private LambdaMartRanker ranker() {
@@ -56,9 +61,9 @@ class LambdaMartRankerTest {
         given(pipeline.extract(any(), any())).willReturn(List.of(
                 candidate(100L, 0.1), candidate(200L, 0.9), candidate(300L, 0.2)));
 
-        List<Long> ranked = ranker().rank(CandidateUnion.merge(List.of()), null, 5);
+        List<RankedCandidate> ranked = ranker().rank(CandidateUnion.merge(List.of()), null, 5);
 
-        assertThat(ranked).startsWith(200L);
+        assertThat(itemIdsOf(ranked)).startsWith(200L);
     }
 
     @Test
@@ -75,7 +80,7 @@ class LambdaMartRankerTest {
     void rank_WhenFewerCandidatesThanTopN_ReturnsAll() {
         given(pipeline.extract(any(), any())).willReturn(List.of(candidate(100L, 0.9)));
 
-        assertThat(ranker().rank(CandidateUnion.merge(List.of()), null, 5)).containsExactly(100L);
+        assertThat(itemIdsOf(ranker().rank(CandidateUnion.merge(List.of()), null, 5))).containsExactly(100L);
     }
 
     @Test
@@ -92,7 +97,7 @@ class LambdaMartRankerTest {
         given(pipeline.extract(any(), any())).willReturn(List.of(
                 candidate(300L, 0.9), candidate(100L, 0.9), candidate(200L, 0.9)));
 
-        assertThat(ranker().rank(CandidateUnion.merge(List.of()), null, 3))
+        assertThat(itemIdsOf(ranker().rank(CandidateUnion.merge(List.of()), null, 3)))
                 .containsExactly(100L, 200L, 300L);
     }
 
@@ -101,16 +106,38 @@ class LambdaMartRankerTest {
     void rank_PassesMissingFeaturesThroughAsNaN() {
         GradientBoostedTrees missingGoesRight = new GradientBoostedTrees(List.of(new DecisionTree(
                 new int[]{0}, new double[]{0.5}, new boolean[]{false},
-                new int[]{-1}, new int[]{-2}, new double[]{0.0, 1.0})));
+                new int[]{-1}, new int[]{-2}, new double[]{0.0, 1.0},
+                new double[]{10.0}, new double[]{6.0, 4.0})));
         // 채우지 않은 벡터는 전부 결측이다
         given(pipeline.extract(any(), any())).willReturn(List.of(
                 new CandidateFeatures(100L, FeatureVector.empty()), candidate(200L, 0.1)));
 
-        List<Long> ranked = new LambdaMartRanker(pipeline, missingGoesRight)
+        List<RankedCandidate> ranked = new LambdaMartRanker(pipeline, missingGoesRight)
                 .rank(CandidateUnion.merge(List.of()), null, 2);
 
         // 결측이 오른쪽(1.0)으로 가야 100번이 앞선다. 0으로 채웠다면 0.0이 되어 뒤로 밀린다.
-        assertThat(ranked).containsExactly(100L, 200L);
+        assertThat(itemIdsOf(ranked)).containsExactly(100L, 200L);
+    }
+
+    @Test
+    @DisplayName("순위와 함께 각 후보의 feature 벡터를 돌려준다 — 추천 근거를 만들려면 필요하다")
+    void rank_ReturnsTheFeatureVectorAlongsideEachItem() {
+        given(pipeline.extract(any(), any())).willReturn(List.of(candidate(200L, 0.9)));
+
+        List<RankedCandidate> ranked = ranker().rank(CandidateUnion.merge(List.of()), null, 5);
+
+        assertThat(ranked.getFirst().features().get(FeatureName.values()[0])).isEqualTo(0.9);
+    }
+
+    @Test
+    @DisplayName("모델 점수를 함께 돌려준다 — 순위가 왜 그렇게 나왔는지 관측할 수 있어야 한다")
+    void rank_ReturnsTheModelScore() {
+        given(pipeline.extract(any(), any())).willReturn(List.of(
+                candidate(100L, 0.1), candidate(200L, 0.9)));
+
+        List<RankedCandidate> ranked = ranker().rank(CandidateUnion.merge(List.of()), null, 5);
+
+        assertThat(ranked.getFirst().modelScore()).isGreaterThan(ranked.getLast().modelScore());
     }
 
     @Test
@@ -126,9 +153,9 @@ class LambdaMartRankerTest {
                 candidate(100L, 0.1), candidate(200L, 0.9)));
         GradientBoostedTrees real = LightGbmModelLoader.loadFromClasspath("ltr/model.json");
 
-        List<Long> ranked = new LambdaMartRanker(pipeline, real)
+        List<RankedCandidate> ranked = new LambdaMartRanker(pipeline, real)
                 .rank(CandidateUnion.merge(List.of()), (RecommendationQuery) null, 2);
 
-        assertThat(ranked).containsExactlyInAnyOrder(100L, 200L);
+        assertThat(itemIdsOf(ranked)).containsExactlyInAnyOrder(100L, 200L);
     }
 }

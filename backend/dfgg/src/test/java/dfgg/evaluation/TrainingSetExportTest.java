@@ -2,6 +2,7 @@ package dfgg.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dfgg.application.itemstats.ItemStatsAggregationResult;
 import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.item.ItemService;
 import dfgg.application.recommend.v3.CandidateGenerator;
@@ -28,6 +29,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
@@ -89,13 +91,26 @@ class TrainingSetExportTest {
                 .as("실 매치 데이터가 있는 DB를 가리켜야 한다. 참가자 수")
                 .isGreaterThan(MINIMUM_EXPECTED_PARTICIPANTS);
 
-        aggregationService.aggregate(RECENT_PATCH_WINDOW);
         String latestPatch = latestPatch();
+        // patch split의 test 패치를 통계에서 뺀다. 빼지 않으면 모델이 "아직 오지 않은 패치"를
+        // 이미 본 셈이 되어 지표가 낙관적으로 나온다 (T11에서 patch split이 game split보다
+        // 높게 나온 원인으로 의심한 지점이다). 서빙은 전체 패치로 집계하므로 여기서만 다르다.
+        Set<String> excludedPatches = excludeTestPatch() ? Set.of(latestPatch) : Set.of();
+        ItemStatsAggregationResult aggregation =
+                aggregationService.aggregate(RECENT_PATCH_WINDOW, excludedPatches);
+        System.out.printf("집계: 제외 패치=%s, 최근 윈도=%s%n",
+                excludedPatches.isEmpty() ? "없음" : excludedPatches, aggregation.recentPatches());
+        if (!excludedPatches.isEmpty()) {
+            // AssertJ의 doesNotContainAnyElementsOf는 빈 컬렉션을 받으면 예외를 던진다.
+            assertThat(aggregation.recentPatches())
+                    .as("제외한 패치가 최근 윈도에 남아 있으면 누수가 그대로다")
+                    .doesNotContainAnyElementsOf(excludedPatches);
+        }
         Map<Long, Item> itemById = itemService.findItemsByIds(
                         itemService.findCoreItemIds().stream().map(Long::valueOf).toList()).stream()
                 .collect(Collectors.toMap(Item::getItemId, Function.identity(), (first, second) -> first));
 
-        Path outputPath = Path.of(System.getProperty("ltr.export.path", "../ml/data/train.jsonl"));
+        Path outputPath = Path.of(System.getProperty("evaluation.export.path", "../ml/data/train.jsonl"));
         Files.createDirectories(outputPath.toAbsolutePath().getParent());
         // Python은 JSONL만으로는 각 feature 칸이 무엇인지 알 수 없다. 스키마를 함께 내보낸다.
         new FeatureSchemaExporter().export(outputPath.toAbsolutePath().getParent());
@@ -116,6 +131,11 @@ class TrainingSetExportTest {
         assertThat(stats.rowsWithGroundTruth)
                 .as("query마다 정답(등급 3)이 정확히 하나여야 한다")
                 .isEqualTo(stats.exportedQueries);
+    }
+
+    /** 기본은 누수 차단. 비교용으로 옛 방식(전체 패치 집계)을 보려면 false로 끈다. */
+    private boolean excludeTestPatch() {
+        return Boolean.parseBoolean(System.getProperty("evaluation.excludeTestPatch", "true"));
     }
 
     private void exportQueries(

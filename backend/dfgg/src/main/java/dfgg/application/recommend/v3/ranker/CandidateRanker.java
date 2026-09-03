@@ -12,7 +12,7 @@ import java.util.List;
  */
 public interface CandidateRanker {
 
-    List<Long> rank(CandidateUnion union, RecommendationQuery query, int topN);
+    List<RankedCandidate> rank(CandidateUnion union, RecommendationQuery query, int topN);
 
     /** 어떤 랭커가 이 순위를 냈는지. 응답에 담겨 운영 중 관측 지표가 된다. */
     String modelVersion();

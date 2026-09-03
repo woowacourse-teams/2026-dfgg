@@ -29,7 +29,8 @@ public interface ChampionItemRollupRepository extends JpaRepository<ChampionItem
             WITH participant AS (
                 SELECT champion_id, patch, win, core_item_purchase_order
                 FROM normalized_match_participants
-                WHERE core_item_purchase_order_complete
+                WHERE (patch IS NULL OR patch NOT IN (:excludedPatches))
+                  AND core_item_purchase_order_complete
                   AND core_item_purchase_order <> ''
             ),
             champion_games AS (
@@ -55,5 +56,6 @@ public interface ChampionItemRollupRepository extends JpaRepository<ChampionItem
             JOIN champion_games ON champion_games.champion_id = purchase.champion_id
             GROUP BY purchase.champion_id, purchase.item_id
             """, nativeQuery = true)
-    void aggregateFrom(@Param("recentPatches") Collection<String> recentPatches);
+    void aggregateFrom(@Param("recentPatches") Collection<String> recentPatches,
+                       @Param("excludedPatches") Collection<String> excludedPatches);
 }

@@ -1,6 +1,7 @@
 package dfgg.evaluation;
 
 import dfgg.application.recommend.v3.feature.FeatureName;
+import dfgg.application.recommend.v3.feature.ReasonGroup;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,10 +28,17 @@ public final class FeatureSchemaExporter {
         StringJoiner names = new StringJoiner("\",\"", "[\"", "\"]");
         FeatureName.exportNames().forEach(names::add);
 
+        // 묶음 정의를 Java와 Python 양쪽에 두면 한쪽만 고쳐 놓고 분석 결과를 믿게 된다.
+        StringJoiner groups = new StringJoiner("\",\"", "[\"", "\"]");
+        for (FeatureName feature : FeatureName.values()) {
+            groups.add(ReasonGroup.of(feature).name());
+        }
+
         String json = "{\n"
                 + "  \"schema_fingerprint\": \"" + FeatureName.schemaFingerprint() + "\",\n"
                 + "  \"feature_count\": " + FeatureName.values().length + ",\n"
-                + "  \"feature_names\": " + names + "\n"
+                + "  \"feature_names\": " + names + ",\n"
+                + "  \"feature_groups\": " + groups + "\n"
                 + "}\n";
         Files.writeString(path, json);
         return path;

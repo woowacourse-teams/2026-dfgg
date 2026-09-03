@@ -8,6 +8,7 @@ import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import dfgg.domain.match.RecentPatchWindow;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -49,21 +50,35 @@ public class ItemStatsAggregationService {
 
     @Transactional
     public ItemStatsAggregationResult aggregate(int recentPatchWindowSize) {
+        return aggregate(recentPatchWindowSize, Set.of());
+    }
+
+    /**
+     * {@code excludedPatches}의 경기를 통계에서 제외하고 집계한다.
+     *
+     * <p>patch split 평가용이다. test 패치의 경기가 통계에 남아 있으면 모델이 "아직 오지 않은
+     * 패치"를 이미 본 셈이 되어 지표가 낙관적으로 나온다. 서빙 경로는 빈 집합으로 호출하므로
+     * 동작이 달라지지 않는다.
+     */
+    @Transactional
+    public ItemStatsAggregationResult aggregate(int recentPatchWindowSize, Collection<String> excludedPatches) {
         long startedAt = System.currentTimeMillis();
-        RecentPatchWindow window = recentPatchWindow(recentPatchWindowSize);
+        // 최근 윈도도 제외 후 남은 패치에서 고른다. 제외한 패치가 '최근'으로 뽑히면 누수가 그대로다.
+        RecentPatchWindow window = recentPatchWindow(recentPatchWindowSize, excludedPatches);
         Collection<String> recentPatches = recentPatchParameter(window);
+        Collection<String> excluded = excludedPatchParameter(excludedPatches);
 
         championItemStatsRepository.deleteAllInBatch();
-        championItemStatsRepository.aggregateFrom(recentPatches);
+        championItemStatsRepository.aggregateFrom(recentPatches, excluded);
 
         championItemRollupRepository.deleteAllInBatch();
-        championItemRollupRepository.aggregateFrom(recentPatches);
+        championItemRollupRepository.aggregateFrom(recentPatches, excluded);
 
         championPairItemStatsRepository.deleteAllInBatch();
-        championPairItemStatsRepository.aggregateFrom(recentPatches);
+        championPairItemStatsRepository.aggregateFrom(recentPatches, excluded);
 
         itemMetaStatsRepository.deleteAllInBatch();
-        itemMetaStatsRepository.aggregateFrom();
+        itemMetaStatsRepository.aggregateFrom(excluded);
 
         ItemStatsAggregationResult result = new ItemStatsAggregationResult(
                 window.patches(),
@@ -81,8 +96,19 @@ public class ItemStatsAggregationService {
         return result;
     }
 
-    private RecentPatchWindow recentPatchWindow(int recentPatchWindowSize) {
-        return RecentPatchWindow.of(participantRepository.findDistinctPatches(), recentPatchWindowSize);
+    private RecentPatchWindow recentPatchWindow(int recentPatchWindowSize, Collection<String> excludedPatches) {
+        List<String> patches = participantRepository.findDistinctPatches().stream()
+                .filter(patch -> !excludedPatches.contains(patch))
+                .toList();
+        return RecentPatchWindow.of(patches, recentPatchWindowSize);
+    }
+
+    /** 빈 컬렉션은 {@code NOT IN ()}이 되어 SQL 문법 오류가 난다. 어떤 patch와도 같지 않은 값을 넣는다. */
+    private Collection<String> excludedPatchParameter(Collection<String> excludedPatches) {
+        if (excludedPatches.isEmpty()) {
+            return MATCHES_NOTHING;
+        }
+        return excludedPatches;
     }
 
     private Collection<String> recentPatchParameter(RecentPatchWindow window) {

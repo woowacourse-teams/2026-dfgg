@@ -15,6 +15,8 @@ import dfgg.application.recommend.v3.CandidateUnion;
 import dfgg.application.recommend.v3.GeneratorResult;
 import dfgg.application.recommend.v3.HardValidityFilter;
 import dfgg.application.recommend.v3.RecommendationQuery;
+import dfgg.application.recommend.v3.feature.FeatureVector;
+import dfgg.application.recommend.v3.ranker.RankedCandidate;
 import dfgg.application.recommend.v3.ScoredItem;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
 import dfgg.common.NextItemRecommendationNotFoundException;
@@ -59,8 +61,20 @@ class NextItemRecommendationServiceTest {
         service = new NextItemRecommendationService(
                 championService, itemService, List.of(buildGenerator),
                 new HardValidityFilter(new ItemExclusionGroups()), candidateRanker,
-                new dfgg.application.recommend.v3.CandidateTopK(20, 20, 20, 30)
+                new dfgg.application.recommend.v3.CandidateTopK(20, 20, 20, 30),
+                trivialShapCalculator()
         );
+    }
+
+    /** 이유 계산은 여기 관심사가 아니다. 분기 없는 트리라 기여도가 전부 0이 된다. */
+    private dfgg.application.recommend.v3.ranker.TreeShapCalculator trivialShapCalculator() {
+        var tree = new dfgg.application.recommend.v3.ranker.DecisionTree(
+                new int[]{}, new double[]{}, new boolean[]{},
+                new int[]{}, new int[]{}, new double[]{0.0},
+                new double[]{}, new double[]{1.0});
+        return new dfgg.application.recommend.v3.ranker.TreeShapCalculator(
+                new dfgg.application.recommend.v3.ranker.GradientBoostedTrees(List.of(tree)),
+                dfgg.application.recommend.v3.feature.FeatureName.values().length);
     }
 
     private long championIdOf(String name) {
@@ -103,13 +117,20 @@ class NextItemRecommendationServiceTest {
         );
     }
 
+    /** 랭커는 순위와 함께 feature를 돌려준다. 여기서는 순서만 보므로 빈 벡터로 채운다. */
+    private List<RankedCandidate> rankedOf(long... itemIds) {
+        return java.util.stream.LongStream.of(itemIds)
+                .mapToObj(id -> new RankedCandidate(id, 0.0, FeatureVector.empty()))
+                .toList();
+    }
+
     @Test
     @DisplayName("최종 순서는 랭커가 정한 그대로다 — 서비스가 다시 정렬하지 않는다")
     void recommendNextItem_WhenRankerReturnsOrder_PreservesItExactly() {
         // given: 랭커가 generator 점수 순서와 다른 순서를 돌려줘도 그대로 따라야 한다
         givenCandidates(KRAKEN, INFINITY_EDGE, LIANDRY);
         when(candidateRanker.rank(any(CandidateUnion.class), any(RecommendationQuery.class), anyInt()))
-                .thenReturn(List.of(LIANDRY, KRAKEN, INFINITY_EDGE));
+                .thenReturn(rankedOf(LIANDRY, KRAKEN, INFINITY_EDGE));
 
         // when
         NextItemRecommendationResponse response = service.recommendNextItem(request());
@@ -124,7 +145,7 @@ class NextItemRecommendationServiceTest {
     void recommendNextItem_WhenServed_ReportsRankerModelVersion() {
         // given
         givenCandidates(KRAKEN);
-        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(List.of(KRAKEN));
+        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(KRAKEN));
 
         // when
         NextItemRecommendationResponse response = service.recommendNextItem(request());

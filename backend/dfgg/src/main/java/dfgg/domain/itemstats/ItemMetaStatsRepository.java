@@ -5,7 +5,9 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import java.util.Collection;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ItemMetaStatsRepository extends JpaRepository<ItemMetaStats, Long> {
 
@@ -34,7 +36,8 @@ public interface ItemMetaStatsRepository extends JpaRepository<ItemMetaStats, Lo
                        END AS normalized_position,
                        win, core_item_purchase_order
                 FROM normalized_match_participants
-                WHERE core_item_purchase_order_complete
+                WHERE (patch IS NULL OR patch NOT IN (:excludedPatches))
+                  AND core_item_purchase_order_complete
                   AND core_item_purchase_order <> ''
                   AND position IN ('TOP', 'JUNGLE', 'MID', 'MIDDLE', 'BOTTOM', 'SUPPORT', 'UTILITY')
             ),
@@ -58,5 +61,5 @@ public interface ItemMetaStatsRepository extends JpaRepository<ItemMetaStats, Lo
              AND scope.normalized_position = pick.normalized_position
             GROUP BY pick.patch, pick.normalized_position, pick.item_id
             """, nativeQuery = true)
-    void aggregateFrom();
+    void aggregateFrom(@Param("excludedPatches") Collection<String> excludedPatches);
 }

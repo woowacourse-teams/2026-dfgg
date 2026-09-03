@@ -21,7 +21,8 @@ class GradientBoostedTreesTest {
     private DecisionTree simpleTree(boolean defaultLeft) {
         return new DecisionTree(
                 new int[]{0}, new double[]{0.5}, new boolean[]{defaultLeft},
-                new int[]{-1}, new int[]{-2}, new double[]{1.0, 2.0});
+                new int[]{-1}, new int[]{-2}, new double[]{1.0, 2.0},
+                new double[]{10.0}, new double[]{6.0, 4.0});
     }
 
     @Test
@@ -29,7 +30,8 @@ class GradientBoostedTreesTest {
     void predict_WhenTreeHasSingleLeaf_ReturnsThatLeafValue() {
         DecisionTree tree = new DecisionTree(
                 new int[]{}, new double[]{}, new boolean[]{},
-                new int[]{}, new int[]{}, new double[]{0.42});
+                new int[]{}, new int[]{}, new double[]{0.42},
+                new double[]{}, new double[]{10.0});
 
         assertThat(new GradientBoostedTrees(List.of(tree)).predict(new double[]{1.0}))
                 .isEqualTo(0.42);
@@ -85,7 +87,8 @@ class GradientBoostedTreesTest {
         // 노드1: f1<=0.5 → 잎0(1.0) / 잎1(2.0)
         DecisionTree tree = new DecisionTree(
                 new int[]{0, 1}, new double[]{0.5, 0.5}, new boolean[]{true, true},
-                new int[]{1, -1}, new int[]{-3, -2}, new double[]{1.0, 2.0, 3.0});
+                new int[]{1, -1}, new int[]{-3, -2}, new double[]{1.0, 2.0, 3.0},
+                new double[]{10.0, 6.0}, new double[]{4.0, 2.0, 4.0});
         GradientBoostedTrees trees = new GradientBoostedTrees(List.of(tree));
 
         assertThat(trees.predict(new double[]{0.1, 0.1})).isEqualTo(1.0);
@@ -98,7 +101,8 @@ class GradientBoostedTreesTest {
     void construct_WhenNodeArraysHaveDifferentLengths_ThrowsException() {
         assertThatThrownBy(() -> new DecisionTree(
                 new int[]{0, 1}, new double[]{0.5}, new boolean[]{true, true},
-                new int[]{-1, -2}, new int[]{-1, -2}, new double[]{1.0}))
+                new int[]{-1, -2}, new int[]{-1, -2}, new double[]{1.0},
+                new double[]{10.0, 6.0}, new double[]{6.0, 4.0}))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -107,7 +111,8 @@ class GradientBoostedTreesTest {
     void predict_WhenFeatureVectorIsTooShort_ThrowsException() {
         GradientBoostedTrees trees = new GradientBoostedTrees(List.of(
                 new DecisionTree(new int[]{5}, new double[]{0.5}, new boolean[]{true},
-                        new int[]{-1}, new int[]{-2}, new double[]{1.0, 2.0})));
+                        new int[]{-1}, new int[]{-2}, new double[]{1.0, 2.0},
+                        new double[]{10.0}, new double[]{6.0, 4.0})));
 
         assertThatThrownBy(() -> trees.predict(new double[]{0.1}))
                 .isInstanceOf(IllegalArgumentException.class);

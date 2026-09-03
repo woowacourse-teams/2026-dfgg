@@ -92,7 +92,9 @@ public final class LightGbmModelLoader {
                     booleanArray(tree, "default_left"),
                     intArray(tree, "left"),
                     intArray(tree, "right"),
-                    doubleArray(tree, "leaf_value")));
+                    doubleArray(tree, "leaf_value"),
+                    doubleArray(tree, "node_cover"),
+                    doubleArray(tree, "leaf_cover")));
         }
         return parsed;
     }

@@ -1,10 +1,12 @@
 package dfgg.infrastructure.config;
 
 import dfgg.application.recommend.v3.feature.FeatureExtractionPipeline;
+import dfgg.application.recommend.v3.feature.FeatureName;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
 import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
 import dfgg.application.recommend.v3.ranker.LambdaMartRanker;
 import dfgg.application.recommend.v3.ranker.LightGbmModelLoader;
+import dfgg.application.recommend.v3.ranker.TreeShapCalculator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +26,15 @@ public class LtrModelConfiguration {
     public GradientBoostedTrees ltrModel(
             @Value("${recommendation.ltr.model-path:ltr/model.json}") String modelPath) {
         return LightGbmModelLoader.loadFromClasspath(modelPath);
+    }
+
+    /**
+     * 추천 이유 계산기. 모델과 feature 개수가 고정이라 요청마다 새로 만들 이유가 없다.
+     * 트리 깊이만큼의 경로 배열은 계산할 때마다 새로 잡으므로 상태를 공유하지 않는다.
+     */
+    @Bean
+    public TreeShapCalculator treeShapCalculator(GradientBoostedTrees ltrModel) {
+        return new TreeShapCalculator(ltrModel, FeatureName.values().length);
     }
 
     @Bean

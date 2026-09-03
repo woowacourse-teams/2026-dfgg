@@ -68,4 +68,27 @@ class FeatureSchemaExporterTest {
 
         assertThat(path.getFileName().toString()).isEqualTo("feature_schema.json");
     }
+
+    @Test
+    @DisplayName("feature가 어느 묶음에 속하는지도 함께 내보낸다 — Python이 정의를 따로 갖지 않게 한다")
+    void export_IncludesTheReasonGroupOfEachFeature(@TempDir Path directory) throws IOException {
+        // 그룹 정의가 Java와 Python 양쪽에 있으면 한쪽만 고쳐 놓고 분석 결과를 믿게 된다.
+        Path path = new FeatureSchemaExporter().export(directory);
+
+        String json = Files.readString(path);
+        assertThat(json).contains("\"feature_groups\"");
+        for (dfgg.application.recommend.v3.feature.ReasonGroup group
+                : dfgg.application.recommend.v3.feature.ReasonGroup.values()) {
+            assertThat(json).contains(group.name());
+        }
+    }
+
+    @Test
+    @DisplayName("묶음 목록의 길이가 feature 개수와 같다 — 하나라도 빠지면 분석에서 사라진다")
+    void export_ListsOneGroupPerFeature(@TempDir Path directory) throws IOException {
+        Path path = new FeatureSchemaExporter().export(directory);
+
+        String groups = Files.readString(path).split("\"feature_groups\": \\[")[1].split("]")[0];
+        assertThat(groups.split(",")).hasSize(FeatureName.values().length);
+    }
 }

@@ -46,7 +46,8 @@ public interface ChampionPairItemStatsRepository extends JpaRepository<ChampionP
             WITH purchaser AS (
                 SELECT match_id, puuid, team_id, champion_id, patch, win, core_item_purchase_order
                 FROM normalized_match_participants
-                WHERE core_item_purchase_order_complete
+                WHERE (patch IS NULL OR patch NOT IN (:excludedPatches))
+                  AND core_item_purchase_order_complete
                   AND core_item_purchase_order <> ''
             ),
             context AS (
@@ -91,5 +92,6 @@ public interface ChampionPairItemStatsRepository extends JpaRepository<ChampionP
             GROUP BY pair_items.my_champion_id, pair_items.other_champion_id, pair_items.relation,
                      pair_items.item_id
             """, nativeQuery = true)
-    void aggregateFrom(@Param("recentPatches") Collection<String> recentPatches);
+    void aggregateFrom(@Param("recentPatches") Collection<String> recentPatches,
+                       @Param("excludedPatches") Collection<String> excludedPatches);
 }

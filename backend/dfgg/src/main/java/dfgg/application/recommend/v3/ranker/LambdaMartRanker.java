@@ -28,12 +28,13 @@ public class LambdaMartRanker implements CandidateRanker {
     }
 
     @Override
-    public List<Long> rank(CandidateUnion union, RecommendationQuery query, int topN) {
+    public List<RankedCandidate> rank(CandidateUnion union, RecommendationQuery query, int topN) {
         return pipeline.extract(union, query).stream()
                 .sorted(Comparator.comparingDouble(this::score).reversed()
                         .thenComparing(CandidateFeatures::itemId))
                 .limit(topN)
-                .map(CandidateFeatures::itemId)
+                .map(candidate -> new RankedCandidate(
+                        candidate.itemId(), score(candidate), candidate.vector()))
                 .toList();
     }
 
