@@ -18,13 +18,13 @@ import org.springframework.stereotype.Component;
 
 /**
  * "우리 팀 조합 때문에 어떤 아이템이 좋은가"로 후보를 찾는다.
- *
- * <p>아군 4명을 하나의 window로 묶지 않고 <b>각 아군과의 관계를 따로</b> 조회한 뒤 union한다.
+ * <p>
+ * 아군 4명을 하나의 window로 묶지 않고 <b>각 아군과의 관계를 따로</b> 조회한 뒤 union한다.
  * 5명 전체를 한 덩어리로 보면 조합 수가 폭발해 표본이 사라지고, 무엇보다 "징크스 때문에 향로"와
  * "코그모 때문에 월석"을 구분할 수 없게 된다. 서포터처럼 아군에 따라 빌드가 갈리는 챔피언에서
  * 이 구분이 곧 이 generator의 값어치다.
- *
- * <p>랭킹 점수로는 아군별 점수 중 최댓값을 쓴다 — 아군 하나와의 궁합이 결정적인 경우가 흔해서
+ * <p>
+ * 랭킹 점수로는 아군별 점수 중 최댓값을 쓴다 — 아군 하나와의 궁합이 결정적인 경우가 흔해서
  * 평균을 내면 그 신호가 묻힌다. 다만 개별 점수와 max/mean/sum/top1/top2를 모두 보존해
  * 어느 집계가 유효한지는 LTR이 고르게 한다.
  */
@@ -61,7 +61,10 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
         if (!scoresByItem.isEmpty()) {
             List<ScoredItem> ranked = scoresByItem.entrySet().stream()
                     .filter(entry -> !query.purchasedItemIds().contains(entry.getKey()))
-                    .map(entry -> new ScoredItem(entry.getKey(), entry.getValue().max()))
+                    // 랭킹에는 최댓값 하나를 쓰지만 아군별 점수도 함께 남긴다. retriever가
+                    // 이미 계산해 둔 값이라 여기서 버리면 나중에 다시 조회해야 한다.
+                    .map(entry -> new ScoredItem(entry.getKey(), entry.getValue().max(),
+                            entry.getValue().scoreByOtherChampionId()))
                     .sorted(byScoreThenItemId())
                     .limit(topK)
                     .toList();

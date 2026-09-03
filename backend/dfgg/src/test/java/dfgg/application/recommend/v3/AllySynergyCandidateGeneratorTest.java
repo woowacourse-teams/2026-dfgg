@@ -171,6 +171,57 @@ class AllySynergyCandidateGeneratorTest {
     }
 
     @Test
+    @DisplayName("어느 아군 때문에 올라온 후보인지를 결과에 남긴다 — 집계하면서 버리지 않는다")
+    void generate_PreservesWhichAllyDroveEachCandidate() {
+        // retriever는 아군별 점수를 이미 갖고 있는데, ScoredItem으로 옮기면서 max()만
+        // 남기고 버리고 있었다. "누구 때문인가"는 추천 이유를 만들 때 필요하다.
+        GeneratorResult result = generator.generate(queryWithAllies(List.of(JINX, KOGMAW)), 10);
+
+        ScoredItem incense = result.rankedItems().stream()
+                .filter(item -> item.itemId() == INCENSE)
+                .findFirst().orElseThrow();
+
+        assertThat(incense.scoreByChampionId()).containsKeys(JINX, KOGMAW);
+    }
+
+    @Test
+    @DisplayName("남긴 아군별 점수가 개별 조회 결과와 같다 — 다시 계산하면 값이 갈릴 수 있다")
+    void generate_PreservedAllyScoreMatchesTheDirectLookup() {
+        double direct = retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW), PairRelation.ALLY)
+                .get(INCENSE).scoreOf(JINX);
+
+        GeneratorResult result = generator.generate(queryWithAllies(List.of(JINX, KOGMAW)), 10);
+        ScoredItem incense = result.rankedItems().stream()
+                .filter(item -> item.itemId() == INCENSE)
+                .findFirst().orElseThrow();
+
+        assertThat(incense.scoreByChampionId().get(JINX)).isEqualTo(direct);
+    }
+
+    @Test
+    @DisplayName("랭킹 점수는 아군별 점수의 최댓값 그대로다 — 근거를 남겨도 순위는 달라지지 않는다")
+    void generate_RankingScoreStillEqualsTheMaximumPerAllyScore() {
+        GeneratorResult result = generator.generate(queryWithAllies(List.of(JINX, KOGMAW)), 10);
+
+        assertThat(result.rankedItems()).allSatisfy(item ->
+                assertThat(item.score())
+                        .isEqualTo(item.scoreByChampionId().values().stream()
+                                .mapToDouble(Double::doubleValue).max().orElseThrow()));
+    }
+
+    @Test
+    @DisplayName("base rate로 백오프한 후보에는 아군을 붙이지 않는다 — 아군 덕이 아닌데 그렇게 말하면 거짓말이다")
+    void generate_WhenBackedOffToChampionBaseRate_AttributesToNoAlly() {
+        // 아리와는 함께한 적이 없어 아군 궁합이 아니라 챔피언 전반 통계로 뽑은 후보다.
+        GeneratorResult result = generator.generate(queryWithAllies(List.of(AHRI)), 10);
+
+        assertThat(result.backoffLevel()).isEqualTo(PairBackoffLevel.BASE_RATE.ordinal());
+        assertThat(result.rankedItems())
+                .isNotEmpty()
+                .allSatisfy(item -> assertThat(item.scoreByChampionId()).isEmpty());
+    }
+
+    @Test
     @DisplayName("topK를 넘는 후보는 내지 않는다")
     void generate_WhenMoreCandidatesThanTopK_LimitsResultSize() {
         assertThat(generator.generate(queryWithAllies(List.of(JINX, KOGMAW)), 1).rankedItems())
