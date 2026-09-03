@@ -94,7 +94,7 @@ class RenormalizationControllerTest {
     @DisplayName("알 수 없는 티어는 거부한다")
     void renormalize_WhenTierIsInvalid_ReturnsBadRequest() {
         given()
-                .queryParam("tier", "CHALLENGER")
+                .queryParam("tier", "INVALID_TIER")
                 .queryParam("limit", 10)
                 .when().post("/admin/riot/matches/renormalize")
                 .then().statusCode(400);
