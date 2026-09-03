@@ -38,6 +38,16 @@ jobs:
           test -w /opt/dfgg/green
           test -r /etc/nginx/conf.d/dfgg-upstream.conf
           sudo -n nginx -t
+          # EC2의 dfgg@.service도 색상별 JAR 경로로 먼저 변경해야 한다.
+          # 기존 app.jar를 실행하는 설정이면 새 버전 배포로 오인하지 않도록 중단한다.
+          for slot in blue green; do
+            slot_jar="/opt/dfgg/$slot/dfgg-$slot.jar"
+            slot_exec=$(systemctl show "dfgg@$slot.service" -p ExecStart --value)
+            if [[ "$slot_exec" != *" -jar $slot_jar "* ]]; then
+              echo "::error::dfgg@$slot.service must execute $slot_jar; update the EC2 systemd configuration first"
+              exit 1
+            fi
+          done
           # 두 JVM이 켜진 채로 무거운 빌드를 시작하지 않는다.
           blue=$(systemctl show dfgg@blue.service -p ActiveState --value)
           green=$(systemctl show dfgg@green.service -p ActiveState --value)
@@ -46,6 +56,21 @@ jobs:
 
       - name: Copy .env file
         run: cp /home/ubuntu/app-config/.env ./.env
+
+      # 현재 모델 원본은 EC2의 app-config다. 모델 갱신 시 이 파일도 먼저 교체한다.
+      - name: Copy LTR model resource
+        run: |
+          set -euo pipefail
+          model_source=/home/ubuntu/app-config/model.json
+          model_target=src/main/resources/ltr/model.json
+          if [[ ! -r "$model_source" || ! -s "$model_source" ]]; then
+            echo '::error::LTR model file is missing, empty, or unreadable in app-config'
+            exit 1
+          fi
+          mkdir -p src/main/resources/ltr
+          cp "$model_source" "$model_target"
+          # JSON 형식만 검사한다. 코드와 모델의 호환성은 앱 기동 시 검증한다.
+          jq -e -s 'length == 1 and (.[0] | type == "object")' "$model_target" > /dev/null
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -59,6 +84,12 @@ jobs:
       - name: Build JAR
         timeout-minutes: 20
         run: ./gradlew clean build --no-daemon -x test
+
+      - name: Verify LTR model in JAR
+        run: |
+          set -euo pipefail
+          jar tf build/libs/dfgg-0.0.1-SNAPSHOT.jar \
+            | grep -Fx 'BOOT-INF/classes/ltr/model.json'
 
       # DB 스키마는 구/신 버전과 호환되어야 한다. DDL 변경은 롤백하지 못한다.
       # 최초 실행 전 runner의 jq/flock 및 sudo·배포 디렉터리 권한을 확인한다.
@@ -220,6 +251,7 @@ jobs:
           esac
           DFGG_OLD_UNIT="dfgg@${DFGG_OLD}.service"
           DFGG_NEW_UNIT="dfgg@${DFGG_NEW}.service"
+          DFGG_NEW_JAR="/opt/dfgg/$DFGG_NEW/dfgg-$DFGG_NEW.jar"
           [[ "$(property nginx.service ActiveState)" == active ]] || exit 1
           [[ "$(property nginx.service UnitFileState)" == enabled ]] || exit 1
           stopped dfgg.service
@@ -243,17 +275,17 @@ jobs:
 
           # 2. 종료된 슬롯에만 JAR를 배치한다. 체크섬 확인 후 한 번에 교체한다.
           test ! -L "/opt/dfgg/$DFGG_NEW"
-          test ! -L "/opt/dfgg/$DFGG_NEW/app.jar"
+          test ! -L "$DFGG_NEW_JAR"
           DFGG_JAR_HASH=$(sha256sum "$DFGG_JAR")
           DFGG_JAR_HASH=${DFGG_JAR_HASH%% *}
-          DFGG_JAR_STAGE=$(mktemp "/opt/dfgg/$DFGG_NEW/.app.XXXXXX")
+          DFGG_JAR_STAGE=$(mktemp "/opt/dfgg/$DFGG_NEW/.dfgg-$DFGG_NEW.XXXXXX")
           cp "$DFGG_JAR" "$DFGG_JAR_STAGE"
           chmod 0644 "$DFGG_JAR_STAGE"
           staged_hash=$(sha256sum "$DFGG_JAR_STAGE")
           [[ "${staged_hash%% *}" == "$DFGG_JAR_HASH" ]] \
             || { echo 'JAR checksum mismatch'; exit 1; }
           stopped "$DFGG_NEW_UNIT"
-          mv -T "$DFGG_JAR_STAGE" "/opt/dfgg/$DFGG_NEW/app.jar"
+          mv -T "$DFGG_JAR_STAGE" "$DFGG_NEW_JAR"
           echo "Deploying $DFGG_OLD -> $DFGG_NEW; SHA256=$DFGG_JAR_HASH"
 
           # 3. 기동·Readiness·추천 API를 확인한다. 준비에 실패하면 경로를 바꾸지 않는다.
