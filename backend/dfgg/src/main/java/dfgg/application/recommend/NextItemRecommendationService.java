@@ -9,8 +9,10 @@ import dfgg.application.recommend.v3.GeneratorResult;
 import dfgg.application.recommend.v3.RecommendationQuery;
 import dfgg.application.recommend.v3.HardValidityFilter;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
-import dfgg.application.recommend.v3.ranker.TreeShapCalculator;
+import dfgg.application.recommend.v3.explanation.DescriptionComposer;
+import dfgg.application.recommend.v3.explanation.ExplanationSelector;
 import dfgg.application.recommend.v3.ranker.RankedCandidate;
+import dfgg.application.recommend.v3.ranker.TreeShapCalculator;
 import dfgg.common.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
@@ -52,6 +54,8 @@ public class NextItemRecommendationService {
     private final CandidateRanker candidateRanker;
     private final CandidateTopK candidateTopK;
     private final TreeShapCalculator treeShapCalculator;
+    private final ExplanationSelector explanationSelector;
+    private final DescriptionComposer descriptionComposer;
 
     public NextItemRecommendationService(
             ChampionService championService,
@@ -60,7 +64,9 @@ public class NextItemRecommendationService {
             HardValidityFilter hardValidityFilter,
             CandidateRanker candidateRanker,
             CandidateTopK candidateTopK,
-            TreeShapCalculator treeShapCalculator
+            TreeShapCalculator treeShapCalculator,
+            ExplanationSelector explanationSelector,
+            DescriptionComposer descriptionComposer
     ) {
         this.championService = championService;
         this.itemService = itemService;
@@ -69,10 +75,13 @@ public class NextItemRecommendationService {
         this.candidateRanker = candidateRanker;
         this.candidateTopK = candidateTopK;
         this.treeShapCalculator = treeShapCalculator;
+        this.explanationSelector = explanationSelector;
+        this.descriptionComposer = descriptionComposer;
     }
 
     public NextItemRecommendationResponse recommendNextItem(NextItemRecommendationRequest request) {
-        RecommendationQuery query = toQuery(request);
+        Champion myChampion = championService.findChampionByName(request.myChampion().name());
+        RecommendationQuery query = toQuery(request, myChampion);
 
         List<GeneratorResult> generatorResults = new ArrayList<>();
         for (CandidateGenerator generator : generators) {
@@ -91,19 +100,22 @@ public class NextItemRecommendationService {
             throw new NextItemRecommendationNotFoundException(
                     request.myChampion().name(), query.position().name());
         }
-        List<RecommendedItemDto> recommendedItems = ranked.stream()
-                .map(candidate -> RecommendedItemDto.of(
-                        itemById.get(candidate.itemId()),
-                        // 순위를 매길 때 쓴 feature 벡터를 그대로 넘긴다. 다시 계산하면
-                        // 서빙 점수와 이유가 어긋날 수 있다.
-                        RecommendationReasons.of(
-                                treeShapCalculator.contributions(candidate.features().values()))))
-                .toList();
+        List<RecommendedItemDto> recommendedItems = new ArrayList<>();
+        for (int index = 0; index < ranked.size(); index++) {
+            RankedCandidate candidate = ranked.get(index);
+            // 순위를 매길 때 쓴 feature 벡터를 그대로 넘긴다. 다시 계산하면 서빙 점수와
+            // 이유가 어긋날 수 있다.
+            RecommendationReasons reasons = RecommendationReasons.of(
+                    treeShapCalculator.contributions(candidate.features().values()));
+            String description = descriptionComposer.compose(
+                    explanationSelector.select(reasons.byGroup(), index + 1), myChampion.getName());
+            recommendedItems.add(RecommendedItemDto.of(
+                    itemById.get(candidate.itemId()), description, reasons));
+        }
         return new NextItemRecommendationResponse(recommendedItems, candidateRanker.modelVersion());
     }
 
-    private RecommendationQuery toQuery(NextItemRecommendationRequest request) {
-        Champion myChampion = championService.findChampionByName(request.myChampion().name());
+    private RecommendationQuery toQuery(NextItemRecommendationRequest request, Champion myChampion) {
         return new RecommendationQuery(
                 myChampion.getChampionId(),
                 ChampionPosition.valueOf(request.myChampion().position()),

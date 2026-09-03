@@ -22,6 +22,14 @@ public record RecommendationReasons(
         double baseValue
 ) {
 
+    /** 설명 선택기가 읽을 형태. 응답용 목록과 같은 값을 열거형 키로 돌려준다. */
+    public Map<ReasonGroup, Double> byGroup() {
+        Map<ReasonGroup, Double> byGroup = new EnumMap<>(ReasonGroup.class);
+        contributions.forEach(contribution ->
+                byGroup.put(ReasonGroup.valueOf(contribution.group()), contribution.value()));
+        return byGroup;
+    }
+
     public static RecommendationReasons of(FeatureContributions featureContributions) {
         Map<ReasonGroup, Double> totals = new EnumMap<>(ReasonGroup.class);
         for (ReasonGroup group : ReasonGroup.values()) {

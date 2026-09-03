@@ -7,6 +7,7 @@ import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.recommend.v3.feature.FeatureName;
 import dfgg.application.recommend.v3.feature.ReasonGroup;
 import dfgg.presentation.dto.GroupContribution;
+import dfgg.presentation.dto.RecommendedItemDto;
 import java.util.Arrays;
 import java.util.Comparator;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
@@ -218,6 +219,60 @@ class NextItemRecommendationV3PipelineTest {
                     .toList();
             assertThat(values).isSortedAccordingTo(Comparator.reverseOrder());
         });
+    }
+
+    @Test
+    @DisplayName("추천마다 사람이 읽을 수 있는 한 문장을 함께 낸다")
+    void recommendV3_IncludesAHumanReadableDescription() {
+        NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
+
+        assertThat(response.recommendedItems())
+                .allSatisfy(item -> assertThat(item.description())
+                        .isNotBlank()
+                        // 단서가 붙으면 문장이 그쪽으로 끝나므로 endsWith로 볼 수 없다.
+                        .contains("추천했어요.")
+                        .endsWith(".")
+                        .doesNotContain("null", "%s"));
+    }
+
+    @Test
+    @DisplayName("설명에 SHAP 수치나 내부 묶음 이름이 새어나가지 않는다")
+    void recommendV3_DescriptionLeaksNoInternalNames() {
+        NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
+
+        assertThat(response.recommendedItems())
+                .extracting(RecommendedItemDto::description)
+                .allSatisfy(description -> assertThat(description)
+                        .doesNotContain("BUILD", "COUNTER", "SHAP", "PATCH_META", "baseValue"));
+    }
+
+    @Test
+    @DisplayName("설명이 응답 안의 이유 선택과 어긋나지 않는다")
+    void recommendV3_DescriptionAgreesWithTheSelectedReasons() {
+        // reasons는 아직 응답에 남아 있다(E8에서 제거). 둘이 어긋나면 한쪽이 거짓말이다.
+        NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
+
+        assertThat(response.recommendedItems()).allSatisfy(item -> {
+            GroupContribution largest = item.reasons().contributions().getFirst();
+            if (largest.value() > 0) {
+                assertThat(item.description())
+                        .as("가장 크게 밀어올린 묶음 %s의 문구가 설명에 있어야 한다", largest.group())
+                        .contains(expectedFragmentOf(largest.group()));
+            }
+        });
+    }
+
+    private String expectedFragmentOf(String group) {
+        return switch (group) {
+            case "BUILD" -> "빌드 흐름";
+            case "COUNTER" -> "상대 조합";
+            case "PATCH_META" -> "패치";
+            case "ALLY_SYNERGY" -> "아군 조합";
+            case "SELF_SYNERGY" -> "특성";
+            case "TEAM_COMPOSITION" -> "양 팀 조합";
+            case "CONTEXT" -> "지금 상황";
+            default -> throw new IllegalStateException("알 수 없는 묶음: " + group);
+        };
     }
 
     @Test
