@@ -23,6 +23,9 @@ def _flatten_tree(root: dict[str, Any]) -> dict[str, Any]:
     tree: dict[str, list[Any]] = {
         "split_feature": [], "threshold": [], "default_left": [],
         "left": [], "right": [], "leaf_value": [],
+        # TreeSHAP은 각 노드를 지난 학습 표본 수가 있어야 계산된다. 분기 조건과 무관한
+        # feature의 기여도를 "양쪽으로 얼마나 갈렸는가"의 비율로 나누기 때문이다.
+        "node_cover": [], "leaf_cover": [],
     }
     _visit(root, tree)
     return tree
@@ -32,6 +35,8 @@ def _visit(node: dict[str, Any], tree: dict[str, list[Any]]) -> int:
     """노드를 배열에 넣고 자식 인덱스 규약에 맞는 값을 돌려준다."""
     if "leaf_value" in node:
         tree["leaf_value"].append(float(node["leaf_value"]))
+        # 트리가 잎 하나뿐이면 leaf_count가 없다. 그때 cover는 학습 표본 전체다.
+        tree["leaf_cover"].append(float(node.get("leaf_count", node.get("internal_count", 1))))
         return -len(tree["leaf_value"])  # 잎 0번 → -1, 1번 → -2 ...
 
     decision_type = node.get("decision_type", "<=")
@@ -45,6 +50,7 @@ def _visit(node: dict[str, Any], tree: dict[str, list[Any]]) -> int:
     tree["split_feature"].append(int(node["split_feature"]))
     tree["threshold"].append(float(node["threshold"]))
     tree["default_left"].append(bool(node.get("default_left", True)))
+    tree["node_cover"].append(float(node["internal_count"]))
     tree["left"].append(0)   # 자리만 잡고 자식 방문 후 채운다
     tree["right"].append(0)
 

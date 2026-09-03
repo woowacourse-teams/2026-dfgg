@@ -74,6 +74,8 @@ def main() -> None:
     parser.add_argument("--schema", type=Path, default=Path("data/feature_schema.json"))
     parser.add_argument("--split", choices=["game", "patch"], default="game")
     parser.add_argument("--rounds", type=int, default=500)
+    parser.add_argument("--booster-out", type=Path, default=None,
+                        help="LightGBM 네이티브 모델 저장 경로. SHAP 기준값(pred_contrib) 생성에 쓴다.")
     parser.add_argument("--out", type=Path, default=None,
                         help="모델 JSON 출력 경로. 주지 않으면 학습만 하고 내보내지 않는다")
     args = parser.parse_args()
@@ -91,6 +93,11 @@ def main() -> None:
         key = f"ndcg@{k}"
         if key in results["valid"]:
             print(f"  NDCG@{k} = {results['valid'][key][booster.best_iteration - 1]:.4f}")
+
+    if args.booster_out is not None:
+        args.booster_out.parent.mkdir(parents=True, exist_ok=True)
+        booster.save_model(str(args.booster_out), num_iteration=booster.best_iteration)
+        print(f"네이티브 모델 저장: {args.booster_out}")
 
     if args.out is not None:
         exported = to_export_dict(booster, train_set.feature_names, train_set.schema_fingerprint)
