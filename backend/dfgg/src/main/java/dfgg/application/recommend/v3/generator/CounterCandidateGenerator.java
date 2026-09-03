@@ -91,8 +91,10 @@ public class CounterCandidateGenerator implements CandidateGenerator {
         }
 
         List<ScoredItem> ranked = liftByItemAndEnemy.entrySet().stream()
+                // 랭킹에는 최댓값 하나를 쓰지만 적별 lift도 함께 남긴다. 여기서 버리면
+                // "누구 때문에 올라왔는가"를 나중에 다시 조회해야 한다.
                 .map(entry -> new ScoredItem(
-                        entry.getKey(), PairScoreAggregate.of(entry.getValue()).max()))
+                        entry.getKey(), PairScoreAggregate.of(entry.getValue()).max(), entry.getValue()))
                 .sorted(byScoreThenItemId())
                 .limit(topK)
                 .toList();

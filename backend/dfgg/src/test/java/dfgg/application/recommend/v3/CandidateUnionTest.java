@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -180,5 +181,33 @@ class CandidateUnionTest {
         // then
         assertThat(union.candidates()).hasSize(1);
         assertThat(union.candidateOf(LIANDRY).sources()).containsExactly(COUNTER);
+    }
+
+    @Test
+    @DisplayName("어느 챔피언 때문에 올라온 후보인지를 union이 흘리지 않는다")
+    void merge_PreservesPerChampionAttribution() {
+        // T7에서 backoffLevel을 여기서 흘린 전례가 있다. 근거는 generator에서 응답까지
+        // 그대로 도착해야 하고, 중간에 사라지면 조용히 빈 설명이 나간다.
+        GeneratorResult counter = GeneratorResult.of(CandidateSource.COUNTER,
+                List.of(new ScoredItem(3036L, 1.8, Map.of(33L, 1.8, 122L, 1.2))));
+
+        CandidateUnion union = CandidateUnion.merge(List.of(counter));
+
+        assertThat(union.candidateOf(3036L).evidenceOf(CandidateSource.COUNTER).orElseThrow()
+                .scoreByChampionId())
+                .containsEntry(33L, 1.8)
+                .containsEntry(122L, 1.2);
+    }
+
+    @Test
+    @DisplayName("근거를 남기지 않은 generator의 후보는 빈 맵을 갖는다 — null이 아니다")
+    void merge_WhenGeneratorLeftNoAttribution_YieldsEmptyMapNotNull() {
+        GeneratorResult build = GeneratorResult.of(CandidateSource.BUILD,
+                List.of(new ScoredItem(3031L, 0.9)));
+
+        CandidateUnion union = CandidateUnion.merge(List.of(build));
+
+        assertThat(union.candidateOf(3031L).evidenceOf(CandidateSource.BUILD).orElseThrow()
+                .scoreByChampionId()).isEmpty();
     }
 }

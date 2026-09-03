@@ -124,6 +124,56 @@ class CounterCandidateGeneratorTest {
     }
 
     @Test
+    @DisplayName("어느 적 때문에 올라온 후보인지를 결과에 남긴다 — 집계하면서 버리지 않는다")
+    void generate_PreservesWhichEnemyDroveEachCandidate() {
+        // 랭킹 점수로는 적별 lift의 최댓값 하나만 쓰지만, "누구 때문인가"는 추천 이유를
+        // 만들 때 필요하다. 여기서 버리면 나중에 같은 통계를 다시 조회해야 한다.
+        GeneratorResult result = generator.generate(queryAgainst(List.of(RAMMUS)), 10);
+
+        ScoredItem dominik = result.rankedItems().stream()
+                .filter(item -> item.itemId() == DOMINIK)
+                .findFirst().orElseThrow();
+
+        assertThat(dominik.scoreByChampionId()).containsKey(RAMMUS);
+    }
+
+    @Test
+    @DisplayName("적이 여럿이면 각각의 lift를 따로 남긴다")
+    void generate_WhenMultipleEnemies_KeepsEachEnemysLiftSeparately() {
+        GeneratorResult result = generator.generate(queryAgainst(List.of(RAMMUS, AHRI)), 10);
+
+        ScoredItem infinityEdge = result.rankedItems().stream()
+                .filter(item -> item.itemId() == INFINITY_EDGE)
+                .findFirst().orElseThrow();
+
+        assertThat(infinityEdge.scoreByChampionId()).containsKeys(RAMMUS, AHRI);
+    }
+
+    @Test
+    @DisplayName("남긴 적별 lift가 개별 조회 결과와 같다 — 다시 계산하면 값이 갈릴 수 있다")
+    void generate_PreservedLiftMatchesTheDirectLookup() {
+        double direct = generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS).get(DOMINIK).lift();
+
+        GeneratorResult result = generator.generate(queryAgainst(List.of(RAMMUS)), 10);
+        ScoredItem dominik = result.rankedItems().stream()
+                .filter(item -> item.itemId() == DOMINIK)
+                .findFirst().orElseThrow();
+
+        assertThat(dominik.scoreByChampionId().get(RAMMUS)).isEqualTo(direct);
+    }
+
+    @Test
+    @DisplayName("랭킹 점수는 적별 lift의 최댓값 그대로다 — 근거를 남겨도 순위는 달라지지 않는다")
+    void generate_RankingScoreStillEqualsTheMaximumPerEnemyLift() {
+        GeneratorResult result = generator.generate(queryAgainst(List.of(RAMMUS, AHRI)), 10);
+
+        assertThat(result.rankedItems()).allSatisfy(item ->
+                assertThat(item.score())
+                        .isEqualTo(item.scoreByChampionId().values().stream()
+                                .mapToDouble(Double::doubleValue).max().orElseThrow()));
+    }
+
+    @Test
     @DisplayName("적을 추가해도 기존 적과의 lift는 변하지 않는다 — 적 5명을 하나의 window로 묶지 않는다")
     void liftsByItem_WhenAnotherEnemyAdded_DoesNotChangeExistingEnemyLift() {
         // given
