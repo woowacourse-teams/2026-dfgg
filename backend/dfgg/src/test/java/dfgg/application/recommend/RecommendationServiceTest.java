@@ -1,0 +1,186 @@
+package dfgg.application.recommend;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import dfgg.application.champion.ChampionService;
+import dfgg.common.CompositionStatsNotFoundException;
+import dfgg.domain.champion.Champion;
+import dfgg.domain.champion.ChampionPosition;
+import dfgg.domain.champion.ChampionTag;
+import dfgg.domain.item.Item;
+import dfgg.domain.stats.ChampionBuildStats;
+import dfgg.domain.stats.ChampionBuildStatsRepository;
+import dfgg.presentation.dto.ChampionDto;
+import dfgg.presentation.dto.request.RecommendationRequest;
+import dfgg.presentation.dto.response.RecommendationResponse;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class RecommendationServiceTest {
+
+    private RecommendationService recommendationService;
+
+    @Mock
+    private ChampionService championService;
+
+    @Mock
+    private ChampionBuildStatsRepository statsRepository;
+
+    private final RecommendationBuildComposer buildComposer = new RecommendationBuildComposer();
+
+    @BeforeEach
+    void setUp() {
+        recommendationService = new RecommendationService(championService, statsRepository, buildComposer);
+    }
+
+    @Test
+    @DisplayName("여러 buildKey의 통계를 슬롯별로 병합해 하나의 buildKey보다 많은 아이템을 추천한다")
+    void recommend_success() {
+        // given
+        RecommendationRequest request = new RecommendationRequest(
+                new ChampionDto("징크스", "BOTTOM"),
+                List.of(new ChampionDto("쓰레쉬", "SUPPORT")),
+                List.of(new ChampionDto("케이틀린", "BOTTOM"))
+        );
+
+        Champion myChampion = mock(Champion.class);
+        when(myChampion.getChampionId()).thenReturn(1L);
+        when(myChampion.getName()).thenReturn("징크스");
+
+        Champion thresh = mock(Champion.class);
+        when(thresh.getChampionTags()).thenReturn(List.of(ChampionTag.SUPPORT));
+
+        Champion caitlyn = mock(Champion.class);
+        when(caitlyn.getChampionTags()).thenReturn(List.of(ChampionTag.MARKSMAN));
+
+        when(championService.findChampionByName("징크스")).thenReturn(myChampion);
+        when(championService.findChampionByName("쓰레쉬")).thenReturn(thresh);
+        when(championService.findChampionByName("케이틀린")).thenReturn(caitlyn);
+
+        Item item1 = new Item(1L, "아이템1");
+        Item boots = new Item(2L, "신발", List.of("Boots"));
+        Item item2 = new Item(3L, "아이템2");
+        Item item3 = new Item(4L, "아이템3");
+        Item item4 = new Item(5L, "아이템4");
+        Item item5 = new Item(6L, "아이템5");
+        Item item6 = new Item(7L, "아이템6");
+
+        ChampionBuildStats shortPopularStats = new ChampionBuildStats(
+                "16.15", 420, myChampion, ChampionPosition.BOTTOM,
+                null, null, null, null, null,
+                "PLATINUM", "SHORT", List.of(item1, boots, item2), 30, 50
+        );
+        ChampionBuildStats longRareStats = new ChampionBuildStats(
+                "16.15", 420, myChampion, ChampionPosition.BOTTOM,
+                null, null, null, null, null,
+                "PLATINUM", "LONG", List.of(item1, boots, item2, item3, item4, item5, item6), 2, 3
+        );
+
+        when(statsRepository.findAllMatchingStats(
+                eq(1L), eq("BOTTOM"),
+                anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean()
+        )).thenReturn(List.of(shortPopularStats, longRareStats));
+
+        // when
+        RecommendationResponse response = recommendationService.recommend(request);
+
+        // then
+        assertThat(response.champion()).isEqualTo("징크스");
+        assertThat(response.position()).isEqualTo("BOTTOM");
+        assertThat(response.items()).hasSize(7);
+    }
+
+    @Test
+    @DisplayName("매칭되는 통계가 없으면 예외가 발생한다")
+    void recommend_WhenStatsNotFound_ThrowCompositionStatsNotFoundException() {
+        // given
+        RecommendationRequest request = new RecommendationRequest(
+                new ChampionDto("징크스", "BOTTOM"),
+                List.of(),
+                List.of()
+        );
+
+        Champion myChampion = mock(Champion.class);
+        when(myChampion.getChampionId()).thenReturn(1L);
+        when(myChampion.getName()).thenReturn("징크스");
+
+        when(championService.findChampionByName(anyString())).thenReturn(myChampion);
+
+        when(statsRepository.findAllMatchingStats(
+                anyLong(), anyString(),
+                anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean()
+        )).thenReturn(List.of());
+
+        // when & then
+        assertThatThrownBy(() -> recommendationService.recommend(request))
+                .isInstanceOf(CompositionStatsNotFoundException.class)
+                .hasMessageContaining("징크스")
+                .hasMessageContaining("BOTTOM");
+    }
+
+    @Test
+    @DisplayName("BOTTOM 통계는 존재하지만 신발 후보가 없으면 추천 없음 예외가 발생한다")
+    void recommend_WhenBottomStatsHaveNoBootCandidate_ThrowCompositionStatsNotFoundException() {
+        RecommendationRequest request = new RecommendationRequest(
+                new ChampionDto("징크스", "BOTTOM"),
+                List.of(),
+                List.of()
+        );
+        Champion myChampion = mock(Champion.class);
+        when(myChampion.getChampionId()).thenReturn(1L);
+        when(myChampion.getName()).thenReturn("징크스");
+        when(championService.findChampionByName("징크스")).thenReturn(myChampion);
+
+        ChampionBuildStats bootlessStats = new ChampionBuildStats(
+                "16.15",
+                420,
+                myChampion,
+                ChampionPosition.BOTTOM,
+                false,
+                false,
+                false,
+                false,
+                false,
+                "PLATINUM",
+                "BOOTLESS",
+                List.of(
+                        new Item(10L, "아이템0"),
+                        new Item(11L, "아이템1"),
+                        new Item(12L, "아이템2"),
+                        new Item(13L, "아이템3"),
+                        new Item(14L, "아이템4"),
+                        new Item(15L, "아이템5"),
+                        new Item(16L, "아이템6")
+                ),
+                50,
+                100
+        );
+        when(statsRepository.findAllMatchingStats(
+                eq(1L),
+                eq("BOTTOM"),
+                anyBoolean(),
+                anyBoolean(),
+                anyBoolean(),
+                anyBoolean(),
+                anyBoolean()
+        )).thenReturn(List.of(bootlessStats));
+
+        assertThatThrownBy(() -> recommendationService.recommend(request))
+                .isInstanceOf(CompositionStatsNotFoundException.class)
+                .hasMessageContaining("징크스")
+                .hasMessageContaining("BOTTOM");
+    }
+}

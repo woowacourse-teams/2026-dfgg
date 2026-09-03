@@ -1,0 +1,185 @@
+package dfgg.application.stats;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import dfgg.application.item.ItemService;
+import dfgg.domain.champion.Champion;
+import dfgg.domain.champion.ChampionRepository;
+import dfgg.domain.champion.ChampionTag;
+import dfgg.domain.item.Item;
+import dfgg.domain.match.NormalizedMatch;
+import dfgg.domain.match.NormalizedMatchParticipant;
+import dfgg.domain.stats.ChampionBuildStatsRepository;
+import dfgg.domain.stats.CompositionStatsSampleRepository;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class ChampionBuildStatsAggregationServiceTest {
+
+    @Mock
+    private ChampionBuildStatsRepository statsRepository;
+
+    @Mock
+    private CompositionStatsSampleRepository sampleRepository;
+
+    @Mock
+    private ChampionRepository championRepository;
+
+    @Mock
+    private ItemService itemService;
+
+    @InjectMocks
+    private ChampionBuildStatsAggregationService aggregationService;
+
+    @Test
+    void 대상_PUUID의_코어_아이템_구매_순서를_통계로_집계한다() {
+        Champion focal = champion(1L, "FIGHTER");
+        Champion ally = champion(2L, "MARKSMAN");
+        Champion enemy = champion(3L, "TANK");
+        when(championRepository.findAllById(any())).thenReturn(List.of(focal, ally, enemy));
+        when(itemService.findItemsByIds(any())).thenReturn(List.of(
+                new Item(3071L, "아이템 A"),
+                new Item(6610L, "아이템 B")
+        ));
+        when(statsRepository.insertIfAbsent(
+                anyString(),
+                anyInt(),
+                anyLong(),
+                anyString(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                anyString(),
+                anyString(),
+                anyString()
+        )).thenReturn(1);
+        NormalizedMatch match = new NormalizedMatch(
+                "KR_1",
+                "16.15",
+                420,
+                List.of(
+                        participant("p-focal", 1, 1, 100, "TOP", true),
+                        participant("p-ally", 2, 2, 100, "JUNGLE", false),
+                        participant("p-enemy", 3, 3, 200, "TOP", false)
+                )
+        );
+
+        aggregationService.aggregate(match, "PLATINUM", List.of("p-focal"));
+
+        verify(statsRepository).insertIfAbsent(
+                eq("16.15"),
+                eq(420),
+                eq(1L),
+                eq("TOP"),
+                eq(false),
+                eq(false),
+                eq(false),
+                eq(false),
+                eq(false),
+                eq("PLATINUM"),
+                eq("3071>6610"),
+                anyString()
+        );
+        verify(statsRepository, times(2)).insertItem(anyString(), anyLong(), anyInt());
+        ArgumentCaptor<String> statsKeyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(sampleRepository).insertAndIncrementIfAbsent(
+                statsKeyCaptor.capture(),
+                eq("KR_1"),
+                eq("p-focal"),
+                eq(true)
+        );
+        assertThat(statsKeyCaptor.getAllValues())
+                .containsExactly("16.15|420|1|TOP|false|false|false|false|false|PLATINUM|3071>6610");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "MIDDLE, MID",
+            "UTILITY, SUPPORT"
+    })
+    void Riot_포지션을_서비스_포지션으로_변환해_집계한다(
+            String riotPosition,
+            String servicePosition
+    ) {
+        Champion focal = champion(1L, "FIGHTER");
+        Champion ally = champion(2L, "MARKSMAN");
+        Champion enemy = champion(3L, "TANK");
+        when(championRepository.findAllById(any())).thenReturn(List.of(focal, ally, enemy));
+        when(itemService.findItemsByIds(any())).thenReturn(List.of(
+                new Item(3071L, "아이템 A"),
+                new Item(6610L, "아이템 B")
+        ));
+
+        NormalizedMatch match = new NormalizedMatch(
+                "KR_1",
+                "16.15",
+                420,
+                List.of(
+                        participant("p-focal", 1, 1, 100, riotPosition, true),
+                        participant("p-ally", 2, 2, 100, "JUNGLE", false),
+                        participant("p-enemy", 3, 3, 200, "TOP", false)
+                )
+        );
+
+        aggregationService.aggregate(match, "PLATINUM", List.of("p-focal"));
+
+        verify(statsRepository).insertIfAbsent(
+                eq("16.15"),
+                eq(420),
+                eq(1L),
+                eq(servicePosition),
+                eq(false),
+                eq(false),
+                eq(false),
+                eq(false),
+                eq(false),
+                eq("PLATINUM"),
+                eq("3071>6610"),
+                anyString()
+        );
+    }
+
+    private Champion champion(Long id, String tag) {
+        return new Champion(id, "champion-" + id, "챔피언" + id, List.of(ChampionTag.valueOf(tag)));
+    }
+
+    private NormalizedMatchParticipant participant(
+            String puuid,
+            int participantId,
+            int championId,
+            int teamId,
+            String position,
+            boolean win
+    ) {
+        return new NormalizedMatchParticipant(
+                puuid,
+                participantId,
+                championId,
+                teamId,
+                position,
+                "PLATINUM",
+                win,
+                List.of(3071, 6610),
+                List.of(3071, 6610),
+                true
+        );
+    }
+}

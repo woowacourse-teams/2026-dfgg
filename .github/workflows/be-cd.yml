@@ -1,0 +1,343 @@
+name: BE CD - EC2(BE/Dev)
+
+on:
+  push:
+    branches: [ "BE/dev" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 같은 EC2의 배포를 직렬화하고 진행 중인 배포는 자동 취소하지 않는다.
+concurrency:
+  group: dfgg-backend-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/BE/dev'
+    runs-on: self-hosted
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./backend/dfgg
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check deployment prerequisites
+        run: |
+          set -euo pipefail
+          for tool in curl jq flock sha256sum systemctl nginx ps ss; do
+            command -v "$tool" > /dev/null
+          done
+          test -w /opt/dfgg
+          test -w /opt/dfgg/blue
+          test -w /opt/dfgg/green
+          test -r /etc/nginx/conf.d/dfgg-upstream.conf
+          sudo -n nginx -t
+          # EC2의 dfgg@.service도 색상별 JAR 경로로 먼저 변경해야 한다.
+          # 기존 app.jar를 실행하는 설정이면 새 버전 배포로 오인하지 않도록 중단한다.
+          for slot in blue green; do
+            slot_jar="/opt/dfgg/$slot/dfgg-$slot.jar"
+            slot_exec=$(systemctl show "dfgg@$slot.service" -p ExecStart --value)
+            if [[ "$slot_exec" != *" -jar $slot_jar "* ]]; then
+              echo "::error::dfgg@$slot.service must execute $slot_jar; update the EC2 systemd configuration first"
+              exit 1
+            fi
+          done
+          # 두 JVM이 켜진 채로 무거운 빌드를 시작하지 않는다.
+          blue=$(systemctl show dfgg@blue.service -p ActiveState --value)
+          green=$(systemctl show dfgg@green.service -p ActiveState --value)
+          [[ "$blue:$green" == active:inactive || "$blue:$green" == inactive:active ]] \
+            || { echo 'Expected exactly one active application'; exit 1; }
+
+      - name: Copy .env file
+        run: cp /home/ubuntu/app-config/.env ./.env
+
+      # 현재 모델 원본은 EC2의 app-config다. 모델 갱신 시 이 파일도 먼저 교체한다.
+      - name: Copy LTR model resource
+        run: |
+          set -euo pipefail
+          model_source=/home/ubuntu/app-config/model.json
+          model_target=src/main/resources/ltr/model.json
+          if [[ ! -r "$model_source" || ! -s "$model_source" ]]; then
+            echo '::error::LTR model file is missing, empty, or unreadable in app-config'
+            exit 1
+          fi
+          mkdir -p src/main/resources/ltr
+          cp "$model_source" "$model_target"
+          # JSON 형식만 검사한다. 코드와 모델의 호환성은 앱 기동 시 검증한다.
+          jq -e -s 'length == 1 and (.[0] | type == "object")' "$model_target" > /dev/null
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build JAR
+        timeout-minutes: 20
+        run: ./gradlew clean build --no-daemon -x test
+
+      - name: Verify LTR model in JAR
+        run: |
+          set -euo pipefail
+          jar tf build/libs/dfgg-0.0.1-SNAPSHOT.jar \
+            | grep -Fx 'BOOT-INF/classes/ltr/model.json'
+
+      # DB 스키마는 구/신 버전과 호환되어야 한다. DDL 변경은 롤백하지 못한다.
+      # 최초 실행 전 runner의 jq/flock 및 sudo·배포 디렉터리 권한을 확인한다.
+      - name: Deploy with Blue-Green switch
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+
+          DFGG_UPSTREAM=/etc/nginx/conf.d/dfgg-upstream.conf
+          DFGG_JAR=build/libs/dfgg-0.0.1-SNAPSHOT.jar
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]] \
+            || { echo 'Invalid workflow run identifier'; exit 1; }
+          DFGG_CONFIG_STAGE="/etc/nginx/conf.d/.dfgg-upstream-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.pending"
+          DFGG_BACKUP="${DFGG_UPSTREAM}.backup-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          # 워크플로 외부의 동일 배포와도 겹치지 않게 잠근다. lock 파일은 지우지 않는다.
+          test ! -L /opt/dfgg/.deploy.lock
+          exec 9>/opt/dfgg/.deploy.lock
+          flock -n 9 || { echo 'Another deployment is running'; exit 1; }
+          DFGG_TMP=$(mktemp -d)
+          DFGG_STARTED=false
+          DFGG_CHANGED=false
+          DFGG_RELOADED=false
+          DFGG_COMMITTED=false
+          DFGG_JAR_STAGE=''
+
+          property() { systemctl show "$1" -p "$2" --value; }
+          stopped() {
+            [[ "$(property "$1" ActiveState)" == inactive && "$(property "$1" MainPID)" == 0 ]]
+          }
+          set_enabled() {
+            sudo -n systemctl "$2" "$1" || return 1
+            local expected=disabled
+            [[ "$2" != enable ]] || expected=enabled
+            [[ "$(property "$1" UnitFileState)" == "$expected" ]]
+          }
+
+          # HTTP 상태와 JSON을 모두 검사한다. 응답 본문/비밀 값은 로그에 남기지 않는다.
+          probe() {
+            local port=$1 path=$2 filter=$3 body=${4:-} code
+            local args=(--noproxy '*' --connect-timeout 3 --max-time 15 -sS
+              -o "$DFGG_TMP/response.json" -w '%{http_code}')
+            if [[ -n "$body" ]]; then
+              args+=(-H 'Content-Type: application/json' --data "$body")
+            fi
+            code=$(curl "${args[@]}" "http://127.0.0.1:${port}${path}") || return 1
+            [[ "$code" == 200 ]] || return 1
+            jq -e "$filter" "$DFGG_TMP/response.json" > /dev/null
+          }
+          ready() { probe "$1" /actuator/health/readiness '.status == "UP"'; }
+          proxy_ok() { probe 8080 /v3/api-docs '(.openapi | type == "string") and (.paths | type == "object")'; }
+
+          # PID와 시작 시각을 함께 기록한다. 이미 처리 중인 요청이 끝날 때까지 기다린다.
+          workers() {
+            local master
+            master=$(property nginx.service MainPID) || return 1
+            [[ "$master" == "$DFGG_MASTER" ]] || return 1
+            ps -eo pid=,ppid=,lstart=,args= | awk -v master="$master" '
+              $2 == master && $8 == "nginx:" && $9 == "worker" && $10 == "process" {
+                print $1 ":" $3 "_" $4 "_" $5 "_" $6 "_" $7
+              }'
+          }
+          wait_new_workers() {
+            local before=$1 current worker attempt
+            for attempt in $(seq 1 10); do
+              current=$(workers) || return 1
+              while IFS= read -r worker; do
+                [[ -n "$worker" ]] || continue
+                if ! grep -Fxq -- "$worker" <<< "$before"; then return 0; fi
+              done <<< "$current"
+              sleep 1
+            done
+            echo 'New Nginx workers were not observed' >&2
+            return 1
+          }
+          wait_drained() {
+            local before=$1 current worker pending attempt
+            for attempt in $(seq 1 60); do
+              current=$(workers) || return 1
+              [[ -n "$current" ]] || return 1
+              pending=false
+              while IFS= read -r worker; do
+                [[ -n "$worker" ]] || continue
+                if grep -Fxq -- "$worker" <<< "$current"; then pending=true; fi
+              done <<< "$before"
+              if [[ "$pending" == false ]]; then return 0; fi
+              sleep 1
+            done
+            echo 'Old Nginx workers are still draining' >&2
+            return 1
+          }
+          atomic_upstream() {
+            sudo -n install -o root -g root -m 0644 "$1" "$DFGG_CONFIG_STAGE" || return 1
+            sudo -n mv -T "$DFGG_CONFIG_STAGE" "$DFGG_UPSTREAM"
+          }
+
+          # 전환 도중 실패하면 기존 경로로 복구한다. 복구가 불확실하면 두 앱을 유지한다.
+          rollback() {
+            local before
+            if [[ "$DFGG_CHANGED" == true ]]; then
+              # 다른 관리자가 수정했다면 덮어쓰지 않고 수동 확인한다.
+              cmp -s "$DFGG_UPSTREAM" "$DFGG_TMP/upstream.next" \
+                || cmp -s "$DFGG_UPSTREAM" "$DFGG_TMP/upstream.before" || return 1
+              atomic_upstream "$DFGG_TMP/upstream.before" || return 1
+              sudo -n nginx -t || return 1
+            fi
+            if [[ "$DFGG_RELOADED" == true ]]; then
+              ready "$DFGG_OLD_PORT" || return 1
+              before=$(workers) || return 1
+              sudo -n systemctl reload nginx.service || return 1
+              wait_new_workers "$before" || return 1
+              wait_drained "$before" || return 1
+              proxy_ok || return 1
+            fi
+            if [[ "$DFGG_STARTED" == true ]]; then
+              set_enabled "$DFGG_OLD_UNIT" enable || return 1
+              set_enabled "$DFGG_NEW_UNIT" disable || return 1
+              sudo -n systemctl stop "$DFGG_NEW_UNIT" || return 1
+              stopped "$DFGG_NEW_UNIT" || return 1
+            fi
+          }
+          finish() {
+            local result=$?
+            trap - EXIT
+            trap '' INT TERM
+            set +e
+            if [[ "$result" != 0 ]]; then
+              if [[ "$DFGG_COMMITTED" == true ]]; then
+                echo "::error::New slot remains active; old-slot cleanup/final check failed. Inspect manually."
+              elif rollback; then
+                echo '::error::Deployment failed; previous route preserved/restored.'
+              else
+                echo "::error::Recovery uncertain. Do not stop either app. Inspect $DFGG_BACKUP"
+              fi
+            fi
+            # 이 실행의 임시 파일만 정리하고 기존 JAR와 서버 측 백업은 남긴다.
+            [[ -z "$DFGG_JAR_STAGE" ]] || rm -f "$DFGG_JAR_STAGE"
+            if [[ "$DFGG_CHANGED" == true ]]; then sudo -n rm -f "$DFGG_CONFIG_STAGE"; fi
+            rm -f "$DFGG_TMP/response.json" "$DFGG_TMP/upstream.before" "$DFGG_TMP/upstream.next"
+            rmdir "$DFGG_TMP"
+            exit "$result"
+          }
+          trap finish EXIT
+          # 강제 종료/runner 장애 시 자동 복구는 보장할 수 없다. 중간 취소는 피한다.
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+
+          # 1. 현재 경로와 앱 상태를 확인한다. 모호한 상태라면 변경 없이 중단한다.
+          test -s "$DFGG_JAR"
+          test ! -L "$DFGG_UPSTREAM"
+          cp "$DFGG_UPSTREAM" "$DFGG_TMP/upstream.before"
+          compact=$(sed 's/#.*//' "$DFGG_TMP/upstream.before" | tr -d '[:space:]')
+          case "$compact" in
+            'upstreamdfgg_backend{server127.0.0.1:8081;keepalive16;}')
+              DFGG_OLD=blue; DFGG_NEW=green; DFGG_OLD_PORT=8081; DFGG_NEW_PORT=8082 ;;
+            'upstreamdfgg_backend{server127.0.0.1:8082;keepalive16;}')
+              DFGG_OLD=green; DFGG_NEW=blue; DFGG_OLD_PORT=8082; DFGG_NEW_PORT=8081 ;;
+            *) echo 'Unknown upstream configuration'; exit 1 ;;
+          esac
+          DFGG_OLD_UNIT="dfgg@${DFGG_OLD}.service"
+          DFGG_NEW_UNIT="dfgg@${DFGG_NEW}.service"
+          DFGG_NEW_JAR="/opt/dfgg/$DFGG_NEW/dfgg-$DFGG_NEW.jar"
+          [[ "$(property nginx.service ActiveState)" == active ]] || exit 1
+          [[ "$(property nginx.service UnitFileState)" == enabled ]] || exit 1
+          stopped dfgg.service
+          [[ "$(property dfgg.service UnitFileState)" == disabled ]] || exit 1
+          [[ "$(property "$DFGG_OLD_UNIT" ActiveState)" == active ]] || exit 1
+          [[ "$(property "$DFGG_OLD_UNIT" UnitFileState)" == enabled ]] || exit 1
+          stopped "$DFGG_NEW_UNIT"
+          [[ "$(property "$DFGG_NEW_UNIT" UnitFileState)" == disabled ]] || exit 1
+          DFGG_MASTER=$(property nginx.service MainPID)
+          [[ "$DFGG_MASTER" =~ ^[1-9][0-9]*$ ]] || exit 1
+          current_workers=$(workers)
+          [[ -n "$current_workers" ]] || exit 1
+          if ps -eo args= | grep -q '[n]ginx: worker process is shutting down'; then
+            echo 'Previous reload is still draining'; exit 1
+          fi
+          sudo -n nginx -t
+          ready "$DFGG_OLD_PORT"
+          proxy_ok
+          listeners=$(ss -H -ltn "sport = :$DFGG_NEW_PORT")
+          [[ -z "$listeners" ]] || { echo 'Target port is already in use'; exit 1; }
+
+          # 2. 종료된 슬롯에만 JAR를 배치한다. 체크섬 확인 후 한 번에 교체한다.
+          test ! -L "/opt/dfgg/$DFGG_NEW"
+          test ! -L "$DFGG_NEW_JAR"
+          DFGG_JAR_HASH=$(sha256sum "$DFGG_JAR")
+          DFGG_JAR_HASH=${DFGG_JAR_HASH%% *}
+          DFGG_JAR_STAGE=$(mktemp "/opt/dfgg/$DFGG_NEW/.dfgg-$DFGG_NEW.XXXXXX")
+          cp "$DFGG_JAR" "$DFGG_JAR_STAGE"
+          chmod 0644 "$DFGG_JAR_STAGE"
+          staged_hash=$(sha256sum "$DFGG_JAR_STAGE")
+          [[ "${staged_hash%% *}" == "$DFGG_JAR_HASH" ]] \
+            || { echo 'JAR checksum mismatch'; exit 1; }
+          stopped "$DFGG_NEW_UNIT"
+          mv -T "$DFGG_JAR_STAGE" "$DFGG_NEW_JAR"
+          echo "Deploying $DFGG_OLD -> $DFGG_NEW; SHA256=$DFGG_JAR_HASH"
+
+          # 3. 기동·Readiness·추천 API를 확인한다. 준비에 실패하면 경로를 바꾸지 않는다.
+          DFGG_STARTED=true
+          sudo -n systemctl start "$DFGG_NEW_UNIT"
+          deadline=$((SECONDS + 90))
+          until ready "$DFGG_NEW_PORT"; do
+            if (( SECONDS >= deadline )); then echo 'Readiness timed out'; exit 1; fi
+            sleep 2
+          done
+          [[ "$(property "$DFGG_NEW_UNIT" ActiveState)" == active ]] || exit 1
+          [[ "$(property "$DFGG_NEW_UNIT" SubState)" == running ]] || exit 1
+          [[ "$(property "$DFGG_NEW_UNIT" MainPID)" =~ ^[1-9][0-9]*$ ]] || exit 1
+          DFGG_V2_BODY='{"myChampion":{"name":"말파이트","position":"TOP"},"allies":[{"name":"리 신","position":"JUNGLE"},{"name":"아리","position":"MID"},{"name":"징크스","position":"BOTTOM"},{"name":"룰루","position":"SUPPORT"}],"enemies":[{"name":"가렌","position":"TOP"},{"name":"바이","position":"JUNGLE"},{"name":"제드","position":"MID"},{"name":"케이틀린","position":"BOTTOM"},{"name":"레오나","position":"SUPPORT"}]}'
+          # 수동 실험과 같은 데이터다. 지원 패치가 바뀌면 smoke 조건도 갱신한다.
+          DFGG_V3_BODY=$(jq -cn --argjson base "$DFGG_V2_BODY" \
+            '$base + {purchasedItemIds: [], tier: "PLATINUM", patch: "16.17"}')
+          probe "$DFGG_NEW_PORT" /api/recommendations/v2 \
+            '(.champion | type == "string") and (.builds | type == "array" and length > 0)' "$DFGG_V2_BODY"
+          probe "$DFGG_NEW_PORT" /api/recommendations/v3 \
+            '(.recommendedItems | type == "array" and length > 0) and (.servedBy | type == "string")' "$DFGG_V3_BODY"
+
+          # 4. 설정 백업 → 구문 검사 → reload. Nginx restart는 사용하지 않는다.
+          sudo -n install -o root -g root -m 0644 "$DFGG_TMP/upstream.before" "$DFGG_BACKUP"
+          echo "Upstream backup: $DFGG_BACKUP"
+          sed "s/127\\.0\\.0\\.1:$DFGG_OLD_PORT/127.0.0.1:$DFGG_NEW_PORT/" \
+            "$DFGG_TMP/upstream.before" > "$DFGG_TMP/upstream.next"
+          before=$(workers)
+          set_enabled "$DFGG_NEW_UNIT" enable
+          cmp -s "$DFGG_UPSTREAM" "$DFGG_TMP/upstream.before"
+          DFGG_CHANGED=true
+          atomic_upstream "$DFGG_TMP/upstream.next"
+          sudo -n nginx -t
+          date -u '+switch_started=%Y-%m-%dT%H:%M:%SZ'
+          DFGG_RELOADED=true
+          sudo -n systemctl reload nginx.service
+          wait_new_workers "$before"
+          for attempt in $(seq 1 5); do
+            ready "$DFGG_NEW_PORT"
+            proxy_ok
+            sleep 2
+          done
+
+          # 5. 이전 worker가 종료된 뒤 이전 앱을 멈추고 자동 시작도 새 슬롯에 맞춘다.
+          wait_drained "$before"
+          ready "$DFGG_NEW_PORT"
+          proxy_ok
+          set_enabled "$DFGG_OLD_UNIT" disable
+          DFGG_COMMITTED=true
+          sudo -n systemctl stop "$DFGG_OLD_UNIT"
+          stopped "$DFGG_OLD_UNIT"
+          ready "$DFGG_NEW_PORT"
+          proxy_ok
+          date -u '+deployment_completed=%Y-%m-%dT%H:%M:%SZ'
+          echo "SUCCESS: $DFGG_NEW active; $DFGG_OLD stopped"

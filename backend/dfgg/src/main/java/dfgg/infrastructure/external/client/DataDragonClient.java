@@ -19,6 +19,10 @@ public class DataDragonClient {
     }
 
     public String getLatestVersion() {
+        return normalizePatch(getLatestDataVersion());
+    }
+
+    private String getLatestDataVersion() {
         String[] versions = restClient.get()
                 .uri("api/versions.json")
                 .retrieve()
@@ -30,10 +34,24 @@ public class DataDragonClient {
         return versions[0];
     }
 
+    private static String normalizePatch(String version) {
+        if (version == null || version.isBlank()) {
+            throw new IllegalStateException("[Error] Data Dragon version is invalid");
+        }
+
+        String[] components = version.split("\\.");
+        if (components.length < 2
+                || components[0].isBlank()
+                || components[1].isBlank()) {
+            throw new IllegalStateException("[Error] Data Dragon version is invalid: " + version);
+        }
+        return components[0] + "." + components[1];
+    }
+
     public ChampionResponse getChampions() {
         ChampionResponse response = restClient.get()
                 .uri("/cdn/{version}/data/ko_KR/champion.json",
-                        getLatestVersion())
+                        getLatestDataVersion())
                 .retrieve()
                 .body(ChampionResponse.class);
 
@@ -59,7 +77,7 @@ public class DataDragonClient {
 
     public ItemResponse getItems() {
         ItemResponse response = restClient.get()
-                .uri("/cdn/{version}/data/ko_KR/item.json", getLatestVersion())
+                .uri("/cdn/{version}/data/ko_KR/item.json", getLatestDataVersion())
                 .retrieve()
                 .body(ItemResponse.class);
 

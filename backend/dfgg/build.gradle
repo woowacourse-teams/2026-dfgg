@@ -18,6 +18,7 @@ repositories {
 }
 
 dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.1'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -26,9 +27,32 @@ dependencies {
     runtimeOnly 'org.postgresql:postgresql'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'io.rest-assured:rest-assured:5.5.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    // 평가는 실 데이터(dfgg_backtest)를 대상으로 수 분간 도는 작업이라 기본 test에서 뺀다.
+    useJUnitPlatform {
+        excludeTags 'evaluation'
+    }
+}
+
+// 오프라인 평가 전용. 실 데이터 dump가 있는 DB를 가리키므로 CI 기본 경로에 넣지 않는다.
+tasks.register('evaluationTest', Test) {
+    group = 'verification'
+    description = 'Runs @Tag("evaluation") offline evaluation against real match data.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'evaluation'
+    }
+    testLogging {
+        showStandardStreams = true
+    }
+    // -Devaluation.* 를 테스트 JVM으로 넘긴다. 없으면 기본값이 조용히 쓰인다.
+    systemProperties = System.properties.findAll { key, value ->
+        key.toString().startsWith('evaluation.')
+    }
+    outputs.upToDateWhen { false }
 }

@@ -33,7 +33,7 @@ public class DataDragonClientTest {
     }
 
     @Test
-    void 버전_목록의_첫_번째_값을_최신_버전으로_반환한다() {
+    void 최신_버전을_통계_패치_형식으로_반환한다() {
         // given
         server.expect(requestTo(BASE_URL + "/api/versions.json"))
                 .andRespond(withSuccess("""
@@ -43,7 +43,20 @@ public class DataDragonClientTest {
         String lastVersion = client.getLatestVersion();
 
         // then
-        assertThat(lastVersion).isEqualTo("16.15.1");
+        assertThat(lastVersion).isEqualTo("16.15");
+        server.verify();
+    }
+
+    @Test
+    void 유효하지_않은_버전이면_예외가_발생한다() {
+        // given
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"invalid\"]", MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertThatThrownBy(client::getLatestVersion)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Data Dragon version is invalid: invalid");
         server.verify();
     }
 

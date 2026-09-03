@@ -1,0 +1,219 @@
+package dfgg.domain.match;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface NormalizedMatchParticipantRepository extends JpaRepository<NormalizedMatchParticipant, Long> {
+
+    List<NormalizedMatchParticipant> findByMatchId(String matchId);
+
+    boolean existsByMatchId(String matchId);
+
+    @Query("""
+            SELECT participant.puuid
+            FROM NormalizedMatchParticipant participant
+            WHERE participant.matchId = :matchId
+              AND participant.tier = :tier
+            """)
+    List<String> findPuuidsByMatchIdAndTier(
+            @Param("matchId") String matchId,
+            @Param("tier") String tier
+    );
+
+    void deleteByMatchId(String matchId);
+
+    List<NormalizedMatchParticipant> findByMatchIdIn(Collection<String> matchIds);
+
+    @Query("""
+            SELECT DISTINCT p.matchId
+            FROM NormalizedMatchParticipant p
+            ORDER BY p.matchId
+            """)
+    Slice<String> findDistinctMatchIds(Pageable pageable);
+
+    /**
+     * 구매 순서가 {@code prefix}로 정확히 시작하는 표본에서 {@code nextPosition}번째 아이템 분포.
+     * 전체 집계와 최근 윈도 집계를 한 번에 돌려준다 — 후보 검색이 둘의 union이라 두 값이 모두 필요하다.
+     *
+     * <p>gap을 허용하지 않는다. "빌드 어딘가에 있음"과 "그 자리에 정확히 있음"은 다른 통계이고,
+     * 1~2코어에서 이 차이가 크게 벌어진다.
+     *
+     * <p>반환: {@code [item_id, support_all, win_all, support_recent, win_recent]}
+     */
+    @Query(value = """
+            SELECT item_id,
+                   count(*) AS support_all,
+                   count(*) FILTER (WHERE win) AS win_all,
+                   count(*) FILTER (WHERE patch IN (:recentPatches)) AS support_recent,
+                   count(*) FILTER (WHERE win AND patch IN (:recentPatches)) AS win_recent
+            FROM (
+                SELECT split_part(core_item_purchase_order, ',', :nextPosition) AS item_id, patch, win
+                FROM normalized_match_participants
+                WHERE champion_id = :championId
+                  AND position IN (:positions)
+                  AND core_item_purchase_order_complete
+                  AND (:prefix = '' OR core_item_purchase_order LIKE :prefix || ',%')
+            ) AS next_items
+            WHERE item_id <> ''
+            GROUP BY item_id
+            """, nativeQuery = true)
+    List<Object[]> findNextItemAfterExactPrefix(
+            @Param("championId") Long championId,
+            @Param("positions") Collection<String> positions,
+            @Param("prefix") String prefix,
+            @Param("nextPosition") int nextPosition,
+            @Param("recentPatches") Collection<String> recentPatches
+    );
+
+    /**
+     * {@code lastItemId} 바로 다음에 산 아이템의 분포(빌드 내 위치는 따지지 않는다).
+     * 정확 prefix가 표본을 못 찾을 때 한 단계 물러설 자리다.
+     *
+     * <p>반환: {@code [item_id, support_all, win_all, support_recent, win_recent]}
+     */
+    @Query(value = """
+            SELECT item_id,
+                   count(*) AS support_all,
+                   count(*) FILTER (WHERE win) AS win_all,
+                   count(*) FILTER (WHERE patch IN (:recentPatches)) AS support_recent,
+                   count(*) FILTER (WHERE win AND patch IN (:recentPatches)) AS win_recent
+            FROM (
+                SELECT items[array_position(items, cast(:lastItemId AS text)) + 1] AS item_id, patch, win
+                FROM (
+                    SELECT string_to_array(core_item_purchase_order, ',') AS items, patch, win
+                    FROM normalized_match_participants
+                    WHERE champion_id = :championId
+                      AND position IN (:positions)
+                      AND core_item_purchase_order_complete
+                ) AS sequences
+                WHERE array_position(items, cast(:lastItemId AS text)) IS NOT NULL
+            ) AS next_items
+            WHERE item_id IS NOT NULL AND item_id <> ''
+            GROUP BY item_id
+            """, nativeQuery = true)
+    List<Object[]> findNextItemAfterLastItem(
+            @Param("championId") Long championId,
+            @Param("positions") Collection<String> positions,
+            @Param("lastItemId") Long lastItemId,
+            @Param("recentPatches") Collection<String> recentPatches
+    );
+
+    /**
+     * 매치 ID를 <b>해시 순서</b>로 돌려준다. 표본을 앞에서 자를 때 시간 편향이 새지 않게 하려는 것이다.
+     *
+     * <p>{@code match_id}는 시간순으로 증가해서 {@link #findDistinctMatchIds} 결과를 앞에서
+     * 자르면 가장 오래된 매치만 뽑힌다 — 실제로 학습 데이터 30,000 query가 전부 16.1~16.4에서만
+     * 나와 최신 패치 test 세트가 비었다. 해시로 정렬하면 순서가 시간과 무관해지고,
+     * 같은 입력에 같은 순서라 학습 데이터를 재현할 수 있다.
+     */
+    @Query(value = """
+            SELECT match_id
+            FROM normalized_match_participants
+            GROUP BY match_id
+            ORDER BY md5(match_id)
+            """, nativeQuery = true)
+    List<String> findSampledMatchIds(Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT p.patch
+            FROM NormalizedMatchParticipant p
+            """)
+    List<String> findDistinctPatches();
+
+    @Query(value = """
+            SELECT item_id, count(*)
+            FROM (
+                SELECT unnest(string_to_array(final_core_item_ids, ',')) AS item_id
+                FROM normalized_match_participants
+            ) AS item_tokens
+            WHERE item_id <> ''
+            GROUP BY item_id
+            """, nativeQuery = true)
+    List<Object[]> countItemOccurrences();
+
+    /**
+     * 이 챔피언·포지션이 실제로 코어 아이템으로 산 적 있는 아이템 ID를 중복 없이 반환한다.
+     *
+     * <p>탐색 구역(카운터 임베딩 공간)은 태그를 학습하지 않는다(콘텐츠 문맥은 정체성 공간
+     * 전용). 그래서 "이 챔피언이 애초에 살 수 없는/안 사는 아이템"인지를 카운터 공간의
+     * 코사인 유사도만으로는 판단할 수 없다 — 적과의 유사도가 아무리 높아도, 실측 구매
+     * 이력에 없는 아이템은 이 결과로 걸러낸다. {@code position}에는 Riot 원시값이
+     * 저장되므로 호출자가 {@code ChampionPositionNormalizer.riotValuesOf(...)}로 별칭까지
+     * 넘겨야 한다.
+     */
+    @Query(value = """
+            SELECT DISTINCT item_id
+            FROM (
+                SELECT unnest(string_to_array(final_core_item_ids, ',')) AS item_id
+                FROM normalized_match_participants
+                WHERE champion_id = :championId
+                  AND position IN (:positions)
+            ) AS purchased_items
+            WHERE item_id <> ''
+            """, nativeQuery = true)
+    List<String> findDistinctPurchasedItemIds(
+            @Param("championId") Long championId,
+            @Param("positions") Collection<String> positions
+    );
+
+    /**
+     * 챔피언·포지션에서 가장 많이 등장한 코어 아이템 빌드를 콤마 구분 문자열로 반환한다.
+     *
+     * <p>{@code position}에는 Riot 원시값이 저장되므로(정규화는 마이닝 시점에만 일어남)
+     * 호출자가 {@code ChampionPositionNormalizer.riotValuesOf(...)}로 별칭까지 넘겨야 한다.
+     */
+    @Query(value = """
+            SELECT final_core_item_ids
+            FROM normalized_match_participants
+            WHERE champion_id = :championId
+              AND position IN (:positions)
+              AND final_core_item_ids <> ''
+            GROUP BY final_core_item_ids
+            ORDER BY count(*) DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<String> findMostFrequentBuild(
+            @Param("championId") Long championId,
+            @Param("positions") Collection<String> positions
+    );
+
+    /**
+     * {@code prefix}(콤마 구분 아이템 ID 문자열)로 구매 순서가 정확히 시작하는 참가자들만
+     * 걸러, {@code nextPosition}번째(1-indexed) 아이템의 분포를 반환한다.
+     *
+     * <p>{@code mined_sequential_patterns}(PrefixSpan)와 달리 gap을 허용하지 않고 구매
+     * 순서의 실제 앞부분에 정확히 anchoring된 통계다 — "빌드 어딘가에 있음"과 "그 위치에
+     * 정확히 있음"을 혼동하지 않기 위함(1~2코어에서 이 차이가 크게 벌어짐을 실측으로 확인).
+     * {@code prefix}가 빈 문자열이면 전체(필터 없음)를 대상으로 1번째 위치를 본다.
+     *
+     * <p>티어로 거르지 않는다. 요청자의 티어("누가 묻는가")와 학습 데이터의 티어("누구의
+     * 판에서 배우는가")는 다른 개념인데, 예전엔 요청 티어를 그대로 조건에 넣어 수집 티어와
+     * 다른 사용자는 0행을 받고 폴백 체인 맨 아래까지 떨어졌다.
+     */
+    @Query(value = """
+            SELECT item_id, count(*) AS support, sum(win::int) AS win_count
+            FROM (
+                SELECT split_part(core_item_purchase_order, ',', :nextPosition) AS item_id, win
+                FROM normalized_match_participants
+                WHERE champion_id = :championId
+                  AND position IN (:positions)
+                  AND patch = :patch
+                  AND (:prefix = '' OR core_item_purchase_order LIKE :prefix || ',%')
+            ) AS next_items
+            WHERE item_id <> ''
+            GROUP BY item_id
+            """, nativeQuery = true)
+    List<Object[]> findNextItemDistribution(
+            @Param("championId") Long championId,
+            @Param("positions") Collection<String> positions,
+            @Param("patch") String patch,
+            @Param("prefix") String prefix,
+            @Param("nextPosition") int nextPosition
+    );
+}
