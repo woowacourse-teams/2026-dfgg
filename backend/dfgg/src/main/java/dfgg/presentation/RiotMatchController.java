@@ -54,7 +54,7 @@ public class RiotMatchController {
     @PostMapping("/riot/matches/renormalize")
     public ResponseEntity<RenormalizationResult> renormalize(
             @RequestParam
-            @Pattern(regexp = "IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND")
+            @Pattern(regexp = "IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND|MASTER|GRANDMASTER|CHALLENGER")
             String tier,
             @RequestParam(defaultValue = "") String afterMatchId,
             @RequestParam @Min(1) @Max(1000) int limit
