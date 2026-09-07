@@ -125,7 +125,7 @@ class TrainingSetExportTest {
 
         String report = stats.render(outputPath, durationMillis, latestPatch);
         System.out.println(report);
-        Files.writeString(Path.of("../tasks/eval-training-set.md"), report);
+        new EvaluationReportWriter().write(Path.of("../tasks/eval-training-set.md"), report);
 
         assertThat(stats.exportedQueries).as("내보낸 query 수").isPositive();
         assertThat(stats.rowsWithGroundTruth)

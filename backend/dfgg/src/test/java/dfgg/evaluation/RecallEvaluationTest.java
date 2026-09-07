@@ -352,10 +352,10 @@ class RecallEvaluationTest {
         return String.format("%.1f%%", ratio * 100);
     }
 
-    private void writeReport(String report) throws IOException {
+    private void writeReport(String report) {
         Path path = Path.of(System.getProperty("evaluation.report.path", "../tasks/eval-recall.md"));
-        Files.createDirectories(path.toAbsolutePath().getParent());
-        Files.writeString(path, report);
-        System.out.println("리포트 저장: " + path.toAbsolutePath());
+        if (new EvaluationReportWriter().write(path, report)) {
+            System.out.println("리포트 저장: " + path.toAbsolutePath());
+        }
     }
 }
