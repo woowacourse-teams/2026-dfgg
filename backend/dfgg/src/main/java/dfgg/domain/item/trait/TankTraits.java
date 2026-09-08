@@ -1,5 +1,7 @@
 package dfgg.domain.item.trait;
 
+import static dfgg.domain.item.trait.ItemTrait.ENGAGE;
+
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
@@ -18,7 +20,7 @@ final class TankTraits {
             Map.entry(2502L, Set.of()),  // 끝없는 절망
             Map.entry(2504L, Set.of()),  // 케이닉 루컨
             Map.entry(2525L, Set.of()),  // 원형질 안전벨트
-            Map.entry(3050L, Set.of()),  // 지크의 융합
+            Map.entry(3050L, Set.of(ENGAGE)), // 지크의 융합
             Map.entry(3065L, Set.of()),  // 정령의 형상
             Map.entry(3068L, Set.of()),  // 태양불꽃 방패
             Map.entry(3075L, Set.of()),  // 가시 갑옷
