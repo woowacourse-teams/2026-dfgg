@@ -41,6 +41,7 @@ class NextItemRecommendationServiceTest {
     private ItemService itemService;
     private CandidateGenerator buildGenerator;
     private CandidateRanker candidateRanker;
+    private dfgg.domain.champion.ChampionRepository championRepository;
     private NextItemRecommendationService service;
 
     @BeforeEach
@@ -49,6 +50,7 @@ class NextItemRecommendationServiceTest {
         itemService = mock(ItemService.class);
         buildGenerator = mock(CandidateGenerator.class);
         candidateRanker = mock(CandidateRanker.class);
+        championRepository = mock(dfgg.domain.champion.ChampionRepository.class);
 
         when(championService.findChampionByName(any())).thenAnswer(invocation -> {
             Champion champion = mock(Champion.class);
@@ -64,7 +66,8 @@ class NextItemRecommendationServiceTest {
                 new dfgg.application.recommend.v3.CandidateTopK(20, 20, 20, 30),
                 trivialShapCalculator(),
                 new dfgg.application.recommend.v3.explanation.ExplanationSelector(),
-                new dfgg.application.recommend.v3.explanation.DescriptionComposer()
+                new dfgg.application.recommend.v3.explanation.ChampionDirectory(championRepository),
+                new dfgg.domain.item.trait.ItemTraitCatalog()
         );
     }
 

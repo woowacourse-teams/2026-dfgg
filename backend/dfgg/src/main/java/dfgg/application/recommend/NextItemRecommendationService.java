@@ -9,7 +9,10 @@ import dfgg.application.recommend.v3.GeneratorResult;
 import dfgg.application.recommend.v3.RecommendationQuery;
 import dfgg.application.recommend.v3.HardValidityFilter;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
-import dfgg.application.recommend.v3.explanation.DescriptionComposer;
+import dfgg.application.recommend.v3.explanation.ChampionDirectory;
+import dfgg.application.recommend.v3.explanation.CounterEvidence;
+import dfgg.application.recommend.v3.explanation.ChampionProfile;
+import dfgg.application.recommend.v3.explanation.SelectedReasons;
 import dfgg.application.recommend.v3.explanation.ExplanationSelector;
 import dfgg.application.recommend.v3.ranker.RankedCandidate;
 import dfgg.application.recommend.v3.ranker.TreeShapCalculator;
@@ -17,7 +20,10 @@ import dfgg.common.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.item.Item;
+import dfgg.domain.item.trait.ItemTraitCatalog;
 import dfgg.presentation.dto.ChampionDto;
+import dfgg.presentation.dto.ChampionRefDto;
+import dfgg.presentation.dto.RecommendationDescription;
 import dfgg.presentation.dto.RecommendationReasons;
 import dfgg.presentation.dto.RecommendedItemDto;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
@@ -25,6 +31,7 @@ import dfgg.presentation.dto.response.NextItemRecommendationResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -55,7 +62,8 @@ public class NextItemRecommendationService {
     private final CandidateTopK candidateTopK;
     private final TreeShapCalculator treeShapCalculator;
     private final ExplanationSelector explanationSelector;
-    private final DescriptionComposer descriptionComposer;
+    private final ChampionDirectory championDirectory;
+    private final ItemTraitCatalog itemTraitCatalog;
 
     public NextItemRecommendationService(
             ChampionService championService,
@@ -66,7 +74,8 @@ public class NextItemRecommendationService {
             CandidateTopK candidateTopK,
             TreeShapCalculator treeShapCalculator,
             ExplanationSelector explanationSelector,
-            DescriptionComposer descriptionComposer
+            ChampionDirectory championDirectory,
+            ItemTraitCatalog itemTraitCatalog
     ) {
         this.championService = championService;
         this.itemService = itemService;
@@ -76,7 +85,8 @@ public class NextItemRecommendationService {
         this.candidateTopK = candidateTopK;
         this.treeShapCalculator = treeShapCalculator;
         this.explanationSelector = explanationSelector;
-        this.descriptionComposer = descriptionComposer;
+        this.championDirectory = championDirectory;
+        this.itemTraitCatalog = itemTraitCatalog;
     }
 
     public NextItemRecommendationResponse recommendNextItem(NextItemRecommendationRequest request) {
@@ -100,6 +110,9 @@ public class NextItemRecommendationService {
             throw new NextItemRecommendationNotFoundException(
                     request.myChampion().name(), query.position().name());
         }
+        // 근거로 지목할 챔피언 이름은 요청당 한 번에 해석한다. 후보마다 조회하면 N+1이 된다.
+        Map<Long, ChampionProfile> championProfiles = championDirectory.resolve(query.enemyChampionIds());
+
         List<RecommendedItemDto> recommendedItems = new ArrayList<>();
         for (int index = 0; index < ranked.size(); index++) {
             RankedCandidate candidate = ranked.get(index);
@@ -107,12 +120,37 @@ public class NextItemRecommendationService {
             // 이유가 어긋날 수 있다.
             RecommendationReasons reasons = RecommendationReasons.of(
                     treeShapCalculator.contributions(candidate.features().values()));
-            String description = descriptionComposer.compose(
-                    explanationSelector.select(reasons.byGroup(), index + 1), myChampion.getName());
-            recommendedItems.add(RecommendedItemDto.of(
-                    itemById.get(candidate.itemId()), description, reasons));
+            SelectedReasons selected = explanationSelector.select(reasons.byGroup(), index + 1);
+            Item item = itemById.get(candidate.itemId());
+
+            recommendedItems.add(RecommendedItemDto.of(item,
+                    new RecommendationDescription(
+                            counterChampions(valid, candidate, selected, championProfiles),
+                            List.of(),
+                            traitNamesOf(item)),
+                    reasons));
         }
         return new NextItemRecommendationResponse(recommendedItems, candidateRanker.modelVersion());
+    }
+
+    private List<ChampionRefDto> counterChampions(
+            CandidateUnion union, RankedCandidate candidate, SelectedReasons selected,
+            Map<Long, ChampionProfile> championProfiles
+    ) {
+        return CounterEvidence.championIdsFor(selected, union.candidateOf(candidate.itemId()))
+                .stream()
+                .map(championProfiles::get)
+                .filter(Objects::nonNull)
+                .map(profile -> new ChampionRefDto(profile.championId(), profile.name()))
+                .toList();
+    }
+
+    /** 아이템 자체의 성질이라 모델 판단과 무관하다. 게이트를 걸지 않는다. */
+    private List<String> traitNamesOf(Item item) {
+        return itemTraitCatalog.traitsOf(item).stream()
+                .map(Enum::name)
+                .sorted()
+                .toList();
     }
 
     private RecommendationQuery toQuery(NextItemRecommendationRequest request, Champion myChampion) {

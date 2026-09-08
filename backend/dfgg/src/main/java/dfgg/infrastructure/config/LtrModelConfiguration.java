@@ -1,7 +1,7 @@
 package dfgg.infrastructure.config;
 
 import dfgg.application.recommend.v3.feature.FeatureExtractionPipeline;
-import dfgg.application.recommend.v3.explanation.DescriptionComposer;
+import dfgg.application.recommend.v3.explanation.ChampionDirectory;
 import dfgg.application.recommend.v3.explanation.ExplanationSelector;
 import dfgg.application.recommend.v3.feature.FeatureName;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
@@ -45,8 +45,13 @@ public class LtrModelConfiguration {
     }
 
     @Bean
-    public DescriptionComposer descriptionComposer() {
-        return new DescriptionComposer();
+    public ChampionDirectory championDirectory(dfgg.domain.champion.ChampionRepository championRepository) {
+        return new ChampionDirectory(championRepository);
+    }
+
+    @Bean
+    public dfgg.domain.item.trait.ItemTraitCatalog itemTraitCatalog() {
+        return new dfgg.domain.item.trait.ItemTraitCatalog();
     }
 
     @Bean
