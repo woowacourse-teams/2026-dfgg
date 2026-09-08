@@ -10,6 +10,7 @@ import dfgg.application.recommend.v3.RecommendationQuery;
 import dfgg.application.recommend.v3.HardValidityFilter;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
 import dfgg.application.recommend.v3.explanation.ChampionDirectory;
+import dfgg.application.recommend.v3.explanation.AllyEvidence;
 import dfgg.application.recommend.v3.explanation.CounterEvidence;
 import dfgg.application.recommend.v3.explanation.ChampionProfile;
 import dfgg.application.recommend.v3.explanation.SelectedReasons;
@@ -111,7 +112,9 @@ public class NextItemRecommendationService {
                     request.myChampion().name(), query.position().name());
         }
         // 근거로 지목할 챔피언 이름은 요청당 한 번에 해석한다. 후보마다 조회하면 N+1이 된다.
-        Map<Long, ChampionProfile> championProfiles = championDirectory.resolve(query.enemyChampionIds());
+        List<Long> evidenceChampionIds = new ArrayList<>(query.enemyChampionIds());
+        evidenceChampionIds.addAll(query.allyChampionIds());
+        Map<Long, ChampionProfile> championProfiles = championDirectory.resolve(evidenceChampionIds);
 
         List<RecommendedItemDto> recommendedItems = new ArrayList<>();
         for (int index = 0; index < ranked.size(); index++) {
@@ -125,20 +128,20 @@ public class NextItemRecommendationService {
 
             recommendedItems.add(RecommendedItemDto.of(item,
                     new RecommendationDescription(
-                            counterChampions(valid, candidate, selected, championProfiles),
-                            List.of(),
+                            championRefs(CounterEvidence.championIdsFor(
+                                    selected, valid.candidateOf(candidate.itemId())), championProfiles),
+                            championRefs(AllyEvidence.championIdsFor(
+                                    selected, valid.candidateOf(candidate.itemId())), championProfiles),
                             traitNamesOf(item)),
                     reasons));
         }
         return new NextItemRecommendationResponse(recommendedItems, candidateRanker.modelVersion());
     }
 
-    private List<ChampionRefDto> counterChampions(
-            CandidateUnion union, RankedCandidate candidate, SelectedReasons selected,
-            Map<Long, ChampionProfile> championProfiles
-    ) {
-        return CounterEvidence.championIdsFor(selected, union.candidateOf(candidate.itemId()))
-                .stream()
+    /** 이름을 못 찾은 챔피언은 뺀다. id만으로는 화면에 쓸 수 없다. */
+    private List<ChampionRefDto> championRefs(
+            List<Long> championIds, Map<Long, ChampionProfile> championProfiles) {
+        return championIds.stream()
                 .map(championProfiles::get)
                 .filter(Objects::nonNull)
                 .map(profile -> new ChampionRefDto(profile.championId(), profile.name()))
