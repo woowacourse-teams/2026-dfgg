@@ -491,6 +491,130 @@ class RiotCollectionOrchestratorTest {
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "IV", 2);
     }
 
+    @Test
+    void 설정된_티어_순서대로_수집하고_첫_티어로_돌아온다() {
+        properties.setTiers(List.of("EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"));
+        properties.setDivisions(List.of("IV"));
+        properties.setRecoverMissingTimelines(false);
+
+        for (int execution = 0; execution < 6; execution++) {
+            orchestrator.runOnce();
+        }
+
+        InOrder order = inOrder(playerSyncService);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "MASTER", "I", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "GRANDMASTER", "I", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "CHALLENGER", "I", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "III", 1);
+
+        order.verifyNoMoreInteractions();
+    }
+
+    @Test
+    void 티어_수집이_실패해도_다음_티어로_이동하고_실패한_위치를_유지한다() {
+        // given
+        properties.setTiers(List.of("EMERALD", "DIAMOND"));
+        properties.setDivisions(List.of("IV"));
+        properties.setRecoverMissingTimelines(false);
+
+        // when
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1))
+                .thenThrow(new IllegalStateException("리그 조회 실패"))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of()));
+
+        for (int execution = 0; execution < 3; execution++) {
+            orchestrator.runOnce();
+        }
+
+        InOrder order = inOrder(playerSyncService);
+
+        // then
+        order.verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1);
+        order.verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
+        order.verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1);
+        order.verifyNoMoreInteractions();
+    }
+
+    @Test
+    void 상위_티어별_플레이어_수집_위치를_독립적으로_유지한다() {
+        // given
+        properties.setTiers(List.of("MASTER", "GRANDMASTER"));
+        properties.setPlayerLimit(1);
+        properties.setRecoverMissingTimelines(false);
+
+        // when
+        when(playerSyncService.syncLeagueEntries(
+                "RANKED_SOLO_5x5", "MASTER", "I", 1
+        )).thenReturn(new RiotPlayerSyncService.SyncResult(
+                2, List.of("master-a", "master-b")
+        ));
+
+        when(playerSyncService.syncLeagueEntries(
+                "RANKED_SOLO_5x5", "GRANDMASTER", "I", 1
+        )).thenReturn(new RiotPlayerSyncService.SyncResult(
+                2, List.of("grandmaster-a", "grandmaster-b")
+        ));
+
+        for (int execution = 0; execution < 4; execution++) {
+            orchestrator.runOnce();
+        }
+
+        // then
+        InOrder order = inOrder(matchSyncService);
+
+        order.verify(matchSyncService).findMatchIds("master-a", 0, 20);
+        order.verify(matchSyncService).findMatchIds("grandmaster-a", 0, 20);
+        order.verify(matchSyncService).findMatchIds("master-b", 0, 20);
+        order.verify(matchSyncService).findMatchIds("grandmaster-b", 0, 20);
+
+        order.verifyNoMoreInteractions();
+    }
+
+    @Test
+    void 일반_티어별_페이지와_플레이어_발견_여부를_독립적으로_유지한다() {
+        // given
+        properties.setTiers(List.of("EMERALD", "DIAMOND"));
+        properties.setDivisions(List.of("IV", "III"));
+        properties.setRecoverMissingTimelines(false);
+
+        // when
+        when(playerSyncService.syncLeagueEntries(
+                "RANKED_SOLO_5x5", "EMERALD", "IV", 1
+        )).thenReturn(new RiotPlayerSyncService.SyncResult(
+                1, List.of("emerald-player")
+        ));
+
+        for (int execution = 0; execution < 6; execution++) {
+            orchestrator.runOnce();
+        }
+
+        // then
+        InOrder order = inOrder(playerSyncService);
+
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "III", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "III", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 2);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
+
+        order.verifyNoMoreInteractions();
+    }
+
     private NormalizedMatch normalizedMatch(String matchId) {
         return new NormalizedMatch(matchId, "16.15", 420, List.of());
     }

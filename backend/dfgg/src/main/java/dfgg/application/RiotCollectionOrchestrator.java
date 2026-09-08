@@ -49,6 +49,7 @@ public class RiotCollectionOrchestrator {
     private final Map<String, Integer> nextDivisionIndexes;
     private final Map<String, Boolean> leagueRangeHasPlayersByTier;
     private final Map<String, Integer> nextApexPlayerIndexes;
+    private int nextTierIndex;
 
     public RiotCollectionOrchestrator(
             RiotSchedulerProperties properties,
@@ -66,6 +67,7 @@ public class RiotCollectionOrchestrator {
         this.nextDivisionIndexes = new HashMap<>();
         this.leagueRangeHasPlayersByTier = new HashMap<>();
         this.nextApexPlayerIndexes = new HashMap<>();
+        this.nextTierIndex = 0;
     }
 
     public void runOnce() {
@@ -76,12 +78,17 @@ public class RiotCollectionOrchestrator {
             return;
         }
 
-        String sampleTier = properties.getTiers().getFirst();
-        List<String> collectedPuuids = collectPlayers(sampleTier);
-        collectMatches(collectedPuuids, sampleTier);
-        if (properties.isRecoverMissingTimelines()) {
-            // 호출 예산을 별도로 확보한 경우에만 누락 Timeline을 자동 보완한다.
-            collectMissingTimelines();
+        String sampleTier = properties.getTiers().get(nextTierIndex);
+
+        try {
+            List<String> collectedPuuids = collectPlayers(sampleTier);
+            collectMatches(collectedPuuids, sampleTier);
+
+            if (properties.isRecoverMissingTimelines()) {
+                collectMissingTimelines();
+            }
+        } finally {
+            moveToNextTier();
         }
     }
 
@@ -169,6 +176,10 @@ public class RiotCollectionOrchestrator {
 
         int nextLeaguePage = nextLeaguePages.getOrDefault(tier, 1);
         nextLeaguePages.put(tier, nextLeaguePage + properties.getLeaguePageCount());
+    }
+
+    private void moveToNextTier() {
+        nextTierIndex = (nextTierIndex + 1) % properties.getTiers().size();
     }
 
     private String currentDivision(String tier) {
@@ -444,34 +455,51 @@ public class RiotCollectionOrchestrator {
     }
 
     private void validateProperties() {
-        if (properties.getTiers().isEmpty()) {
-            throw new IllegalArgumentException("collection scheduler tiers must not be empty");
-        }
-        if (properties.getTiers().size() != 1) {
-            throw new IllegalArgumentException("tier sample collection requires exactly one scheduler tier");
-        }
-        if (!SUPPORTED_TIERS.contains(properties.getTiers().getFirst())) {
-            throw new IllegalArgumentException("collection scheduler tier is not supported");
-        }
-        if (!APEX_TIERS.contains(properties.getTiers().getFirst())) {
-            if (properties.getDivisions().isEmpty()) {
-                throw new IllegalArgumentException("collection scheduler divisions must not be empty");
-            }
-            if (properties.getDivisions().stream().anyMatch(division -> !DIVISION_ORDER.contains(division))) {
-                throw new IllegalArgumentException("collection scheduler divisions must be one of IV, III, II, I");
-            }
-            if (properties.getLeaguePageCount() < 1) {
-                throw new IllegalArgumentException("collection scheduler league page count must be positive");
-            }
-        }
+        validateTiers();
+        validateLeagueSettings();
+        validateCollectionLimits();
+    }
+
+    private void validateCollectionLimits() {
         if (properties.getPlayerPageSize() < 1 || properties.getPlayerPageSize() > 100) {
-            throw new IllegalArgumentException("collection scheduler player page size must be between 1 and 100");
+            throw new IllegalArgumentException("플레이어 처리 페이지 크기는 1 이상 100 이하여야 합니다.");
         }
         if (properties.getPlayerLimit() < 1 || properties.getPlayerLimit() > 100) {
-            throw new IllegalArgumentException("collection scheduler player limit must be between 1 and 100");
+            throw new IllegalArgumentException("한 번에 수집할 플레이어 수는 1 이상 100 이하여야 합니다.");
         }
         if (properties.getMatchCount() < 1 || properties.getMatchCount() > 100) {
-            throw new IllegalArgumentException("collection scheduler match count must be between 1 and 100");
+            throw new IllegalArgumentException("플레이어당 조회할 매치 수는 1 이상 100 이하여야 합니다.");
+        }
+    }
+
+    private void validateLeagueSettings() {
+        boolean onlyApexTiers = properties.getTiers().stream()
+                .allMatch(APEX_TIERS::contains);
+        if (onlyApexTiers) {
+            return;
+        }
+        List<String> divisions = properties.getDivisions();
+
+        if (divisions.isEmpty()) {
+            throw new IllegalArgumentException("수집 대상 디비전은 하나 이상 설정해야 합니다.");
+        }
+        if (!DIVISION_ORDER.containsAll(divisions)) {
+            throw new IllegalArgumentException("수집 대상 디비전은 IV, III, II, I 중에서 설정해야 합니다.");
+        }
+        if (properties.getLeaguePageCount() < 1) {
+            throw new IllegalArgumentException("한 번에 조회할 리그 페이지 수는 1 이상이어야 합니다.");
+        }
+
+    }
+
+    private void validateTiers() {
+        List<String> tiers = properties.getTiers();
+
+        if (tiers.isEmpty()) {
+            throw new IllegalArgumentException("수집 대상 티어는 하나 이상 설정해야 합니다.");
+        }
+        if (!SUPPORTED_TIERS.containsAll(tiers)) {
+            throw new IllegalArgumentException("수집 대상에 지원하지 않는 티어가 포함되어 있습니다.");
         }
     }
 
