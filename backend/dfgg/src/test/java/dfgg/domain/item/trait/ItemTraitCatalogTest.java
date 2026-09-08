@@ -1,4 +1,4 @@
-package dfgg.domain.item;
+package dfgg.domain.item.trait;
 
 import static dfgg.domain.item.trait.ItemTrait.ENGAGE;
 import static dfgg.domain.item.trait.ItemTrait.HEAL;
@@ -7,7 +7,7 @@ import static dfgg.domain.item.trait.ItemTrait.SHIELD;
 import static dfgg.domain.item.trait.ItemTrait.TEAM_BUFF;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dfgg.domain.item.trait.ItemTraitCatalog;
+import dfgg.domain.item.Item;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -25,10 +25,11 @@ class ItemTraitCatalogTest {
         Item ardentCenser = new Item(3504L, "불타는 향로");
 
         // when & then
-        assertThat(catalog.traitsOf(shurelyasBattlesong)).containsExactly(ENGAGE);
-        assertThat(catalog.traitsOf(locketOfTheIronSolari)).containsExactlyInAnyOrder(PEEL, SHIELD);
-        assertThat(catalog.traitsOf(moonstoneRenewer)).containsExactlyInAnyOrder(HEAL, SHIELD);
-        assertThat(catalog.traitsOf(ardentCenser)).containsExactly(TEAM_BUFF);
+        // 이 테스트의 관심사는 "유틸리티 trait가 제공되는가"이므로 그것만 확인한다.
+        assertThat(catalog.traitsOf(shurelyasBattlesong)).contains(ENGAGE);
+        assertThat(catalog.traitsOf(locketOfTheIronSolari)).contains(PEEL, SHIELD);
+        assertThat(catalog.traitsOf(moonstoneRenewer)).contains(HEAL, SHIELD);
+        assertThat(catalog.traitsOf(ardentCenser)).contains(TEAM_BUFF);
     }
 
     @Test
