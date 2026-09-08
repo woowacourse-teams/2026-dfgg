@@ -7,8 +7,10 @@ import dfgg.application.stats.ChampionBuildStatsMatchService;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.IntStream;
@@ -20,9 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 
 /**
- * Riot 데이터 자동 수집의 전체 순서만 조율한다.
- * 플레이어를 조회한 뒤 새로 수집한 매치별로 원본 수집 → 정규화 → 통계 집계를 이어서 실행한다.
- * 이전 실행에서 남은 미완료 데이터의 정규화와 집계는 관리자 API가 담당한다.
+ * Riot 데이터 자동 수집의 전체 순서만 조율한다. 플레이어를 조회한 뒤 새로 수집한 매치별로 원본 수집 → 정규화 → 통계 집계를 이어서 실행한다. 이전 실행에서 남은 미완료 데이터의 정규화와 집계는 관리자
+ * API가 담당한다.
  */
 @Service
 public class RiotCollectionOrchestrator {
@@ -44,10 +45,10 @@ public class RiotCollectionOrchestrator {
     private final RiotMatchSyncService matchSyncService;
     private final MatchNormalizationService matchNormalizationService;
     private final ChampionBuildStatsMatchService statsMatchService;
-    private int nextLeaguePage;
-    private int nextDivisionIndex;
-    private boolean currentLeagueRangeHasPlayers;
-    private int nextApexPlayerIndex;
+    private final Map<String, Integer> nextLeaguePages;
+    private final Map<String, Integer> nextDivisionIndexes;
+    private final Map<String, Boolean> leagueRangeHasPlayersByTier;
+    private final Map<String, Integer> nextApexPlayerIndexes;
 
     public RiotCollectionOrchestrator(
             RiotSchedulerProperties properties,
@@ -61,10 +62,10 @@ public class RiotCollectionOrchestrator {
         this.matchSyncService = matchSyncService;
         this.matchNormalizationService = matchNormalizationService;
         this.statsMatchService = statsMatchService;
-        this.nextLeaguePage = 1;
-        this.nextDivisionIndex = 0;
-        this.currentLeagueRangeHasPlayers = false;
-        this.nextApexPlayerIndex = 0;
+        this.nextLeaguePages = new HashMap<>();
+        this.nextDivisionIndexes = new HashMap<>();
+        this.leagueRangeHasPlayersByTier = new HashMap<>();
+        this.nextApexPlayerIndexes = new HashMap<>();
     }
 
     public void runOnce() {
@@ -76,7 +77,7 @@ public class RiotCollectionOrchestrator {
         }
 
         String sampleTier = properties.getTiers().getFirst();
-        List<String> collectedPuuids = collectPlayers();
+        List<String> collectedPuuids = collectPlayers(sampleTier);
         collectMatches(collectedPuuids, sampleTier);
         if (properties.isRecoverMissingTimelines()) {
             // 호출 예산을 별도로 확보한 경우에만 누락 Timeline을 자동 보완한다.
@@ -84,15 +85,15 @@ public class RiotCollectionOrchestrator {
         }
     }
 
-    private List<String> collectPlayers() {
-        String tier = properties.getTiers().getFirst();
+    private List<String> collectPlayers(String tier) {
         if (APEX_TIERS.contains(tier)) {
             return collectApexPlayers(tier);
         }
 
         boolean completed = true;
         LinkedHashSet<String> collectedPuuids = new LinkedHashSet<>();
-        String division = currentDivision();
+        String division = currentDivision(tier);
+        int nextLeaguePage = nextLeaguePages.getOrDefault(tier, 1);
         int pageEnd = nextLeaguePage + properties.getLeaguePageCount();
         for (int page = nextLeaguePage; page < pageEnd; page++) {
             try {
@@ -104,13 +105,23 @@ public class RiotCollectionOrchestrator {
                 completed = false;
             }
         }
-        currentLeagueRangeHasPlayers |= !collectedPuuids.isEmpty();
+        boolean previousFoundPlayers = leagueRangeHasPlayersByTier.getOrDefault(tier, false);
+        leagueRangeHasPlayersByTier.put(tier, previousFoundPlayers || !collectedPuuids.isEmpty());
         if (completed) {
-            moveToNextLeagueRange();
+            moveToNextLeagueRange(tier);
         }
         return List.copyOf(collectedPuuids);
     }
 
+    /**
+     * 마스터·그랜드마스터·챌린저 중 지정한 리그의 플레이어 정보를 동기화하고, 이번 실행에서 매치를 수집할 플레이어의 PUUID를 최대 playerLimit명만큼 반환한다.
+     *
+     * <p>상위 리그는 디비전과 페이지 구분이 없으므로 전체 명단을 조회한다.
+     * PUUID를 중복 제거 후 정렬하고, 티어별로 기억한 위치부터 순환 선택한다. 명단 끝에 도달하면 처음으로 돌아가며, 선택 직후 다음 위치를 저장한다.
+     *
+     * <p>리그 조회 또는 플레이어 동기화에 실패하면 위치를 유지하고 빈 목록을 반환한다.
+     * 조회된 명단이 비어 있으면 해당 티어의 위치를 0으로 초기화한다.
+     */
     private List<String> collectApexPlayers(String tier) {
         RiotPlayerSyncService.SyncResult syncResult;
         try {
@@ -125,35 +136,45 @@ public class RiotCollectionOrchestrator {
                 .sorted()
                 .toList();
         if (puuids.isEmpty()) {
-            nextApexPlayerIndex = 0;
+            nextApexPlayerIndexes.put(tier, 0);
             return List.of();
         }
-
-        int start = Math.floorMod(nextApexPlayerIndex, puuids.size());
+        int nextPlayerIndex = nextApexPlayerIndexes.getOrDefault(tier, 0);
+        int start = Math.floorMod(nextPlayerIndex, puuids.size());
         int count = Math.min(properties.getPlayerLimit(), puuids.size());
         List<String> selected = IntStream.range(0, count)
                 .mapToObj(offset -> puuids.get((start + offset) % puuids.size()))
                 .toList();
-        nextApexPlayerIndex = (start + count) % puuids.size();
+        nextApexPlayerIndexes.put(tier, (start + count) % puuids.size());
         return selected;
     }
 
-    private void moveToNextLeagueRange() {
-        nextDivisionIndex++;
+    private void moveToNextLeagueRange(String tier) {
+        int nextDivisionIndex = nextDivisionIndexes.getOrDefault(tier, 0) + 1;
         if (nextDivisionIndex >= progressiveDivisions().size()) {
             nextDivisionIndex = 0;
-            if (currentLeagueRangeHasPlayers) {
-                nextLeaguePage += properties.getLeaguePageCount();
-            } else {
-                nextLeaguePage = 1;
-            }
-            currentLeagueRangeHasPlayers = false;
+            moveToNextLeaguePage(tier);
         }
+        nextDivisionIndexes.put(tier, nextDivisionIndex);
     }
 
-    private String currentDivision() {
+    private void moveToNextLeaguePage(String tier) {
+        boolean hasPlayers = leagueRangeHasPlayersByTier.getOrDefault(tier, false);
+        leagueRangeHasPlayersByTier.put(tier, false);
+
+        if (!hasPlayers) {
+            nextLeaguePages.put(tier, 1);
+            return;
+        }
+
+        int nextLeaguePage = nextLeaguePages.getOrDefault(tier, 1);
+        nextLeaguePages.put(tier, nextLeaguePage + properties.getLeaguePageCount());
+    }
+
+    private String currentDivision(String tier) {
         List<String> divisions = progressiveDivisions();
-        return divisions.get(Math.min(nextDivisionIndex, divisions.size() - 1));
+        int divisionIndex = nextDivisionIndexes.getOrDefault(tier, 0);
+        return divisions.get(Math.min(divisionIndex, divisions.size() - 1));
     }
 
     private List<String> progressiveDivisions() {
@@ -186,8 +207,7 @@ public class RiotCollectionOrchestrator {
     }
 
     /**
-     * 한 플레이어의 매치 ID를 조회하고, 각 매치를 원본 수집부터 통계 집계까지 처리한다.
-     * 매치 ID 조회가 실패해도 다른 플레이어의 수집은 계속한다.
+     * 한 플레이어의 매치 ID를 조회하고, 각 매치를 원본 수집부터 통계 집계까지 처리한다. 매치 ID 조회가 실패해도 다른 플레이어의 수집은 계속한다.
      */
     private void collectPlayerMatches(String puuid, String sampleTier, Set<String> processedMatchIds) {
         List<String> matchIds;
@@ -210,8 +230,7 @@ public class RiotCollectionOrchestrator {
     }
 
     /**
-     * 한 매치를 Raw Match → Timeline → 정규화 → 통계 순서로 처리한다.
-     * 원본 수집에 실패한 매치는 정규화하지 않고 다음 실행의 복구 대상으로 남긴다.
+     * 한 매치를 Raw Match → Timeline → 정규화 → 통계 순서로 처리한다. 원본 수집에 실패한 매치는 정규화하지 않고 다음 실행의 복구 대상으로 남긴다.
      */
     private void processMatch(String matchId, String sampleTier) {
         boolean collected;
@@ -245,8 +264,7 @@ public class RiotCollectionOrchestrator {
     }
 
     /**
-     * 저장된 Raw Match와 Raw Timeline 중 아직 처리하지 않은 매치를 정규화하고 바로 통계를 집계한다.
-     * 관리자 API에서도 스케줄러와 같은 정상 처리 흐름을 재사용할 수 있도록 공개한다.
+     * 저장된 Raw Match와 Raw Timeline 중 아직 처리하지 않은 매치를 정규화하고 바로 통계를 집계한다. 관리자 API에서도 스케줄러와 같은 정상 처리 흐름을 재사용할 수 있도록 공개한다.
      *
      * @throws IllegalStateException 한 건이라도 정규화하거나 집계하지 못한 경우
      */
