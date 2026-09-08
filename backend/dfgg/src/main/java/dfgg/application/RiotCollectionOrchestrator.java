@@ -103,21 +103,32 @@ public class RiotCollectionOrchestrator {
         int nextLeaguePage = nextLeaguePages.getOrDefault(tier, 1);
         int pageEnd = nextLeaguePage + properties.getLeaguePageCount();
         for (int page = nextLeaguePage; page < pageEnd; page++) {
-            try {
-                RiotPlayerSyncService.SyncResult syncResult = playerSyncService.syncLeagueEntries(
-                        QUEUE_TYPE, tier, division, page
-                );
-                collectedPuuids.addAll(syncResult.puuids());
-            } catch (RuntimeException ignored) {
-                completed = false;
-            }
+            boolean pageCollected = collectLeaguePage(tier, division, page, collectedPuuids);
+            completed = completed && pageCollected;
         }
-        boolean previousFoundPlayers = leagueRangeHasPlayersByTier.getOrDefault(tier, false);
-        leagueRangeHasPlayersByTier.put(tier, previousFoundPlayers || !collectedPuuids.isEmpty());
+        recordLeaguePlayersFound(tier, collectedPuuids);
         if (completed) {
             moveToNextLeagueRange(tier);
         }
         return List.copyOf(collectedPuuids);
+    }
+
+    private boolean collectLeaguePage(String tier, String division, int page, Set<String> collectedPuuids) {
+        try {
+            RiotPlayerSyncService.SyncResult result = playerSyncService.syncLeagueEntries(QUEUE_TYPE, tier, division,
+                    page);
+            collectedPuuids.addAll(result.puuids());
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private void recordLeaguePlayersFound(String tier, Set<String> collectedPuuids) {
+        if (collectedPuuids.isEmpty()) {
+            return;
+        }
+        leagueRangeHasPlayersByTier.put(tier, true);
     }
 
     /**
