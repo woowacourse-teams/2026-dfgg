@@ -1,12 +1,13 @@
 package dfgg.domain.item;
 
-import static dfgg.domain.item.ItemTrait.ENGAGE;
-import static dfgg.domain.item.ItemTrait.HEAL;
-import static dfgg.domain.item.ItemTrait.PEEL;
-import static dfgg.domain.item.ItemTrait.SHIELD;
-import static dfgg.domain.item.ItemTrait.TEAM_BUFF;
+import static dfgg.domain.item.trait.ItemTrait.ENGAGE;
+import static dfgg.domain.item.trait.ItemTrait.HEAL;
+import static dfgg.domain.item.trait.ItemTrait.PEEL;
+import static dfgg.domain.item.trait.ItemTrait.SHIELD;
+import static dfgg.domain.item.trait.ItemTrait.TEAM_BUFF;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dfgg.domain.item.trait.ItemTraitCatalog;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

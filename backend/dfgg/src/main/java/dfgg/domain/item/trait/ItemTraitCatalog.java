@@ -1,10 +1,12 @@
-package dfgg.domain.item;
+package dfgg.domain.item.trait;
 
-import static dfgg.domain.item.ItemTrait.ENGAGE;
-import static dfgg.domain.item.ItemTrait.HEAL;
-import static dfgg.domain.item.ItemTrait.PEEL;
-import static dfgg.domain.item.ItemTrait.SHIELD;
-import static dfgg.domain.item.ItemTrait.TEAM_BUFF;
+import dfgg.domain.item.Item;
+
+import static dfgg.domain.item.trait.ItemTrait.ENGAGE;
+import static dfgg.domain.item.trait.ItemTrait.HEAL;
+import static dfgg.domain.item.trait.ItemTrait.PEEL;
+import static dfgg.domain.item.trait.ItemTrait.SHIELD;
+import static dfgg.domain.item.trait.ItemTrait.TEAM_BUFF;
 
 import java.util.HashMap;
 import java.util.Map;

@@ -1,8 +1,8 @@
 package dfgg.domain.recommendation;
 
-import static dfgg.domain.item.ItemTrait.ENGAGE;
-import static dfgg.domain.item.ItemTrait.HEAL;
-import static dfgg.domain.item.ItemTrait.PEEL;
+import static dfgg.domain.item.trait.ItemTrait.ENGAGE;
+import static dfgg.domain.item.trait.ItemTrait.HEAL;
+import static dfgg.domain.item.trait.ItemTrait.PEEL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.BDDMockito.given;
@@ -11,7 +11,7 @@ import static org.mockito.Mockito.mock;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
-import dfgg.domain.item.ItemTraitCatalog;
+import dfgg.domain.item.trait.ItemTraitCatalog;
 import dfgg.domain.stats.ChampionBuildStats;
 import java.util.List;
 import java.util.Map;
