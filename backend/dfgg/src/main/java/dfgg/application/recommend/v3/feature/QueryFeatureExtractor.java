@@ -22,10 +22,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class QueryFeatureExtractor {
 
-    /** 저티어→고티어 순서값. 데이터가 PLATINUM에 90% 편중돼 분산은 작지만 그대로 넘긴다. */
-    private static final Map<String, Double> TIER_ORDINALS = Map.of(
-            "IRON", 1.0, "BRONZE", 2.0, "SILVER", 3.0, "GOLD", 4.0,
-            "PLATINUM", 5.0, "EMERALD", 6.0, "DIAMOND", 7.0
+    /** 저티어→고티어 순서값. */
+    private static final Map<String, Double> TIER_ORDINALS = Map.ofEntries(
+            Map.entry("IRON", 1.0), Map.entry("BRONZE", 2.0), Map.entry("SILVER", 3.0),
+            Map.entry("GOLD", 4.0), Map.entry("PLATINUM", 5.0), Map.entry("EMERALD", 6.0),
+            Map.entry("DIAMOND", 7.0), Map.entry("MASTER", 8.0), Map.entry("GRANDMASTER", 9.0),
+            Map.entry("CHALLENGER", 10.0)
     );
 
     private static final Map<ChampionPosition, FeatureName> POSITION_FEATURES = Map.of(

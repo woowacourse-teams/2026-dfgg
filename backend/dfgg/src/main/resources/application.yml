@@ -46,6 +46,9 @@ recommendation:
     counter: "${RECOMMENDATION_CANDIDATE_TOP_K_COUNTER:5}"
   v2-min-sample-count: "${RECOMMENDATION_V2_MIN_SAMPLE_COUNT:30}"
   v2-tiers: "${RECOMMENDATION_V2_TIERS:PLATINUM,EMERALD,DIAMOND,MASTER,GRANDMASTER,CHALLENGER}"
+  v3:
+    # 집계·export·서빙이 공유하는 티어. 정책이 바뀌면 여기만 바꾸고 재집계·재학습한다.
+    tiers: "${RECOMMENDATION_V3_TIERS:EMERALD,DIAMOND,MASTER,GRANDMASTER,CHALLENGER}"
 
 collection:
   scheduler:
