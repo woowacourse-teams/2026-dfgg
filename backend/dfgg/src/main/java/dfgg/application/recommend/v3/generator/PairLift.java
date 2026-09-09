@@ -10,7 +10,7 @@ package dfgg.application.recommend.v3.generator;
  * @param pairProbability 스무딩 전 원 확률 {@code co / pairGames}
  * @param baseRate        스무딩 전 원 base rate {@code purchase / games}
  */
-public record CounterLift(double lift, double pairProbability, double baseRate) {
+public record PairLift(double lift, double pairProbability, double baseRate) {
 
-    public static final CounterLift NEUTRAL = new CounterLift(1.0, 0.0, 0.0);
+    public static final PairLift NEUTRAL = new PairLift(1.0, 0.0, 0.0);
 }

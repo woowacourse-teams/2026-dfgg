@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import({TierScopeConfiguration.class, ItemStatsAggregationService.class, FeatureExtractionPipeline.class,
         CandidateFeatureExtractor.class, StatsFeatureExtractor.class, QueryFeatureExtractor.class,
         dfgg.application.recommend.v3.generator.PairSynergyRetriever.class,
-        dfgg.application.recommend.v3.generator.CounterLiftCalculator.class,
+        dfgg.application.recommend.v3.generator.PairLiftCalculator.class,
         dfgg.application.utils.WilsonScoreCalculator.class})
 @Sql("/sql/counter-test-data.sql")
 class FeatureExtractionPipelineTest {

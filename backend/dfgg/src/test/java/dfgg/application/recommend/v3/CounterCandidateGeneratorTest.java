@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.recommend.v3.generator.CounterCandidateGenerator;
-import dfgg.application.recommend.v3.generator.CounterLift;
-import dfgg.application.recommend.v3.generator.CounterLiftCalculator;
+import dfgg.application.recommend.v3.generator.PairLift;
+import dfgg.application.recommend.v3.generator.PairLiftCalculator;
 import dfgg.application.recommend.v3.generator.PairBackoffLevel;
 import dfgg.application.utils.WilsonScoreCalculator;
 import dfgg.domain.champion.ChampionPosition;
@@ -59,7 +59,7 @@ class CounterCandidateGeneratorTest {
         aggregationService.aggregate(1);
         generator = new CounterCandidateGenerator(
                 pairRepository, championItemStatsRepository, championItemRollupRepository,
-                new CounterLiftCalculator(1.0, 159), new WilsonScoreCalculator(), 5, NO_BASE_RATE_FLOOR
+                new PairLiftCalculator(1.0, 159), new WilsonScoreCalculator(), 5, NO_BASE_RATE_FLOOR
         );
     }
 
@@ -89,7 +89,7 @@ class CounterCandidateGeneratorTest {
     @DisplayName("내가 이 적 상대로 실제로 더 사는 아이템은 lift가 1보다 크다")
     void generate_WhenIBuyMoreAgainstThisEnemy_LiftExceedsOne() {
         // given: 야스오의 도미닉 구매율은 평소 45%(18/40)인데 람머스 상대로는 80%(16/20)
-        Map<Long, CounterLift> lifts = generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS);
+        Map<Long, PairLift> lifts = generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS);
 
         // then
         assertThat(lifts.get(DOMINIK).lift()).isGreaterThan(1.0);
@@ -99,7 +99,7 @@ class CounterCandidateGeneratorTest {
     @DisplayName("내가 이 적 상대로 덜 사는 아이템은 lift가 1보다 작다")
     void generate_WhenIBuyLessAgainstThisEnemy_LiftIsBelowOne() {
         // given: 무한의 대검은 평소 55%(22/40)인데 람머스 상대로는 20%(4/20)
-        Map<Long, CounterLift> lifts = generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS);
+        Map<Long, PairLift> lifts = generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS);
 
         // then
         assertThat(lifts.get(INFINITY_EDGE).lift()).isLessThan(1.0);
@@ -109,10 +109,10 @@ class CounterCandidateGeneratorTest {
     @DisplayName("lift와 함께 내 챔피언의 base rate를 별도로 남긴다 — 셋을 구분해야 실패 유형을 잡는다")
     void liftsByItem_WhenComputed_PreservesBaseRateSeparately() {
         // when
-        Map<Long, CounterLift> lifts = generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS);
+        Map<Long, PairLift> lifts = generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS);
 
         // then: 야스오의 도미닉 base rate는 18/40 = 0.45
-        CounterLift dominik = lifts.get(DOMINIK);
+        PairLift dominik = lifts.get(DOMINIK);
         assertThat(dominik.baseRate()).isEqualTo(0.45);
         assertThat(dominik.pairProbability()).isEqualTo(16.0 / 20.0);
     }

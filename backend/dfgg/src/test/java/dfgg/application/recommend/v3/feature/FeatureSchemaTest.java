@@ -66,7 +66,7 @@ class FeatureSchemaTest {
 
     @Test
     @DisplayName("counter의 lift·원 확률·base rate가 각각 별도 feature다 — 셋을 구분해야 실패 유형을 잡는다")
-    void schema_KeepsCounterLiftAndBaseRateSeparate() {
+    void schema_KeepsPairLiftAndBaseRateSeparate() {
         String names = Arrays.stream(FeatureName.values())
                 .map(FeatureName::exportName)
                 .collect(Collectors.joining(","));

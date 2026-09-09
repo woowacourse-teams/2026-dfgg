@@ -4,7 +4,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * {@code P(item | 내 챔피언, 적 챔피언) / P(item | 내 챔피언)} — 이번 작업의 핵심 계산.
+ * {@code P(item | 내 챔피언, 상대 챔피언) / P(item | 내 챔피언)} — 이번 작업의 핵심 계산.
+ * <p>
+ * 상대가 적이면 counter, 아군이면 ally다. 계산은 같고 어느 관계의 통계를 넣느냐만 다르다.
+ * 이름에 counter를 박아두면 ally가 쓸 때 읽는 사람이 오해한다.
  * <p>
  * 분모가 내 챔피언 자신의 구매율이라는 점이 기존 구조와 갈리는 지점이다.
  * 예전 카운터 학습은 "적 X가 있을 때 우리 팀 누군가가 산 아이템"을 셌기 때문에,
@@ -19,7 +22,7 @@ import org.springframework.stereotype.Component;
  * 두세 판의 우연이 강한 counter 신호로 둔갑하는 걸 막는 장치다.
  */
 @Component
-public class CounterLiftCalculator {
+public class PairLiftCalculator {
 
     /** 스무딩 강도. 클수록 표본이 얇을 때 lift가 1로 더 강하게 끌려간다. */
     private final double alpha;
@@ -27,9 +30,9 @@ public class CounterLiftCalculator {
     /** 라플라스 스무딩의 사전분포 크기(아이템 종류 수). */
     private final int vocabularySize;
 
-    public CounterLiftCalculator(
-            @Value("${recommendation.counter.lift-smoothing-alpha}") double alpha,
-            @Value("${recommendation.counter.item-vocabulary-size}") int vocabularySize
+    public PairLiftCalculator(
+            @Value("${recommendation.pair-lift.smoothing-alpha}") double alpha,
+            @Value("${recommendation.pair-lift.item-vocabulary-size}") int vocabularySize
     ) {
         this.alpha = alpha;
         this.vocabularySize = vocabularySize;
@@ -41,15 +44,15 @@ public class CounterLiftCalculator {
      * @param baseCount      이 챔피언이 이 아이템을 산 판 수(적 무관)
      * @param baseGameCount  이 챔피언이 치른 판 수
      */
-    public CounterLift calculate(int coCount, int pairGameCount, int baseCount, int baseGameCount) {
+    public PairLift calculate(int coCount, int pairGameCount, int baseCount, int baseGameCount) {
         if (pairGameCount <= 0 || baseGameCount <= 0) {
-            return CounterLift.NEUTRAL;
+            return PairLift.NEUTRAL;
         }
         double baseRate = (double) baseCount / baseGameCount;
         double flooredBaseRate = Math.max(baseRate, floor(baseGameCount));
         double smoothedPairRate = (coCount + alpha * flooredBaseRate) / (pairGameCount + alpha);
 
-        return new CounterLift(
+        return new PairLift(
                 smoothedPairRate / flooredBaseRate,
                 (double) coCount / pairGameCount,
                 baseRate

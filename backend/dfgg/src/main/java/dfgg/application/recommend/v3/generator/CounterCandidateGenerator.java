@@ -39,7 +39,7 @@ public class CounterCandidateGenerator implements CandidateGenerator {
     private final ChampionPairItemStatsRepository pairRepository;
     private final ChampionItemStatsRepository championItemStatsRepository;
     private final ChampionItemRollupRepository championItemRollupRepository;
-    private final CounterLiftCalculator counterLiftCalculator;
+    private final PairLiftCalculator pairLiftCalculator;
     private final WilsonScoreCalculator wilsonScoreCalculator;
     private final int minimumPairGames;
     private final double minimumBaseRate;
@@ -48,7 +48,7 @@ public class CounterCandidateGenerator implements CandidateGenerator {
             ChampionPairItemStatsRepository pairRepository,
             ChampionItemStatsRepository championItemStatsRepository,
             ChampionItemRollupRepository championItemRollupRepository,
-            CounterLiftCalculator counterLiftCalculator,
+            PairLiftCalculator pairLiftCalculator,
             WilsonScoreCalculator wilsonScoreCalculator,
             @Value("${recommendation.pair-synergy.minimum-pair-games}") int minimumPairGames,
             @Value("${recommendation.counter.minimum-base-rate}") double minimumBaseRate
@@ -56,7 +56,7 @@ public class CounterCandidateGenerator implements CandidateGenerator {
         this.pairRepository = pairRepository;
         this.championItemStatsRepository = championItemStatsRepository;
         this.championItemRollupRepository = championItemRollupRepository;
-        this.counterLiftCalculator = counterLiftCalculator;
+        this.pairLiftCalculator = pairLiftCalculator;
         this.wilsonScoreCalculator = wilsonScoreCalculator;
         this.minimumPairGames = minimumPairGames;
         this.minimumBaseRate = minimumBaseRate;
@@ -80,7 +80,7 @@ public class CounterCandidateGenerator implements CandidateGenerator {
                     || belowBaseRateFloor(baseCountByItem, baseGameCount, stats.getItemId())) {
                 continue;
             }
-            CounterLift lift = counterLiftCalculator.calculate(
+            PairLift lift = pairLiftCalculator.calculate(
                     stats.getCoCountAll(), stats.getPairGameCountAll(),
                     baseCountByItem.getOrDefault(stats.getItemId(), 0), baseGameCount
             );
@@ -130,14 +130,14 @@ public class CounterCandidateGenerator implements CandidateGenerator {
      * 적 하나에 대한 아이템별 counter 근거. lift·원 확률·base rate를 모두 담아 돌려주므로
      * feature extraction이 같은 계산을 되풀이하지 않고 그대로 쓸 수 있다.
      */
-    public Map<Long, CounterLift> liftsByItem(long myChampionId, ChampionPosition position, long enemyChampionId) {
+    public Map<Long, PairLift> liftsByItem(long myChampionId, ChampionPosition position, long enemyChampionId) {
         Map<Long, Integer> baseCountByItem = baseCounts(myChampionId, position);
         int baseGameCount = baseGameCount(myChampionId, position);
 
-        Map<Long, CounterLift> liftByItem = new HashMap<>();
+        Map<Long, PairLift> liftByItem = new HashMap<>();
         for (ChampionPairItemStats stats : pairRepository.findByMyChampionIdAndRelationAndOtherChampionIdIn(
                 Math.toIntExact(myChampionId), PairRelation.ENEMY, List.of(Math.toIntExact(enemyChampionId)))) {
-            liftByItem.put(stats.getItemId(), counterLiftCalculator.calculate(
+            liftByItem.put(stats.getItemId(), pairLiftCalculator.calculate(
                     stats.getCoCountAll(), stats.getPairGameCountAll(),
                     baseCountByItem.getOrDefault(stats.getItemId(), 0), baseGameCount
             ));

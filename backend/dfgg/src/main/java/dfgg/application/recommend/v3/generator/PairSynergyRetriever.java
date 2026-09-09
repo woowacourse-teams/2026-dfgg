@@ -1,6 +1,5 @@
 package dfgg.application.recommend.v3.generator;
 
-import dfgg.application.utils.WilsonScoreCalculator;
 import dfgg.domain.itemstats.ChampionPairItemStats;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.domain.itemstats.PairRelation;
@@ -11,7 +10,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * {@code [내 챔피언 + 상대 챔피언 + 아이템]} 삼중항 점수를 상대별로 따로 읽어온다.
+ * {@code [내 챔피언 + 상대 챔피언 + 아이템]} 삼중항 lift를 상대별로 따로 읽어온다.
+ * <p>
+ * 점수는 {@code P(item | 나, 상대) / P(item | 나)}다. 한때 Wilson 하한 확률을 썼는데,
+ * 그러면 "원딜이면 다 사는 아이템"이 모든 아군에 대해 높은 점수를 받아 근거로 둔갑했다.
+ * lift는 <b>평소 대비</b>를 보므로 그런 아이템이 1 근처로 수축한다.
  * Ally-Synergy(아군)와 Counter(적)가 같은 구조를 쓰므로 relation만 갈아끼워 공유한다.
  * <p>
  * 상대별 점수를 합쳐서 돌려주지 않는 것이 핵심이다. 5명을 하나의 window로 뭉치면
@@ -25,34 +28,44 @@ import org.springframework.stereotype.Component;
 public class PairSynergyRetriever {
 
     private final ChampionPairItemStatsRepository pairRepository;
-    private final WilsonScoreCalculator wilsonScoreCalculator;
+    private final PairLiftCalculator pairLiftCalculator;
     private final int minimumPairGames;
+    private final double minimumBaseRate;
 
     public PairSynergyRetriever(
             ChampionPairItemStatsRepository pairRepository,
-            WilsonScoreCalculator wilsonScoreCalculator,
-            @Value("${recommendation.pair-synergy.minimum-pair-games}") int minimumPairGames
+            PairLiftCalculator pairLiftCalculator,
+            @Value("${recommendation.pair-synergy.minimum-pair-games}") int minimumPairGames,
+            @Value("${recommendation.ally-synergy.minimum-base-rate}") double minimumBaseRate
     ) {
         this.pairRepository = pairRepository;
-        this.wilsonScoreCalculator = wilsonScoreCalculator;
+        this.pairLiftCalculator = pairLiftCalculator;
         this.minimumPairGames = minimumPairGames;
+        this.minimumBaseRate = minimumBaseRate;
     }
 
     /**
      * 아이템별로 "상대 챔피언 → 점수" 묶음을 만든다.
      * 반환된 map에 없는 아이템은 어떤 상대와도 유의미하게 관측되지 않았다는 뜻이다.
      */
+    /**
+     * @param baseCountByItem 내 챔피언이 각 아이템을 산 판 수(상대 무관) — lift의 분모
+     * @param baseGameCount   내 챔피언이 치른 판 수
+     */
     public Map<Long, PairScoreAggregate> scoresByItem(
-            long myChampionId, List<Long> otherChampionIds, PairRelation relation
+            long myChampionId, List<Long> otherChampionIds, PairRelation relation,
+            Map<Long, Integer> baseCountByItem, int baseGameCount
     ) {
         Map<Long, Map<Long, Double>> scoreByItemAndOther = new HashMap<>();
         for (ChampionPairItemStats stats : findStats(myChampionId, otherChampionIds, relation)) {
-            if (stats.getPairGameCountAll() < minimumPairGames) {
+            if (stats.getPairGameCountAll() < minimumPairGames
+                    || belowBaseRateFloor(stats.getItemId(), baseCountByItem, baseGameCount)) {
                 continue;
             }
             scoreByItemAndOther
                     .computeIfAbsent(stats.getItemId(), itemId -> new HashMap<>())
-                    .put(Long.valueOf(stats.getOtherChampionId()), score(stats));
+                    .put(Long.valueOf(stats.getOtherChampionId()),
+                            lift(stats, baseCountByItem, baseGameCount));
         }
 
         Map<Long, PairScoreAggregate> aggregateByItem = new HashMap<>();
@@ -74,13 +87,31 @@ public class PairSynergyRetriever {
     }
 
     /**
-     * {@code P(item | 내 챔피언, 상대 챔피언)}의 Wilson 하한. 전체 집계와 최근 윈도 중 높은 쪽을 쓴다 —
-     * 갓 버프된 아이템이 전체 표본에 묻혀 후보에서 빠지는 걸 막기 위함이다.
+     * 내 챔피언이 애초에 거의 사지 않는 아이템은 후보에서 뺀다.
+     * <p>
+     * lift는 분모가 바닥이면 분자가 조금만 커도 폭발한다. 하한이 없을 때 실측하면
+     * ally 상위 5 후보의 <b>96.9%가 구매율 1% 미만</b>이었고 lift 최대는 7749였다 —
+     * counter에서 겪은 것과 같은 구조다. 그 상태에서는 {@code lift > 1} 문턱이
+     * 아무것도 거르지 못한다.
+     * <p>
+     * 생성기와 feature 추출기가 <b>같은 조건</b>을 봐야 한다. 한쪽만 거르면 후보에 없는
+     * 아이템이 ally feature만 갖거나 그 반대가 된다. 그래서 두 호출자가 공유하는
+     * 이 클래스에 둔다.
      */
-    private double score(ChampionPairItemStats stats) {
-        double all = wilsonScoreCalculator.lowerBound(stats.getCoCountAll(), stats.getPairGameCountAll());
-        double recent = wilsonScoreCalculator.lowerBound(
-                stats.getCoCountRecent(), stats.getPairGameCountRecent());
-        return Math.max(all, recent);
+    private boolean belowBaseRateFloor(
+            Long itemId, Map<Long, Integer> baseCountByItem, int baseGameCount) {
+        if (minimumBaseRate <= 0.0 || baseGameCount == 0) {
+            return false;
+        }
+        return (double) baseCountByItem.getOrDefault(itemId, 0) / baseGameCount < minimumBaseRate;
+    }
+
+    /** {@code P(item | 나, 상대) / P(item | 나)}. counter와 같은 계산기를 쓴다. */
+    private double lift(
+            ChampionPairItemStats stats, Map<Long, Integer> baseCountByItem, int baseGameCount) {
+        return pairLiftCalculator.calculate(
+                stats.getCoCountAll(), stats.getPairGameCountAll(),
+                baseCountByItem.getOrDefault(stats.getItemId(), 0), baseGameCount
+        ).lift();
     }
 }

@@ -55,8 +55,12 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
 
     @Override
     public GeneratorResult generate(RecommendationQuery query, int topK) {
+        List<ChampionItemStats> positionStats =
+                championItemStatsRepository.findByChampionIdAndPosition(
+                        Math.toIntExact(query.myChampionId()), query.position());
         Map<Long, PairScoreAggregate> scoresByItem = pairSynergyRetriever.scoresByItem(
-                query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY);
+                query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
+                baseCounts(positionStats), baseGameCount(positionStats));
 
         if (!scoresByItem.isEmpty()) {
             List<ScoredItem> ranked = scoresByItem.entrySet().stream()
@@ -72,6 +76,22 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
         }
 
         return GeneratorResult.of(source(), championBaseRate(query, topK), PairBackoffLevel.BASE_RATE.ordinal());
+    }
+
+    /** lift의 분모 — 이 챔피언이 각 아이템을 산 판 수. 상대가 누구든 같은 값이다. */
+    private Map<Long, Integer> baseCounts(List<ChampionItemStats> positionStats) {
+        Map<Long, Integer> countByItem = new java.util.HashMap<>();
+        for (ChampionItemStats stats : positionStats) {
+            countByItem.put(stats.getItemId(), stats.getPurchaseCountAll());
+        }
+        return countByItem;
+    }
+
+    private int baseGameCount(List<ChampionItemStats> positionStats) {
+        return positionStats.stream()
+                .mapToInt(ChampionItemStats::getChampionGameCountAll)
+                .max()
+                .orElse(0);
     }
 
     /**

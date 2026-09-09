@@ -22,7 +22,7 @@ import org.springframework.test.context.jdbc.Sql;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({TierScopeConfiguration.class, ItemStatsAggregationService.class, StatsFeatureExtractor.class,
         dfgg.application.recommend.v3.generator.PairSynergyRetriever.class,
-        dfgg.application.recommend.v3.generator.CounterLiftCalculator.class,
+        dfgg.application.recommend.v3.generator.PairLiftCalculator.class,
         dfgg.application.utils.WilsonScoreCalculator.class})
 @Sql("/sql/counter-test-data.sql")
 class StatsFeatureExtractorTest {
@@ -80,7 +80,7 @@ class StatsFeatureExtractorTest {
 
     @Test
     @DisplayName("counter lift를 적별로 계산해 집계한다")
-    void extract_WhenEnemiesObserved_SetsCounterLiftAggregates() {
+    void extract_WhenEnemiesObserved_SetsPairLiftAggregates() {
         // when: 야스오의 도미닉은 평소 45%인데 람머스 상대로는 80%
         FeatureVector vector = extract(DOMINIK);
 

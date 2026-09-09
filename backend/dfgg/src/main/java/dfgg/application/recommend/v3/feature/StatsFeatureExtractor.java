@@ -1,8 +1,8 @@
 package dfgg.application.recommend.v3.feature;
 
 import dfgg.application.recommend.v3.RecommendationQuery;
-import dfgg.application.recommend.v3.generator.CounterLift;
-import dfgg.application.recommend.v3.generator.CounterLiftCalculator;
+import dfgg.application.recommend.v3.generator.PairLift;
+import dfgg.application.recommend.v3.generator.PairLiftCalculator;
 import dfgg.application.recommend.v3.generator.PairScoreAggregate;
 import dfgg.application.recommend.v3.generator.PairSynergyRetriever;
 import dfgg.domain.itemstats.ChampionItemStats;
@@ -35,20 +35,20 @@ public class StatsFeatureExtractor {
     private final ChampionPairItemStatsRepository pairRepository;
     private final ItemMetaStatsRepository itemMetaStatsRepository;
     private final PairSynergyRetriever pairSynergyRetriever;
-    private final CounterLiftCalculator counterLiftCalculator;
+    private final PairLiftCalculator pairLiftCalculator;
 
     public StatsFeatureExtractor(
             ChampionItemStatsRepository championItemStatsRepository,
             ChampionPairItemStatsRepository pairRepository,
             ItemMetaStatsRepository itemMetaStatsRepository,
             PairSynergyRetriever pairSynergyRetriever,
-            CounterLiftCalculator counterLiftCalculator
+            PairLiftCalculator pairLiftCalculator
     ) {
         this.championItemStatsRepository = championItemStatsRepository;
         this.pairRepository = pairRepository;
         this.itemMetaStatsRepository = itemMetaStatsRepository;
         this.pairSynergyRetriever = pairSynergyRetriever;
-        this.counterLiftCalculator = counterLiftCalculator;
+        this.pairLiftCalculator = pairLiftCalculator;
     }
 
     /**
@@ -59,13 +59,25 @@ public class StatsFeatureExtractor {
      * 학습 데이터 30만 query 규모에서는 시간 차이가 몇 시간 단위로 벌어진다.
      */
     public StatsContext prepare(RecommendationQuery query) {
+        int[] championGameCounts = championGameCounts(query);
+        Map<Long, int[]> purchaseCounts = purchaseCountsByItem(query);
         return new StatsContext(
-                championGameCounts(query),
-                purchaseCountsByItem(query),
+                championGameCounts,
+                purchaseCounts,
                 counterStatsByItem(query),
+                // ally 점수도 lift다. 분모(base rate)는 counter와 같은 값을 쓴다 —
+                // 여기서 다른 분모를 쓰면 두 묶음의 feature가 서로 다른 축을 갖게 된다.
                 pairSynergyRetriever.scoresByItem(
-                        query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY)
+                        query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
+                        allBaseCounts(purchaseCounts), championGameCounts[0])
         );
+    }
+
+    /** {@code purchaseCountsByItem}은 [전체, 최근] 쌍이다. lift 분모로는 전체를 쓴다. */
+    private Map<Long, Integer> allBaseCounts(Map<Long, int[]> purchaseCountsByItem) {
+        Map<Long, Integer> countByItem = new HashMap<>();
+        purchaseCountsByItem.forEach((itemId, counts) -> countByItem.put(itemId, counts[0]));
+        return countByItem;
     }
 
     public void extract(long itemId, RecommendationQuery query, FeatureVector vector) {
@@ -143,10 +155,10 @@ public class StatsFeatureExtractor {
         if (baseRate.gameCountAll() <= 0) {
             return;
         }
-        List<CounterLift> lifts = context.counterStatsByItem()
+        List<PairLift> lifts = context.counterStatsByItem()
                 .getOrDefault(itemId, List.of())
                 .stream()
-                .map(stats -> counterLiftCalculator.calculate(
+                .map(stats -> pairLiftCalculator.calculate(
                         stats.getCoCountAll(), stats.getPairGameCountAll(),
                         baseRate.purchaseCountAll(), baseRate.gameCountAll()))
                 .toList();
@@ -155,7 +167,7 @@ public class StatsFeatureExtractor {
         }
 
         List<Double> descending = lifts.stream()
-                .map(CounterLift::lift)
+                .map(PairLift::lift)
                 .sorted(Comparator.reverseOrder())
                 .toList();
         vector.set(FeatureName.COUNTER_LIFT_MAX, descending.get(0));
@@ -164,7 +176,7 @@ public class StatsFeatureExtractor {
         vector.set(FeatureName.COUNTER_LIFT_MEAN,
                 descending.stream().mapToDouble(Double::doubleValue).average().orElse(0.0));
         vector.set(FeatureName.COUNTER_PAIR_PROBABILITY_MAX,
-                lifts.stream().mapToDouble(CounterLift::pairProbability).max().orElse(0.0));
+                lifts.stream().mapToDouble(PairLift::pairProbability).max().orElse(0.0));
     }
 
     // ── Ally ───────────────────────────────────────────────────────────────
