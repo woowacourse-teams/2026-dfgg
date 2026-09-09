@@ -65,7 +65,6 @@ class NextItemRecommendationServiceTest {
                 new HardValidityFilter(new ItemExclusionGroups()), candidateRanker,
                 new dfgg.application.recommend.v3.CandidateTopK(20, 20, 20, 30),
                 trivialShapCalculator(),
-                new dfgg.application.recommend.v3.explanation.ExplanationSelector(),
                 new dfgg.application.recommend.v3.explanation.ChampionDirectory(championRepository),
                 new dfgg.domain.item.trait.ItemTraitCatalog()
         );

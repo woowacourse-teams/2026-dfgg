@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dfgg.application.recommend.v3.CandidateSource;
 import dfgg.application.recommend.v3.ItemCandidate;
 import dfgg.application.recommend.v3.SourceEvidence;
-import dfgg.application.recommend.v3.feature.ReasonGroup;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -30,14 +29,6 @@ class AllyEvidenceTest {
     private static final long ORNN = 516L;
     private static final long ARDENT_CENSER = 3504L;
 
-    private static SelectedReasons gateOpen() {
-        return new SelectedReasons(List.of(new GroupWeight(ReasonGroup.ALLY_SYNERGY, 0.9)));
-    }
-
-    private static SelectedReasons gateClosed() {
-        return new SelectedReasons(List.of(new GroupWeight(ReasonGroup.BUILD, 2.4)));
-    }
-
     /** 점수는 이제 lift다 — 1.0이 "평소와 같다"이고 그 아래는 오히려 덜 산다는 뜻이다. */
     private static ItemCandidate candidateWithAllyLifts(Map<Long, Double> liftByAlly) {
         return new ItemCandidate(ARDENT_CENSER, Map.of(
@@ -45,19 +36,10 @@ class AllyEvidenceTest {
     }
 
     @Test
-    @DisplayName("아군 시너지가 점수를 올렸을 때만 아군을 지목한다")
+    @DisplayName("lift가 1을 넘는 아군을 지목한다")
     void championIdsFor_WhenAllySynergyDroveTheScore_NamesAllies() {
-        assertThat(AllyEvidence.championIdsFor(
-                gateOpen(), candidateWithAllyLifts(Map.of(JINX, 2.4))))
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(Map.of(JINX, 2.4))))
                 .containsExactly(JINX);
-    }
-
-    @Test
-    @DisplayName("아군 시너지가 점수를 올리지 않았으면 근거가 있어도 지목하지 않는다")
-    void championIdsFor_WhenAllySynergyDidNotDriveTheScore_NamesNobody() {
-        assertThat(AllyEvidence.championIdsFor(
-                gateClosed(), candidateWithAllyLifts(Map.of(JINX, 2.4))))
-                .isEmpty();
     }
 
     @Test
@@ -65,7 +47,7 @@ class AllyEvidenceTest {
     void championIdsFor_WhenLiftIsNotAboveNeutral_DropsThatAlly() {
         Map<Long, Double> lifts = Map.of(JINX, 2.4, KOGMAW, 1.0);
 
-        assertThat(AllyEvidence.championIdsFor(gateOpen(), candidateWithAllyLifts(lifts)))
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts)))
                 .containsExactly(JINX);
     }
 
@@ -75,7 +57,7 @@ class AllyEvidenceTest {
         // 옛 상대 문턱(최상위의 절반)이었다면 1.1은 5.0의 절반에 못 미쳐 빠졌다.
         Map<Long, Double> lifts = Map.of(JINX, 5.0, KOGMAW, 1.1);
 
-        assertThat(AllyEvidence.championIdsFor(gateOpen(), candidateWithAllyLifts(lifts)))
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts)))
                 .containsExactly(JINX, KOGMAW);
     }
 
@@ -86,15 +68,14 @@ class AllyEvidenceTest {
         // 상대 문턱이었다면 최상위의 절반을 넘는 아군이 전부 통과했다.
         Map<Long, Double> lifts = Map.of(JINX, 1.0, KOGMAW, 0.98, ORNN, 0.95);
 
-        assertThat(AllyEvidence.championIdsFor(gateOpen(), candidateWithAllyLifts(lifts)))
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts)))
                 .isEmpty();
     }
 
     @Test
     @DisplayName("아군이 하나뿐이어도 lift가 1을 넘으면 지목한다")
     void championIdsFor_WhenOnlyOneAllyAboveNeutral_NamesThatAlly() {
-        assertThat(AllyEvidence.championIdsFor(
-                gateOpen(), candidateWithAllyLifts(Map.of(KOGMAW, 1.6))))
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(Map.of(KOGMAW, 1.6))))
                 .containsExactly(KOGMAW);
     }
 
@@ -103,7 +84,7 @@ class AllyEvidenceTest {
     void championIdsFor_CapsAtTwoAllies() {
         Map<Long, Double> lifts = Map.of(JINX, 3.0, KOGMAW, 2.5, ORNN, 2.0);
 
-        assertThat(AllyEvidence.championIdsFor(gateOpen(), candidateWithAllyLifts(lifts)))
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts)))
                 .containsExactly(JINX, KOGMAW);
     }
 
@@ -113,21 +94,20 @@ class AllyEvidenceTest {
         ItemCandidate buildOnly = new ItemCandidate(ARDENT_CENSER, Map.of(
                 CandidateSource.BUILD, new SourceEvidence(0.9, 1)));
 
-        assertThat(AllyEvidence.championIdsFor(gateOpen(), buildOnly)).isEmpty();
+        assertThat(AllyEvidence.championIdsFor(buildOnly)).isEmpty();
     }
 
     @Test
     @DisplayName("base rate로 백오프한 후보는 아무도 지목하지 않는다")
     void championIdsFor_WhenBackedOffToBaseRate_IsEmpty() {
-        assertThat(AllyEvidence.championIdsFor(gateOpen(), candidateWithAllyLifts(Map.of())))
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(Map.of())))
                 .isEmpty();
     }
 
     @Test
     @DisplayName("lift가 모두 0이면 지목하지 않는다 — 관측되지 않았다는 뜻이다")
     void championIdsFor_WhenEveryLiftIsZero_IsEmpty() {
-        assertThat(AllyEvidence.championIdsFor(
-                gateOpen(), candidateWithAllyLifts(Map.of(JINX, 0.0, KOGMAW, 0.0))))
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(Map.of(JINX, 0.0, KOGMAW, 0.0))))
                 .isEmpty();
     }
 }

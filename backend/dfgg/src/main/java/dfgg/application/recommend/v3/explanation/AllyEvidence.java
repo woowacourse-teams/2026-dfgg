@@ -3,7 +3,6 @@ package dfgg.application.recommend.v3.explanation;
 import dfgg.application.recommend.v3.CandidateSource;
 import dfgg.application.recommend.v3.ItemCandidate;
 import dfgg.application.recommend.v3.SourceEvidence;
-import dfgg.application.recommend.v3.feature.ReasonGroup;
 import java.util.List;
 
 /**
@@ -16,6 +15,9 @@ import java.util.List;
  * 실측에서 원딜에게 무한의 대검이 추천될 때 이렐리아·요네·피즈가 이유로 붙었다 —
  * 원딜이면 거의 다 사는 아이템이라 특정 아군으로 설명될 이유가 없는데도 그랬다.
  * 점수를 lift로 바꾸면 "평소보다 더 산다"가 되어 그런 아이템이 자연히 걸러진다.
+ * <p>
+ * SHAP 지분 게이트는 걷어냈다({@link CounterEvidence} 참고). ally는 특히 손해를 봤는데,
+ * 게이트를 빼자 노출량이 10.44% → 20.92%로 두 배가 됐다 — 절반이 지분에 막혀 있었다.
  */
 public final class AllyEvidence {
 
@@ -28,10 +30,7 @@ public final class AllyEvidence {
     private AllyEvidence() {
     }
 
-    public static List<Long> championIdsFor(SelectedReasons selected, ItemCandidate candidate) {
-        if (!droveTheScore(selected)) {
-            return List.of();
-        }
+    public static List<Long> championIdsFor(ItemCandidate candidate) {
         return candidate.evidenceOf(CandidateSource.ALLY_SYNERGY)
                 .map(SourceEvidence::scoreByChampionId)
                 .map(liftByAlly -> ChampionEvidence.topChampionIds(
@@ -39,8 +38,4 @@ public final class AllyEvidence {
                 .orElse(List.of());
     }
 
-    private static boolean droveTheScore(SelectedReasons selected) {
-        return selected.qualified().stream()
-                .anyMatch(weight -> weight.group() == ReasonGroup.ALLY_SYNERGY);
-    }
 }

@@ -2,7 +2,6 @@ package dfgg.infrastructure.config;
 
 import dfgg.application.recommend.v3.feature.FeatureExtractionPipeline;
 import dfgg.application.recommend.v3.explanation.ChampionDirectory;
-import dfgg.application.recommend.v3.explanation.ExplanationSelector;
 import dfgg.application.recommend.v3.feature.FeatureName;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
 import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
@@ -39,10 +38,6 @@ public class LtrModelConfiguration {
         return new TreeShapCalculator(ltrModel, FeatureName.values().length);
     }
 
-    @Bean
-    public ExplanationSelector explanationSelector() {
-        return new ExplanationSelector();
-    }
 
     @Bean
     public ChampionDirectory championDirectory(dfgg.domain.champion.ChampionRepository championRepository) {

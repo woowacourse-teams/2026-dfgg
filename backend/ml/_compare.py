@@ -18,8 +18,7 @@ SCHEMA = json.loads(Path("data/feature_schema.json").read_text(encoding="utf-8")
 GROUPS = defaultdict(list)
 for index, name in enumerate(SCHEMA["feature_groups"]):
     GROUPS[name].append(index)
-COUNTER = GROUPS["COUNTER"]
-SRC_COUNTER = SCHEMA["feature_names"].index("source_counter")
+
 
 
 def load_test(path: str):
@@ -39,13 +38,16 @@ def load_test(path: str):
     return (np.asarray(features), np.asarray(labels, np.int32), np.asarray(group, np.int32))
 
 
+SRC = {"COUNTER": SCHEMA["feature_names"].index("source_counter"),
+       "ALLY_SYNERGY": SCHEMA["feature_names"].index("source_ally_synergy")}
+
 models = {
-    "A 하한0%": lgb.Booster(model_file="data/booster_floor0.txt"),
-    "B 하한1%": lgb.Booster(model_file="data/booster_floor1.txt"),
+    "B counter하한만": lgb.Booster(model_file="data/booster_floor1.txt"),
+    "F7 ally lift":   lgb.Booster(model_file="data/booster_f7.txt"),
 }
 sets = {
-    "A의 test (후보 11.2)": load_test("data/train_floor0.jsonl"),
-    "B의 test (후보 10.2)": load_test("data/train_floor1.jsonl"),
+    "B의 test  (후보 10.2)": load_test("data/train_floor1.jsonl"),
+    "F7의 test (후보 11.8)": load_test("data/train_f7.jsonl"),
 }
 
 print("같은 test 세트를 두 모델로 각각 채점\n")
@@ -57,13 +59,17 @@ for set_name, (features, labels, group) in sets.items():
               f"  @5 {m['ndcg@5']:.4f}  MRR {m['mrr']:.4f}")
     print()
 
-print("counter_score 부호 — 소속/비소속에서 COUNTER 묶음 기여")
+print("묶음 기여 부호 — 소속/비소속")
 print(f"{'':<12}{'세트':<24}{'소속 비율':>10}{'소속 기여':>11}{'비소속 기여':>12}")
 print("-" * 72)
-for set_name, (features, labels, group) in sets.items():
-    member = features[:, SRC_COUNTER] > 0
-    for model_name, booster in models.items():
-        contrib = booster.predict(features, pred_contrib=True)[:, :-1]
-        grouped = contrib[:, COUNTER].sum(axis=1)
-        print(f"{model_name:<12}{set_name:<24}{member.mean() * 100:>9.1f}%"
-              f"{grouped[member].mean():>11.4f}{grouped[~member].mean():>12.4f}")
+for group_name in ["COUNTER", "ALLY_SYNERGY"]:
+    cols = GROUPS[group_name]
+    src = SRC[group_name]
+    print(f"  [{group_name}]")
+    for set_name, (features, labels, group) in sets.items():
+        member = features[:, src] > 0
+        for model_name, booster in models.items():
+            contrib = booster.predict(features, pred_contrib=True)[:, :-1]
+            grouped = contrib[:, cols].sum(axis=1)
+            print(f"  {model_name:<16}{set_name:<24}{member.mean() * 100:>8.1f}%"
+                  f"{grouped[member].mean():>11.4f}{grouped[~member].mean():>12.4f}")

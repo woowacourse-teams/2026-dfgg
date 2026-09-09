@@ -3,7 +3,6 @@ package dfgg.application.recommend.v3.explanation;
 import dfgg.application.recommend.v3.CandidateSource;
 import dfgg.application.recommend.v3.ItemCandidate;
 import dfgg.application.recommend.v3.SourceEvidence;
-import dfgg.application.recommend.v3.feature.ReasonGroup;
 import java.util.List;
 
 /**
@@ -19,6 +18,14 @@ import java.util.List;
  * </ul>
  * <p>
  * base rate로 백오프한 후보는 적별 lift가 비어 있어 자연히 아무도 지목하지 않는다.
+ * <p>
+ * 한때 SHAP 지분 게이트가 하나 더 있었다. 걷어낸 이유는 SHAP이 "예측을 얼마나 밀었나"를
+ * 답할 뿐 "이유인가"를 답하지 못하기 때문이다. 필멸자의 운명이 치유 감소가 필요한 적 조합
+ * 때문에 1위로 올라왔는데(COUNTER 기여 −0.153 → +0.170) 지분이 8.68%라 설명하지 못했다.
+ * 지분은 BUILD처럼 다른 묶음이 세지면 눌리므로 근거의 질과 무관하게 오르내린다.
+ * <p>
+ * 실질을 담당하는 것은 소속 조건이다 — 이 generator가 후보로 내놓았는가.
+ * 게이트를 뺀 뒤 노출량은 8.30% → 11.41%로 늘었을 뿐 폭증하지 않았다.
  */
 public final class CounterEvidence {
 
@@ -35,10 +42,7 @@ public final class CounterEvidence {
     private CounterEvidence() {
     }
 
-    public static List<Long> championIdsFor(SelectedReasons selected, ItemCandidate candidate) {
-        if (!droveTheScore(selected)) {
-            return List.of();
-        }
+    public static List<Long> championIdsFor(ItemCandidate candidate) {
         return candidate.evidenceOf(CandidateSource.COUNTER)
                 .map(SourceEvidence::scoreByChampionId)
                 .map(liftByEnemy -> ChampionEvidence.topChampionIds(
@@ -46,8 +50,4 @@ public final class CounterEvidence {
                 .orElse(List.of());
     }
 
-    private static boolean droveTheScore(SelectedReasons selected) {
-        return selected.qualified().stream()
-                .anyMatch(weight -> weight.group() == ReasonGroup.COUNTER);
-    }
 }

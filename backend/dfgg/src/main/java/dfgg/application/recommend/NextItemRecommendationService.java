@@ -13,8 +13,6 @@ import dfgg.application.recommend.v3.explanation.ChampionDirectory;
 import dfgg.application.recommend.v3.explanation.AllyEvidence;
 import dfgg.application.recommend.v3.explanation.CounterEvidence;
 import dfgg.application.recommend.v3.explanation.ChampionProfile;
-import dfgg.application.recommend.v3.explanation.SelectedReasons;
-import dfgg.application.recommend.v3.explanation.ExplanationSelector;
 import dfgg.application.recommend.v3.ranker.RankedCandidate;
 import dfgg.application.recommend.v3.ranker.TreeShapCalculator;
 import dfgg.common.NextItemRecommendationNotFoundException;
@@ -62,7 +60,6 @@ public class NextItemRecommendationService {
     private final CandidateRanker candidateRanker;
     private final CandidateTopK candidateTopK;
     private final TreeShapCalculator treeShapCalculator;
-    private final ExplanationSelector explanationSelector;
     private final ChampionDirectory championDirectory;
     private final ItemTraitCatalog itemTraitCatalog;
 
@@ -74,7 +71,6 @@ public class NextItemRecommendationService {
             CandidateRanker candidateRanker,
             CandidateTopK candidateTopK,
             TreeShapCalculator treeShapCalculator,
-            ExplanationSelector explanationSelector,
             ChampionDirectory championDirectory,
             ItemTraitCatalog itemTraitCatalog
     ) {
@@ -85,7 +81,6 @@ public class NextItemRecommendationService {
         this.candidateRanker = candidateRanker;
         this.candidateTopK = candidateTopK;
         this.treeShapCalculator = treeShapCalculator;
-        this.explanationSelector = explanationSelector;
         this.championDirectory = championDirectory;
         this.itemTraitCatalog = itemTraitCatalog;
     }
@@ -123,15 +118,14 @@ public class NextItemRecommendationService {
             // 이유가 어긋날 수 있다.
             RecommendationReasons reasons = RecommendationReasons.of(
                     treeShapCalculator.contributions(candidate.features().values()));
-            SelectedReasons selected = explanationSelector.select(reasons.byGroup());
             Item item = itemById.get(candidate.itemId());
 
             recommendedItems.add(RecommendedItemDto.of(item,
                     new RecommendationDescription(
                             championRefs(CounterEvidence.championIdsFor(
-                                    selected, valid.candidateOf(candidate.itemId())), championProfiles),
+                                    valid.candidateOf(candidate.itemId())), championProfiles),
                             championRefs(AllyEvidence.championIdsFor(
-                                    selected, valid.candidateOf(candidate.itemId())), championProfiles),
+                                    valid.candidateOf(candidate.itemId())), championProfiles),
                             traitNamesOf(item)),
                     reasons));
         }
