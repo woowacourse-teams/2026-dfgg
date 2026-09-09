@@ -46,7 +46,7 @@ public final class AllyEvidence {
     }
 
     private static boolean droveTheScore(SelectedReasons selected) {
-        return selected.highlights().stream()
+        return selected.qualified().stream()
                 .anyMatch(weight -> weight.group() == ReasonGroup.ALLY_SYNERGY);
     }
 }

@@ -123,7 +123,7 @@ public class NextItemRecommendationService {
             // 이유가 어긋날 수 있다.
             RecommendationReasons reasons = RecommendationReasons.of(
                     treeShapCalculator.contributions(candidate.features().values()));
-            SelectedReasons selected = explanationSelector.select(reasons.byGroup(), index + 1);
+            SelectedReasons selected = explanationSelector.select(reasons.byGroup());
             Item item = itemById.get(candidate.itemId());
 
             recommendedItems.add(RecommendedItemDto.of(item,

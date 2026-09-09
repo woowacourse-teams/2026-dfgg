@@ -10,11 +10,11 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * 그룹 기여도 중 사용자에게 설명할 것을 고른다.
+ * 그룹 기여도 중 근거로 쓸 만한 것을 고른다.
  * <p>
- * 7개를 다 늘어놓으면 설명이 아니라 표가 된다.
- * 그렇다고 상위 2개를 그냥 자르면 노이즈까지 설명으로 승격된다
- * — 실제 응답에서 CONTEXT는 +0.0006 같은 값이 나온다.
+ * 문장을 만들던 시절에는 상위 2개만 골랐다 — 한 문장에 이유 셋을 넣으면 읽기 어렵기 때문이다.
+ * 지금은 구조화된 키를 내보내므로 <b>무엇을 보여줄지는 클라이언트가 고른다</b>.
+ * 여기 남는 규칙은 노이즈 차단 하나다 — 실제 응답에서 CONTEXT는 +0.0006 같은 값이 나온다.
  * <p>
  * 아래 숫자는 레넥톤 TOP 실제 응답에서 그대로 가져왔다.
  * 규칙이 실데이터에서 어떻게 동작하는지가 이 클래스의 관심사라, 합성값 대신 실제 값으로 고정한다.
@@ -52,66 +52,53 @@ class ExplanationSelectorTest {
     }
 
     @Nested
-    @DisplayName("무엇을 말할지 고르기")
-    class Highlights {
+    @DisplayName("문턱을 넘은 묶음을 고른다")
+    class Qualified {
 
         @Test
-        @DisplayName("가장 크게 밀어올린 두 묶음을 고른다")
-        void select_PicksTheTwoLargestQualifyingGroups() {
-            SelectedReasons reasons = selector.select(platedSteelcaps(), 1);
+        @DisplayName("문턱을 넘은 묶음은 셋 이상이어도 모두 남는다 — 몇 개를 보여줄지는 클라이언트가 정한다")
+        void select_WhenMoreThanTwoQualify_KeepsThemAll() {
+            // given: 판금 장화는 BUILD 55%, COUNTER 23%, PATCH_META 11%로 셋이 문턱을 넘는다
+            SelectedReasons reasons = selector.select(platedSteelcaps());
 
-            assertThat(reasons.highlights())
-                    .extracting(GroupWeight::group)
-                    .containsExactly(ReasonGroup.BUILD, ReasonGroup.COUNTER);
+            // then
+            assertThat(reasons.qualified()).extracting(GroupWeight::group)
+                    .containsExactly(ReasonGroup.BUILD, ReasonGroup.COUNTER, ReasonGroup.PATCH_META);
         }
 
         @Test
-        @DisplayName("BUILD가 낮은 아이템은 다른 묶음이 올라온다 — 같은 문장이 반복되지 않는다")
-        void select_WhenBuildIsWeak_PicksWhatActuallyDroveTheItem() {
-            SelectedReasons reasons = selector.select(sterakspage(), 5);
+        @DisplayName("큰 순서로 준다")
+        void select_OrdersByContributionDescending() {
+            SelectedReasons reasons = selector.select(sterakspage());
 
-            assertThat(reasons.highlights())
-                    .extracting(GroupWeight::group)
-                    .containsExactly(ReasonGroup.COUNTER, ReasonGroup.PATCH_META);
+            assertThat(reasons.qualified()).extracting(GroupWeight::value).isSortedAccordingTo(
+                    java.util.Comparator.<Double>reverseOrder());
         }
 
         @Test
-        @DisplayName("노이즈가 2위여도 고르지 않는다 — 두 번째 자리를 채우려고 아무거나 쓰지 않는다")
-        void select_WhenTheSecondLargestIsNegligible_LeavesItOut() {
-            // BUILD 하나가 이 아이템을 끌어올렸고 나머지는 사실상 0이다.
-            // 상위 2개를 그냥 자르면 CONTEXT(+0.003, 전체의 0.15%)가 이유로 승격된다.
-            Map<ReasonGroup, Double> onlyBuildMatters =
-                    contributions(2.0, 0.0, 0.0, 0.0, 0.0, 0.003, -0.01);
+        @DisplayName("노이즈는 순위와 무관하게 빠진다 — 상한을 없앤 것이지 문턱을 없앤 것이 아니다")
+        void select_WhenBelowShareFloor_ExcludesRegardlessOfRank() {
+            // given: CONTEXT(+0.0006)와 TEAM_COMPOSITION은 양수 총합의 1%도 안 된다
+            SelectedReasons reasons = selector.select(platedSteelcaps());
 
-            SelectedReasons reasons = selector.select(onlyBuildMatters, 1);
-
-            assertThat(reasons.highlights())
-                    .extracting(GroupWeight::group)
-                    .containsExactly(ReasonGroup.BUILD);
-        }
-
-        @Test
-        @DisplayName("실제 응답에서도 노이즈 묶음은 들어가지 않는다")
-        void select_ForARealResponse_ExcludesNoiseGroups() {
-            // 칠흑의 양날 도끼. CONTEXT는 +0.0030으로 양수지만 전체의 0.1%다.
-            Map<ReasonGroup, Double> blackCleaver =
-                    contributions(1.7262, 0.8037, 0.3531, 0.2871, 0.1109, 0.0030, -0.0053);
-
-            SelectedReasons reasons = selector.select(blackCleaver, 3);
-
-            assertThat(reasons.highlights())
-                    .extracting(GroupWeight::group)
+            // then
+            assertThat(reasons.qualified()).extracting(GroupWeight::group)
                     .doesNotContain(ReasonGroup.CONTEXT, ReasonGroup.TEAM_COMPOSITION);
         }
 
         @Test
-        @DisplayName("최대 두 개까지만 말한다")
-        void select_NeverReturnsMoreThanTwoHighlights() {
-            assertThat(selector.select(platedSteelcaps(), 1).highlights()).hasSizeLessThanOrEqualTo(2);
+        @DisplayName("지분 10% 미만은 3등이어도 빠진다")
+        void select_WhenThirdButBelowFloor_IsExcluded() {
+            // given: ALLY 0.09는 양수 총합 1.09의 8.3%다
+            Map<ReasonGroup, Double> justBelow = contributions(0.8, 0.2, 0.0, 0.09, 0.0, 0.0, 0.0);
+
+            // when & then
+            assertThat(selector.select(justBelow).qualified()).extracting(GroupWeight::group)
+                    .containsExactly(ReasonGroup.BUILD, ReasonGroup.COUNTER);
         }
 
         @Test
-        @DisplayName("양수 기여가 하나라도 있으면 반드시 말한다 — 이유 없는 추천은 없다")
+        @DisplayName("양수 기여가 하나라도 있으면 반드시 무언가 남는다 — 이유 없는 추천은 없다")
         void select_WhenAnyGroupIsPositive_AlwaysExplains() {
             // 이 불변식은 문턱값에 달려 있다. 묶음이 7개면 지분 합이 100%라 최댓값은 항상
             // 14.3% 이상이고, 그래서 10% 문턱은 절대 전부를 막지 못한다. 문턱을 이 선 위로
@@ -119,37 +106,37 @@ class ExplanationSelectorTest {
             Map<ReasonGroup, Double> spreadThin =
                     contributions(0.15, 0.14, 0.14, 0.14, 0.14, 0.14, 0.14);
 
-            SelectedReasons reasons = selector.select(spreadThin, 1);
+            SelectedReasons reasons = selector.select(spreadThin);
 
-            assertThat(reasons.highlights()).isNotEmpty();
-            assertThat(reasons.highlights().getFirst().group()).isEqualTo(ReasonGroup.BUILD);
+            assertThat(reasons.qualified()).isNotEmpty();
+            assertThat(reasons.qualified().getFirst().group()).isEqualTo(ReasonGroup.BUILD);
         }
 
         @Test
-        @DisplayName("점수를 끌어내린 묶음은 이유로 쓰지 않는다")
-        void select_NeverHighlightsAGroupThatLoweredTheScore() {
-            SelectedReasons reasons = selector.select(mercurysTreads(), 4);
+        @DisplayName("점수를 끌어내린 묶음은 근거로 쓰지 않는다")
+        void select_NeverPicksAGroupThatLoweredTheScore() {
+            SelectedReasons reasons = selector.select(mercurysTreads());
 
-            assertThat(reasons.highlights())
+            assertThat(reasons.qualified())
                     .allSatisfy(weight -> assertThat(weight.value()).isPositive());
         }
 
         @Test
-        @DisplayName("전부 0 이하면 말할 이유가 없다")
-        void select_WhenNothingIsPositive_HasNoHighlight() {
+        @DisplayName("전부 0 이하면 남는 것이 없다")
+        void select_WhenNothingIsPositive_HasNothingQualified() {
             Map<ReasonGroup, Double> allNegative =
                     contributions(-0.5, -0.2, -0.1, -0.1, -0.1, -0.1, -0.1);
 
-            assertThat(selector.select(allNegative, 5).highlights()).isEmpty();
+            assertThat(selector.select(allNegative).qualified()).isEmpty();
         }
 
         @Test
-        @DisplayName("값이 같으면 매번 같은 순서를 낸다 — 순서가 흔들리면 문장이 흔들린다")
+        @DisplayName("값이 같으면 매번 같은 순서를 낸다 — 순서가 흔들리면 응답이 흔들린다")
         void select_BreaksTiesDeterministically() {
             Map<ReasonGroup, Double> tied = contributions(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0);
 
-            assertThat(selector.select(tied, 1).highlights())
-                    .isEqualTo(selector.select(tied, 1).highlights());
+            assertThat(selector.select(tied).qualified())
+                    .isEqualTo(selector.select(tied).qualified());
         }
     }
 
@@ -159,83 +146,23 @@ class ExplanationSelectorTest {
 
         @Test
         @DisplayName("패치 메타도 다른 묶음과 같은 기준으로 뽑힌다")
-        void select_HoldsPatchMetaToTheSameThresholdAsOtherGroups() {
-            // 트위스티드 페이트 MID 실제 응답의 리치베인. COUNTER가 1위이고 PATCH_META가
-            // 2위(전체의 20.3%)다.
-            //
-            // 한때 PATCH_META에만 25% 문턱을 걸었다가 되돌렸다. 근거로 삼았던 T14 ablation은
-            // "패치 feature 없이 재학습해도 정확도가 비슷하다"는 중복성 이야기지, "이 아이템의
-            // 점수를 밀어올렸는가"와는 다른 질문이다. 게다가 T15의 permutation 중요도에서
-            // PATCH_META(+0.0148)는 ALLY_SYNERGY(+0.0116)보다 높은데, ALLY는 기본 문턱으로
-            // 통과시키면서 PATCH만 막는 것은 앞뒤가 맞지 않았다.
-            Map<ReasonGroup, Double> lichBane =
-                    contributions(0.5060, 1.0862, 0.5954, 0.4046, 0.1938, 0.1456, -0.0040);
+        void select_AppliesTheSameFloorToPatchMeta() {
+            // given: 스테락의 도전에서 PATCH_META는 양수 총합의 24%다
+            SelectedReasons reasons = selector.select(sterakspage());
 
-            SelectedReasons reasons = selector.select(lichBane, 3);
-
-            assertThat(reasons.highlights())
-                    .extracting(GroupWeight::group)
-                    .containsExactly(ReasonGroup.COUNTER, ReasonGroup.PATCH_META);
+            // then
+            assertThat(reasons.qualified()).extracting(GroupWeight::group)
+                    .contains(ReasonGroup.PATCH_META);
         }
 
         @Test
         @DisplayName("지분이 작으면 어느 묶음이든 똑같이 빠진다")
-        void select_DropsAnyGroupBelowTheShare() {
-            // 영겁의 지팡이(실제 응답). PATCH_META는 7.4%로 문턱 미달이다.
-            Map<ReasonGroup, Double> archangels =
-                    contributions(2.8658, 0.7907, 0.3277, 0.3022, 0.1221, 0.0265, 0.0060);
+        void select_WhenShareIsSmall_ExcludesAnyGroupAlike() {
+            Map<ReasonGroup, Double> tinyPatchMeta =
+                    contributions(2.0, 1.0, 0.05, 0.05, 0.05, 0.05, 0.05);
 
-            SelectedReasons reasons = selector.select(archangels, 1);
-
-            assertThat(reasons.highlights())
-                    .extracting(GroupWeight::group)
+            assertThat(selector.select(tinyPatchMeta).qualified()).extracting(GroupWeight::group)
                     .containsExactly(ReasonGroup.BUILD, ReasonGroup.COUNTER);
-        }
-    }
-
-    @Nested
-    @DisplayName("단서(caveat)는 아낀다")
-    class Caveat {
-
-        @Test
-        @DisplayName("음수가 작으면 단서를 달지 않는다 — 추천해놓고 깎는 문장이 된다")
-        void select_WhenTheNegativeIsSmall_AddsNoCaveat() {
-            // 헤르메스의 발걸음(4위). CONTEXT −0.1006은 양수 총합 2.16의 4.7%에 불과하다.
-            SelectedReasons reasons = selector.select(mercurysTreads(), 4);
-
-            assertThat(reasons.caveat()).isEmpty();
-        }
-
-        @Test
-        @DisplayName("하위 순위이면서 음수가 클 때만 단서를 단다")
-        void select_WhenRankIsLowAndTheNegativeIsLarge_AddsACaveat() {
-            Map<ReasonGroup, Double> heldBack =
-                    contributions(1.0, 0.2, 0.0, 0.0, 0.0, -0.6, 0.0);
-
-            SelectedReasons reasons = selector.select(heldBack, 5);
-
-            assertThat(reasons.caveat()).isPresent();
-            assertThat(reasons.caveat().orElseThrow().group()).isEqualTo(ReasonGroup.CONTEXT);
-        }
-
-        @Test
-        @DisplayName("상위 순위면 음수가 커도 단서를 달지 않는다 — 1위 추천에 붙일 말이 아니다")
-        void select_WhenRankIsHigh_AddsNoCaveatEvenForALargeNegative() {
-            Map<ReasonGroup, Double> heldBack =
-                    contributions(1.0, 0.2, 0.0, 0.0, 0.0, -0.6, 0.0);
-
-            assertThat(selector.select(heldBack, 1).caveat()).isEmpty();
-        }
-
-        @Test
-        @DisplayName("단서는 가장 크게 끌어내린 묶음 하나만 단다")
-        void select_ReportsOnlyTheLargestNegative() {
-            Map<ReasonGroup, Double> twoNegatives =
-                    contributions(1.0, 0.2, 0.0, 0.0, 0.0, -0.6, -0.5);
-
-            SelectedReasons reasons = selector.select(twoNegatives, 5);
-
-            assertThat(reasons.caveat().orElseThrow().group()).isEqualTo(ReasonGroup.CONTEXT);
         }
     }
 }

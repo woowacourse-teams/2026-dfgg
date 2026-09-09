@@ -8,7 +8,6 @@ import dfgg.application.recommend.v3.SourceEvidence;
 import dfgg.application.recommend.v3.feature.ReasonGroup;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -31,13 +30,11 @@ class AllyEvidenceTest {
     private static final long ARDENT_CENSER = 3504L;
 
     private static SelectedReasons gateOpen() {
-        return new SelectedReasons(
-                List.of(new GroupWeight(ReasonGroup.ALLY_SYNERGY, 0.9)), Optional.empty());
+        return new SelectedReasons(List.of(new GroupWeight(ReasonGroup.ALLY_SYNERGY, 0.9)));
     }
 
     private static SelectedReasons gateClosed() {
-        return new SelectedReasons(
-                List.of(new GroupWeight(ReasonGroup.BUILD, 2.4)), Optional.empty());
+        return new SelectedReasons(List.of(new GroupWeight(ReasonGroup.BUILD, 2.4)));
     }
 
     private static ItemCandidate candidateWithAllyScores(Map<Long, Double> scoreByAlly) {

@@ -4,14 +4,17 @@ import dfgg.application.recommend.v3.feature.ReasonGroup;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
- * 그룹 기여도 중 사용자에게 설명할 것을 고른다.
+ * 그룹 기여도 중 근거로 쓸 만한 것을 고른다.
  * <p>
- * 7개를 다 늘어놓으면 설명이 아니라 표가 되고, 상위 2개를 그냥 자르면 노이즈까지 이유로 승격된다
- * — 실제 응답에서 CONTEXT는 +0.0006 같은 값이 나온다. 그래서 "그 아이템의 양수 기여 중 몇 %인가"로 먼저 거르고,
- * 통과한 것들을 큰 순서로 최대 둘까지 쓴다.
+ * 규칙은 하나다 — "그 아이템의 양수 기여 중 몇 %인가"로 노이즈를 거른다.
+ * 실제 응답에서 CONTEXT는 +0.0006 같은 값이 나오는데, 그런 것까지 이유로 승격시키면
+ * 설명이 아니라 잡음이 된다.
+ * <p>
+ * <b>개수 상한은 두지 않는다.</b> 한때 상위 2개만 골랐는데, 그건 한 문장에 이유 셋을 넣으면
+ * 읽기 어렵다는 <i>문장</i>의 제약이었다. 구조화된 키를 내보내는 지금은 무엇을 보여줄지
+ * 클라이언트가 고르므로, 여기서 미리 자르면 근거를 잃기만 한다.
  * <p>
  * 문턱은 모든 묶음에 같다.
  * 후보들 사이의 상대 편차로 순서를 정하는 방식도 검토했다가 버렸다.
@@ -21,57 +24,29 @@ import java.util.Optional;
  */
 public class ExplanationSelector {
 
-    private static final int MAX_HIGHLIGHTS = 2;
-
     /** 양수 기여 총합 대비 이 비율은 넘어야 말할 가치가 있다. */
     private static final double MINIMUM_SHARE = 0.10;
 
-    /** 이 순위 밖으로 밀린 추천에만 단서를 붙인다. 상위 추천에 붙일 말이 아니다. */
-    private static final int CAVEAT_MINIMUM_RANK = 4;
-
-    /** 단서를 달 만큼 크게 끌어내렸는가. 양수 총합 대비 비율이다. */
-    private static final double CAVEAT_MINIMUM_SHARE = 0.15;
-
-    public SelectedReasons select(Map<ReasonGroup, Double> contributionByGroup, int rank) {
+    /**
+     * 양수 기여가 하나라도 있으면 결과도 비지 않는다. 묶음이 7개면 지분 합이 100%라 최댓값은
+     * 항상 14.3% 이상이고, 그래서 {@link #MINIMUM_SHARE}가 전부를 막을 수 없다. 이 관계가
+     * 깨지도록 문턱을 올리면 근거 없는 추천이 생기는데, 그건 테스트가 잡는다.
+     */
+    public SelectedReasons select(Map<ReasonGroup, Double> contributionByGroup) {
         double positiveTotal = contributionByGroup.values().stream()
                 .filter(value -> value > 0)
                 .mapToDouble(Double::doubleValue)
                 .sum();
 
-        List<GroupWeight> positives = contributionByGroup.entrySet().stream()
+        List<GroupWeight> qualified = contributionByGroup.entrySet().stream()
                 .filter(entry -> entry.getValue() > 0)
                 .map(entry -> new GroupWeight(entry.getKey(), entry.getValue()))
-                // 값이 같으면 선언 순서로 갈라 매 요청 같은 문장이 나오게 한다.
+                .filter(weight -> weight.value() / positiveTotal >= MINIMUM_SHARE)
+                // 값이 같으면 선언 순서로 갈라 매 요청 같은 응답이 나오게 한다.
                 .sorted(Comparator.comparingDouble(GroupWeight::value).reversed()
                         .thenComparing(GroupWeight::group))
                 .toList();
 
-        return new SelectedReasons(
-                highlights(positives, positiveTotal),
-                caveat(contributionByGroup, positiveTotal, rank));
-    }
-
-    /**
-     * 양수 기여가 하나라도 있으면 결과도 비지 않는다. 묶음이 7개면 지분 합이 100%라 최댓값은
-     * 항상 14.3% 이상이고, 그래서 {@link #MINIMUM_SHARE}가 전부를 막을 수 없다. 이 관계가
-     * 깨지도록 문턱을 올리면 설명 없는 추천이 생기는데, 그건 테스트가 잡는다.
-     */
-    private List<GroupWeight> highlights(List<GroupWeight> positives, double positiveTotal) {
-        return positives.stream()
-                .filter(weight -> weight.value() / positiveTotal >= MINIMUM_SHARE)
-                .limit(MAX_HIGHLIGHTS)
-                .toList();
-    }
-
-    private Optional<GroupWeight> caveat(
-            Map<ReasonGroup, Double> contributionByGroup, double positiveTotal, int rank) {
-        if (rank < CAVEAT_MINIMUM_RANK) {
-            return Optional.empty();
-        }
-        return contributionByGroup.entrySet().stream()
-                .filter(entry -> entry.getValue() < 0)
-                .min(Map.Entry.comparingByValue())
-                .filter(entry -> Math.abs(entry.getValue()) >= CAVEAT_MINIMUM_SHARE * positiveTotal)
-                .map(entry -> new GroupWeight(entry.getKey(), entry.getValue()));
+        return new SelectedReasons(qualified);
     }
 }

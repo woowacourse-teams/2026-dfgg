@@ -8,7 +8,6 @@ import dfgg.application.recommend.v3.SourceEvidence;
 import dfgg.application.recommend.v3.feature.ReasonGroup;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -26,13 +25,11 @@ class CounterEvidenceTest {
     private static final long DOMINIK = 3036L;
 
     private static SelectedReasons gateOpen() {
-        return new SelectedReasons(
-                List.of(new GroupWeight(ReasonGroup.COUNTER, 1.2)), Optional.empty());
+        return new SelectedReasons(List.of(new GroupWeight(ReasonGroup.COUNTER, 1.2)));
     }
 
     private static SelectedReasons gateClosed() {
-        return new SelectedReasons(
-                List.of(new GroupWeight(ReasonGroup.BUILD, 2.4)), Optional.empty());
+        return new SelectedReasons(List.of(new GroupWeight(ReasonGroup.BUILD, 2.4)));
     }
 
     private static ItemCandidate candidateWithLifts(Map<Long, Double> liftByEnemy) {

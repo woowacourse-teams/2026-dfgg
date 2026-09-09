@@ -47,7 +47,7 @@ public final class CounterEvidence {
     }
 
     private static boolean droveTheScore(SelectedReasons selected) {
-        return selected.highlights().stream()
+        return selected.qualified().stream()
                 .anyMatch(weight -> weight.group() == ReasonGroup.COUNTER);
     }
 }
