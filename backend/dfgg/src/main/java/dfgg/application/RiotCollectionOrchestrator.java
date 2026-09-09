@@ -79,6 +79,7 @@ public class RiotCollectionOrchestrator {
         }
 
         String sampleTier = properties.getTiers().get(nextTierIndex);
+        log.info("Riot 데이터 수집 대상 티어: tier={}", sampleTier);
 
         try {
             List<String> collectedPuuids = collectPlayers(sampleTier);
@@ -215,26 +216,19 @@ public class RiotCollectionOrchestrator {
     }
 
     private void collectMatches(List<String> puuids, String sampleTier) {
-        Set<String> processedMatchIds = new LinkedHashSet<>();
-        int playerCount = properties.getPlayerPageSize();
+        Set<String> attemptedMatchIds = new LinkedHashSet<>();
         List<String> limitedPuuids = puuids.stream()
                 .limit(properties.getPlayerLimit())
                 .toList();
-        for (int fromIndex = 0; fromIndex < limitedPuuids.size(); fromIndex += playerCount) {
-            List<String> targets = limitedPuuids.subList(
-                    fromIndex,
-                    Math.min(fromIndex + playerCount, limitedPuuids.size())
-            );
-            for (String puuid : targets) {
-                collectPlayerMatches(puuid, sampleTier, processedMatchIds);
-            }
+        for (String puuid : limitedPuuids) {
+            collectPlayerMatches(puuid, sampleTier, attemptedMatchIds);
         }
     }
 
     /**
      * 한 플레이어의 매치 ID를 조회하고, 각 매치를 원본 수집부터 통계 집계까지 처리한다. 매치 ID 조회가 실패해도 다른 플레이어의 수집은 계속한다.
      */
-    private void collectPlayerMatches(String puuid, String sampleTier, Set<String> processedMatchIds) {
+    private void collectPlayerMatches(String puuid, String sampleTier, Set<String> attemptedMatchIds) {
         List<String> matchIds;
         try {
             matchIds = matchSyncService.findMatchIds(
@@ -242,13 +236,14 @@ public class RiotCollectionOrchestrator {
                     0,
                     properties.getMatchCount()
             );
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            log.warn("플레이어 매치 ID 조회 실패, 해당 플레이어의 매치 수집 생략: puuid={}", puuid, exception);
             return;
         }
 
         for (String matchId : matchIds) {
             // 여러 플레이어가 같은 매치를 조회할 수 있으므로 한 스케줄 실행 안에서는 한 번만 처리한다.
-            if (processedMatchIds.add(matchId)) {
+            if (attemptedMatchIds.add(matchId)) {
                 processMatch(matchId, sampleTier);
             }
         }
@@ -261,7 +256,8 @@ public class RiotCollectionOrchestrator {
         boolean collected;
         try {
             collected = matchSyncService.syncMatch(matchId);
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            log.warn("매치 원본 수집 실패, 해당 매치의 후속 처리 생략: matchId={}", matchId, exception);
             return;
         }
 
