@@ -39,6 +39,7 @@ public interface ItemMetaStatsRepository extends JpaRepository<ItemMetaStats, Lo
                 WHERE (patch IS NULL OR patch NOT IN (:excludedPatches))
                   AND core_item_purchase_order_complete
                   AND core_item_purchase_order <> ''
+                  AND tier IN (:tiers)
                   AND position IN ('TOP', 'JUNGLE', 'MID', 'MIDDLE', 'BOTTOM', 'SUPPORT', 'UTILITY')
             ),
             scope AS (
@@ -61,5 +62,6 @@ public interface ItemMetaStatsRepository extends JpaRepository<ItemMetaStats, Lo
              AND scope.normalized_position = pick.normalized_position
             GROUP BY pick.patch, pick.normalized_position, pick.item_id
             """, nativeQuery = true)
-    void aggregateFrom(@Param("excludedPatches") Collection<String> excludedPatches);
+    void aggregateFrom(@Param("excludedPatches") Collection<String> excludedPatches,
+                       @Param("tiers") Collection<String> tiers);
 }

@@ -7,6 +7,7 @@ import dfgg.domain.itemstats.ChampionItemRollup;
 import dfgg.domain.itemstats.ChampionItemRollupRepository;
 import dfgg.domain.itemstats.ChampionItemStats;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
+import dfgg.infrastructure.config.TierScopeConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,7 @@ import org.springframework.test.context.jdbc.Sql;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(ItemStatsAggregationService.class)
+@Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/item-stats-aggregation-test-data.sql")
 class ChampionItemStatsAggregationTest {
 

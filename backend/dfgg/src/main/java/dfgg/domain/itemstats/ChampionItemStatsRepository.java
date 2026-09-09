@@ -49,6 +49,7 @@ public interface ChampionItemStatsRepository extends JpaRepository<ChampionItemS
                 WHERE (patch IS NULL OR patch NOT IN (:excludedPatches))
                   AND core_item_purchase_order_complete
                   AND core_item_purchase_order <> ''
+                  AND tier IN (:tiers)
                   AND position IN ('TOP', 'JUNGLE', 'MID', 'MIDDLE', 'BOTTOM', 'SUPPORT', 'UTILITY')
             ),
             champion_games AS (
@@ -77,5 +78,6 @@ public interface ChampionItemStatsRepository extends JpaRepository<ChampionItemS
             GROUP BY purchase.champion_id, purchase.normalized_position, purchase.item_id
             """, nativeQuery = true)
     void aggregateFrom(@Param("recentPatches") Collection<String> recentPatches,
-                       @Param("excludedPatches") Collection<String> excludedPatches);
+                       @Param("excludedPatches") Collection<String> excludedPatches,
+                       @Param("tiers") Collection<String> tiers);
 }

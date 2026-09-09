@@ -4,6 +4,7 @@ import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.recommend.v3.*;
 
 import dfgg.domain.champion.ChampionPosition;
+import dfgg.infrastructure.config.TierScopeConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ItemStatsAggregationService.class, FeatureExtractionPipeline.class,
+@Import({TierScopeConfiguration.class, ItemStatsAggregationService.class, FeatureExtractionPipeline.class,
         CandidateFeatureExtractor.class, StatsFeatureExtractor.class, QueryFeatureExtractor.class,
         dfgg.application.recommend.v3.generator.PairSynergyRetriever.class,
         dfgg.application.recommend.v3.generator.CounterLiftCalculator.class,

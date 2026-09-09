@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dfgg.domain.itemstats.ChampionPairItemStats;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.domain.itemstats.PairRelation;
+import dfgg.infrastructure.config.TierScopeConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ import org.springframework.test.context.jdbc.Sql;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(ItemStatsAggregationService.class)
+@Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/item-stats-aggregation-test-data.sql")
 class ChampionPairItemStatsAggregationTest {
 

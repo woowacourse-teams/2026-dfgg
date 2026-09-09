@@ -6,6 +6,7 @@ import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.recommend.v3.RecommendationQuery;
 import dfgg.domain.champion.ChampionPosition;
 import java.util.List;
+import dfgg.infrastructure.config.TierScopeConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,7 @@ import org.springframework.test.context.jdbc.Sql;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ItemStatsAggregationService.class, StatsFeatureExtractor.class,
+@Import({TierScopeConfiguration.class, ItemStatsAggregationService.class, StatsFeatureExtractor.class,
         dfgg.application.recommend.v3.generator.PairSynergyRetriever.class,
         dfgg.application.recommend.v3.generator.CounterLiftCalculator.class,
         dfgg.application.utils.WilsonScoreCalculator.class})

@@ -9,6 +9,7 @@ import dfgg.domain.itemstats.ItemMetaStats;
 import dfgg.domain.itemstats.ItemMetaStatsRepository;
 import java.util.List;
 import java.util.Set;
+import dfgg.infrastructure.config.TierScopeConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +30,7 @@ import org.springframework.test.context.jdbc.Sql;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(ItemStatsAggregationService.class)
+@Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/item-stats-aggregation-test-data.sql")
 class PatchExclusionAggregationTest {
 

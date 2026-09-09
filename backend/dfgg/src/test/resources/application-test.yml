@@ -27,6 +27,9 @@ collection:
   scheduler:
     enabled: false
 recommendation:
+  # 픽스처가 EMERALD로 들어간다. 운영 기본값이 바뀌어도 테스트가 흔들리지 않도록 한다.
+  v3:
+    tiers: "EMERALD,DIAMOND,MASTER,GRANDMASTER,CHALLENGER"
   recent-patch-window-size: 3
   counter:
     lift-smoothing-alpha: 1.0

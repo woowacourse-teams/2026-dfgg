@@ -15,6 +15,7 @@ import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.domain.itemstats.PairRelation;
 import java.util.List;
 import java.util.Map;
+import dfgg.infrastructure.config.TierScopeConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,7 +29,7 @@ import org.springframework.test.context.jdbc.Sql;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(ItemStatsAggregationService.class)
+@Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/ally-synergy-test-data.sql")
 class AllySynergyCandidateGeneratorTest {
 
