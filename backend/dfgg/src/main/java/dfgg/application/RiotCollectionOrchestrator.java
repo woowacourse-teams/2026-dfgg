@@ -7,8 +7,10 @@ import dfgg.application.stats.ChampionBuildStatsMatchService;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.IntStream;
@@ -20,9 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 
 /**
- * Riot 데이터 자동 수집의 전체 순서만 조율한다.
- * 플레이어를 조회한 뒤 새로 수집한 매치별로 원본 수집 → 정규화 → 통계 집계를 이어서 실행한다.
- * 이전 실행에서 남은 미완료 데이터의 정규화와 집계는 관리자 API가 담당한다.
+ * Riot 데이터 자동 수집의 전체 순서만 조율한다. 플레이어를 조회한 뒤 새로 수집한 매치별로 원본 수집 → 정규화 → 통계 집계를 이어서 실행한다. 이전 실행에서 남은 미완료 데이터의 정규화와 집계는 관리자
+ * API가 담당한다.
  */
 @Service
 public class RiotCollectionOrchestrator {
@@ -44,10 +45,11 @@ public class RiotCollectionOrchestrator {
     private final RiotMatchSyncService matchSyncService;
     private final MatchNormalizationService matchNormalizationService;
     private final ChampionBuildStatsMatchService statsMatchService;
-    private int nextLeaguePage;
-    private int nextDivisionIndex;
-    private boolean currentLeagueRangeHasPlayers;
-    private int nextApexPlayerIndex;
+    private final Map<String, Integer> nextLeaguePages;
+    private final Map<String, Integer> nextDivisionIndexes;
+    private final Map<String, Boolean> leagueRangeHasPlayersByTier;
+    private final Map<String, Integer> nextApexPlayerIndexes;
+    private int nextTierIndex;
 
     public RiotCollectionOrchestrator(
             RiotSchedulerProperties properties,
@@ -61,10 +63,11 @@ public class RiotCollectionOrchestrator {
         this.matchSyncService = matchSyncService;
         this.matchNormalizationService = matchNormalizationService;
         this.statsMatchService = statsMatchService;
-        this.nextLeaguePage = 1;
-        this.nextDivisionIndex = 0;
-        this.currentLeagueRangeHasPlayers = false;
-        this.nextApexPlayerIndex = 0;
+        this.nextLeaguePages = new HashMap<>();
+        this.nextDivisionIndexes = new HashMap<>();
+        this.leagueRangeHasPlayersByTier = new HashMap<>();
+        this.nextApexPlayerIndexes = new HashMap<>();
+        this.nextTierIndex = 0;
     }
 
     public void runOnce() {
@@ -75,47 +78,32 @@ public class RiotCollectionOrchestrator {
             return;
         }
 
-        String sampleTier = properties.getTiers().getFirst();
-        List<String> collectedPuuids = collectPlayers();
-        collectMatches(collectedPuuids, sampleTier);
-        if (properties.isRecoverMissingTimelines()) {
-            // 호출 예산을 별도로 확보한 경우에만 누락 Timeline을 자동 보완한다.
-            collectMissingTimelines();
+        String sampleTier = properties.getTiers().get(nextTierIndex);
+        log.info("Riot 데이터 수집 대상 티어: tier={}", sampleTier);
+
+        try {
+            List<String> collectedPuuids = collectPlayers(sampleTier);
+            collectMatches(collectedPuuids, sampleTier);
+
+            if (properties.isRecoverMissingTimelines()) {
+                collectMissingTimelines();
+            }
+        } finally {
+            moveToNextTier();
         }
     }
 
-    private List<String> collectPlayers() {
-        String tier = properties.getTiers().getFirst();
+    private List<String> collectPlayers(String tier) {
         if (APEX_TIERS.contains(tier)) {
             return collectApexPlayers(tier);
         }
-
-        boolean completed = true;
-        LinkedHashSet<String> collectedPuuids = new LinkedHashSet<>();
-        String division = currentDivision();
-        int pageEnd = nextLeaguePage + properties.getLeaguePageCount();
-        for (int page = nextLeaguePage; page < pageEnd; page++) {
-            try {
-                RiotPlayerSyncService.SyncResult syncResult = playerSyncService.syncLeagueEntries(
-                        QUEUE_TYPE, tier, division, page
-                );
-                collectedPuuids.addAll(syncResult.puuids());
-            } catch (RuntimeException ignored) {
-                completed = false;
-            }
-        }
-        currentLeagueRangeHasPlayers |= !collectedPuuids.isEmpty();
-        if (completed) {
-            moveToNextLeagueRange();
-        }
-        return List.copyOf(collectedPuuids);
+        return collectLeaguePlayers(tier);
     }
 
     private List<String> collectApexPlayers(String tier) {
         RiotPlayerSyncService.SyncResult syncResult;
         try {
-            // 최상위 리그 API에는 division과 page가 없으며 서비스가 이 두 인자를 사용하지 않는다.
-            syncResult = playerSyncService.syncLeagueEntries(QUEUE_TYPE, tier, "I", 1);
+            syncResult = playerSyncService.syncApexLeague(QUEUE_TYPE, tier);
         } catch (RuntimeException ignored) {
             return List.of();
         }
@@ -124,36 +112,91 @@ public class RiotCollectionOrchestrator {
                 .distinct()
                 .sorted()
                 .toList();
+        return selectNextApexPlayers(tier, puuids);
+    }
+
+    private List<String> selectNextApexPlayers(String tier, List<String> puuids) {
         if (puuids.isEmpty()) {
-            nextApexPlayerIndex = 0;
+            nextApexPlayerIndexes.put(tier, 0);
             return List.of();
         }
-
-        int start = Math.floorMod(nextApexPlayerIndex, puuids.size());
+        int nextPlayerIndex = nextApexPlayerIndexes.getOrDefault(tier, 0);
+        int start = Math.floorMod(nextPlayerIndex, puuids.size());
         int count = Math.min(properties.getPlayerLimit(), puuids.size());
         List<String> selected = IntStream.range(0, count)
                 .mapToObj(offset -> puuids.get((start + offset) % puuids.size()))
                 .toList();
-        nextApexPlayerIndex = (start + count) % puuids.size();
+        nextApexPlayerIndexes.put(tier, (start + count) % puuids.size());
         return selected;
     }
 
-    private void moveToNextLeagueRange() {
-        nextDivisionIndex++;
-        if (nextDivisionIndex >= progressiveDivisions().size()) {
-            nextDivisionIndex = 0;
-            if (currentLeagueRangeHasPlayers) {
-                nextLeaguePage += properties.getLeaguePageCount();
-            } else {
-                nextLeaguePage = 1;
-            }
-            currentLeagueRangeHasPlayers = false;
+    private List<String> collectLeaguePlayers(String tier) {
+        Set<String> collectedPuuids = new LinkedHashSet<>();
+        boolean allPagesCollected = collectLeaguePages(tier, collectedPuuids);
+
+        recordLeaguePlayersFound(tier, collectedPuuids);
+        if (allPagesCollected) {
+            moveToNextLeagueRange(tier);
+        }
+        return List.copyOf(collectedPuuids);
+    }
+
+    private boolean collectLeaguePages(String tier, Set<String> collectedPuuids) {
+        boolean allPagesCollected = true;
+        String division = currentDivision(tier);
+        int nextLeaguePage = nextLeaguePages.getOrDefault(tier, 1);
+        int pageEnd = nextLeaguePage + properties.getLeaguePageCount();
+        for (int page = nextLeaguePage; page < pageEnd; page++) {
+            boolean pageCollected = collectLeaguePage(tier, division, page, collectedPuuids);
+            allPagesCollected = allPagesCollected && pageCollected;
+        }
+        return allPagesCollected;
+    }
+
+    private boolean collectLeaguePage(String tier, String division, int page, Set<String> collectedPuuids) {
+        try {
+            RiotPlayerSyncService.SyncResult result = playerSyncService.syncLeagueEntries(QUEUE_TYPE, tier, division,
+                    page);
+            collectedPuuids.addAll(result.puuids());
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
         }
     }
 
-    private String currentDivision() {
+    private void recordLeaguePlayersFound(String tier, Set<String> collectedPuuids) {
+        if (collectedPuuids.isEmpty()) {
+            return;
+        }
+        leagueRangeHasPlayersByTier.put(tier, true);
+    }
+
+    private void moveToNextLeagueRange(String tier) {
+        int nextDivisionIndex = nextDivisionIndexes.getOrDefault(tier, 0) + 1;
+        if (nextDivisionIndex >= progressiveDivisions().size()) {
+            nextDivisionIndex = 0;
+            moveToNextLeaguePage(tier);
+        }
+        nextDivisionIndexes.put(tier, nextDivisionIndex);
+    }
+
+    private void moveToNextLeaguePage(String tier) {
+        boolean hasPlayers = leagueRangeHasPlayersByTier.getOrDefault(tier, false);
+        leagueRangeHasPlayersByTier.put(tier, false);
+
+        if (!hasPlayers) {
+            nextLeaguePages.put(tier, 1);
+            return;
+        }
+
+        int nextLeaguePage = nextLeaguePages.getOrDefault(tier, 1);
+        nextLeaguePages.put(tier, nextLeaguePage + properties.getLeaguePageCount());
+    }
+
+    private String currentDivision(String tier) {
         List<String> divisions = progressiveDivisions();
-        return divisions.get(Math.min(nextDivisionIndex, divisions.size() - 1));
+        int divisionIndex = nextDivisionIndexes.getOrDefault(tier, 0);
+        return divisions.get(Math.min(divisionIndex, divisions.size() - 1));
     }
 
     private List<String> progressiveDivisions() {
@@ -168,28 +211,24 @@ public class RiotCollectionOrchestrator {
         return DIVISION_ORDER.subList(startIndex, DIVISION_ORDER.size());
     }
 
+    private void moveToNextTier() {
+        nextTierIndex = (nextTierIndex + 1) % properties.getTiers().size();
+    }
+
     private void collectMatches(List<String> puuids, String sampleTier) {
-        Set<String> processedMatchIds = new LinkedHashSet<>();
-        int playerCount = properties.getPlayerPageSize();
+        Set<String> attemptedMatchIds = new LinkedHashSet<>();
         List<String> limitedPuuids = puuids.stream()
                 .limit(properties.getPlayerLimit())
                 .toList();
-        for (int fromIndex = 0; fromIndex < limitedPuuids.size(); fromIndex += playerCount) {
-            List<String> targets = limitedPuuids.subList(
-                    fromIndex,
-                    Math.min(fromIndex + playerCount, limitedPuuids.size())
-            );
-            for (String puuid : targets) {
-                collectPlayerMatches(puuid, sampleTier, processedMatchIds);
-            }
+        for (String puuid : limitedPuuids) {
+            collectPlayerMatches(puuid, sampleTier, attemptedMatchIds);
         }
     }
 
     /**
-     * 한 플레이어의 매치 ID를 조회하고, 각 매치를 원본 수집부터 통계 집계까지 처리한다.
-     * 매치 ID 조회가 실패해도 다른 플레이어의 수집은 계속한다.
+     * 한 플레이어의 매치 ID를 조회하고, 각 매치를 원본 수집부터 통계 집계까지 처리한다. 매치 ID 조회가 실패해도 다른 플레이어의 수집은 계속한다.
      */
-    private void collectPlayerMatches(String puuid, String sampleTier, Set<String> processedMatchIds) {
+    private void collectPlayerMatches(String puuid, String sampleTier, Set<String> attemptedMatchIds) {
         List<String> matchIds;
         try {
             matchIds = matchSyncService.findMatchIds(
@@ -197,27 +236,28 @@ public class RiotCollectionOrchestrator {
                     0,
                     properties.getMatchCount()
             );
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            log.warn("플레이어 매치 ID 조회 실패, 해당 플레이어의 매치 수집 생략: puuid={}", puuid, exception);
             return;
         }
 
         for (String matchId : matchIds) {
             // 여러 플레이어가 같은 매치를 조회할 수 있으므로 한 스케줄 실행 안에서는 한 번만 처리한다.
-            if (processedMatchIds.add(matchId)) {
+            if (attemptedMatchIds.add(matchId)) {
                 processMatch(matchId, sampleTier);
             }
         }
     }
 
     /**
-     * 한 매치를 Raw Match → Timeline → 정규화 → 통계 순서로 처리한다.
-     * 원본 수집에 실패한 매치는 정규화하지 않고 다음 실행의 복구 대상으로 남긴다.
+     * 한 매치를 Raw Match → Timeline → 정규화 → 통계 순서로 처리한다. 원본 수집에 실패한 매치는 정규화하지 않고 다음 실행의 복구 대상으로 남긴다.
      */
     private void processMatch(String matchId, String sampleTier) {
         boolean collected;
         try {
             collected = matchSyncService.syncMatch(matchId);
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            log.warn("매치 원본 수집 실패, 해당 매치의 후속 처리 생략: matchId={}", matchId, exception);
             return;
         }
 
@@ -245,8 +285,7 @@ public class RiotCollectionOrchestrator {
     }
 
     /**
-     * 저장된 Raw Match와 Raw Timeline 중 아직 처리하지 않은 매치를 정규화하고 바로 통계를 집계한다.
-     * 관리자 API에서도 스케줄러와 같은 정상 처리 흐름을 재사용할 수 있도록 공개한다.
+     * 저장된 Raw Match와 Raw Timeline 중 아직 처리하지 않은 매치를 정규화하고 바로 통계를 집계한다. 관리자 API에서도 스케줄러와 같은 정상 처리 흐름을 재사용할 수 있도록 공개한다.
      *
      * @throws IllegalStateException 한 건이라도 정규화하거나 집계하지 못한 경우
      */
@@ -426,34 +465,51 @@ public class RiotCollectionOrchestrator {
     }
 
     private void validateProperties() {
-        if (properties.getTiers().isEmpty()) {
-            throw new IllegalArgumentException("collection scheduler tiers must not be empty");
-        }
-        if (properties.getTiers().size() != 1) {
-            throw new IllegalArgumentException("tier sample collection requires exactly one scheduler tier");
-        }
-        if (!SUPPORTED_TIERS.contains(properties.getTiers().getFirst())) {
-            throw new IllegalArgumentException("collection scheduler tier is not supported");
-        }
-        if (!APEX_TIERS.contains(properties.getTiers().getFirst())) {
-            if (properties.getDivisions().isEmpty()) {
-                throw new IllegalArgumentException("collection scheduler divisions must not be empty");
-            }
-            if (properties.getDivisions().stream().anyMatch(division -> !DIVISION_ORDER.contains(division))) {
-                throw new IllegalArgumentException("collection scheduler divisions must be one of IV, III, II, I");
-            }
-            if (properties.getLeaguePageCount() < 1) {
-                throw new IllegalArgumentException("collection scheduler league page count must be positive");
-            }
-        }
+        validateTiers();
+        validateLeagueSettings();
+        validateCollectionLimits();
+    }
+
+    private void validateCollectionLimits() {
         if (properties.getPlayerPageSize() < 1 || properties.getPlayerPageSize() > 100) {
-            throw new IllegalArgumentException("collection scheduler player page size must be between 1 and 100");
+            throw new IllegalArgumentException("플레이어 처리 페이지 크기는 1 이상 100 이하여야 합니다.");
         }
         if (properties.getPlayerLimit() < 1 || properties.getPlayerLimit() > 100) {
-            throw new IllegalArgumentException("collection scheduler player limit must be between 1 and 100");
+            throw new IllegalArgumentException("한 번에 수집할 플레이어 수는 1 이상 100 이하여야 합니다.");
         }
         if (properties.getMatchCount() < 1 || properties.getMatchCount() > 100) {
-            throw new IllegalArgumentException("collection scheduler match count must be between 1 and 100");
+            throw new IllegalArgumentException("플레이어당 조회할 매치 수는 1 이상 100 이하여야 합니다.");
+        }
+    }
+
+    private void validateLeagueSettings() {
+        boolean onlyApexTiers = properties.getTiers().stream()
+                .allMatch(APEX_TIERS::contains);
+        if (onlyApexTiers) {
+            return;
+        }
+        List<String> divisions = properties.getDivisions();
+
+        if (divisions.isEmpty()) {
+            throw new IllegalArgumentException("수집 대상 디비전은 하나 이상 설정해야 합니다.");
+        }
+        if (!DIVISION_ORDER.containsAll(divisions)) {
+            throw new IllegalArgumentException("수집 대상 디비전은 IV, III, II, I 중에서 설정해야 합니다.");
+        }
+        if (properties.getLeaguePageCount() < 1) {
+            throw new IllegalArgumentException("한 번에 조회할 리그 페이지 수는 1 이상이어야 합니다.");
+        }
+
+    }
+
+    private void validateTiers() {
+        List<String> tiers = properties.getTiers();
+
+        if (tiers.isEmpty()) {
+            throw new IllegalArgumentException("수집 대상 티어는 하나 이상 설정해야 합니다.");
+        }
+        if (!SUPPORTED_TIERS.containsAll(tiers)) {
+            throw new IllegalArgumentException("수집 대상에 지원하지 않는 티어가 포함되어 있습니다.");
         }
     }
 

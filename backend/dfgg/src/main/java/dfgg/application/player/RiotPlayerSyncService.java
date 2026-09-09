@@ -42,13 +42,23 @@ public class RiotPlayerSyncService {
             String division,
             int page
     ) {
-        List<LeagueEntryResponse> entries = switch (tier) {
-            case MASTER_TIER -> enrichLeagueEntries(riotClient.getMasterLeague(queue));
-            case GRANDMASTER_TIER -> enrichLeagueEntries(riotClient.getGrandmasterLeague(queue));
-            case CHALLENGER_TIER -> enrichLeagueEntries(riotClient.getChallengerLeague(queue));
-            default -> riotClient.getLeagueEntries(queue, tier, division, page);
+        return switch (tier) {
+            case MASTER_TIER, GRANDMASTER_TIER, CHALLENGER_TIER -> syncApexLeague(queue, tier);
+            default -> syncPlayers(riotClient.getLeagueEntries(queue, tier, division, page));
         };
+    }
 
+    public SyncResult syncApexLeague(String queue, String tier) {
+        LeagueListResponse league = switch (tier) {
+            case MASTER_TIER -> riotClient.getMasterLeague(queue);
+            case GRANDMASTER_TIER -> riotClient.getGrandmasterLeague(queue);
+            case CHALLENGER_TIER -> riotClient.getChallengerLeague(queue);
+            default -> throw new IllegalArgumentException("unsupported apex tier: " + tier);
+        };
+        return syncPlayers(enrichLeagueEntries(league));
+    }
+
+    private SyncResult syncPlayers(List<LeagueEntryResponse> entries) {
         Instant collectedAt = Instant.now();
         int newPlayers = entries.stream()
                 .mapToInt(entry -> savePlayer(

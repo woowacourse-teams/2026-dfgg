@@ -48,6 +48,8 @@ class RiotCollectionOrchestratorTest {
         when(playerSyncService.syncLeagueEntries(
                 anyString(), anyString(), anyString(), anyInt()
         )).thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of()));
+        when(playerSyncService.syncApexLeague(anyString(), anyString()))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of()));
         when(matchSyncService.findMatchIds(anyString(), anyInt(), anyInt()))
                 .thenReturn(List.of());
 
@@ -134,7 +136,7 @@ class RiotCollectionOrchestratorTest {
         properties.setDivisions(List.of());
         properties.setLeaguePageCount(0);
         properties.setPlayerLimit(2);
-        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "MASTER", "I", 1))
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "MASTER"))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(
                         3,
                         List.of("puuid-c", "puuid-a", "puuid-b")
@@ -142,7 +144,7 @@ class RiotCollectionOrchestratorTest {
 
         orchestrator.runOnce();
 
-        verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "MASTER", "I", 1);
+        verify(playerSyncService).syncApexLeague("RANKED_SOLO_5x5", "MASTER");
         verify(matchSyncService).findMatchIds("puuid-a", 0, 20);
         verify(matchSyncService).findMatchIds("puuid-b", 0, 20);
         verify(matchSyncService, never()).findMatchIds("puuid-c", 0, 20);
@@ -152,7 +154,7 @@ class RiotCollectionOrchestratorTest {
     void Master_리그_플레이어를_실행마다_순환한다() {
         properties.setTiers(List.of("MASTER"));
         properties.setPlayerLimit(2);
-        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "MASTER", "I", 1))
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "MASTER"))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(
                         3,
                         List.of("puuid-c", "puuid-a", "puuid-b")
@@ -170,7 +172,7 @@ class RiotCollectionOrchestratorTest {
     void Master_매치를_Master_표본으로_정규화하고_집계한다() {
         properties.setTiers(List.of("MASTER"));
         properties.setPlayerLimit(1);
-        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "MASTER", "I", 1))
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "MASTER"))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("master-puuid")));
         when(matchSyncService.findMatchIds("master-puuid", 0, 20))
                 .thenReturn(List.of("KR_MASTER"));
@@ -192,7 +194,7 @@ class RiotCollectionOrchestratorTest {
         properties.setDivisions(List.of());
         properties.setLeaguePageCount(0);
         properties.setPlayerLimit(1);
-        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "GRANDMASTER", "I", 1))
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "GRANDMASTER"))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("grandmaster-puuid")));
         when(matchSyncService.findMatchIds("grandmaster-puuid", 0, 20))
                 .thenReturn(List.of("KR_GRANDMASTER"));
@@ -203,7 +205,7 @@ class RiotCollectionOrchestratorTest {
 
         orchestrator.runOnce();
 
-        verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "GRANDMASTER", "I", 1);
+        verify(playerSyncService).syncApexLeague("RANKED_SOLO_5x5", "GRANDMASTER");
         verify(matchNormalizationService).normalizeAsTierSample("KR_GRANDMASTER", "GRANDMASTER");
         verify(matchNormalizationService).save(normalized);
         verify(statsMatchService).registerMatchStats(normalized, "GRANDMASTER");
@@ -215,7 +217,7 @@ class RiotCollectionOrchestratorTest {
         properties.setDivisions(List.of());
         properties.setLeaguePageCount(0);
         properties.setPlayerLimit(1);
-        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "CHALLENGER", "I", 1))
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "CHALLENGER"))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("challenger-puuid")));
         when(matchSyncService.findMatchIds("challenger-puuid", 0, 20))
                 .thenReturn(List.of("KR_CHALLENGER"));
@@ -226,7 +228,7 @@ class RiotCollectionOrchestratorTest {
 
         orchestrator.runOnce();
 
-        verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "CHALLENGER", "I", 1);
+        verify(playerSyncService).syncApexLeague("RANKED_SOLO_5x5", "CHALLENGER");
         verify(matchNormalizationService).normalizeAsTierSample("KR_CHALLENGER", "CHALLENGER");
         verify(matchNormalizationService).save(normalized);
         verify(statsMatchService).registerMatchStats(normalized, "CHALLENGER");
@@ -489,6 +491,126 @@ class RiotCollectionOrchestratorTest {
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "IV", 1);
         verify(playerSyncService, never())
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "IV", 2);
+    }
+
+    @Test
+    void 설정된_티어_순서대로_수집하고_첫_티어로_돌아온다() {
+        properties.setTiers(List.of("EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"));
+        properties.setDivisions(List.of("IV"));
+        properties.setRecoverMissingTimelines(false);
+
+        for (int execution = 0; execution < 6; execution++) {
+            orchestrator.runOnce();
+        }
+
+        InOrder order = inOrder(playerSyncService);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
+        order.verify(playerSyncService)
+                .syncApexLeague("RANKED_SOLO_5x5", "MASTER");
+        order.verify(playerSyncService)
+                .syncApexLeague("RANKED_SOLO_5x5", "GRANDMASTER");
+        order.verify(playerSyncService)
+                .syncApexLeague("RANKED_SOLO_5x5", "CHALLENGER");
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "III", 1);
+
+        order.verifyNoMoreInteractions();
+    }
+
+    @Test
+    void 티어_수집이_실패해도_다음_티어로_이동하고_실패한_위치를_유지한다() {
+        // given
+        properties.setTiers(List.of("EMERALD", "DIAMOND"));
+        properties.setDivisions(List.of("IV"));
+        properties.setRecoverMissingTimelines(false);
+
+        // when
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1))
+                .thenThrow(new IllegalStateException("리그 조회 실패"))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of()));
+
+        for (int execution = 0; execution < 3; execution++) {
+            orchestrator.runOnce();
+        }
+
+        InOrder order = inOrder(playerSyncService);
+
+        // then
+        order.verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1);
+        order.verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
+        order.verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1);
+        order.verifyNoMoreInteractions();
+    }
+
+    @Test
+    void 상위_티어별_플레이어_수집_위치를_독립적으로_유지한다() {
+        // given
+        properties.setTiers(List.of("MASTER", "GRANDMASTER"));
+        properties.setPlayerLimit(1);
+        properties.setRecoverMissingTimelines(false);
+
+        // when
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "MASTER")).thenReturn(new RiotPlayerSyncService.SyncResult(
+                2, List.of("master-a", "master-b")
+        ));
+
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "GRANDMASTER")).thenReturn(new RiotPlayerSyncService.SyncResult(
+                2, List.of("grandmaster-a", "grandmaster-b")
+        ));
+
+        for (int execution = 0; execution < 4; execution++) {
+            orchestrator.runOnce();
+        }
+
+        // then
+        InOrder order = inOrder(matchSyncService);
+
+        order.verify(matchSyncService).findMatchIds("master-a", 0, 20);
+        order.verify(matchSyncService).findMatchIds("grandmaster-a", 0, 20);
+        order.verify(matchSyncService).findMatchIds("master-b", 0, 20);
+        order.verify(matchSyncService).findMatchIds("grandmaster-b", 0, 20);
+
+        order.verifyNoMoreInteractions();
+    }
+
+    @Test
+    void 일반_티어별_페이지와_플레이어_발견_여부를_독립적으로_유지한다() {
+        // given
+        properties.setTiers(List.of("EMERALD", "DIAMOND"));
+        properties.setDivisions(List.of("IV", "III"));
+        properties.setRecoverMissingTimelines(false);
+
+        // when
+        when(playerSyncService.syncLeagueEntries(
+                "RANKED_SOLO_5x5", "EMERALD", "IV", 1
+        )).thenReturn(new RiotPlayerSyncService.SyncResult(
+                1, List.of("emerald-player")
+        ));
+
+        for (int execution = 0; execution < 6; execution++) {
+            orchestrator.runOnce();
+        }
+
+        // then
+        InOrder order = inOrder(playerSyncService);
+
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "III", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "III", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 2);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
+
+        order.verifyNoMoreInteractions();
     }
 
     private NormalizedMatch normalizedMatch(String matchId) {

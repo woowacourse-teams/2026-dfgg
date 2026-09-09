@@ -129,8 +129,8 @@ class RiotPlayerSyncServiceTest {
                 ));
         when(playerRepository.findById("grandmaster-puuid")).thenReturn(Optional.empty());
 
-        RiotPlayerSyncService.SyncResult result = riotPlayerSyncService.syncLeagueEntries(
-                "RANKED_SOLO_5x5", "GRANDMASTER", "IV", 7
+        RiotPlayerSyncService.SyncResult result = riotPlayerSyncService.syncApexLeague(
+                "RANKED_SOLO_5x5", "GRANDMASTER"
         );
 
         ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
@@ -164,8 +164,8 @@ class RiotPlayerSyncServiceTest {
                 ));
         when(playerRepository.findById("challenger-puuid")).thenReturn(Optional.empty());
 
-        RiotPlayerSyncService.SyncResult result = riotPlayerSyncService.syncLeagueEntries(
-                "RANKED_SOLO_5x5", "CHALLENGER", "IV", 7
+        RiotPlayerSyncService.SyncResult result = riotPlayerSyncService.syncApexLeague(
+                "RANKED_SOLO_5x5", "CHALLENGER"
         );
 
         ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
