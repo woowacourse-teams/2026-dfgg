@@ -28,3 +28,5 @@ INSERT INTO normalized_match_participants (
 
     ('M3', '16.17', 420, 'm3-a', 1, 157, 100, 'TOP',     true,  '6673',      '6673',      true),
     ('M3', '16.17', 420, 'm3-b', 2,  33, 200, 'MIDDLE',  false, '3068',      '3068',      true);
+
+UPDATE normalized_match_participants SET tier = 'EMERALD' WHERE tier IS NULL;

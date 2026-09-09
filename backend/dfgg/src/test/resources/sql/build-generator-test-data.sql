@@ -59,3 +59,5 @@ INSERT INTO normalized_match_participants (
 SELECT 'SURGE-' || g, '16.17', 420, 'surge-' || g, 1, 157, 100, 'MIDDLE', g % 2 = 0,
        '3153', '3153', true
 FROM generate_series(1, 10) g;
+
+UPDATE normalized_match_participants SET tier = 'EMERALD' WHERE tier IS NULL;
