@@ -37,7 +37,7 @@ public final class CounterEvidence {
     /**
      * lift 1.0은 "평소와 같다"는 뜻이다. 이유가 되려면 넘어야 한다.
      */
-    private static final double NEUTRAL_LIFT = 1.0;
+    private static final double MINIMUM_LIFT = 1.2;
 
     private CounterEvidence() {
     }
@@ -46,7 +46,7 @@ public final class CounterEvidence {
         return candidate.evidenceOf(CandidateSource.COUNTER)
                 .map(SourceEvidence::scoreByChampionId)
                 .map(liftByEnemy -> ChampionEvidence.topChampionIds(
-                        liftByEnemy, NEUTRAL_LIFT, MAXIMUM_ENEMIES))
+                        liftByEnemy, MINIMUM_LIFT, MAXIMUM_ENEMIES))
                 .orElse(List.of());
     }
 

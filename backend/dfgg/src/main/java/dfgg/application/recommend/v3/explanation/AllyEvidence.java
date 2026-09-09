@@ -24,8 +24,10 @@ public final class AllyEvidence {
     /** 넷을 다 늘어놓으면 "누구 때문인가"가 흐려진다. */
     private static final int MAXIMUM_ALLIES = 2;
 
-    /** 이 아군과 함께일 때 평소만큼 산다면 이유가 아니다. */
-    private static final double NEUTRAL_LIFT = 1.0;
+    /**
+     * 이 아군과 함께일 때 뚜렷이 더 사야 이유가 된다.
+     */
+    private static final double MINIMUM_LIFT = 1.2;
 
     private AllyEvidence() {
     }
@@ -34,7 +36,7 @@ public final class AllyEvidence {
         return candidate.evidenceOf(CandidateSource.ALLY_SYNERGY)
                 .map(SourceEvidence::scoreByChampionId)
                 .map(liftByAlly -> ChampionEvidence.topChampionIds(
-                        liftByAlly, NEUTRAL_LIFT, MAXIMUM_ALLIES))
+                        liftByAlly, MINIMUM_LIFT, MAXIMUM_ALLIES))
                 .orElse(List.of());
     }
 

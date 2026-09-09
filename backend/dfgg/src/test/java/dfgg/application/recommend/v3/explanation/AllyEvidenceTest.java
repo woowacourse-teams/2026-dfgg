@@ -36,16 +36,16 @@ class AllyEvidenceTest {
     }
 
     @Test
-    @DisplayName("lift가 1을 넘는 아군을 지목한다")
+    @DisplayName("lift가 문턱을 넘는 아군을 지목한다")
     void championIdsFor_WhenAllySynergyDroveTheScore_NamesAllies() {
         assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(Map.of(JINX, 2.4))))
                 .containsExactly(JINX);
     }
 
     @Test
-    @DisplayName("lift가 1 이하인 아군은 뺀다 — 평소보다 더 사는 게 아니면 이유가 아니다")
+    @DisplayName("문턱 이하인 아군은 뺀다 — 평소보다 뚜렷이 더 사는 게 아니면 이유가 아니다")
     void championIdsFor_WhenLiftIsNotAboveNeutral_DropsThatAlly() {
-        Map<Long, Double> lifts = Map.of(JINX, 2.4, KOGMAW, 1.0);
+        Map<Long, Double> lifts = Map.of(JINX, 2.4, KOGMAW, 1.15);
 
         assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts)))
                 .containsExactly(JINX);
@@ -54,8 +54,8 @@ class AllyEvidenceTest {
     @Test
     @DisplayName("최상위와 차이가 커도 lift가 1을 넘으면 함께 지목한다 — 상대 기준이 아니다")
     void championIdsFor_WhenFarBelowTopButStillAboveNeutral_KeepsIt() {
-        // 옛 상대 문턱(최상위의 절반)이었다면 1.1은 5.0의 절반에 못 미쳐 빠졌다.
-        Map<Long, Double> lifts = Map.of(JINX, 5.0, KOGMAW, 1.1);
+        // 옛 상대 문턱(최상위의 절반)이었다면 1.3은 5.0의 절반에 못 미쳐 빠졌다.
+        Map<Long, Double> lifts = Map.of(JINX, 5.0, KOGMAW, 1.3);
 
         assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts)))
                 .containsExactly(JINX, KOGMAW);
@@ -66,14 +66,14 @@ class AllyEvidenceTest {
     void championIdsFor_WhenEveryLiftIsNeutral_NamesNobody() {
         // 무한의 대검처럼 원딜이면 다 사는 아이템이 이렇게 나온다.
         // 상대 문턱이었다면 최상위의 절반을 넘는 아군이 전부 통과했다.
-        Map<Long, Double> lifts = Map.of(JINX, 1.0, KOGMAW, 0.98, ORNN, 0.95);
+        Map<Long, Double> lifts = Map.of(JINX, 1.1, KOGMAW, 0.98, ORNN, 0.95);
 
         assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts)))
                 .isEmpty();
     }
 
     @Test
-    @DisplayName("아군이 하나뿐이어도 lift가 1을 넘으면 지목한다")
+    @DisplayName("아군이 하나뿐이어도 문턱을 넘으면 지목한다")
     void championIdsFor_WhenOnlyOneAllyAboveNeutral_NamesThatAlly() {
         assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(Map.of(KOGMAW, 1.6))))
                 .containsExactly(KOGMAW);
@@ -109,5 +109,13 @@ class AllyEvidenceTest {
     void championIdsFor_WhenEveryLiftIsZero_IsEmpty() {
         assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(Map.of(JINX, 0.0, KOGMAW, 0.0))))
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("평소와 별 차이 없는 아군은 빼둔다 — 실사례의 리 신 1.09가 그것이다")
+    void championIdsFor_WhenLiftIsBarelyAboveNeutral_DropsThatAlly() {
+        Map<Long, Double> lifts = Map.of(JINX, 1.12, KOGMAW, 1.09);
+
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts))).isEmpty();
     }
 }

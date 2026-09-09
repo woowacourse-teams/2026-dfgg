@@ -31,7 +31,7 @@ class CounterEvidenceTest {
     }
 
     @Test
-    @DisplayName("lift가 1을 넘는 적을 지목한다")
+    @DisplayName("lift가 문턱을 넘는 적을 지목한다")
     void championIdsFor_WhenCounterDroveTheScore_NamesEnemies() {
 
         assertThat(CounterEvidence.championIdsFor(candidateWithLifts(Map.of(RAMMUS, 1.7))))
@@ -41,7 +41,7 @@ class CounterEvidenceTest {
     @Test
     @DisplayName("두 명까지만 지목한다 — 다섯을 늘어놓으면 누구 때문인지 흐려진다")
     void championIdsFor_CapsAtTwoEnemies() {
-        Map<Long, Double> threeEnemies = Map.of(RAMMUS, 1.9, AHRI, 2.4, JINX, 1.2);
+        Map<Long, Double> threeEnemies = Map.of(RAMMUS, 1.9, AHRI, 2.4, JINX, 1.3);
 
         assertThat(CounterEvidence.championIdsFor(candidateWithLifts(threeEnemies)))
                 .containsExactly(AHRI, RAMMUS);
@@ -69,5 +69,26 @@ class CounterEvidenceTest {
         // 백오프하면 적별 lift가 비어 있다. 적 덕이 아닌데 그렇게 말하면 거짓말이다.
         assertThat(CounterEvidence.championIdsFor(candidateWithLifts(Map.of())))
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("평소와 별 차이 없는 적은 빼둔다 — lift 1.09 같은 것은 근거가 아니다")
+    void championIdsFor_WhenLiftIsBarelyAboveNeutral_DropsThatEnemy() {
+        // topK를 5 → 10으로 넓히자 9~10위권의 약한 근거가 들어왔다. 실사례에서 애쉬의
+        // 필멸자의 운명에 lift 1.09인 아군이 붙었는데, 3% 차이를 이유라 부를 수는 없다.
+        Map<Long, Double> lifts = Map.of(RAMMUS, 1.09, AHRI, 1.15);
+
+        assertThat(CounterEvidence.championIdsFor(candidateWithLifts(lifts))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("치유 감소가 필요한 조합은 살아남는다 — 문턱을 더 올리면 잃는 사례")
+    void championIdsFor_WhenHealHeavyEnemies_KeepsThem() {
+        // 실측: 애쉬 + 문도·마오카이·사일러스 → 필멸자의 운명.
+        // 문도 1.36 / 사일러스 1.25는 남고, 회복이 약한 마오카이 0.87은 빠진다.
+        Map<Long, Double> lifts = Map.of(RAMMUS, 1.36, AHRI, 1.25, JINX, 0.87);
+
+        assertThat(CounterEvidence.championIdsFor(candidateWithLifts(lifts)))
+                .containsExactly(RAMMUS, AHRI);
     }
 }
