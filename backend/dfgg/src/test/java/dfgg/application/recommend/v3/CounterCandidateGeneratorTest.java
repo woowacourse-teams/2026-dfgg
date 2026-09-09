@@ -48,6 +48,9 @@ class CounterCandidateGeneratorTest {
     @Autowired
     private ChampionItemRollupRepository championItemRollupRepository;
 
+    /** 이 테스트는 하한 도입 이전의 동작을 고정한다. 하한 자체는 별도 테스트에서 다룬다. */
+    private static final double NO_BASE_RATE_FLOOR = 0.0;
+
     private CounterCandidateGenerator generator;
 
     @BeforeEach
@@ -55,7 +58,7 @@ class CounterCandidateGeneratorTest {
         aggregationService.aggregate(1);
         generator = new CounterCandidateGenerator(
                 pairRepository, championItemStatsRepository, championItemRollupRepository,
-                new CounterLiftCalculator(1.0, 159), new WilsonScoreCalculator(), 5
+                new CounterLiftCalculator(1.0, 159), new WilsonScoreCalculator(), 5, NO_BASE_RATE_FLOOR
         );
     }
 

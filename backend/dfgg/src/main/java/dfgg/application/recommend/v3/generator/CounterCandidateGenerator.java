@@ -42,6 +42,7 @@ public class CounterCandidateGenerator implements CandidateGenerator {
     private final CounterLiftCalculator counterLiftCalculator;
     private final WilsonScoreCalculator wilsonScoreCalculator;
     private final int minimumPairGames;
+    private final double minimumBaseRate;
 
     public CounterCandidateGenerator(
             ChampionPairItemStatsRepository pairRepository,
@@ -49,7 +50,8 @@ public class CounterCandidateGenerator implements CandidateGenerator {
             ChampionItemRollupRepository championItemRollupRepository,
             CounterLiftCalculator counterLiftCalculator,
             WilsonScoreCalculator wilsonScoreCalculator,
-            @Value("${recommendation.pair-synergy.minimum-pair-games}") int minimumPairGames
+            @Value("${recommendation.pair-synergy.minimum-pair-games}") int minimumPairGames,
+            @Value("${recommendation.counter.minimum-base-rate:0.0}") double minimumBaseRate
     ) {
         this.pairRepository = pairRepository;
         this.championItemStatsRepository = championItemStatsRepository;
@@ -57,6 +59,7 @@ public class CounterCandidateGenerator implements CandidateGenerator {
         this.counterLiftCalculator = counterLiftCalculator;
         this.wilsonScoreCalculator = wilsonScoreCalculator;
         this.minimumPairGames = minimumPairGames;
+        this.minimumBaseRate = minimumBaseRate;
     }
 
     @Override
@@ -73,7 +76,8 @@ public class CounterCandidateGenerator implements CandidateGenerator {
         Map<Long, Map<Long, Double>> liftByItemAndEnemy = new HashMap<>();
         for (ChampionPairItemStats stats : enemyStats(query)) {
             if (stats.getPairGameCountAll() < minimumPairGames
-                    || query.purchasedItemIds().contains(stats.getItemId())) {
+                    || query.purchasedItemIds().contains(stats.getItemId())
+                    || belowBaseRateFloor(baseCountByItem, baseGameCount, stats.getItemId())) {
                 continue;
             }
             CounterLift lift = counterLiftCalculator.calculate(
@@ -99,6 +103,26 @@ public class CounterCandidateGenerator implements CandidateGenerator {
                 .limit(topK)
                 .toList();
         return GeneratorResult.of(source(), ranked, PairBackoffLevel.TRIPLE.ordinal());
+    }
+
+    /**
+     * 내 챔피언이 애초에 거의 사지 않는 아이템을 후보에서 뺀다.
+     * <p>
+     * lift는 {@code P(item|나,적) / P(item|나)}라 분모가 바닥이면 분자가 조금만 커도 값이 폭발한다.
+     * 실측에서 lift 37배 구간의 정답률이 0.00%였고, 한 판짜리 우연이 상위를 점령해
+     * 진짜 근거를 topK 밖으로 밀어냈다. {@code minimumPairGames}가 분자에 두는 표본 하한을
+     * 분모에도 두는 셈이다.
+     * <p>
+     * 아이템 타입으로 막는 것이 아니므로 비정형 빌드라도 그 챔피언이 실제로 사는 것이면 남는다.
+     * 다만 문턱을 올릴수록 드문 정답을 지우므로 recall과 함께 봐야 한다.
+     * 기본값 0.0은 아무것도 거르지 않는다.
+     */
+    private boolean belowBaseRateFloor(
+            Map<Long, Integer> baseCountByItem, int baseGameCount, Long itemId) {
+        if (minimumBaseRate <= 0.0 || baseGameCount == 0) {
+            return false;
+        }
+        return (double) baseCountByItem.getOrDefault(itemId, 0) / baseGameCount < minimumBaseRate;
     }
 
     /**
