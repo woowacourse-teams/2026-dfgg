@@ -51,7 +51,7 @@ public class CounterCandidateGenerator implements CandidateGenerator {
             CounterLiftCalculator counterLiftCalculator,
             WilsonScoreCalculator wilsonScoreCalculator,
             @Value("${recommendation.pair-synergy.minimum-pair-games}") int minimumPairGames,
-            @Value("${recommendation.counter.minimum-base-rate:0.0}") double minimumBaseRate
+            @Value("${recommendation.counter.minimum-base-rate}") double minimumBaseRate
     ) {
         this.pairRepository = pairRepository;
         this.championItemStatsRepository = championItemStatsRepository;
@@ -115,7 +115,8 @@ public class CounterCandidateGenerator implements CandidateGenerator {
      * <p>
      * 아이템 타입으로 막는 것이 아니므로 비정형 빌드라도 그 챔피언이 실제로 사는 것이면 남는다.
      * 다만 문턱을 올릴수록 드문 정답을 지우므로 recall과 함께 봐야 한다.
-     * 기본값 0.0은 아무것도 거르지 않는다.
+     * 0.0은 아무것도 거르지 않는다. 설정에 기본값을 두지 않는 것은 의도다 —
+     * 인라인 기본값이 있으면 설정 누락이 조용히 하한 해제로 돌아간다.
      */
     private boolean belowBaseRateFloor(
             Map<Long, Integer> baseCountByItem, int baseGameCount, Long itemId) {

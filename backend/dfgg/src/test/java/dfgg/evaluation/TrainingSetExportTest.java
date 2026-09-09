@@ -38,6 +38,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
@@ -84,6 +85,9 @@ class TrainingSetExportTest {
     /** 집계·서빙과 같은 범위를 본다. 학습 데이터만 다른 티어를 보면 train/serve가 어긋난다. */
     @Autowired
     private TierScope tierScope;
+
+    @Value("${recommendation.counter.minimum-base-rate:0.0}")
+    private double counterMinimumBaseRate;
 
     private final SnapshotQueryBuilder snapshotQueryBuilder = new SnapshotQueryBuilder();
     private ParticipantSampler participantSampler;
@@ -134,7 +138,8 @@ class TrainingSetExportTest {
         }
         long durationMillis = System.currentTimeMillis() - startedAt;
 
-        String report = stats.render(outputPath, durationMillis, latestPatch);
+        String report = stats.render(outputPath, durationMillis, latestPatch,
+                tierScope.values(), counterMinimumBaseRate);
         System.out.println(report);
         new EvaluationReportWriter().write(Path.of("../tasks/eval-training-set.md"), report);
 
@@ -289,12 +294,16 @@ class TrainingSetExportTest {
             tierCounts.merge(tier == null ? "(없음)" : tier, 1L, Long::sum);
         }
 
-        private String render(Path outputPath, long durationMillis, String latestPatch) {
+        private String render(Path outputPath, long durationMillis, String latestPatch,
+                              List<String> tiers, double counterMinimumBaseRate) {
             long totalRows = labelCounts.values().stream().mapToLong(Long::longValue).sum();
             StringBuilder report = new StringBuilder();
             report.append("# LTR 학습 데이터 export 결과\n\n");
             report.append("| 항목 | 값 |\n|---|---|\n");
             report.append("| 출력 | `").append(outputPath).append("` |\n");
+            // 산출물이 어떤 설정에서 나왔는지 남긴다. EC2 사이로 파일만 옮기면 이력이 사라진다.
+            report.append("| 티어 범위 | ").append(tiers).append(" |\n");
+            report.append(String.format("| counter base rate 하한 | %.4f |%n", counterMinimumBaseRate));
             report.append("| 시도한 query | ").append(attemptedQueries).append(" |\n");
             report.append("| 내보낸 query | ").append(exportedQueries).append(" |\n");
             report.append("| 제외된 query | ").append(droppedQueries).append(" (")
