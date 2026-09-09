@@ -10,6 +10,7 @@ import dfgg.application.recommend.v3.GeneratorResult;
 import dfgg.application.recommend.v3.ScoredItem;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
+import dfgg.domain.match.TierScope;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -66,8 +68,17 @@ class RecallEvaluationTest {
     @Autowired
     private List<CandidateGenerator> generators;
 
+    /** 집계·서빙과 같은 범위를 본다. 학습 데이터만 다른 티어를 보면 train/serve가 어긋난다. */
+    @Autowired
+    private TierScope tierScope;
+
     private final SnapshotQueryBuilder snapshotQueryBuilder = new SnapshotQueryBuilder();
-    private final ParticipantSampler participantSampler = new ParticipantSampler();
+    private ParticipantSampler participantSampler;
+
+    @BeforeEach
+    void prepareSampler() {
+        participantSampler = new ParticipantSampler(tierScope);
+    }
     private final GameSplit gameSplit = new GameSplit(0.8);
 
     @Test
@@ -114,7 +125,7 @@ class RecallEvaluationTest {
 
         while (sampledMatches < SAMPLE_MATCHES) {
             // 해시 순서. match_id 순은 시간순이라 앞에서 자르면 오래된 패치만 표본에 들어간다.
-            List<String> matchIds = participantRepository.findSampledMatchIds(PageRequest.of(page++, 500));
+            List<String> matchIds = participantRepository.findSampledMatchIds(tierScope.values(), PageRequest.of(page++, 500));
             if (matchIds.isEmpty()) {
                 break;
             }

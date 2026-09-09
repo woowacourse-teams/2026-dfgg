@@ -24,6 +24,9 @@ import org.springframework.test.context.jdbc.Sql;
 @Sql("/sql/match-sampling-order-test-data.sql")
 class MatchSamplingOrderTest {
 
+    /** 픽스처의 참가자는 전부 PLATINUM이다. */
+    private static final List<String> FIXTURE_TIERS = List.of("PLATINUM");
+
     @Autowired
     private NormalizedMatchParticipantRepository participantRepository;
 
@@ -34,7 +37,7 @@ class MatchSamplingOrderTest {
         List<String> byMatchId = participantRepository
                 .findDistinctMatchIds(PageRequest.of(0, 30)).getContent();
         List<String> sampled = participantRepository
-                .findSampledMatchIds(PageRequest.of(0, 30));
+                .findSampledMatchIds(FIXTURE_TIERS, PageRequest.of(0, 30));
 
         // then: 같은 집합이지만 순서가 달라야 한다
         assertThat(sampled).containsExactlyInAnyOrderElementsOf(byMatchId);
@@ -45,7 +48,7 @@ class MatchSamplingOrderTest {
     @DisplayName("앞에서 잘라도 최신 패치가 표본에 들어온다")
     void findSampledMatchIds_WhenTruncated_StillCoversLatestPatch() {
         // given: 절반만 뽑는다
-        List<String> sampled = participantRepository.findSampledMatchIds(PageRequest.of(0, 15));
+        List<String> sampled = participantRepository.findSampledMatchIds(FIXTURE_TIERS, PageRequest.of(0, 15));
 
         // when: 그 매치들의 패치를 본다
         List<String> patches = sampled.stream()
@@ -61,8 +64,8 @@ class MatchSamplingOrderTest {
     @Test
     @DisplayName("같은 요청은 항상 같은 순서를 준다 — 학습 데이터를 재현할 수 있어야 한다")
     void findSampledMatchIds_IsDeterministic() {
-        List<String> first = participantRepository.findSampledMatchIds(PageRequest.of(0, 20));
-        List<String> second = participantRepository.findSampledMatchIds(PageRequest.of(0, 20));
+        List<String> first = participantRepository.findSampledMatchIds(FIXTURE_TIERS, PageRequest.of(0, 20));
+        List<String> second = participantRepository.findSampledMatchIds(FIXTURE_TIERS, PageRequest.of(0, 20));
 
         assertThat(second).isEqualTo(first);
     }
@@ -70,9 +73,20 @@ class MatchSamplingOrderTest {
     @Test
     @DisplayName("페이지를 넘겨도 중복 없이 이어진다")
     void findSampledMatchIds_WhenPaged_DoesNotRepeat() {
-        List<String> firstPage = participantRepository.findSampledMatchIds(PageRequest.of(0, 10));
-        List<String> secondPage = participantRepository.findSampledMatchIds(PageRequest.of(1, 10));
+        List<String> firstPage = participantRepository.findSampledMatchIds(FIXTURE_TIERS, PageRequest.of(0, 10));
+        List<String> secondPage = participantRepository.findSampledMatchIds(FIXTURE_TIERS, PageRequest.of(1, 10));
 
         assertThat(firstPage).doesNotContainAnyElementsOf(secondPage);
+    }
+
+    @Test
+    @DisplayName("범위 밖 티어만 주면 아무 매치도 주지 않는다 — 티어 조건이 실제로 걸린다")
+    void findSampledMatchIds_WhenTierOutOfScope_ReturnsEmpty() {
+        // when
+        List<String> sampled = participantRepository
+                .findSampledMatchIds(List.of("CHALLENGER"), PageRequest.of(0, 30));
+
+        // then
+        assertThat(sampled).isEmpty();
     }
 }

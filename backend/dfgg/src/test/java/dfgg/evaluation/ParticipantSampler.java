@@ -1,6 +1,7 @@
 package dfgg.evaluation;
 
 import dfgg.domain.match.NormalizedMatchParticipant;
+import dfgg.domain.match.TierScope;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -17,13 +18,25 @@ import java.util.Random;
  *
  * <p>매치 ID를 시드로 셔플해 포지션·팀에 고루 퍼지게 하되, 같은 매치는 항상 같은 참가자를
  * 뽑아 평가를 재현할 수 있게 한다.
+ *
+ * <p>학습 대상 티어 밖의 참가자는 셔플 전에 뺀다. 한 매치에 티어가 섞일 수 있어
+ * (실제 티어로 정규화된 경기가 그렇다) 매치 단위로만 걸러서는 정책 밖 구매가 정답으로 새어 든다.
  */
 public final class ParticipantSampler {
+
+    private final TierScope tierScope;
+
+    public ParticipantSampler(TierScope tierScope) {
+        this.tierScope = tierScope;
+    }
 
     public List<NormalizedMatchParticipant> sample(
             List<NormalizedMatchParticipant> matchParticipants, String matchId, int sampleSize
     ) {
-        List<NormalizedMatchParticipant> shuffled = new ArrayList<>(matchParticipants);
+        List<NormalizedMatchParticipant> inScope = matchParticipants.stream()
+                .filter(participant -> tierScope.contains(participant.getTier()))
+                .toList();
+        List<NormalizedMatchParticipant> shuffled = new ArrayList<>(inScope);
         Collections.shuffle(shuffled, new Random(matchId.hashCode()));
         return shuffled.subList(0, Math.min(sampleSize, shuffled.size()));
     }

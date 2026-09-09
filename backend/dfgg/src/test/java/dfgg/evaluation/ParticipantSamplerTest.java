@@ -3,6 +3,7 @@ package dfgg.evaluation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.domain.match.NormalizedMatchParticipant;
+import dfgg.domain.match.TierScope;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -12,7 +13,10 @@ import org.junit.jupiter.api.Test;
 
 class ParticipantSamplerTest {
 
-    private final ParticipantSampler sampler = new ParticipantSampler();
+    private static final TierScope EMERALD_PLUS =
+            TierScope.of(List.of("EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"), "test");
+
+    private final ParticipantSampler sampler = new ParticipantSampler(EMERALD_PLUS);
 
     /** Riot 데이터에서 participantId는 포지션과 강하게 묶여 있다: 1=TOP, 2=JUNGLE, 3=MID... */
     private List<NormalizedMatchParticipant> match() {
@@ -76,5 +80,50 @@ class ParticipantSamplerTest {
 
         // when & then
         assertThat(sampler.sample(small, "KR_1", 5)).hasSize(3);
+    }
+
+    /** 한 매치에 티어가 섞일 수 있다 — 실제 티어로 정규화된 경기가 그렇다. */
+    private List<NormalizedMatchParticipant> mixedTierMatch() {
+        List<String> positions = List.of("TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY");
+        return IntStream.range(0, 10)
+                .mapToObj(i -> new NormalizedMatchParticipant(
+                        "puuid-" + i, i + 1, 100 + i, i < 5 ? 100 : 200,
+                        positions.get(i % 5), i < 4 ? "PLATINUM" : "EMERALD", true,
+                        List.of(3031), List.of(3031), true))
+                .toList();
+    }
+
+    @Test
+    @DisplayName("범위 밖 티어의 참가자는 뽑지 않는다 — 정책 밖 구매가 정답으로 새면 안 된다")
+    void sample_WhenTierOutOfScope_ExcludeThoseParticipants() {
+        // when
+        List<NormalizedMatchParticipant> sampled = sampler.sample(mixedTierMatch(), "KR_1", 10);
+
+        // then
+        assertThat(sampled).hasSize(6);
+        assertThat(sampled).extracting(NormalizedMatchParticipant::getTier).containsOnly("EMERALD");
+    }
+
+    @Test
+    @DisplayName("범위 안 참가자가 없으면 빈 목록이다 — 매치 단위 필터만으로는 새어 들어온다")
+    void sample_WhenNoParticipantInScope_ReturnsEmpty() {
+        // given
+        TierScope challengerOnly = TierScope.of(List.of("CHALLENGER"), "test");
+
+        // when & then
+        assertThat(new ParticipantSampler(challengerOnly).sample(mixedTierMatch(), "KR_1", 10)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("티어를 걸러도 같은 매치는 같은 참가자를 뽑는다")
+    void sample_WhenTierFiltered_StillReproducible() {
+        // when
+        List<String> first = sampler.sample(mixedTierMatch(), "KR_7", 2).stream()
+                .map(NormalizedMatchParticipant::getPuuid).toList();
+        List<String> second = sampler.sample(mixedTierMatch(), "KR_7", 2).stream()
+                .map(NormalizedMatchParticipant::getPuuid).toList();
+
+        // then
+        assertThat(second).isEqualTo(first);
     }
 }

@@ -18,6 +18,7 @@ import dfgg.domain.itemstats.ChampionItemStats;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
+import dfgg.domain.match.TierScope;
 import dfgg.domain.match.PatchVersion;
 import java.io.IOException;
 import java.io.Writer;
@@ -32,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -79,8 +81,17 @@ class TrainingSetExportTest {
     @Autowired
     private FeatureExtractionPipeline featurePipeline;
 
+    /** 집계·서빙과 같은 범위를 본다. 학습 데이터만 다른 티어를 보면 train/serve가 어긋난다. */
+    @Autowired
+    private TierScope tierScope;
+
     private final SnapshotQueryBuilder snapshotQueryBuilder = new SnapshotQueryBuilder();
-    private final ParticipantSampler participantSampler = new ParticipantSampler();
+    private ParticipantSampler participantSampler;
+
+    @BeforeEach
+    void prepareSampler() {
+        participantSampler = new ParticipantSampler(tierScope);
+    }
     private final GameSplit gameSplit = new GameSplit(0.8);
     private final RelevanceLabeler labeler = new RelevanceLabeler(PLAUSIBLE_ALTERNATIVE_THRESHOLD);
 
@@ -144,7 +155,7 @@ class TrainingSetExportTest {
         int page = 0;
         while (stats.exportedQueries < TARGET_QUERIES) {
             // 해시 순서로 뽑는다. match_id 순은 곧 시간순이라 앞에서 자르면 오래된 패치만 남는다.
-            List<String> matchIds = participantRepository.findSampledMatchIds(PageRequest.of(page++, 500));
+            List<String> matchIds = participantRepository.findSampledMatchIds(tierScope.values(), PageRequest.of(page++, 500));
             if (matchIds.isEmpty()) {
                 break;
             }
@@ -226,7 +237,7 @@ class TrainingSetExportTest {
         stats.exportedQueries++;
         stats.rowsWithGroundTruth++;
         stats.countCoverage(snapshot.query().position(), snapshot.query().myChampionId(),
-                snapshot.query().patch());
+                snapshot.query().patch(), snapshot.query().tier());
     }
 
     private Map<Long, Double> baseRatesOf(NormalizedMatchParticipant participant) {
@@ -263,15 +274,19 @@ class TrainingSetExportTest {
         private final Map<ChampionPosition, Long> positionCounts = new LinkedHashMap<>();
         private final Map<Long, Long> championCounts = new HashMap<>();
         private final Map<String, Long> patchCounts = new HashMap<>();
+        private final Map<String, Long> tierCounts = new HashMap<>();
 
         private void countLabel(int label) {
             labelCounts.merge(label, 1L, Long::sum);
         }
 
-        private void countCoverage(ChampionPosition position, long championId, String patch) {
+        private void countCoverage(
+                ChampionPosition position, long championId, String patch, String tier) {
             positionCounts.merge(position, 1L, Long::sum);
             championCounts.merge(championId, 1L, Long::sum);
             patchCounts.merge(patch, 1L, Long::sum);
+            // 티어 필터가 실제로 걸렸는지 리포트에서 눈으로 확인할 수 있어야 한다.
+            tierCounts.merge(tier == null ? "(없음)" : tier, 1L, Long::sum);
         }
 
         private String render(Path outputPath, long durationMillis, String latestPatch) {
@@ -313,6 +328,12 @@ class TrainingSetExportTest {
                         .append(" |\n");
             }
             report.append("\n고유 챔피언 수: **").append(championCounts.size()).append("종**\n");
+
+            report.append("\n### 티어 분포\n\n| 티어 | query |\n|---|---|\n");
+            tierCounts.entrySet().stream()
+                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                    .forEach(entry -> report.append(
+                            String.format("| %s | %,d |%n", entry.getKey(), entry.getValue())));
 
             report.append("\n### 패치 분포 (상위 10)\n\n| 패치 | query |\n|---|---|\n");
             patchCounts.entrySet().stream()
