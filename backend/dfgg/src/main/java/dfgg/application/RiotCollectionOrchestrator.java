@@ -96,21 +96,60 @@ public class RiotCollectionOrchestrator {
         if (APEX_TIERS.contains(tier)) {
             return collectApexPlayers(tier);
         }
+        return collectLeaguePlayers(tier);
+    }
 
-        boolean completed = true;
-        LinkedHashSet<String> collectedPuuids = new LinkedHashSet<>();
+    private List<String> collectApexPlayers(String tier) {
+        RiotPlayerSyncService.SyncResult syncResult;
+        try {
+            syncResult = playerSyncService.syncApexLeague(QUEUE_TYPE, tier);
+        } catch (RuntimeException ignored) {
+            return List.of();
+        }
+
+        List<String> puuids = syncResult.puuids().stream()
+                .distinct()
+                .sorted()
+                .toList();
+        return selectNextApexPlayers(tier, puuids);
+    }
+
+    private List<String> selectNextApexPlayers(String tier, List<String> puuids) {
+        if (puuids.isEmpty()) {
+            nextApexPlayerIndexes.put(tier, 0);
+            return List.of();
+        }
+        int nextPlayerIndex = nextApexPlayerIndexes.getOrDefault(tier, 0);
+        int start = Math.floorMod(nextPlayerIndex, puuids.size());
+        int count = Math.min(properties.getPlayerLimit(), puuids.size());
+        List<String> selected = IntStream.range(0, count)
+                .mapToObj(offset -> puuids.get((start + offset) % puuids.size()))
+                .toList();
+        nextApexPlayerIndexes.put(tier, (start + count) % puuids.size());
+        return selected;
+    }
+
+    private List<String> collectLeaguePlayers(String tier) {
+        Set<String> collectedPuuids = new LinkedHashSet<>();
+        boolean allPagesCollected = collectLeaguePages(tier, collectedPuuids);
+
+        recordLeaguePlayersFound(tier, collectedPuuids);
+        if (allPagesCollected) {
+            moveToNextLeagueRange(tier);
+        }
+        return List.copyOf(collectedPuuids);
+    }
+
+    private boolean collectLeaguePages(String tier, Set<String> collectedPuuids) {
+        boolean allPagesCollected = true;
         String division = currentDivision(tier);
         int nextLeaguePage = nextLeaguePages.getOrDefault(tier, 1);
         int pageEnd = nextLeaguePage + properties.getLeaguePageCount();
         for (int page = nextLeaguePage; page < pageEnd; page++) {
             boolean pageCollected = collectLeaguePage(tier, division, page, collectedPuuids);
-            completed = completed && pageCollected;
+            allPagesCollected = allPagesCollected && pageCollected;
         }
-        recordLeaguePlayersFound(tier, collectedPuuids);
-        if (completed) {
-            moveToNextLeagueRange(tier);
-        }
-        return List.copyOf(collectedPuuids);
+        return allPagesCollected;
     }
 
     private boolean collectLeaguePage(String tier, String division, int page, Set<String> collectedPuuids) {
@@ -129,42 +168,6 @@ public class RiotCollectionOrchestrator {
             return;
         }
         leagueRangeHasPlayersByTier.put(tier, true);
-    }
-
-    /**
-     * 마스터·그랜드마스터·챌린저 중 지정한 리그의 플레이어 정보를 동기화하고, 이번 실행에서 매치를 수집할 플레이어의 PUUID를 최대 playerLimit명만큼 반환한다.
-     *
-     * <p>상위 리그는 디비전과 페이지 구분이 없으므로 전체 명단을 조회한다.
-     * PUUID를 중복 제거 후 정렬하고, 티어별로 기억한 위치부터 순환 선택한다. 명단 끝에 도달하면 처음으로 돌아가며, 선택 직후 다음 위치를 저장한다.
-     *
-     * <p>리그 조회 또는 플레이어 동기화에 실패하면 위치를 유지하고 빈 목록을 반환한다.
-     * 조회된 명단이 비어 있으면 해당 티어의 위치를 0으로 초기화한다.
-     */
-    private List<String> collectApexPlayers(String tier) {
-        RiotPlayerSyncService.SyncResult syncResult;
-        try {
-            // 최상위 리그 API에는 division과 page가 없으며 서비스가 이 두 인자를 사용하지 않는다.
-            syncResult = playerSyncService.syncLeagueEntries(QUEUE_TYPE, tier, "I", 1);
-        } catch (RuntimeException ignored) {
-            return List.of();
-        }
-
-        List<String> puuids = syncResult.puuids().stream()
-                .distinct()
-                .sorted()
-                .toList();
-        if (puuids.isEmpty()) {
-            nextApexPlayerIndexes.put(tier, 0);
-            return List.of();
-        }
-        int nextPlayerIndex = nextApexPlayerIndexes.getOrDefault(tier, 0);
-        int start = Math.floorMod(nextPlayerIndex, puuids.size());
-        int count = Math.min(properties.getPlayerLimit(), puuids.size());
-        List<String> selected = IntStream.range(0, count)
-                .mapToObj(offset -> puuids.get((start + offset) % puuids.size()))
-                .toList();
-        nextApexPlayerIndexes.put(tier, (start + count) % puuids.size());
-        return selected;
     }
 
     private void moveToNextLeagueRange(String tier) {
@@ -189,10 +192,6 @@ public class RiotCollectionOrchestrator {
         nextLeaguePages.put(tier, nextLeaguePage + properties.getLeaguePageCount());
     }
 
-    private void moveToNextTier() {
-        nextTierIndex = (nextTierIndex + 1) % properties.getTiers().size();
-    }
-
     private String currentDivision(String tier) {
         List<String> divisions = progressiveDivisions();
         int divisionIndex = nextDivisionIndexes.getOrDefault(tier, 0);
@@ -209,6 +208,10 @@ public class RiotCollectionOrchestrator {
             return configured;
         }
         return DIVISION_ORDER.subList(startIndex, DIVISION_ORDER.size());
+    }
+
+    private void moveToNextTier() {
+        nextTierIndex = (nextTierIndex + 1) % properties.getTiers().size();
     }
 
     private void collectMatches(List<String> puuids, String sampleTier) {
