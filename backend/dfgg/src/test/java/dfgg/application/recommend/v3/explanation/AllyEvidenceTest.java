@@ -29,47 +29,51 @@ class AllyEvidenceTest {
     private static final long ORNN = 516L;
     private static final long ARDENT_CENSER = 3504L;
 
-    /** 점수는 이제 lift다 — 1.0이 "평소와 같다"이고 그 아래는 오히려 덜 산다는 뜻이다. */
-    private static ItemCandidate candidateWithAllyLifts(Map<Long, Double> liftByAlly) {
+    /**
+     * 승률 lift다 — {@code P(win | 나, 아군, item) / P(win | 나, item)}.
+     * 1.0이 "이 아군과 함께여도 평소만큼 이긴다"이고, 넘어야 시너지라 부를 수 있다.
+     * 구매 lift(랭킹에 쓰는 값)는 별도로 들고 있으므로 여기서는 승률만 준다.
+     */
+    private static ItemCandidate candidateWithAllyLifts(Map<Long, Double> winLiftByAlly) {
         return new ItemCandidate(ARDENT_CENSER, Map.of(
-                CandidateSource.ALLY_SYNERGY, new SourceEvidence(2.4, 1, 0, liftByAlly)));
+                CandidateSource.ALLY_SYNERGY,
+                new SourceEvidence(2.4, 1, 0, Map.of(), winLiftByAlly)));
     }
 
     @Test
-    @DisplayName("lift가 문턱을 넘는 아군을 지목한다")
+    @DisplayName("승률 lift가 문턱을 넘는 아군을 지목한다")
     void championIdsFor_WhenAllySynergyDroveTheScore_NamesAllies() {
-        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(Map.of(JINX, 2.4))))
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(Map.of(JINX, 1.15))))
                 .containsExactly(JINX);
     }
 
     @Test
-    @DisplayName("문턱 이하인 아군은 뺀다 — 평소보다 뚜렷이 더 사는 게 아니면 이유가 아니다")
-    void championIdsFor_WhenLiftIsNotAboveNeutral_DropsThatAlly() {
-        Map<Long, Double> lifts = Map.of(JINX, 2.4, KOGMAW, 1.15);
+    @DisplayName("문턱 이하인 아군은 뺀다 — 평소만큼만 이기면 이유가 아니다")
+    void championIdsFor_WhenWinLiftIsNotAboveNeutral_DropsThatAlly() {
+        // 승률 lift는 구매 lift보다 스케일이 작다. 1.01은 승률이 1% 높다는 뜻이라 노이즈다.
+        Map<Long, Double> winLifts = Map.of(JINX, 1.15, KOGMAW, 1.02);
 
-        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts)))
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(winLifts)))
                 .containsExactly(JINX);
     }
 
     @Test
-    @DisplayName("최상위와 차이가 커도 lift가 1을 넘으면 함께 지목한다 — 상대 기준이 아니다")
-    void championIdsFor_WhenFarBelowTopButStillAboveNeutral_KeepsIt() {
-        // 옛 상대 문턱(최상위의 절반)이었다면 1.3은 5.0의 절반에 못 미쳐 빠졌다.
-        Map<Long, Double> lifts = Map.of(JINX, 5.0, KOGMAW, 1.3);
+    @DisplayName("최상위와 차이가 커도 문턱을 넘으면 함께 지목한다 — 상대 기준이 아니다")
+    void championIdsFor_WhenFarBelowTopButStillAboveFloor_KeepsIt() {
+        // 옛 상대 문턱(최상위의 절반)이었다면 1.05는 1.30의 절반에 못 미쳐 빠졌다.
+        Map<Long, Double> winLifts = Map.of(JINX, 1.30, KOGMAW, 1.09);
 
-        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts)))
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(winLifts)))
                 .containsExactly(JINX, KOGMAW);
     }
 
     @Test
-    @DisplayName("모두가 고만고만해도 lift가 1 이하면 아무도 지목하지 않는다 — 옛 상대 문턱의 결함")
-    void championIdsFor_WhenEveryLiftIsNeutral_NamesNobody() {
-        // 무한의 대검처럼 원딜이면 다 사는 아이템이 이렇게 나온다.
+    @DisplayName("모두가 평소 승률 근처면 아무도 지목하지 않는다 — 옛 상대 문턱의 결함")
+    void championIdsFor_WhenEveryWinLiftIsNeutral_NamesNobody() {
         // 상대 문턱이었다면 최상위의 절반을 넘는 아군이 전부 통과했다.
-        Map<Long, Double> lifts = Map.of(JINX, 1.1, KOGMAW, 0.98, ORNN, 0.95);
+        Map<Long, Double> winLifts = Map.of(JINX, 1.05, KOGMAW, 0.98, ORNN, 0.95);
 
-        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts)))
-                .isEmpty();
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(winLifts))).isEmpty();
     }
 
     @Test
@@ -82,9 +86,9 @@ class AllyEvidenceTest {
     @Test
     @DisplayName("두 명까지만 지목한다")
     void championIdsFor_CapsAtTwoAllies() {
-        Map<Long, Double> lifts = Map.of(JINX, 3.0, KOGMAW, 2.5, ORNN, 2.0);
+        Map<Long, Double> winLifts = Map.of(JINX, 1.25, KOGMAW, 1.20, ORNN, 1.15);
 
-        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts)))
+        assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(winLifts)))
                 .containsExactly(JINX, KOGMAW);
     }
 
@@ -112,10 +116,32 @@ class AllyEvidenceTest {
     }
 
     @Test
-    @DisplayName("평소와 별 차이 없는 아군은 빼둔다 — 실사례의 리 신 1.09가 그것이다")
-    void championIdsFor_WhenLiftIsBarelyAboveNeutral_DropsThatAlly() {
-        Map<Long, Double> lifts = Map.of(JINX, 1.12, KOGMAW, 1.09);
+    @DisplayName("승률이 평소와 별 차이 없으면 빼둔다")
+    void championIdsFor_WhenWinLiftIsBarelyAboveNeutral_DropsThatAlly() {
+        Map<Long, Double> lifts = Map.of(JINX, 1.06, KOGMAW, 1.04);
 
         assertThat(AllyEvidence.championIdsFor(candidateWithAllyLifts(lifts))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("구매 lift가 높아도 승률 lift가 낮으면 지목하지 않는다 — 드래프트 상관을 걸러낸다")
+    void championIdsFor_WhenPurchaseLiftHighButWinLiftLow_NamesNobody() {
+        // 실사례: 애쉬+룰루의 도미닉은 구매 lift 1.21이지만, 룰루 때문에 이기는 것이 아니다.
+        // 적이 탱커일 때 도미닉을 사는 것이고, 그 상관이 아군 쪽으로 새어 든 것이다.
+        ItemCandidate purchaseHeavy = new ItemCandidate(ARDENT_CENSER, Map.of(
+                CandidateSource.ALLY_SYNERGY,
+                new SourceEvidence(2.4, 1, 0, Map.of(JINX, 3.5), Map.of(JINX, 1.02))));
+
+        assertThat(AllyEvidence.championIdsFor(purchaseHeavy)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("승률 표본이 얇아 lift를 못 구한 아군은 지목하지 않는다")
+    void championIdsFor_WhenWinLiftMissing_NamesNobody() {
+        ItemCandidate noWinLift = new ItemCandidate(ARDENT_CENSER, Map.of(
+                CandidateSource.ALLY_SYNERGY,
+                new SourceEvidence(2.4, 1, 0, Map.of(JINX, 3.5), Map.of())));
+
+        assertThat(AllyEvidence.championIdsFor(noWinLift)).isEmpty();
     }
 }

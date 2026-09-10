@@ -31,6 +31,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class AllySynergyCandidateGenerator implements CandidateGenerator {
 
+    private static final int MINIMUM_WIN_SAMPLES = 30;
+
     private final PairSynergyRetriever pairSynergyRetriever;
     private final ChampionItemStatsRepository championItemStatsRepository;
     private final ChampionItemRollupRepository championItemRollupRepository;
@@ -61,6 +63,10 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
         Map<Long, PairScoreAggregate> scoresByItem = pairSynergyRetriever.scoresByItem(
                 query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
                 baseCounts(positionStats), baseGameCount(positionStats));
+        // 추천 이유용. 랭킹에는 쓰지 않는다 — 표본이 얇아 발견에는 못 쓴다.
+        Map<Long, Map<Long, Double>> winLiftsByItem = pairSynergyRetriever.winLiftsByItem(
+                query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
+                itemWinRates(positionStats), MINIMUM_WIN_SAMPLES);
 
         if (!scoresByItem.isEmpty()) {
             List<ScoredItem> ranked = scoresByItem.entrySet().stream()
@@ -68,7 +74,8 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
                     // 랭킹에는 최댓값 하나를 쓰지만 아군별 점수도 함께 남긴다. retriever가
                     // 이미 계산해 둔 값이라 여기서 버리면 나중에 다시 조회해야 한다.
                     .map(entry -> new ScoredItem(entry.getKey(), entry.getValue().max(),
-                            entry.getValue().scoreByOtherChampionId()))
+                            entry.getValue().scoreByOtherChampionId(),
+                            winLiftsByItem.getOrDefault(entry.getKey(), Map.of())))
                     .sorted(byScoreThenItemId())
                     .limit(topK)
                     .toList();
@@ -76,6 +83,22 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
         }
 
         return GeneratorResult.of(source(), championBaseRate(query, topK), PairBackoffLevel.BASE_RATE.ordinal());
+    }
+
+    /**
+     * 승률 lift의 분모 — 이 챔피언이 이 아이템을 샀을 때의 평소 승률.
+     * 상대와 무관한 값이라 "이 아군과 함께일 때 특별히 잘 되는가"를 물을 수 있다.
+     * 표본이 얇은 아이템은 빼둔다 — 분모가 튀면 lift도 튄다.
+     */
+    private Map<Long, Double> itemWinRates(List<ChampionItemStats> positionStats) {
+        Map<Long, Double> winRateByItem = new java.util.HashMap<>();
+        for (ChampionItemStats stats : positionStats) {
+            if (stats.getPurchaseCountAll() >= MINIMUM_WIN_SAMPLES) {
+                winRateByItem.put(stats.getItemId(),
+                        (double) stats.getWinCountAll() / stats.getPurchaseCountAll());
+            }
+        }
+        return winRateByItem;
     }
 
     /** lift의 분모 — 이 챔피언이 각 아이템을 산 판 수. 상대가 누구든 같은 값이다. */

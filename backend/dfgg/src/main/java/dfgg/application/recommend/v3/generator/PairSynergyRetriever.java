@@ -106,6 +106,38 @@ public class PairSynergyRetriever {
         return (double) baseCountByItem.getOrDefault(itemId, 0) / baseGameCount < minimumBaseRate;
     }
 
+    /**
+     * 상대별 승률 lift — {@code P(win | 나, 상대, item) / P(win | 나, item)}.
+     * <p>
+     * 구매 lift가 "함께일 때 더 산다"(상관)라면 이것은 "함께 사면 더 이긴다"(시너지에 근접)다.
+     * 추천 이유로만 쓰고 랭킹·feature에는 넣지 않는다 — 표본이 얇아 발견에 쓰기 어렵다.
+     * <p>
+     * 분모를 "이 아군과 함께일 때의 승률"이 아니라 "이 아이템의 평소 승률"로 둔 이유가 있다.
+     * 전자는 아이템과 무관한 값이라 아이템 간 비교가 안 되고, 후자는 "이 아이템이 이 아군과
+     * 있을 때 특별히 잘 되는가"를 직접 묻는다.
+     * <p>
+     * {@code minimumWinSamples} 미만은 아예 내지 않는다. 승패는 이항이라 표본이 얇으면
+     * 승률이 0 아니면 1로 튄다
+     */
+    public Map<Long, Map<Long, Double>> winLiftsByItem(
+            long myChampionId, List<Long> otherChampionIds, PairRelation relation,
+            Map<Long, Double> itemWinRateById, int minimumWinSamples
+    ) {
+        Map<Long, Map<Long, Double>> winLiftByItemAndOther = new HashMap<>();
+        for (ChampionPairItemStats stats : findStats(myChampionId, otherChampionIds, relation)) {
+            Double itemWinRate = itemWinRateById.get(stats.getItemId());
+            if (itemWinRate == null || itemWinRate <= 0
+                    || stats.getCoCountAll() < minimumWinSamples) {
+                continue;
+            }
+            double pairWinRate = (double) stats.getWinCountAll() / stats.getCoCountAll();
+            winLiftByItemAndOther
+                    .computeIfAbsent(stats.getItemId(), itemId -> new HashMap<>())
+                    .put(Long.valueOf(stats.getOtherChampionId()), pairWinRate / itemWinRate);
+        }
+        return winLiftByItemAndOther;
+    }
+
     /** {@code P(item | 나, 상대) / P(item | 나)}. counter와 같은 계산기를 쓴다. */
     private double lift(
             ChampionPairItemStats stats, Map<Long, Integer> baseCountByItem, int baseGameCount) {

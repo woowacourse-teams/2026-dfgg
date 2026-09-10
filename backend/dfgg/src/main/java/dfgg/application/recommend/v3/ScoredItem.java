@@ -12,14 +12,21 @@ import java.util.Map;
  *
  * @param score 랭킹에 쓰는 점수. 상대별 점수가 있으면 그 최댓값이다
  */
-public record ScoredItem(Long itemId, double score, Map<Long, Double> scoreByChampionId) {
+public record ScoredItem(Long itemId, double score,
+                         Map<Long, Double> scoreByChampionId,
+                         Map<Long, Double> winLiftByChampionId) {
 
     public ScoredItem {
         scoreByChampionId = Map.copyOf(scoreByChampionId);
+        winLiftByChampionId = Map.copyOf(winLiftByChampionId);
+    }
+
+    public ScoredItem(Long itemId, double score, Map<Long, Double> scoreByChampionId) {
+        this(itemId, score, scoreByChampionId, Map.of());
     }
 
     /** 상대 개념이 없는 generator용. */
     public ScoredItem(Long itemId, double score) {
-        this(itemId, score, Map.of());
+        this(itemId, score, Map.of(), Map.of());
     }
 }
