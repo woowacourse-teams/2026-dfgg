@@ -35,7 +35,8 @@ public interface ChampionItemStatsRepository extends JpaRepository<ChampionItemS
                 champion_id, position, item_id,
                 purchase_count_all, purchase_count_recent,
                 win_count_all, win_count_recent,
-                champion_game_count_all, champion_game_count_recent
+                champion_game_count_all, champion_game_count_recent,
+                champion_win_count_all
             )
             WITH participant AS (
                 SELECT champion_id,
@@ -55,7 +56,9 @@ public interface ChampionItemStatsRepository extends JpaRepository<ChampionItemS
             champion_games AS (
                 SELECT champion_id, normalized_position,
                        count(*) AS game_all,
-                       count(*) FILTER (WHERE patch IN (:recentPatches)) AS game_recent
+                       count(*) FILTER (WHERE patch IN (:recentPatches)) AS game_recent,
+                       -- 아이템과 무관한 기준선. 시너지는 이 값 대비로만 말할 수 있다.
+                       count(*) FILTER (WHERE win) AS win_all
                 FROM participant
                 GROUP BY champion_id, normalized_position
             ),
@@ -70,7 +73,8 @@ public interface ChampionItemStatsRepository extends JpaRepository<ChampionItemS
                    count(*) FILTER (WHERE purchase.win),
                    count(*) FILTER (WHERE purchase.win AND purchase.patch IN (:recentPatches)),
                    max(champion_games.game_all),
-                   max(champion_games.game_recent)
+                   max(champion_games.game_recent),
+                   max(champion_games.win_all)
             FROM purchase
             JOIN champion_games
               ON champion_games.champion_id = purchase.champion_id

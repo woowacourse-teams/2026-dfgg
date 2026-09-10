@@ -121,7 +121,7 @@ public class PairSynergyRetriever {
      */
     public Map<Long, Map<Long, Double>> winLiftsByItem(
             long myChampionId, List<Long> otherChampionIds, PairRelation relation,
-            Map<Long, Double> itemWinRateById, int minimumWinSamples
+            Map<Long, Double> itemWinRateById, double championWinRate, int minimumWinSamples
     ) {
         Map<Long, Map<Long, Double>> winLiftByItemAndOther = new HashMap<>();
         for (ChampionPairItemStats stats : findStats(myChampionId, otherChampionIds, relation)) {
@@ -130,12 +130,29 @@ public class PairSynergyRetriever {
                     || stats.getCoCountAll() < minimumWinSamples) {
                 continue;
             }
-            double pairWinRate = (double) stats.getWinCountAll() / stats.getCoCountAll();
+            double pairBaselineLift = pairBaselineLift(stats, championWinRate);
+            if (pairBaselineLift <= 0) {
+                continue;
+            }
+            double pairItemWinRate = (double) stats.getWinCountAll() / stats.getCoCountAll();
             winLiftByItemAndOther
                     .computeIfAbsent(stats.getItemId(), itemId -> new HashMap<>())
-                    .put(Long.valueOf(stats.getOtherChampionId()), pairWinRate / itemWinRate);
+                    .put(Long.valueOf(stats.getOtherChampionId()),
+                            (pairItemWinRate / itemWinRate) / pairBaselineLift);
         }
         return winLiftByItemAndOther;
+    }
+
+    /**
+     * {@code P(win | 나, 상대) / P(win | 나)} — 이 조합 자체가 평소보다 잘 이기는 정도.
+     * 아이템과 무관한 값이라, 이것으로 나누면 상대의 강함이 상쇄된다.
+     */
+    private double pairBaselineLift(ChampionPairItemStats stats, double championWinRate) {
+        if (championWinRate <= 0 || stats.getPairGameCountAll() <= 0) {
+            return 0.0;
+        }
+        double pairWinRate = (double) stats.getPairWinCountAll() / stats.getPairGameCountAll();
+        return pairWinRate / championWinRate;
     }
 
     /** {@code P(item | 나, 상대) / P(item | 나)}. counter와 같은 계산기를 쓴다. */

@@ -66,7 +66,8 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
         // 추천 이유용. 랭킹에는 쓰지 않는다 — 표본이 얇아 발견에는 못 쓴다.
         Map<Long, Map<Long, Double>> winLiftsByItem = pairSynergyRetriever.winLiftsByItem(
                 query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
-                itemWinRates(positionStats), MINIMUM_WIN_SAMPLES);
+                itemWinRates(positionStats), championWinRate(positionStats),
+                MINIMUM_WIN_SAMPLES);
 
         if (!scoresByItem.isEmpty()) {
             List<ScoredItem> ranked = scoresByItem.entrySet().stream()
@@ -99,6 +100,19 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
             }
         }
         return winRateByItem;
+    }
+
+    /**
+     * 이 챔피언·포지션의 아이템 무관 승률. 이중 차분의 마지막 항이다 —
+     * 조합 승률을 이것으로 나눠야 "이 조합이 평소보다 잘 이기는 정도"가 나온다.
+     */
+    private double championWinRate(List<ChampionItemStats> positionStats) {
+        return positionStats.stream()
+                .filter(stats -> stats.getChampionGameCountAll() > 0)
+                .mapToDouble(stats ->
+                        (double) stats.getChampionWinCountAll() / stats.getChampionGameCountAll())
+                .findFirst()
+                .orElse(0.0);
     }
 
     /** lift의 분모 — 이 챔피언이 각 아이템을 산 판 수. 상대가 누구든 같은 값이다. */

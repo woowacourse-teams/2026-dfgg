@@ -3,10 +3,10 @@ package dfgg.application.recommend.v3;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
-import dfgg.application.recommend.v3.generator.PairScoreAggregate;
 import dfgg.application.recommend.v3.generator.AllySynergyCandidateGenerator;
 import dfgg.application.recommend.v3.generator.PairBackoffLevel;
 import dfgg.application.recommend.v3.generator.PairLiftCalculator;
+import dfgg.application.recommend.v3.generator.PairScoreAggregate;
 import dfgg.application.recommend.v3.generator.PairSynergyRetriever;
 import dfgg.application.utils.WilsonScoreCalculator;
 import dfgg.domain.champion.ChampionPosition;
@@ -14,9 +14,9 @@ import dfgg.domain.itemstats.ChampionItemRollupRepository;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.domain.itemstats.PairRelation;
+import dfgg.infrastructure.config.TierScopeConfiguration;
 import java.util.List;
 import java.util.Map;
-import dfgg.infrastructure.config.TierScopeConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -74,7 +74,9 @@ class AllySynergyCandidateGeneratorTest {
         );
     }
 
-    /** 생성기가 lift 분모로 쓰는 것과 같은 값. 직접 조회와 생성기 결과를 비교하려면 같아야 한다. */
+    /**
+     * 생성기가 lift 분모로 쓰는 것과 같은 값. 직접 조회와 생성기 결과를 비교하려면 같아야 한다.
+     */
     private Map<Long, Integer> jannaBaseCounts() {
         Map<Long, Integer> countByItem = new java.util.HashMap<>();
         championItemStatsRepository
@@ -143,12 +145,12 @@ class AllySynergyCandidateGeneratorTest {
     void retrieve_WhenAnotherAllyAdded_DoesNotChangeExistingAllyScores() {
         // given
         double beforeAdding = retriever.scoresByItem(JANNA, List.of(JINX), PairRelation.ALLY,
-                jannaBaseCounts(), jannaGameCount())
+                        jannaBaseCounts(), jannaGameCount())
                 .get(INCENSE).scoreOf(JINX);
 
         // when: 관계없는 아군을 하나 더 넣는다
         double afterAdding = retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW, ORNN), PairRelation.ALLY,
-                jannaBaseCounts(), jannaGameCount())
+                        jannaBaseCounts(), jannaGameCount())
                 .get(INCENSE).scoreOf(JINX);
 
         // then: 통짜 window라면 아군이 늘 때마다 점수가 흔들린다
@@ -215,7 +217,7 @@ class AllySynergyCandidateGeneratorTest {
     @DisplayName("남긴 아군별 점수가 개별 조회 결과와 같다 — 다시 계산하면 값이 갈릴 수 있다")
     void generate_PreservedAllyScoreMatchesTheDirectLookup() {
         double direct = retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW), PairRelation.ALLY,
-                jannaBaseCounts(), jannaGameCount())
+                        jannaBaseCounts(), jannaGameCount())
                 .get(INCENSE).scoreOf(JINX);
 
         GeneratorResult result = generator.generate(queryWithAllies(List.of(JINX, KOGMAW)), 10);

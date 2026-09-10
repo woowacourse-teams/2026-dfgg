@@ -74,6 +74,15 @@ public class ChampionPairItemStats {
     @Column(name = "pair_game_count_recent", nullable = false)
     private int pairGameCountRecent;
 
+    /**
+     * 이 조합이 아이템과 무관하게 이긴 판 수.
+     * <p>
+     * 아군이 세서 모든 아이템이 좋아 보이는 것을 상쇄하는 데 쓴다.
+     * 실측에서 승률 lift 분산의 41%가 "어느 아군이냐"로 설명됐다 — 이 값 없이는 아이템 고유 시너지를 못 가른다.
+     */
+    @Column(name = "pair_win_count_all", nullable = false)
+    private int pairWinCountAll;
+
     protected ChampionPairItemStats() {
     }
 
@@ -115,6 +124,10 @@ public class ChampionPairItemStats {
 
     public int getPairGameCountAll() {
         return pairGameCountAll;
+    }
+
+    public int getPairWinCountAll() {
+        return pairWinCountAll;
     }
 
     public int getPairGameCountRecent() {
