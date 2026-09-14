@@ -2,7 +2,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, Menu, screen, shell } from
 import path from 'node:path';
 
 import { trackEvent } from './analytics';
-import { requestRecommendation } from './backend';
+import { requestRecommendation, requestRecommendationV3 } from './backend';
 import { parseChampSelect } from './champ-select';
 import { type ClientWindowRect, watchClientWindow } from './client-window';
 import { fetchLiveGame } from './live-client';
@@ -21,6 +21,9 @@ import type { LcuStatus, Lineup } from './types';
 
 const isDev = !app.isPackaged;
 
+/** 앱을 얼마나 켜두는지 보려고 남겨둔 시각. before-quit에서 이걸로 세션 길이를 잰다. */
+const appLaunchedAt = Date.now();
+
 const DEV_SERVER = 'http://localhost:3000';
 
 /** 클라이언트가 꺼져 있을 때 다시 붙어보는 간격. */
@@ -36,8 +39,14 @@ const TOGGLE_OVERLAY = 'Alt+D';
  * 아이콘 w-8(32px) 에 gap-1(4px) 이므로 6*32 + 5*4 = 212. 여기에 카드 안쪽
  * 여백 p-2.5(10*2) 와 바깥 여백 p-2(8*2) 를 더해 248, 반올림 여유로 252.
  * ItemBuild 의 크기를 바꾸면 이 값도 같이 고쳐야 한다.
+ *
+ * 높이는 builds가 최대 3개까지 세로로 쌓이는 걸 기준으로 잡는다. 오버레이는
+ * 스크롤을 못 받는 클릭-통과 창이라, 창 자체가 낮으면 두 번째·세 번째 빌드는
+ * 그려지긴 해도 창 바깥이라 아예 안 보인다. 빌드 하나당 대략 65px(라벨+아이콘
+ * 한 줄+카드 여백) + 빌드 사이 간격 6px 이고, 여기에 헤더 줄과 바깥 여백을
+ * 더하면 3빌드 기준 약 270px. 여유를 두고 300으로 잡는다.
  */
-const OVERLAY_SIZE = { width: 252, height: 96 };
+const OVERLAY_SIZE = { width: 252, height: 300 };
 
 /** 화면 가장자리에서 띄울 여백. */
 const OVERLAY_MARGIN = 24;
@@ -67,6 +76,13 @@ const DOCK_WIDTH = 460;
 const MIN_DOCK_WIDTH = 320;
 
 /**
+ * 클라이언트 좌표가 이 안에서만 흔들리면 다시 붙이지 않는다. GetWindowRect가
+ * 픽셀 단위로 미세하게(1~2px) 흔들리는 순간이 있어서, 문자열 비교로만 걸러내면
+ * 그때마다 다시 붙어서 창이 계속 떨리듯 따라다니는 것처럼 보인다.
+ */
+const DOCK_JITTER_PX = 3;
+
+/**
  * 조회가 몇 번 연속 실패해야 "끝났다"로 볼지.
  * 인게임 API는 로딩 화면이나 순간적인 부하에서 응답을 거르는 일이 있어,
  * 한 번 실패했다고 화면을 비우면 아이템이 깜빡인다.
@@ -94,12 +110,26 @@ let missCount = 0;
 let sessionId = 0;
 let sessionActive = false;
 
+/**
+ * 이번 판에서 한 번이라도 본 아이템 id를 계속 들고 있는다.
+ *
+ * 신발 미션이 완료돼서 "미션 칸"으로 넘어가면, Riot Live Client API가 그
+ * 아이템을 items 배열에서 아예 빼버린다(슬롯만 바뀌는 게 아니라 자체를 안
+ * 준다). 매 폴링 스냅샷을 그대로 쓰면 그 순간 "구매 안 함"으로 되돌아가
+ * 버리므로, 한 번 본 건 세션이 끝날 때까지 계속 가진 것으로 취급한다.
+ */
+let seenItemIds = new Set<number>();
+let seenItemsSessionId = -1;
+
 let overlayScale = 1;
 let overlayVisible = true;
 
+/** 1번/2번 추천 방식 중 화면에 보여줄 것. 메인 창에서 바꾸면 오버레이도 따라간다. */
+let recommendMode: 1 | 2 = 1;
+
 let unwatchClient: (() => void) | null = null;
-/** 마지막으로 붙여준 클라이언트 좌표. 같은 값이면 창을 건드리지 않는다. */
-let lastDockedTo = '';
+/** 마지막으로 실제로 옮겨 붙인 우리 창의 위치·크기. 흔들림 판단 기준이 된다. */
+let lastDockedBounds: { x: number; y: number; width: number; height: number } | null = null;
 /** 직전 dock 시도가 자리 부족이었는지. 계속 좁은 동안 이벤트를 반복하지 않는다. */
 let wasDockInsufficient = false;
 
@@ -149,7 +179,18 @@ function setStatus(status: LcuStatus) {
   broadcast('lcu:status', status);
 }
 
-function publish(lineup: Lineup | null) {
+function publish(rawLineup: Lineup | null) {
+  let lineup = rawLineup;
+  if (lineup) {
+    // 세션이 바뀌면 누적을 새로 시작한다. 지난 판 아이템이 다음 판까지 넘어가면 안 된다.
+    if (lineup.sessionId !== seenItemsSessionId) {
+      seenItemsSessionId = lineup.sessionId;
+      seenItemIds = new Set();
+    }
+    for (const id of lineup.myItemIds) seenItemIds.add(id);
+    lineup = { ...lineup, myItemIds: [...seenItemIds] };
+  }
+
   const serialized = JSON.stringify(lineup);
   if (serialized === lastPublished) return; // 바뀐 게 없으면 조용히 넘어간다
   lastPublished = serialized;
@@ -411,10 +452,11 @@ function createMainWindow() {
 }
 
 /**
- * 롤 클라이언트 오른쪽에 메인 창을 붙인다.
- *
- * 클라이언트가 움직였을 때만 부른다. 매번 강제로 붙이면 사용자가 창을 옮겨도
- * 곧바로 되돌아가 버려서 직접 배치할 수가 없다.
+ * 롤 클라이언트 오른쪽에 메인 창을 붙인다. 폴링마다(0.5초) 불리지만,
+ * 실제로 자리가 바뀔 때만 setBounds를 호출한다 — 매번 강제로 다시 붙이면
+ * 사용자가 창을 옮겨도 곧바로 되돌아가 버려서 직접 배치할 수가 없고,
+ * GetWindowRect가 픽셀 단위로 미세하게 흔들리는 순간까지 그대로 반영하면
+ * 창이 계속 떨리듯 따라다니는 것처럼 보인다.
  */
 function dockToClient(rect: ClientWindowRect) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -448,21 +490,34 @@ function dockToClient(rect: ClientWindowRect) {
 
   const y = Math.max(area.y, Math.min(client.y, area.y + area.height - height));
 
-  mainWindow.setBounds({ x, y, width, height });
-  const insufficient = space < MIN_DOCK_WIDTH;
-  console.log(
-    `[dock] 클라이언트 DIP ${client.width}x${client.height}@${client.x},${client.y}` +
-      ` / 여백 좌${leftSpace} 우${rightSpace}` +
-      ` → ${useRight ? '오른쪽' : '왼쪽'} ${width}x${height}@${x},${y}` +
-      (insufficient ? ' (자리 부족 — 일부 겹침)' : ''),
-  );
-  // 자리 부족 상태가 새로 시작될 때만 보낸다. 창을 옮길 때마다 계속 좁으면
-  // dockToClient가 매번 불려도 한 번만 기록한다.
-  if (insufficient && !wasDockInsufficient) track('dock-space-insufficient');
-  wasDockInsufficient = insufficient;
+  // 우리 창이 실제로 옮겨질 계산 결과가 직전과 거의 같으면(흔들림) 그대로 둔다.
+  const moved =
+    !lastDockedBounds ||
+    Math.abs(x - lastDockedBounds.x) > DOCK_JITTER_PX ||
+    Math.abs(y - lastDockedBounds.y) > DOCK_JITTER_PX ||
+    Math.abs(width - lastDockedBounds.width) > DOCK_JITTER_PX ||
+    Math.abs(height - lastDockedBounds.height) > DOCK_JITTER_PX;
+
+  if (moved) {
+    mainWindow.setBounds({ x, y, width, height });
+    lastDockedBounds = { x, y, width, height };
+
+    const insufficient = space < MIN_DOCK_WIDTH;
+    console.log(
+      `[dock] 클라이언트 DIP ${client.width}x${client.height}@${client.x},${client.y}` +
+        ` / 여백 좌${leftSpace} 우${rightSpace}` +
+        ` → ${useRight ? '오른쪽' : '왼쪽'} ${width}x${height}@${x},${y}` +
+        (insufficient ? ' (자리 부족 — 일부 겹침)' : ''),
+    );
+    // 자리 부족 상태가 새로 시작될 때만 보낸다. 창을 옮길 때마다 계속 좁으면
+    // dockToClient가 매번 불려도 한 번만 기록한다.
+    if (insufficient && !wasDockInsufficient) track('dock-space-insufficient');
+    wasDockInsufficient = insufficient;
+  }
 
   // 클라이언트를 클릭하면 그 창이 위로 올라오면서 우리 창을 덮는다. 옆에 붙어
-  // 있으려면 같이 따라 올라와야 한다. 포커스는 뺏지 않는다.
+  // 있으려면 같이 따라 올라와야 한다. 포커스는 뺏지 않는다. 위치가 그대로여도
+  // z-order는 매번 다시 확인해야 클라이언트를 다시 눌렀을 때도 따라 올라온다.
   if (!mainWindow.isMinimized()) {
     mainWindow.showInactive();
     mainWindow.moveTop();
@@ -474,13 +529,10 @@ function startClientDock() {
   unwatchClient = watchClientWindow(
     (rect) => {
       if (!rect) {
-        // 클라이언트가 꺼졌다. 다시 켜지면 그때 한 번 붙인다.
-        lastDockedTo = '';
+        // 클라이언트가 꺼졌다. 다시 켜지면 그때 처음부터 다시 붙인다.
+        lastDockedBounds = null;
         return;
       }
-      const key = `${rect.x},${rect.y},${rect.width},${rect.height},${rect.minimized}`;
-      if (key === lastDockedTo) return;
-      lastDockedTo = key;
       dockToClient(rect);
     },
     () => track('window-watch-spawn-failed'),
@@ -597,6 +649,11 @@ async function createOverlayWindow() {
     applyOverlayBounds();
     if (overlayVisible) created.showInactive();
     console.log('[overlay] 표시됨', inGame ? '(게임 내 오버레이)' : '(일반 창)');
+    // 오버레이는 메인 창과 별개 렌더러라 콘솔도 따로 뜬다. detach로 열어야
+    // 작고 항상 위에 떠 있는 오버레이 창 안에 끼어들지 않는다.
+    if (isDev && process.env.DFGG_DEVTOOLS === '1') {
+      created.webContents.openDevTools({ mode: 'detach' });
+    }
   });
 
   created.webContents.on('did-finish-load', () => sendCurrentState(created));
@@ -618,6 +675,16 @@ ipcMain.handle('lcu:getStatus', () => lastStatus);
 
 // 렌더러 대신 여기서 백엔드를 호출한다. 패키징된 앱의 CORS·CSP 제약을 피한다.
 ipcMain.handle('api:recommend', (_event, body: unknown) => requestRecommendation(body));
+ipcMain.handle('api:recommendV3', (_event, body: unknown) => requestRecommendationV3(body));
+
+// 오버레이는 버튼을 못 다니 메인 창에서 바꾸면 여기서 오버레이까지 같이 알린다.
+ipcMain.handle('recommend:getMode', () => recommendMode);
+ipcMain.handle('recommend:setMode', (_event, mode: 1 | 2) => {
+  recommendMode = mode;
+  track('recommend-mode-change', { mode });
+  broadcast('recommend:mode', recommendMode);
+  return recommendMode;
+});
 
 // 오버레이는 클릭 통과라 자기 자신에 버튼을 달 수 없다. 메인 창에서 조절한다.
 ipcMain.handle('overlay:getState', () => ({ scale: overlayScale, visible: overlayVisible }));
@@ -675,6 +742,11 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  // 메인 창이 이미 닫혀 있으면(오버레이만 떠 있다 꺼지는 경우) 이 이벤트는
+  // 유실된다 — analytics.ts와 같은 이유로 재시도하지 않는다.
+  const minutes = Math.round((Date.now() - appLaunchedAt) / 60_000);
+  track('desktop-app-session', { minutes });
+
   stopAutoUpdate();
   unsubscribe?.();
   // 감시용 PowerShell 이 남으면 앱을 꺼도 프로세스가 계속 돈다.

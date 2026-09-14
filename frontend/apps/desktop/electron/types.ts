@@ -32,6 +32,12 @@ export interface Lineup {
   myChampionId: number;
   myChampionName: string | null;
   myPosition: Position | null;
+  /**
+   * 지금 내가 들고 있는 완성 아이템 id 목록. 밴픽 단계엔 상점이 없어 항상
+   * 빈 배열이고, 인게임에서만 채워진다. 추천 빌드에서 이미 산 아이템에
+   * 체크 표시를 하는 데 쓴다.
+   */
+  myItemIds: number[];
   allies: LineupSlot[];
   enemies: LineupSlot[];
 }

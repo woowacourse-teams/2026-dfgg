@@ -58,6 +58,7 @@ export function parseChampSelect(raw: unknown): Lineup | null {
     myChampionId: me ? pickedChampionId(me) : 0,
     myChampionName: null,
     myPosition: me ? toSlot(me).position : null,
+    myItemIds: [], // 밴픽 단계엔 상점이 없다
     allies: session.myTeam.map(toSlot),
     enemies: (session.theirTeam ?? []).map(toSlot),
   };
