@@ -47,8 +47,7 @@ public class PairSynergyRetriever {
     /**
      * 아이템별로 "상대 챔피언 → 점수" 묶음을 만든다.
      * 반환된 map에 없는 아이템은 어떤 상대와도 유의미하게 관측되지 않았다는 뜻이다.
-     */
-    /**
+     *
      * @param baseCountByItem 내 챔피언이 각 아이템을 산 판 수(상대 무관) — lift의 분모
      * @param baseGameCount   내 챔피언이 치른 판 수
      */

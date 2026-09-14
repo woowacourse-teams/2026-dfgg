@@ -98,13 +98,12 @@ class AllyEvidenceInResponseTest {
     }
 
     @Test
-    @DisplayName("ally 칸이 응답에 존재한다 — 채워지는 조건은 모델이 정한다")
+    @DisplayName("ally 칸이 응답에 존재한다 — 비어 있어도 null이 아니다")
     void recommend_AlwaysCarriesTheAllyField() {
-        // 이 픽스처에서 ALLY_SYNERGY 기여도는 불타는 향로 기준 5.8%로, 말할 가치가 있다고
-        // 볼 문턱(10%)에 못 미친다. 그래서 아군 이름이 붙지 않는 것이 옳은 동작이다.
-        // 게이트가 열렸을 때의 규칙은 AllyEvidenceTest가 단위로 검증한다.
+        // when: 채워지는 조건(아이템 synergy·승률 lift 문턱)은 AllyEvidenceTest가 단위로 검증한다.
         NextItemRecommendationResponse response = recommendForJanna();
 
+        // then
         assertThat(response.recommendedItems())
                 .allSatisfy(item -> assertThat(item.description().ally()).isNotNull());
     }

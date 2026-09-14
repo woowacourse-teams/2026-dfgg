@@ -9,7 +9,7 @@ import java.util.Map;
  * 발견하지 못한 경우는 score 0.0이 아니라 {@link ItemCandidate}에서 아예 부재로 표현한다 —
  * "0점으로 평가했다"와 "평가 대상에 없었다"는 다른 정보다.
  * <p>
- * {@code scoreByChampionId} — 구매 lift. "이 상대와 함께일 때 더 산다". 후보를 발견하는 데 쓰고 LTR feature로도 나간다</li>
+ * {@code scoreByChampionId} — 구매 lift. "이 상대와 함께일 때 더 산다". 후보를 발견하는 데 쓰고 LTR feature로도 나간다.
  * {@code winLiftByChampionId} — 승률 lift. "이 상대와 함께 사면 더 이긴다". 추천 이유로만 쓴다.
  * <p>
  * 구매 lift로 이유를 대면 드래프트 상관을 시너지로 오독한다.

@@ -131,26 +131,6 @@ public class CounterCandidateGenerator implements CandidateGenerator {
         return (double) baseCountByItem.getOrDefault(itemId, 0) / baseGameCount < minimumBaseRate;
     }
 
-    /**
-     * 적 하나에 대한 아이템별 counter 근거. lift·원 확률·base rate를 모두 담아 돌려주므로
-     * feature extraction이 같은 계산을 되풀이하지 않고 그대로 쓸 수 있다.
-     */
-    public Map<Long, PairLift> liftsByItem(long myChampionId, ChampionPosition position, long enemyChampionId) {
-        ChampionBaseline baseline = championBaselineReader.read(myChampionId, position);
-        Map<Long, Integer> baseCountByItem = baseline.purchaseCountAllByItem();
-        int baseGameCount = baseline.gameCountAll();
-
-        Map<Long, PairLift> liftByItem = new HashMap<>();
-        for (ChampionPairItemStats stats : pairRepository.findByMyChampionIdAndRelationAndOtherChampionIdIn(
-                Math.toIntExact(myChampionId), PairRelation.ENEMY, List.of(Math.toIntExact(enemyChampionId)))) {
-            liftByItem.put(stats.getItemId(), pairLiftCalculator.calculate(
-                    stats.getCoCountAll(), stats.getPairGameCountAll(),
-                    baseCountByItem.getOrDefault(stats.getItemId(), 0), baseGameCount
-            ));
-        }
-        return liftByItem;
-    }
-
     private List<ChampionPairItemStats> enemyStats(RecommendationQuery query) {
         if (query.enemyChampionIds().isEmpty()) {
             return List.of();
