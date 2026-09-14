@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 
 import java.util.List;
 
@@ -58,5 +59,22 @@ class ChampionTagFetchTest {
         // then
         assertThat(champions).hasSize(1);
         assertThat(champions.get(0).getChampionTags()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("태그 행이 중복돼 있어도 한 번씩만 낸다")
+    @Sql("/sql/champion-directory-test-data.sql")
+    void findAllWithTags_WhenTagRowsAreDuplicated_ReturnsEachTagOnce() {
+        // given: 픽스처의 다리우스는 FIGHTER, TANK, FIGHTER, TANK 네 행이다(덤프를 두 번 적재했던 로컬 DB 재현).
+        // 중복을 합치는 것은 쿼리의 DISTINCT다 — 이 테스트가 깨지면 DISTINCT가 사라졌는지 먼저 본다.
+        entityManager.clear();
+
+        // when
+        List<Champion> champions = championRepository.findAllWithTagsByChampionIdIn(List.of(122L));
+
+        // then: QueryFeatureExtractor는 이 목록을 그대로 세므로 중복이 남으면 ENEMY_FIGHTER_COUNT가 2가 된다
+        assertThat(champions).hasSize(1);
+        assertThat(champions.get(0).getChampionTags())
+                .containsExactlyInAnyOrder(ChampionTag.FIGHTER, ChampionTag.TANK);
     }
 }

@@ -16,9 +16,9 @@ import java.util.Set;
  * <ul>
  *   <li>태그가 {@code @ElementCollection}이라 지연 로딩이다 — 트랜잭션 밖에서 읽으면 터진다.
  *       그래서 fetch join 메서드를 쓴다.</li>
- *   <li>운영 데이터에 중복 태그 행이 있다 — 다리우스가 {@code FIGHTER,TANK,FIGHTER,TANK}로
- *       나온다. {@code LEFT JOIN FETCH}의 {@code DISTINCT}는 챔피언만 걸러줄 뿐 컬렉션 원소는
- *       그대로다.</li>
+ *   <li>태그가 {@code List}로 매핑돼 있어 DB에 중복 행이 있으면 그대로 올라올 수 있다.
+ *       조회 쿼리의 {@code SELECT DISTINCT}가 SQL로 넘어가 같은 (챔피언, 태그) 행을 합쳐 주지만,
+ *       쿼리에 기대지 않고 여기서 집합으로 한 번 더 접는다.</li>
  * </ul>
  * <p>
  * 모르는 ID는 결과에서 빠진다. 이름을 지어내지 않고, 부재는 호출자가 판단한다.

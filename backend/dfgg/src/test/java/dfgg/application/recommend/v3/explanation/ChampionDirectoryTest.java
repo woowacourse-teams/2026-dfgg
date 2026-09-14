@@ -19,10 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 챔피언 ID를 사람이 읽을 이름과 태그로 바꾼다.
- * <p>
- * 추천 이유에 "다리우스"라고 쓰려면 ID를 한글명으로 바꿔야 하고, "물리 피해"를 말하려면 태그가 필요하다.
- * 둘 다 DB에 있지만 그냥 읽으면 두 가지가 걸린다
- * — 태그가 지연 로딩이라 트랜잭션 밖에서 터지고, 운영 데이터에는 중복 태그 행이 있다.
  */
 @DataJpaTest
 @ActiveProfiles("test")
