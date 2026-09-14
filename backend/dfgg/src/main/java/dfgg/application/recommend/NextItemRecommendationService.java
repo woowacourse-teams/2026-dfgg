@@ -8,11 +8,13 @@ import dfgg.application.recommend.v3.CandidateUnion;
 import dfgg.application.recommend.v3.GeneratorResult;
 import dfgg.application.recommend.v3.RecommendationQuery;
 import dfgg.application.recommend.v3.HardValidityFilter;
+import dfgg.application.recommend.v3.ItemCandidate;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
 import dfgg.application.recommend.v3.explanation.ChampionDirectory;
 import dfgg.application.recommend.v3.explanation.AllyEvidence;
 import dfgg.application.recommend.v3.explanation.CounterEvidence;
 import dfgg.application.recommend.v3.explanation.ChampionProfile;
+import dfgg.application.recommend.v3.ranker.GroupedContributions;
 import dfgg.application.recommend.v3.ranker.RankedCandidate;
 import dfgg.application.recommend.v3.ranker.TreeShapCalculator;
 import dfgg.common.exception.InvalidRecommendationRequestException;
@@ -25,7 +27,6 @@ import dfgg.domain.item.trait.ItemTraitCatalog;
 import dfgg.presentation.dto.ChampionDto;
 import dfgg.presentation.dto.ChampionRefDto;
 import dfgg.presentation.dto.RecommendationDescription;
-import dfgg.presentation.dto.RecommendationReasons;
 import dfgg.presentation.dto.RecommendedItemDto;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
@@ -33,8 +34,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,6 +56,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 public class NextItemRecommendationService {
+
+    private static final Logger log = LoggerFactory.getLogger(NextItemRecommendationService.class);
 
     private static final int TOP_N = 5;
 
@@ -114,25 +120,43 @@ public class NextItemRecommendationService {
         Map<Long, ChampionProfile> championProfiles = championDirectory.resolve(evidenceChampionIds);
 
         List<RecommendedItemDto> recommendedItems = new ArrayList<>();
-        for (int index = 0; index < ranked.size(); index++) {
-            RankedCandidate candidate = ranked.get(index);
-            // 순위를 매길 때 쓴 feature 벡터를 그대로 넘긴다. 다시 계산하면 서빙 점수와
-            // 이유가 어긋날 수 있다.
-            RecommendationReasons reasons = RecommendationReasons.of(
-                    treeShapCalculator.contributions(candidate.features().values()));
+        for (RankedCandidate candidate : ranked) {
             Item item = itemById.get(candidate.itemId());
+            ItemCandidate evidence = valid.candidateOf(candidate.itemId());
+            logContributions(candidate, evidence);
 
             recommendedItems.add(RecommendedItemDto.of(item,
                     new RecommendationDescription(
-                            championRefs(CounterEvidence.championIdsFor(
-                                    valid.candidateOf(candidate.itemId())), championProfiles),
+                            championRefs(CounterEvidence.championIdsFor(evidence), championProfiles),
                             championRefs(AllyEvidence.championIdsFor(
-                                    valid.candidateOf(candidate.itemId()),
-                                    itemTraitCatalog.synergyOf(item)), championProfiles),
-                            traitNamesOf(item)),
-                    reasons));
+                                    evidence, itemTraitCatalog.synergyOf(item)), championProfiles),
+                            traitNamesOf(item))));
         }
-        return new NextItemRecommendationResponse(recommendedItems, candidateRanker.modelVersion());
+        return new NextItemRecommendationResponse(recommendedItems);
+    }
+
+    /**
+     * 이 아이템이 왜 이 순위인지를 SHAP 묶음 기여도로 남긴다.
+     * 응답에는 싣지 않는다.
+     * SHAP은 "예측을 얼마나 밀었나"를 답할 뿐 사용자에게 보일 이유가 아니다.
+     * <p>
+     * 소속(sources)을 함께 남긴다. 부호만으로는 의미가 정해지지 않는다.
+     * counter가 찾지 않은 후보에서도 결측 feature 때문에 COUNTER 기여가 양수로 잡힐 수 있다.
+     * <p>
+     * 어느 모델이 순위를 냈는지(model)도 남긴다. 응답에서 {@code servedBy}를 뺐으므로 모델을 추적할 곳은 여기뿐이다.
+     * <p>
+     * 순위를 매길 때 쓴 feature 벡터를 그대로 쓴다. 다시 계산하면 서빙 점수와 어긋날 수 있다.
+     * DEBUG가 꺼져 있으면 SHAP을 아예 계산하지 않는다.
+     */
+    private void logContributions(RankedCandidate candidate, ItemCandidate evidence) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
+        GroupedContributions contributions = GroupedContributions.of(
+                treeShapCalculator.contributions(candidate.features().values()));
+        log.debug("v3 ranking model={} itemId={} score={} sources={} baseValue={} contributions=[{}]",
+                candidateRanker.modelVersion(), candidate.itemId(), candidate.modelScore(),
+                new TreeSet<>(evidence.sources()), contributions.baseValue(), contributions.describe());
     }
 
     /** 이름을 못 찾은 챔피언은 뺀다. id만으로는 화면에 쓸 수 없다. */

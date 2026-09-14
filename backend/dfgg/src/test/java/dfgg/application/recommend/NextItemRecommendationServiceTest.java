@@ -28,7 +28,13 @@ import dfgg.domain.item.ItemExclusionGroups;
 import dfgg.presentation.dto.ChampionDto;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
+import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,6 +52,10 @@ class NextItemRecommendationServiceTest {
     private CandidateRanker candidateRanker;
     private ChampionRepository championRepository;
     private NextItemRecommendationService service;
+
+    private final Logger serviceLogger = (Logger) LoggerFactory.getLogger(NextItemRecommendationService.class);
+    private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
+    private Level previousLogLevel;
 
     @BeforeEach
     void setUp() {
@@ -71,6 +81,20 @@ class NextItemRecommendationServiceTest {
                 new dfgg.application.recommend.v3.explanation.ChampionDirectory(championRepository),
                 new dfgg.domain.item.trait.ItemTraitCatalog()
         );
+    }
+
+    @AfterEach
+    void detachLogAppender() {
+        serviceLogger.detachAppender(logAppender);
+        serviceLogger.setLevel(previousLogLevel);
+    }
+
+    /** 이 서비스의 로그를 붙잡는다. 레벨은 테스트가 정한다. */
+    private void captureLogsAt(Level level) {
+        previousLogLevel = serviceLogger.getLevel();
+        serviceLogger.setLevel(level);
+        logAppender.start();
+        serviceLogger.addAppender(logAppender);
     }
 
     /** 이유 계산은 여기 관심사가 아니다. 분기 없는 트리라 기여도가 전부 0이 된다. */
@@ -148,20 +172,6 @@ class NextItemRecommendationServiceTest {
     }
 
     @Test
-    @DisplayName("어떤 랭커가 순위를 냈는지 응답에 담는다")
-    void recommendNextItem_WhenServed_ReportsRankerModelVersion() {
-        // given
-        givenCandidates(KRAKEN);
-        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(KRAKEN));
-
-        // when
-        NextItemRecommendationResponse response = service.recommendNextItem(request());
-
-        // then
-        assertThat(response.servedBy()).isEqualTo("test-ranker");
-    }
-
-    @Test
     @DisplayName("후보가 하나도 없으면 기존과 같이 NotFound를 던진다 — 404 계약을 유지한다")
     void recommendNextItem_WhenNoCandidates_ThrowsNotFound() {
         // given
@@ -224,5 +234,39 @@ class NextItemRecommendationServiceTest {
         // then
         assertThat(response.recommendedItems().getFirst().description().traits())
                 .containsExactly("CC 해제 및 회복");
+    }
+
+    @Test
+    @DisplayName("DEBUG가 켜져 있으면 추천마다 순위를 낸 모델, SHAP 묶음 기여도, 후보 소속을 로그로 남긴다")
+    void recommendNextItem_WhenDebugEnabled_LogsContributionsWithSources() {
+        // given: 부호만으로는 의미가 정해지지 않는다 — 어느 generator가 찾았는지를 함께 남긴다
+        captureLogsAt(Level.DEBUG);
+        givenCandidates(KRAKEN);
+        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(KRAKEN));
+
+        // when
+        service.recommendNextItem(request());
+
+        // then
+        assertThat(logAppender.list).extracting(ILoggingEvent::getFormattedMessage)
+                .anySatisfy(message -> assertThat(message)
+                        .contains("model=test-ranker", "itemId=" + KRAKEN, "sources=[BUILD]",
+                                "baseValue=", "BUILD="));
+    }
+
+    @Test
+    @DisplayName("DEBUG가 꺼져 있으면 기여도 로그를 남기지 않는다 — 계산 비용도 들지 않는다")
+    void recommendNextItem_WhenDebugDisabled_LogsNoContributions() {
+        // given
+        captureLogsAt(Level.INFO);
+        givenCandidates(KRAKEN);
+        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(KRAKEN));
+
+        // when
+        service.recommendNextItem(request());
+
+        // then
+        assertThat(logAppender.list).extracting(ILoggingEvent::getFormattedMessage)
+                .noneMatch(message -> message.contains("baseValue="));
     }
 }
