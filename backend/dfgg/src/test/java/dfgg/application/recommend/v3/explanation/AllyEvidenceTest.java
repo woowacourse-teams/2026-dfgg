@@ -149,16 +149,27 @@ class AllyEvidenceTest {
     @Test
     @DisplayName("자기에게만 작용하는 아이템은 승률 lift가 높아도 아군을 지목하지 않는다")
     void championIdsFor_WhenItemActsOnlyOnSelf_NamesNobody() {
-        // 실측: 존야·판금 장화·필멸자의 운명에 아군 이름이 붙었다. 어떤 lift로도
+        // given: 실측에서 존야·판금 장화·필멸자의 운명에 아군 이름이 붙었다. 어떤 lift로도
         // "이 아군 때문에 좋은 아이템"이 될 수 없는 아이템이다.
-        assertThat(AllyEvidence.championIdsFor(
-                candidateWithAllyLifts(Map.of(JINX, 1.40)), Synergy.SELF)).isEmpty();
+        ItemCandidate strongAllyEvidence = candidateWithAllyLifts(Map.of(JINX, 1.40));
+
+        // when
+        List<Long> allies = AllyEvidence.championIdsFor(strongAllyEvidence, Synergy.SELF);
+
+        // then
+        assertThat(allies).isEmpty();
     }
 
     @Test
     @DisplayName("같은 근거라도 아군에게 작용하는 아이템이면 지목한다 — synergy만이 차이다")
     void championIdsFor_WhenSameEvidenceButItemActsOnAllies_NamesAlly() {
-        assertThat(AllyEvidence.championIdsFor(
-                candidateWithAllyLifts(Map.of(JINX, 1.40)), Synergy.ALLY)).containsExactly(JINX);
+        // given
+        ItemCandidate strongAllyEvidence = candidateWithAllyLifts(Map.of(JINX, 1.40));
+
+        // when
+        List<Long> allies = AllyEvidence.championIdsFor(strongAllyEvidence, Synergy.ALLY);
+
+        // then
+        assertThat(allies).containsExactly(JINX);
     }
 }

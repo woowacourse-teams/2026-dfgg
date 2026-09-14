@@ -15,6 +15,7 @@ import dfgg.application.recommend.v3.explanation.CounterEvidence;
 import dfgg.application.recommend.v3.explanation.ChampionProfile;
 import dfgg.application.recommend.v3.ranker.RankedCandidate;
 import dfgg.application.recommend.v3.ranker.TreeShapCalculator;
+import dfgg.common.InvalidRecommendationRequestException;
 import dfgg.common.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
@@ -152,15 +153,32 @@ public class NextItemRecommendationService {
     }
 
     private RecommendationQuery toQuery(NextItemRecommendationRequest request, Champion myChampion) {
+        List<Long> allyChampionIds = resolveChampionIds(request.allies());
+        List<Long> enemyChampionIds = resolveChampionIds(request.enemies());
+        rejectMyChampionInTeams(myChampion, allyChampionIds, enemyChampionIds);
         return new RecommendationQuery(
                 myChampion.getChampionId(),
                 ChampionPosition.valueOf(request.myChampion().position()),
                 request.purchasedItemIds(),
-                resolveChampionIds(request.allies()),
-                resolveChampionIds(request.enemies()),
+                allyChampionIds,
+                enemyChampionIds,
                 request.tier(),
                 request.patch()
         );
+    }
+
+    /**
+     * 이름이 아니라 해석된 ID로 비교한다 — "Yasuo"와 "야스오"는 같은 챔피언이다.
+     * {@link RecommendationQuery}도 같은 조건을 검사하지만 그건 불변식이라 500이 된다.
+     * 요청의 모순은 여기서 입력 오류로 걸러낸다.
+     */
+    private void rejectMyChampionInTeams(
+            Champion myChampion, List<Long> allyChampionIds, List<Long> enemyChampionIds) {
+        if (allyChampionIds.contains(myChampion.getChampionId())
+                || enemyChampionIds.contains(myChampion.getChampionId())) {
+            throw new InvalidRecommendationRequestException(
+                    "내 챔피언이 아군·적 목록에도 들어 있습니다: " + myChampion.getName());
+        }
     }
 
     private Map<Long, Item> loadItems(CandidateUnion union, RecommendationQuery query) {

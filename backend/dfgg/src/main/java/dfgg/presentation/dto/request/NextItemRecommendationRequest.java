@@ -13,7 +13,7 @@ public record NextItemRecommendationRequest(
         ChampionDto myChampion,
 
         @NotNull(message = "구매한 아이템 목록은 필수입니다(아직 없으면 빈 배열)")
-        List<Long> purchasedItemIds,
+        List<@NotNull(message = "구매한 아이템 ID에 null이 들어갈 수 없습니다") Long> purchasedItemIds,
 
         @Valid
         @NotNull(message = "아군 정보는 필수입니다")

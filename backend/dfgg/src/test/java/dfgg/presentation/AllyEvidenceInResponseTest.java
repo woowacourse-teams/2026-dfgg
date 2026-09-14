@@ -111,9 +111,11 @@ class AllyEvidenceInResponseTest {
 
     @Test
     @DisplayName("자기에게만 작용하는 아이템에는 아군 이름이 붙지 않는다 — synergy가 SELF면 비운다")
-    void recommend_LeavesAllyEmptyOnSelfSynergyItems() {
+    void recommend_WhenItemIsSelfSynergy_LeavesAllyEmpty() {
+        // when
         NextItemRecommendationResponse response = recommendForJanna();
 
+        // then
         response.recommendedItems().stream()
                 .filter(item -> itemTraitCatalog.synergyOf(new Item(item.id(), item.name())) == Synergy.SELF)
                 .forEach(item -> assertThat(item.description().ally()).as(item.name()).isEmpty());

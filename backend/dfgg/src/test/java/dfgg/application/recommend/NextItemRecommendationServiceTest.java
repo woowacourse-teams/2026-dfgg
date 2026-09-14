@@ -19,8 +19,10 @@ import dfgg.application.recommend.v3.feature.FeatureVector;
 import dfgg.application.recommend.v3.ranker.RankedCandidate;
 import dfgg.application.recommend.v3.ScoredItem;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
+import dfgg.common.InvalidRecommendationRequestException;
 import dfgg.common.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
+import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemExclusionGroups;
 import dfgg.presentation.dto.ChampionDto;
@@ -41,7 +43,7 @@ class NextItemRecommendationServiceTest {
     private ItemService itemService;
     private CandidateGenerator buildGenerator;
     private CandidateRanker candidateRanker;
-    private dfgg.domain.champion.ChampionRepository championRepository;
+    private ChampionRepository championRepository;
     private NextItemRecommendationService service;
 
     @BeforeEach
@@ -83,7 +85,7 @@ class NextItemRecommendationServiceTest {
 
     private long championIdOf(String name) {
         return switch (name) {
-            case "야스오" -> 157L;
+            case "야스오", "Yasuo" -> 157L;
             case "징크스" -> 222L;
             case "쓰레쉬" -> 412L;
             case "리신" -> 64L;
@@ -170,5 +172,41 @@ class NextItemRecommendationServiceTest {
         // when & then
         assertThatThrownBy(() -> service.recommendNextItem(request()))
                 .isInstanceOf(NextItemRecommendationNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("내 챔피언이 아군 목록에도 있으면 입력 오류다 — 서버 내부 오류로 새지 않는다")
+    void recommendNextItem_WhenMyChampionIsAlsoAnAlly_ThrowsInvalidRequest() {
+        // given
+        NextItemRecommendationRequest request = new NextItemRecommendationRequest(
+                new ChampionDto("야스오", "MID"), List.of(),
+                List.of(new ChampionDto("야스오", "BOTTOM"), new ChampionDto("쓰레쉬", "SUPPORT"),
+                        new ChampionDto("리신", "JUNGLE"), new ChampionDto("오른", "TOP")),
+                List.of(new ChampionDto("람머스", "TOP"), new ChampionDto("아리", "MID"),
+                        new ChampionDto("케이틀린", "BOTTOM"), new ChampionDto("레오나", "SUPPORT"),
+                        new ChampionDto("엘리스", "JUNGLE")),
+                "EMERALD", "16.17");
+
+        // when & then
+        assertThatThrownBy(() -> service.recommendNextItem(request))
+                .isInstanceOf(InvalidRecommendationRequestException.class);
+    }
+
+    @Test
+    @DisplayName("다른 표기로 들어와도 같은 챔피언이면 입력 오류다 — 이름이 아니라 해석된 ID로 비교한다")
+    void recommendNextItem_WhenMyChampionIsAnEnemyUnderAnotherSpelling_ThrowsInvalidRequest() {
+        // given
+        NextItemRecommendationRequest request = new NextItemRecommendationRequest(
+                new ChampionDto("야스오", "MID"), List.of(),
+                List.of(new ChampionDto("징크스", "BOTTOM"), new ChampionDto("쓰레쉬", "SUPPORT"),
+                        new ChampionDto("리신", "JUNGLE"), new ChampionDto("오른", "TOP")),
+                List.of(new ChampionDto("람머스", "TOP"), new ChampionDto("Yasuo", "MID"),
+                        new ChampionDto("케이틀린", "BOTTOM"), new ChampionDto("레오나", "SUPPORT"),
+                        new ChampionDto("엘리스", "JUNGLE")),
+                "EMERALD", "16.17");
+
+        // when & then
+        assertThatThrownBy(() -> service.recommendNextItem(request))
+                .isInstanceOf(InvalidRecommendationRequestException.class);
     }
 }
