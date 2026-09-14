@@ -20,6 +20,7 @@ import dfgg.common.exception.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.item.Item;
+import dfgg.domain.item.trait.ItemTrait;
 import dfgg.domain.item.trait.ItemTraitCatalog;
 import dfgg.presentation.dto.ChampionDto;
 import dfgg.presentation.dto.ChampionRefDto;
@@ -144,10 +145,15 @@ public class NextItemRecommendationService {
                 .toList();
     }
 
-    /** 아이템 자체의 성질이라 모델 판단과 무관하다. 게이트를 걸지 않는다. */
+    /**
+     * 아이템 자체의 성질이라 모델 판단과 무관하다. 게이트를 걸지 않는다.
+     * <p>
+     * 팀이 정한 표시명을 낸다. enum 이름({@code CC_CLEANSE})은 코드의 식별자라 화면에 쓸 말이 아니다.
+     * 정렬은 매 요청 같은 순서를 내기 위한 것이다.
+     */
     private List<String> traitNamesOf(Item item) {
         return itemTraitCatalog.traitsOf(item).stream()
-                .map(Enum::name)
+                .map(ItemTrait::getDisplayName)
                 .sorted()
                 .toList();
     }

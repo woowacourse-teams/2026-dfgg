@@ -38,6 +38,7 @@ class NextItemRecommendationServiceTest {
     private static final long KRAKEN = 6673L;
     private static final long INFINITY_EDGE = 3031L;
     private static final long LIANDRY = 6653L;
+    private static final long MIKAELS_BLESSING = 3222L;
 
     private ChampionService championService;
     private ItemService itemService;
@@ -208,5 +209,20 @@ class NextItemRecommendationServiceTest {
         // when & then
         assertThatThrownBy(() -> service.recommendNextItem(request))
                 .isInstanceOf(InvalidRecommendationRequestException.class);
+    }
+
+    @Test
+    @DisplayName("traits는 팀이 정한 표시명으로 낸다 — enum 이름이 화면에 새지 않는다")
+    void recommendNextItem_WhenItemHasTraits_ReturnsDisplayNames() {
+        // given
+        givenCandidates(MIKAELS_BLESSING);
+        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(MIKAELS_BLESSING));
+
+        // when
+        NextItemRecommendationResponse response = service.recommendNextItem(request());
+
+        // then
+        assertThat(response.recommendedItems().getFirst().description().traits())
+                .containsExactly("CC 해제 및 회복");
     }
 }

@@ -278,9 +278,9 @@ class NextItemRecommendationV3PipelineTest {
     }
 
     @Test
-    @DisplayName("traits는 어휘에 있는 값만 낸다 — Data Dragon 원본 태그가 새어나가지 않는다")
+    @DisplayName("traits는 팀 어휘의 표시명만 낸다 — Data Dragon 원본 태그도 enum 이름도 새어나가지 않는다")
     void recommendV3_TraitsUseTheTeamVocabularyOnly() {
-        List<String> vocabulary = Arrays.stream(ItemTrait.values()).map(Enum::name).toList();
+        List<String> vocabulary = Arrays.stream(ItemTrait.values()).map(ItemTrait::getDisplayName).toList();
 
         NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
 
