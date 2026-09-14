@@ -1,6 +1,6 @@
 package dfgg.application.champion;
 
-import dfgg.common.ChampionNotFoundException;
+import dfgg.common.exception.ChampionNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.champion.ChampionTag;

@@ -1,8 +1,8 @@
 package dfgg.common.handler;
 
-import dfgg.common.ChampionNotFoundException;
-import dfgg.common.InvalidRecommendationRequestException;
-import dfgg.common.NextItemRecommendationNotFoundException;
+import dfgg.common.exception.ChampionNotFoundException;
+import dfgg.common.exception.InvalidRecommendationRequestException;
+import dfgg.common.exception.NextItemRecommendationNotFoundException;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;

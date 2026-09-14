@@ -1,7 +1,7 @@
 package dfgg.application.recommend;
 
 import dfgg.application.champion.ChampionService;
-import dfgg.common.CompositionStatsNotFoundException;
+import dfgg.common.exception.CompositionStatsNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.item.Item;

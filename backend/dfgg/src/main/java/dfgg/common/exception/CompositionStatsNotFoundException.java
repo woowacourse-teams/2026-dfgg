@@ -1,4 +1,4 @@
-package dfgg.common;
+package dfgg.common.exception;
 
 public class CompositionStatsNotFoundException extends RuntimeException {
 

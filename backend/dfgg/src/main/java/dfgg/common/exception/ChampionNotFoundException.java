@@ -1,4 +1,4 @@
-package dfgg.common;
+package dfgg.common.exception;
 
 /**
  * 요청에 적힌 챔피언을 찾을 수 없다.
