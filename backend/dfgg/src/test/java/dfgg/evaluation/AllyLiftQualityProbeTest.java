@@ -6,6 +6,7 @@ import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.recommend.v3.CandidateGenerator;
 import dfgg.application.recommend.v3.CandidateSource;
 import dfgg.application.recommend.v3.ScoredItem;
+import dfgg.application.recommend.v3.generator.ChampionBaselineReader;
 import dfgg.application.recommend.v3.generator.AllySynergyCandidateGenerator;
 import dfgg.application.recommend.v3.generator.PairLiftCalculator;
 import dfgg.application.recommend.v3.generator.PairSynergyRetriever;
@@ -75,7 +76,7 @@ class AllyLiftQualityProbeTest {
             AllySynergyCandidateGenerator ally = new AllySynergyCandidateGenerator(
                     new PairSynergyRetriever(pairRepository, pairLiftCalculator, 5, floor),
                     championItemStatsRepository, championItemRollupRepository,
-                    new WilsonScoreCalculator());
+                    new WilsonScoreCalculator(), new ChampionBaselineReader(championItemStatsRepository, championItemRollupRepository));
             measure(ally, snapshots, floor);
         }
         assertThat(snapshots).isNotEmpty();

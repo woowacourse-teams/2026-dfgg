@@ -43,6 +43,7 @@ public class CounterCandidateGenerator implements CandidateGenerator {
     private final WilsonScoreCalculator wilsonScoreCalculator;
     private final int minimumPairGames;
     private final double minimumBaseRate;
+    private final ChampionBaselineReader championBaselineReader;
 
     public CounterCandidateGenerator(
             ChampionPairItemStatsRepository pairRepository,
@@ -51,7 +52,8 @@ public class CounterCandidateGenerator implements CandidateGenerator {
             PairLiftCalculator pairLiftCalculator,
             WilsonScoreCalculator wilsonScoreCalculator,
             @Value("${recommendation.pair-synergy.minimum-pair-games}") int minimumPairGames,
-            @Value("${recommendation.counter.minimum-base-rate}") double minimumBaseRate
+            @Value("${recommendation.counter.minimum-base-rate}") double minimumBaseRate,
+            ChampionBaselineReader championBaselineReader
     ) {
         this.pairRepository = pairRepository;
         this.championItemStatsRepository = championItemStatsRepository;
@@ -60,6 +62,7 @@ public class CounterCandidateGenerator implements CandidateGenerator {
         this.wilsonScoreCalculator = wilsonScoreCalculator;
         this.minimumPairGames = minimumPairGames;
         this.minimumBaseRate = minimumBaseRate;
+        this.championBaselineReader = championBaselineReader;
     }
 
     @Override
@@ -69,8 +72,10 @@ public class CounterCandidateGenerator implements CandidateGenerator {
 
     @Override
     public GeneratorResult generate(RecommendationQuery query, int topK) {
-        Map<Long, Integer> baseCountByItem = baseCounts(query);
-        int baseGameCount = baseGameCount(query);
+        // 분모는 feature 추출기와 같은 곳에서 읽는다. off-role이면 챔피언 전체로 물러선다.
+        ChampionBaseline baseline = championBaselineReader.read(query.myChampionId(), query.position());
+        Map<Long, Integer> baseCountByItem = baseline.purchaseCountAllByItem();
+        int baseGameCount = baseline.gameCountAll();
 
         // 아이템 → (적 챔피언 → lift). 적별 lift를 개별 보존한 뒤 집계한다.
         Map<Long, Map<Long, Double>> liftByItemAndEnemy = new HashMap<>();
@@ -131,8 +136,9 @@ public class CounterCandidateGenerator implements CandidateGenerator {
      * feature extraction이 같은 계산을 되풀이하지 않고 그대로 쓸 수 있다.
      */
     public Map<Long, PairLift> liftsByItem(long myChampionId, ChampionPosition position, long enemyChampionId) {
-        Map<Long, Integer> baseCountByItem = baseCounts(myChampionId, position);
-        int baseGameCount = baseGameCount(myChampionId, position);
+        ChampionBaseline baseline = championBaselineReader.read(myChampionId, position);
+        Map<Long, Integer> baseCountByItem = baseline.purchaseCountAllByItem();
+        int baseGameCount = baseline.gameCountAll();
 
         Map<Long, PairLift> liftByItem = new HashMap<>();
         for (ChampionPairItemStats stats : pairRepository.findByMyChampionIdAndRelationAndOtherChampionIdIn(
@@ -153,42 +159,6 @@ public class CounterCandidateGenerator implements CandidateGenerator {
                 Math.toIntExact(query.myChampionId()), PairRelation.ENEMY,
                 query.enemyChampionIds().stream().map(Math::toIntExact).toList()
         );
-    }
-
-    private Map<Long, Integer> baseCounts(RecommendationQuery query) {
-        return baseCounts(query.myChampionId(), query.position());
-    }
-
-    private Map<Long, Integer> baseCounts(long myChampionId, ChampionPosition position) {
-        Map<Long, Integer> countByItem = new HashMap<>();
-        for (ChampionItemStats stats : positionStats(myChampionId, position)) {
-            countByItem.put(stats.getItemId(), stats.getPurchaseCountAll());
-        }
-        if (!countByItem.isEmpty()) {
-            return countByItem;
-        }
-        for (ChampionItemRollup stats : championItemRollupRepository.findByChampionId(Math.toIntExact(myChampionId))) {
-            countByItem.put(stats.getItemId(), stats.getPurchaseCountAll());
-        }
-        return countByItem;
-    }
-
-    private int baseGameCount(RecommendationQuery query) {
-        return baseGameCount(query.myChampionId(), query.position());
-    }
-
-    private int baseGameCount(long myChampionId, ChampionPosition position) {
-        int fromPosition = positionStats(myChampionId, position).stream()
-                .mapToInt(ChampionItemStats::getChampionGameCountAll)
-                .max()
-                .orElse(0);
-        if (fromPosition > 0) {
-            return fromPosition;
-        }
-        return championItemRollupRepository.findByChampionId(Math.toIntExact(myChampionId)).stream()
-                .mapToInt(ChampionItemRollup::getChampionGameCountAll)
-                .max()
-                .orElse(0);
     }
 
     private List<ChampionItemStats> positionStats(long myChampionId, ChampionPosition position) {

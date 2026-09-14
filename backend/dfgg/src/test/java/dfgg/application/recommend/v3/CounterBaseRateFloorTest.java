@@ -3,6 +3,7 @@ package dfgg.application.recommend.v3;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
+import dfgg.application.recommend.v3.generator.ChampionBaselineReader;
 import dfgg.application.recommend.v3.generator.CounterCandidateGenerator;
 import dfgg.application.recommend.v3.generator.PairLiftCalculator;
 import dfgg.application.utils.WilsonScoreCalculator;
@@ -63,7 +64,8 @@ class CounterBaseRateFloorTest {
     private CounterCandidateGenerator generatorWith(double floor) {
         return new CounterCandidateGenerator(
                 pairRepository, championItemStatsRepository, championItemRollupRepository,
-                new PairLiftCalculator(1.0, 159), new WilsonScoreCalculator(), 1, floor);
+                new PairLiftCalculator(1.0, 159), new WilsonScoreCalculator(), 1, floor,
+                new ChampionBaselineReader(championItemStatsRepository, championItemRollupRepository));
     }
 
     private List<Long> candidates(double floor) {

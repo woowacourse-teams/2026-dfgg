@@ -37,17 +37,20 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
     private final ChampionItemStatsRepository championItemStatsRepository;
     private final ChampionItemRollupRepository championItemRollupRepository;
     private final WilsonScoreCalculator wilsonScoreCalculator;
+    private final ChampionBaselineReader championBaselineReader;
 
     public AllySynergyCandidateGenerator(
             PairSynergyRetriever pairSynergyRetriever,
             ChampionItemStatsRepository championItemStatsRepository,
             ChampionItemRollupRepository championItemRollupRepository,
-            WilsonScoreCalculator wilsonScoreCalculator
+            WilsonScoreCalculator wilsonScoreCalculator,
+            ChampionBaselineReader championBaselineReader
     ) {
         this.pairSynergyRetriever = pairSynergyRetriever;
         this.championItemStatsRepository = championItemStatsRepository;
         this.championItemRollupRepository = championItemRollupRepository;
         this.wilsonScoreCalculator = wilsonScoreCalculator;
+        this.championBaselineReader = championBaselineReader;
     }
 
     @Override
@@ -57,13 +60,14 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
 
     @Override
     public GeneratorResult generate(RecommendationQuery query, int topK) {
+        // lift 분모는 off-role이면 챔피언 전체로 물러선다. feature 추출기와 같은 곳에서 읽는다.
+        ChampionBaseline baseline = championBaselineReader.read(query.myChampionId(), query.position());
+        Map<Long, PairScoreAggregate> scoresByItem = pairSynergyRetriever.scoresByItem(
+                query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
+                baseline.purchaseCountAllByItem(), baseline.gameCountAll());
         List<ChampionItemStats> positionStats =
                 championItemStatsRepository.findByChampionIdAndPosition(
                         Math.toIntExact(query.myChampionId()), query.position());
-        Map<Long, PairScoreAggregate> scoresByItem = pairSynergyRetriever.scoresByItem(
-                query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
-                baseCounts(positionStats), baseGameCount(positionStats));
-        // 추천 이유용. 랭킹에는 쓰지 않는다 — 표본이 얇아 발견에는 못 쓴다.
         Map<Long, Map<Long, Double>> winLiftsByItem = pairSynergyRetriever.winLiftsByItem(
                 query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
                 itemWinRates(positionStats), championWinRate(positionStats),
@@ -113,22 +117,6 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
                         (double) stats.getChampionWinCountAll() / stats.getChampionGameCountAll())
                 .findFirst()
                 .orElse(0.0);
-    }
-
-    /** lift의 분모 — 이 챔피언이 각 아이템을 산 판 수. 상대가 누구든 같은 값이다. */
-    private Map<Long, Integer> baseCounts(List<ChampionItemStats> positionStats) {
-        Map<Long, Integer> countByItem = new java.util.HashMap<>();
-        for (ChampionItemStats stats : positionStats) {
-            countByItem.put(stats.getItemId(), stats.getPurchaseCountAll());
-        }
-        return countByItem;
-    }
-
-    private int baseGameCount(List<ChampionItemStats> positionStats) {
-        return positionStats.stream()
-                .mapToInt(ChampionItemStats::getChampionGameCountAll)
-                .max()
-                .orElse(0);
     }
 
     /**

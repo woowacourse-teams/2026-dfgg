@@ -3,6 +3,7 @@ package dfgg.application.recommend.v3;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
+import dfgg.application.recommend.v3.generator.ChampionBaselineReader;
 import dfgg.application.recommend.v3.generator.AllySynergyCandidateGenerator;
 import dfgg.application.recommend.v3.generator.PairLiftCalculator;
 import dfgg.application.recommend.v3.generator.PairSynergyRetriever;
@@ -71,7 +72,7 @@ class AllyBaseRateFloorTest {
                 pairRepository, new PairLiftCalculator(1.0, 159), 1, floor);
         AllySynergyCandidateGenerator generator = new AllySynergyCandidateGenerator(
                 retriever, championItemStatsRepository, championItemRollupRepository,
-                new WilsonScoreCalculator());
+                new WilsonScoreCalculator(), new ChampionBaselineReader(championItemStatsRepository, championItemRollupRepository));
         return generator.generate(query(), 20).rankedItems().stream()
                 .map(ScoredItem::itemId)
                 .toList();

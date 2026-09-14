@@ -21,7 +21,7 @@ import org.springframework.test.context.jdbc.Sql;
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({TierScopeConfiguration.class, ItemStatsAggregationService.class, StatsFeatureExtractor.class,
-        dfgg.application.recommend.v3.generator.PairSynergyRetriever.class,
+        dfgg.application.recommend.v3.generator.PairSynergyRetriever.class, dfgg.application.recommend.v3.generator.ChampionBaselineReader.class,
         dfgg.application.recommend.v3.generator.PairLiftCalculator.class,
         dfgg.application.utils.WilsonScoreCalculator.class})
 @Sql("/sql/counter-test-data.sql")

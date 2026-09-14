@@ -3,6 +3,7 @@ package dfgg.application.recommend.v3;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
+import dfgg.application.recommend.v3.generator.ChampionBaselineReader;
 import dfgg.application.recommend.v3.generator.CounterCandidateGenerator;
 import dfgg.application.recommend.v3.generator.PairLift;
 import dfgg.application.recommend.v3.generator.PairLiftCalculator;
@@ -59,7 +60,8 @@ class CounterCandidateGeneratorTest {
         aggregationService.aggregate(1);
         generator = new CounterCandidateGenerator(
                 pairRepository, championItemStatsRepository, championItemRollupRepository,
-                new PairLiftCalculator(1.0, 159), new WilsonScoreCalculator(), 5, NO_BASE_RATE_FLOOR
+                new PairLiftCalculator(1.0, 159), new WilsonScoreCalculator(), 5, NO_BASE_RATE_FLOOR,
+                new ChampionBaselineReader(championItemStatsRepository, championItemRollupRepository)
         );
     }
 

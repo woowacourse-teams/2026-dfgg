@@ -3,6 +3,7 @@ package dfgg.application.recommend.v3;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
+import dfgg.application.recommend.v3.generator.ChampionBaselineReader;
 import dfgg.application.recommend.v3.generator.AllySynergyCandidateGenerator;
 import dfgg.application.recommend.v3.generator.PairBackoffLevel;
 import dfgg.application.recommend.v3.generator.PairLiftCalculator;
@@ -70,7 +71,7 @@ class AllySynergyCandidateGeneratorTest {
                 NO_BASE_RATE_FLOOR);
         generator = new AllySynergyCandidateGenerator(
                 retriever, championItemStatsRepository, championItemRollupRepository,
-                new WilsonScoreCalculator()
+                new WilsonScoreCalculator(), new ChampionBaselineReader(championItemStatsRepository, championItemRollupRepository)
         );
     }
 
