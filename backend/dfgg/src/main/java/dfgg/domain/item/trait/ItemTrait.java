@@ -12,7 +12,13 @@ public enum ItemTrait {
     LIFE_STEAL("생명력 흡수"),
     TENACITY("강인함"),
 
-    // Support item traits
+    // Support item traits V2
+    ENGAGE(""),
+    PEEL(""),
+    HEAL(""),
+    SHIELD(""),
+    TEAM_BUFF(""),
+    // Support item traits V3
     MOBILITY_BUFF("기동력 강화"),
     ATTACK_SPEED_BUFF("아군 공격속도 강화"),
     ALLY_SUSTAIN("지속 아군 회복"),

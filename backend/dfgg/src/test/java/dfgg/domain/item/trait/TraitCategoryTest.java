@@ -33,7 +33,7 @@ class TraitCategoryTest {
                 new RoleFile("암살자", AssassinTraits.BY_ITEM_ID),
                 new RoleFile("마법사", MageTraits.BY_ITEM_ID),
                 new RoleFile("탱커", TankTraits.BY_ITEM_ID),
-                new RoleFile("서포터", SupportTraits.BY_ITEM_ID));
+                new RoleFile("서포터", ItemProfile.traitsByItemId(SupportTraits.BY_ITEM_ID)));
     }
 
     @Test

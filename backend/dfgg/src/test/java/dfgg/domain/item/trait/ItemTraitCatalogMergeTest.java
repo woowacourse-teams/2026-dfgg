@@ -20,20 +20,20 @@ class ItemTraitCatalogMergeTest {
     }
 
     @Test
-    @DisplayName("v1/v2가 쓰는 유틸리티 trait가 그대로 유지된다")
-    void traitsOf_PreservesUtilityTraitsUsedByBuildPolicy() {
-        assertThat(catalog.hasTrait(new Item(3504L, "불타는 향로"), ItemTrait.TEAM_BUFF)).isTrue();
-        assertThat(catalog.hasTrait(new Item(3222L, "미카엘의 축복"), ItemTrait.PEEL)).isTrue();
-        assertThat(catalog.hasTrait(new Item(6617L, "월석 재생기"), ItemTrait.HEAL)).isTrue();
+    @DisplayName("서포터 파일의 고유 trait가 합친 뒤에도 그대로 나온다")
+    void traitsOf_PreservesSupportTraitsAfterMerge() {
+        assertThat(catalog.hasTrait(new Item(3504L, "불타는 향로"), ItemTrait.ATTACK_SPEED_AND_DAMAGE_BUFF)).isTrue();
+        assertThat(catalog.hasTrait(new Item(3222L, "미카엘의 축복"), ItemTrait.CC_CLEANSE)).isTrue();
+        assertThat(catalog.hasTrait(new Item(6617L, "월석 재생기"), ItemTrait.HEAL_SHIELD_AMPLIFY)).isTrue();
     }
 
     @Test
     @DisplayName("매핑을 직접 주입하면 그것만 쓴다 — 테스트가 기본 어휘에 묶이지 않는다")
     void traitsOf_WhenCatalogIsCustom_UsesOnlyTheGivenMapping() {
         ItemTraitCatalog custom = new ItemTraitCatalog(
-                java.util.Map.of(3190L, java.util.Set.of(ItemTrait.ENGAGE)));
+                java.util.Map.of(3190L, java.util.Set.of(ItemTrait.CC_CLEANSE)));
 
         assertThat(custom.traitsOf(new Item(3190L, "강철의 솔라리 펜던트")))
-                .containsExactly(ItemTrait.ENGAGE);
+                .containsExactly(ItemTrait.CC_CLEANSE);
     }
 }
