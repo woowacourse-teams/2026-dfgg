@@ -32,8 +32,10 @@ import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -183,31 +185,39 @@ public class NextItemRecommendationService {
     }
 
     private RecommendationQuery toQuery(NextItemRecommendationRequest request, Champion myChampion) {
-        List<Long> allyChampionIds = resolveChampionIds(request.allies());
-        List<Long> enemyChampionIds = resolveChampionIds(request.enemies());
-        rejectMyChampionInTeams(myChampion, allyChampionIds, enemyChampionIds);
+        List<Champion> allies = resolveChampions(request.allies());
+        List<Champion> enemies = resolveChampions(request.enemies());
+        rejectDuplicateChampions(myChampion, allies, enemies);
         return new RecommendationQuery(
                 myChampion.getChampionId(),
                 ChampionPosition.valueOf(request.myChampion().position()),
                 request.purchasedItemIds(),
-                allyChampionIds,
-                enemyChampionIds,
+                championIdsOf(allies),
+                championIdsOf(enemies),
                 request.tier(),
                 request.patch()
         );
     }
 
     /**
-     * 이름이 아니라 해석된 ID로 비교한다 — "Yasuo"와 "야스오"는 같은 챔피언이다.
-     * {@link RecommendationQuery}도 같은 조건을 검사하지만 그건 불변식이라 500이 된다.
+     * 한 게임에 같은 챔피언은 둘일 수 없다 — 나·아군·적 10명 모두 달라야 한다.
+     * <p>
+     * 이름이 아니라 해석된 ID로 비교한다. "Yasuo"와 "야스오"는 같은 챔피언이다.
+     * {@link RecommendationQuery}도 내 챔피언의 중복은 검사하지만 그건 불변식이라 500이 된다.
      * 요청의 모순은 여기서 입력 오류로 걸러낸다.
      */
-    private void rejectMyChampionInTeams(
-            Champion myChampion, List<Long> allyChampionIds, List<Long> enemyChampionIds) {
-        if (allyChampionIds.contains(myChampion.getChampionId())
-                || enemyChampionIds.contains(myChampion.getChampionId())) {
-            throw new InvalidRecommendationRequestException(
-                    "내 챔피언이 아군·적 목록에도 들어 있습니다: " + myChampion.getName());
+    private void rejectDuplicateChampions(Champion myChampion, List<Champion> allies, List<Champion> enemies) {
+        List<Champion> everyone = new ArrayList<>();
+        everyone.add(myChampion);
+        everyone.addAll(allies);
+        everyone.addAll(enemies);
+
+        Set<Long> seen = new HashSet<>();
+        for (Champion champion : everyone) {
+            if (!seen.add(champion.getChampionId())) {
+                throw new InvalidRecommendationRequestException(
+                        "같은 챔피언이 두 번 이상 들어 있습니다: " + champion.getName());
+            }
         }
     }
 
@@ -220,9 +230,15 @@ public class NextItemRecommendationService {
                 .collect(Collectors.toMap(Item::getItemId, Function.identity(), (first, second) -> first));
     }
 
-    private List<Long> resolveChampionIds(List<ChampionDto> champions) {
+    private List<Champion> resolveChampions(List<ChampionDto> champions) {
         return champions.stream()
-                .map(champion -> championService.findChampionByName(champion.name()).getChampionId())
+                .map(champion -> championService.findChampionByName(champion.name()))
+                .toList();
+    }
+
+    private List<Long> championIdsOf(List<Champion> champions) {
+        return champions.stream()
+                .map(Champion::getChampionId)
                 .toList();
     }
 }

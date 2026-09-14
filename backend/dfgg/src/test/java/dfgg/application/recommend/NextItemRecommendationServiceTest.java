@@ -68,6 +68,7 @@ class NextItemRecommendationServiceTest {
         when(championService.findChampionByName(any())).thenAnswer(invocation -> {
             Champion champion = mock(Champion.class);
             when(champion.getChampionId()).thenReturn(championIdOf(invocation.getArgument(0)));
+            when(champion.getName()).thenReturn(invocation.getArgument(0));
             return champion;
         });
         when(buildGenerator.source()).thenReturn(CandidateSource.BUILD);
@@ -268,5 +269,43 @@ class NextItemRecommendationServiceTest {
         // then
         assertThat(logAppender.list).extracting(ILoggingEvent::getFormattedMessage)
                 .noneMatch(message -> message.contains("baseValue="));
+    }
+
+    @Test
+    @DisplayName("아군과 적에 같은 챔피언이 있으면 입력 오류다 — 한 게임에 같은 챔피언은 둘일 수 없다")
+    void recommendNextItem_WhenSameChampionOnBothTeams_ThrowsInvalidRequest() {
+        // given: 징크스가 아군에도 적에도 있다
+        NextItemRecommendationRequest request = new NextItemRecommendationRequest(
+                new ChampionDto("야스오", "MID"), List.of(),
+                List.of(new ChampionDto("징크스", "BOTTOM"), new ChampionDto("쓰레쉬", "SUPPORT"),
+                        new ChampionDto("리신", "JUNGLE"), new ChampionDto("오른", "TOP")),
+                List.of(new ChampionDto("람머스", "TOP"), new ChampionDto("아리", "MID"),
+                        new ChampionDto("징크스", "BOTTOM"), new ChampionDto("레오나", "SUPPORT"),
+                        new ChampionDto("엘리스", "JUNGLE")),
+                "EMERALD", "16.17");
+
+        // when & then
+        assertThatThrownBy(() -> service.recommendNextItem(request))
+                .isInstanceOf(InvalidRecommendationRequestException.class)
+                .hasMessageContaining("징크스");
+    }
+
+    @Test
+    @DisplayName("아군 안에서 같은 챔피언이 겹쳐도 입력 오류다")
+    void recommendNextItem_WhenAllyRepeats_ThrowsInvalidRequest() {
+        // given
+        NextItemRecommendationRequest request = new NextItemRecommendationRequest(
+                new ChampionDto("야스오", "MID"), List.of(),
+                List.of(new ChampionDto("징크스", "BOTTOM"), new ChampionDto("징크스", "SUPPORT"),
+                        new ChampionDto("리신", "JUNGLE"), new ChampionDto("오른", "TOP")),
+                List.of(new ChampionDto("람머스", "TOP"), new ChampionDto("아리", "MID"),
+                        new ChampionDto("케이틀린", "BOTTOM"), new ChampionDto("레오나", "SUPPORT"),
+                        new ChampionDto("엘리스", "JUNGLE")),
+                "EMERALD", "16.17");
+
+        // when & then
+        assertThatThrownBy(() -> service.recommendNextItem(request))
+                .isInstanceOf(InvalidRecommendationRequestException.class)
+                .hasMessageContaining("징크스");
     }
 }

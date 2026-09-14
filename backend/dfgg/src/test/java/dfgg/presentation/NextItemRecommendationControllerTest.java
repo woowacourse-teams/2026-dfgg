@@ -2,6 +2,7 @@ package dfgg.presentation;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.item.ItemRepository;
@@ -45,6 +46,10 @@ class NextItemRecommendationControllerTest {
               {"name": "엘리스", "position": "JUNGLE"}
             ]""";
 
+    private static final String SIX_ITEMS = "[3031, 3036, 3046, 3072, 3094, 6672]";
+    private static final String SEVEN_ITEMS = "[3031, 3036, 3046, 3072, 3094, 6672, 3006]";
+    private static final String EIGHT_ITEMS = "[3031, 3036, 3046, 3072, 3094, 6672, 3006, 3153]";
+
     @LocalServerPort
     private int port;
 
@@ -69,15 +74,20 @@ class NextItemRecommendationControllerTest {
     }
 
     private String body(String myChampionName, String purchasedItemIds, String allies, String enemies) {
+        return body(myChampionName, "MID", purchasedItemIds, allies, enemies, "EMERALD");
+    }
+
+    private String body(String myChampionName, String position, String purchasedItemIds,
+                        String allies, String enemies, String tier) {
         return """
                 {
-                  "myChampion": {"name": "%s", "position": "MID"},
+                  "myChampion": {"name": "%s", "position": "%s"},
                   "purchasedItemIds": %s,
                   "allies": %s,
                   "enemies": %s,
-                  "tier": "EMERALD",
+                  "tier": "%s",
                   "patch": "16.17"
-                }""".formatted(myChampionName, purchasedItemIds, allies, enemies);
+                }""".formatted(myChampionName, position, purchasedItemIds, allies, enemies, tier);
     }
 
     @Test
@@ -144,5 +154,69 @@ class NextItemRecommendationControllerTest {
                 .when().post("/api/recommendations/v3")
                 .then().statusCode(404)
                 .body("detail", containsString("람머스"));
+    }
+
+    @Test
+    @DisplayName("BOTTOM이 아닌 포지션은 구매 아이템이 6개를 넘으면 400이다")
+    void recommendV3_WhenNonBottomPurchasedMoreThanSix_ReturnsBadRequest() {
+        // given
+        String request = body("야스오", "MID", SEVEN_ITEMS, ALLIES, ENEMIES, "EMERALD");
+
+        // when & then
+        given().contentType(ContentType.JSON).body(request)
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(400)
+                .body("detail", containsString("6개"));
+    }
+
+    @Test
+    @DisplayName("BOTTOM은 구매 아이템이 7개를 넘으면 400이다")
+    void recommendV3_WhenBottomPurchasedMoreThanSeven_ReturnsBadRequest() {
+        // given
+        String request = body("야스오", "BOTTOM", EIGHT_ITEMS, ALLIES, ENEMIES, "EMERALD");
+
+        // when & then
+        given().contentType(ContentType.JSON).body(request)
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(400)
+                .body("detail", containsString("7개"));
+    }
+
+    @Test
+    @DisplayName("BOTTOM은 구매 아이템 7개까지 받는다 — 상한은 포함이다")
+    void recommendV3_WhenBottomPurchasedExactlySeven_IsNotRejected() {
+        // given
+        String request = body("야스오", "BOTTOM", SEVEN_ITEMS, ALLIES, ENEMIES, "EMERALD");
+
+        // when & then
+        given().contentType(ContentType.JSON).body(request)
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(not(400));
+    }
+
+    @Test
+    @DisplayName("BOTTOM이 아닌 포지션은 구매 아이템 6개까지 받는다 — 상한은 포함이다")
+    void recommendV3_WhenNonBottomPurchasedExactlySix_IsNotRejected() {
+        // given
+        String request = body("야스오", "MID", SIX_ITEMS, ALLIES, ENEMIES, "EMERALD");
+
+        // when & then
+        given().contentType(ContentType.JSON).body(request)
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(not(400));
+    }
+
+    @Test
+    @DisplayName("같은 챔피언이 아군과 적에 함께 있으면 400이다 — 한 게임에 같은 챔피언은 둘일 수 없다")
+    void recommendV3_WhenSameChampionOnBothTeams_ReturnsBadRequest() {
+        // given
+        String enemiesWithJinx = ENEMIES.replace("케이틀린", "징크스");
+        String request = body("야스오", "[]", ALLIES, enemiesWithJinx);
+
+        // when & then
+        given().contentType(ContentType.JSON).body(request)
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(400)
+                .body("detail", containsString("징크스"));
     }
 }
