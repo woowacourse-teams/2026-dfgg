@@ -125,7 +125,8 @@ public class NextItemRecommendationService {
                             championRefs(CounterEvidence.championIdsFor(
                                     valid.candidateOf(candidate.itemId())), championProfiles),
                             championRefs(AllyEvidence.championIdsFor(
-                                    valid.candidateOf(candidate.itemId())), championProfiles),
+                                    valid.candidateOf(candidate.itemId()),
+                                    itemTraitCatalog.synergyOf(item)), championProfiles),
                             traitNamesOf(item)),
                     reasons));
         }

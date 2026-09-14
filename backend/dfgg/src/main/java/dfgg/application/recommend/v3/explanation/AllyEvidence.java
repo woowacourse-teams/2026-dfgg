@@ -3,6 +3,7 @@ package dfgg.application.recommend.v3.explanation;
 import dfgg.application.recommend.v3.CandidateSource;
 import dfgg.application.recommend.v3.ItemCandidate;
 import dfgg.application.recommend.v3.SourceEvidence;
+import dfgg.domain.item.trait.Synergy;
 import java.util.List;
 
 /**
@@ -34,7 +35,10 @@ public final class AllyEvidence {
     private AllyEvidence() {
     }
 
-    public static List<Long> championIdsFor(ItemCandidate candidate) {
+    public static List<Long> championIdsFor(ItemCandidate candidate, Synergy synergy) {
+        if (synergy != Synergy.ALLY) {
+            return List.of();
+        }
         return candidate.evidenceOf(CandidateSource.ALLY_SYNERGY)
                 .map(SourceEvidence::winLiftByChampionId)
                 .map(winLiftByAlly -> ChampionEvidence.topChampionIds(

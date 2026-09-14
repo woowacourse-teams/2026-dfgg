@@ -5,7 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.recommend.NextItemRecommendationService;
 import dfgg.domain.champion.ChampionRepository;
+import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
+import dfgg.domain.item.trait.ItemTraitCatalog;
+import dfgg.domain.item.trait.Synergy;
 import dfgg.domain.itemstats.ChampionItemRollupRepository;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
@@ -65,6 +68,8 @@ class AllyEvidenceInResponseTest {
     private ChampionPairItemStatsRepository championPairItemStatsRepository;
     @Autowired
     private ItemMetaStatsRepository itemMetaStatsRepository;
+    @Autowired
+    private ItemTraitCatalog itemTraitCatalog;
 
     @BeforeEach
     void setUp() {
@@ -102,6 +107,16 @@ class AllyEvidenceInResponseTest {
 
         assertThat(response.recommendedItems())
                 .allSatisfy(item -> assertThat(item.description().ally()).isNotNull());
+    }
+
+    @Test
+    @DisplayName("자기에게만 작용하는 아이템에는 아군 이름이 붙지 않는다 — synergy가 SELF면 비운다")
+    void recommend_LeavesAllyEmptyOnSelfSynergyItems() {
+        NextItemRecommendationResponse response = recommendForJanna();
+
+        response.recommendedItems().stream()
+                .filter(item -> itemTraitCatalog.synergyOf(new Item(item.id(), item.name())) == Synergy.SELF)
+                .forEach(item -> assertThat(item.description().ally()).as(item.name()).isEmpty());
     }
 
     @Test

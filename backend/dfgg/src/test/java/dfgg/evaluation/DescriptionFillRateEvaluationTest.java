@@ -7,6 +7,9 @@ import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.recommend.NextItemRecommendationService;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionRepository;
+import dfgg.domain.item.Item;
+import dfgg.domain.item.trait.ItemTraitCatalog;
+import dfgg.domain.item.trait.Synergy;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import dfgg.domain.match.TierScope;
@@ -57,6 +60,7 @@ class DescriptionFillRateEvaluationTest {
     @Autowired private ChampionRepository championRepository;
     @Autowired private ItemStatsAggregationService aggregationService;
     @Autowired private TierScope tierScope;
+    @Autowired private ItemTraitCatalog itemTraitCatalog;
 
     @Value("${recommendation.counter.minimum-base-rate}")
     private double counterMinimumBaseRate;
@@ -81,7 +85,7 @@ class DescriptionFillRateEvaluationTest {
         Map<Long, String> championNames = championRepository.findAll().stream()
                 .collect(Collectors.toMap(Champion::getChampionId, Champion::getName, (a, b) -> a));
 
-        FillTally tally = new FillTally();
+        FillTally tally = new FillTally(itemTraitCatalog);
         long startedAt = System.currentTimeMillis();
         for (SnapshotQuery snapshot : collectTestSnapshots()) {
             NextItemRecommendationRequest request = toRequest(snapshot, championNames);
@@ -178,6 +182,7 @@ class DescriptionFillRateEvaluationTest {
      */
     private static final class FillTally {
 
+        private final ItemTraitCatalog itemTraitCatalog;
         private int queries;
         private int slots;
         private int skippedQueries;
@@ -185,16 +190,32 @@ class DescriptionFillRateEvaluationTest {
         private int counterFilled;
         private int allyFilled;
         private int traitsFilled;
+        /** ally가 채워진 칸 중 synergy가 ALLY인 아이템. AllyEvidence에 synergy 필터를 걸었을 때의 충전량이다. */
+        private int allyOnAllyItems;
         private final Map<String, int[]> byPosition = new HashMap<>();
+        private final Map<String, Integer> allySlotsByItem = new HashMap<>();
+
+        FillTally(ItemTraitCatalog itemTraitCatalog) {
+            this.itemTraitCatalog = itemTraitCatalog;
+        }
 
         void record(String position, NextItemRecommendationResponse response) {
             queries++;
-            int[] counts = byPosition.computeIfAbsent(position, key -> new int[4]);
+            int[] counts = byPosition.computeIfAbsent(position, key -> new int[5]);
             for (RecommendedItemDto item : response.recommendedItems()) {
                 slots++;
                 counts[0]++;
                 if (!item.description().counter().isEmpty()) { counterFilled++; counts[1]++; }
-                if (!item.description().ally().isEmpty()) { allyFilled++; counts[2]++; }
+                if (!item.description().ally().isEmpty()) {
+                    allyFilled++;
+                    counts[2]++;
+                    Synergy synergy = itemTraitCatalog.synergyOf(new Item(item.id(), item.name()));
+                    if (synergy == Synergy.ALLY) {
+                        allyOnAllyItems++;
+                        counts[4]++;
+                    }
+                    allySlotsByItem.merge(item.name() + " | " + synergy, 1, Integer::sum);
+                }
                 if (!item.description().traits().isEmpty()) { traitsFilled++; counts[3]++; }
             }
         }
@@ -215,15 +236,25 @@ class DescriptionFillRateEvaluationTest {
             out.append("## 칸 기준 충전율\n\n| 키 | 채워진 칸 | 비율 |\n|---|---|---|\n");
             out.append(row("counter", counterFilled));
             out.append(row("ally", allyFilled));
+            out.append(row("ally — ALLY 아이템만 (synergy 필터 후)", allyOnAllyItems));
             out.append(row("traits", traitsFilled));
 
-            out.append("\n## 포지션별\n\n| 포지션 | 칸 | counter | ally | traits |\n|---|---|---|---|---|\n");
+            out.append("\n## 포지션별\n\n| 포지션 | 칸 | counter | ally | ally (필터 후) | traits |\n|---|---|---|---|---|---|\n");
             byPosition.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
                 int[] c = entry.getValue();
-                out.append(String.format("| %s | %,d | %.1f%% | %.1f%% | %.1f%% |%n",
+                out.append(String.format("| %s | %,d | %.1f%% | %.1f%% | %.1f%% | %.1f%% |%n",
                         entry.getKey(), c[0], percent(c[1], c[0]), percent(c[2], c[0]),
-                        percent(c[3], c[0])));
+                        percent(c[4], c[0]), percent(c[3], c[0])));
             });
+
+            out.append("\n## ally가 채워진 칸 — 아이템별 상위 25\n\n| 아이템 | synergy | 칸 |\n|---|---|---|\n");
+            allySlotsByItem.entrySet().stream()
+                    .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                    .limit(25)
+                    .forEach(entry -> {
+                        String[] parts = entry.getKey().split(" \\| ");
+                        out.append(String.format("| %s | %s | %,d |%n", parts[0], parts[1], entry.getValue()));
+                    });
             return out.toString();
         }
 
