@@ -39,24 +39,30 @@ public class CounterCandidateGenerator implements CandidateGenerator {
     private final ChampionPairItemStatsRepository pairRepository;
     private final ChampionItemStatsRepository championItemStatsRepository;
     private final ChampionItemRollupRepository championItemRollupRepository;
-    private final CounterLiftCalculator counterLiftCalculator;
+    private final PairLiftCalculator pairLiftCalculator;
     private final WilsonScoreCalculator wilsonScoreCalculator;
     private final int minimumPairGames;
+    private final double minimumBaseRate;
+    private final ChampionBaselineReader championBaselineReader;
 
     public CounterCandidateGenerator(
             ChampionPairItemStatsRepository pairRepository,
             ChampionItemStatsRepository championItemStatsRepository,
             ChampionItemRollupRepository championItemRollupRepository,
-            CounterLiftCalculator counterLiftCalculator,
+            PairLiftCalculator pairLiftCalculator,
             WilsonScoreCalculator wilsonScoreCalculator,
-            @Value("${recommendation.pair-synergy.minimum-pair-games}") int minimumPairGames
+            @Value("${recommendation.pair-synergy.minimum-pair-games}") int minimumPairGames,
+            @Value("${recommendation.counter.minimum-base-rate}") double minimumBaseRate,
+            ChampionBaselineReader championBaselineReader
     ) {
         this.pairRepository = pairRepository;
         this.championItemStatsRepository = championItemStatsRepository;
         this.championItemRollupRepository = championItemRollupRepository;
-        this.counterLiftCalculator = counterLiftCalculator;
+        this.pairLiftCalculator = pairLiftCalculator;
         this.wilsonScoreCalculator = wilsonScoreCalculator;
         this.minimumPairGames = minimumPairGames;
+        this.minimumBaseRate = minimumBaseRate;
+        this.championBaselineReader = championBaselineReader;
     }
 
     @Override
@@ -66,17 +72,20 @@ public class CounterCandidateGenerator implements CandidateGenerator {
 
     @Override
     public GeneratorResult generate(RecommendationQuery query, int topK) {
-        Map<Long, Integer> baseCountByItem = baseCounts(query);
-        int baseGameCount = baseGameCount(query);
+        // 분모는 feature 추출기와 같은 곳에서 읽는다. off-role이면 챔피언 전체로 물러선다.
+        ChampionBaseline baseline = championBaselineReader.read(query.myChampionId(), query.position());
+        Map<Long, Integer> baseCountByItem = baseline.purchaseCountAllByItem();
+        int baseGameCount = baseline.gameCountAll();
 
         // 아이템 → (적 챔피언 → lift). 적별 lift를 개별 보존한 뒤 집계한다.
         Map<Long, Map<Long, Double>> liftByItemAndEnemy = new HashMap<>();
         for (ChampionPairItemStats stats : enemyStats(query)) {
             if (stats.getPairGameCountAll() < minimumPairGames
-                    || query.purchasedItemIds().contains(stats.getItemId())) {
+                    || query.purchasedItemIds().contains(stats.getItemId())
+                    || belowBaseRateFloor(baseCountByItem, baseGameCount, stats.getItemId())) {
                 continue;
             }
-            CounterLift lift = counterLiftCalculator.calculate(
+            PairLift lift = pairLiftCalculator.calculate(
                     stats.getCoCountAll(), stats.getPairGameCountAll(),
                     baseCountByItem.getOrDefault(stats.getItemId(), 0), baseGameCount
             );
@@ -102,22 +111,24 @@ public class CounterCandidateGenerator implements CandidateGenerator {
     }
 
     /**
-     * 적 하나에 대한 아이템별 counter 근거. lift·원 확률·base rate를 모두 담아 돌려주므로
-     * feature extraction이 같은 계산을 되풀이하지 않고 그대로 쓸 수 있다.
+     * 내 챔피언이 애초에 거의 사지 않는 아이템을 후보에서 뺀다.
+     * <p>
+     * lift는 {@code P(item|나,적) / P(item|나)}라 분모가 바닥이면 분자가 조금만 커도 값이 폭발한다.
+     * 실측에서 lift 37배 구간의 정답률이 0.00%였고, 한 판짜리 우연이 상위를 점령해
+     * 진짜 근거를 topK 밖으로 밀어냈다. {@code minimumPairGames}가 분자에 두는 표본 하한을
+     * 분모에도 두는 셈이다.
+     * <p>
+     * 아이템 타입으로 막는 것이 아니므로 비정형 빌드라도 그 챔피언이 실제로 사는 것이면 남는다.
+     * 다만 문턱을 올릴수록 드문 정답을 지우므로 recall과 함께 봐야 한다.
+     * 0.0은 아무것도 거르지 않는다. 설정에 기본값을 두지 않는 것은 의도다 —
+     * 인라인 기본값이 있으면 설정 누락이 조용히 하한 해제로 돌아간다.
      */
-    public Map<Long, CounterLift> liftsByItem(long myChampionId, ChampionPosition position, long enemyChampionId) {
-        Map<Long, Integer> baseCountByItem = baseCounts(myChampionId, position);
-        int baseGameCount = baseGameCount(myChampionId, position);
-
-        Map<Long, CounterLift> liftByItem = new HashMap<>();
-        for (ChampionPairItemStats stats : pairRepository.findByMyChampionIdAndRelationAndOtherChampionIdIn(
-                Math.toIntExact(myChampionId), PairRelation.ENEMY, List.of(Math.toIntExact(enemyChampionId)))) {
-            liftByItem.put(stats.getItemId(), counterLiftCalculator.calculate(
-                    stats.getCoCountAll(), stats.getPairGameCountAll(),
-                    baseCountByItem.getOrDefault(stats.getItemId(), 0), baseGameCount
-            ));
+    private boolean belowBaseRateFloor(
+            Map<Long, Integer> baseCountByItem, int baseGameCount, Long itemId) {
+        if (minimumBaseRate <= 0.0 || baseGameCount == 0) {
+            return false;
         }
-        return liftByItem;
+        return (double) baseCountByItem.getOrDefault(itemId, 0) / baseGameCount < minimumBaseRate;
     }
 
     private List<ChampionPairItemStats> enemyStats(RecommendationQuery query) {
@@ -128,42 +139,6 @@ public class CounterCandidateGenerator implements CandidateGenerator {
                 Math.toIntExact(query.myChampionId()), PairRelation.ENEMY,
                 query.enemyChampionIds().stream().map(Math::toIntExact).toList()
         );
-    }
-
-    private Map<Long, Integer> baseCounts(RecommendationQuery query) {
-        return baseCounts(query.myChampionId(), query.position());
-    }
-
-    private Map<Long, Integer> baseCounts(long myChampionId, ChampionPosition position) {
-        Map<Long, Integer> countByItem = new HashMap<>();
-        for (ChampionItemStats stats : positionStats(myChampionId, position)) {
-            countByItem.put(stats.getItemId(), stats.getPurchaseCountAll());
-        }
-        if (!countByItem.isEmpty()) {
-            return countByItem;
-        }
-        for (ChampionItemRollup stats : championItemRollupRepository.findByChampionId(Math.toIntExact(myChampionId))) {
-            countByItem.put(stats.getItemId(), stats.getPurchaseCountAll());
-        }
-        return countByItem;
-    }
-
-    private int baseGameCount(RecommendationQuery query) {
-        return baseGameCount(query.myChampionId(), query.position());
-    }
-
-    private int baseGameCount(long myChampionId, ChampionPosition position) {
-        int fromPosition = positionStats(myChampionId, position).stream()
-                .mapToInt(ChampionItemStats::getChampionGameCountAll)
-                .max()
-                .orElse(0);
-        if (fromPosition > 0) {
-            return fromPosition;
-        }
-        return championItemRollupRepository.findByChampionId(Math.toIntExact(myChampionId)).stream()
-                .mapToInt(ChampionItemRollup::getChampionGameCountAll)
-                .max()
-                .orElse(0);
     }
 
     private List<ChampionItemStats> positionStats(long myChampionId, ChampionPosition position) {

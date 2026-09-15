@@ -53,3 +53,5 @@ UNION ALL
 SELECT 'CO-' || g, '16.17', 420, 'co-e-' || g, 6, 103, 200, 'MIDDLE', g % 2 = 1,
        '6653', '6653', true
 FROM generate_series(1, 20) g;
+
+UPDATE normalized_match_participants SET tier = 'EMERALD' WHERE tier IS NULL;

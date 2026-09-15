@@ -3,9 +3,11 @@ package dfgg.application.recommend.v3;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
-import dfgg.application.recommend.v3.generator.PairScoreAggregate;
+import dfgg.application.recommend.v3.generator.ChampionBaselineReader;
 import dfgg.application.recommend.v3.generator.AllySynergyCandidateGenerator;
 import dfgg.application.recommend.v3.generator.PairBackoffLevel;
+import dfgg.application.recommend.v3.generator.PairLiftCalculator;
+import dfgg.application.recommend.v3.generator.PairScoreAggregate;
 import dfgg.application.recommend.v3.generator.PairSynergyRetriever;
 import dfgg.application.utils.WilsonScoreCalculator;
 import dfgg.domain.champion.ChampionPosition;
@@ -13,6 +15,7 @@ import dfgg.domain.itemstats.ChampionItemRollupRepository;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.domain.itemstats.PairRelation;
+import dfgg.infrastructure.config.TierScopeConfiguration;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +31,7 @@ import org.springframework.test.context.jdbc.Sql;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(ItemStatsAggregationService.class)
+@Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/ally-synergy-test-data.sql")
 class AllySynergyCandidateGeneratorTest {
 
@@ -54,17 +57,41 @@ class AllySynergyCandidateGeneratorTest {
     @Autowired
     private ChampionItemRollupRepository championItemRollupRepository;
 
+    private static final double NO_BASE_RATE_FLOOR = 0.0;
+
     private PairSynergyRetriever retriever;
     private AllySynergyCandidateGenerator generator;
 
     @BeforeEach
     void setUp() {
         aggregationService.aggregate(1);
-        retriever = new PairSynergyRetriever(pairRepository, new WilsonScoreCalculator(), MINIMUM_PAIR_GAMES);
+        // 이 테스트는 아군별 점수 보존이 관심사다. base rate 하한은 별도 테스트에서 다룬다.
+        retriever = new PairSynergyRetriever(
+                pairRepository, new PairLiftCalculator(1.0, 159), MINIMUM_PAIR_GAMES,
+                NO_BASE_RATE_FLOOR);
         generator = new AllySynergyCandidateGenerator(
                 retriever, championItemStatsRepository, championItemRollupRepository,
-                new WilsonScoreCalculator()
+                new WilsonScoreCalculator(), new ChampionBaselineReader(championItemStatsRepository, championItemRollupRepository)
         );
+    }
+
+    /**
+     * 생성기가 lift 분모로 쓰는 것과 같은 값. 직접 조회와 생성기 결과를 비교하려면 같아야 한다.
+     */
+    private Map<Long, Integer> jannaBaseCounts() {
+        Map<Long, Integer> countByItem = new java.util.HashMap<>();
+        championItemStatsRepository
+                .findByChampionIdAndPosition(Math.toIntExact(JANNA), ChampionPosition.SUPPORT)
+                .forEach(stats -> countByItem.put(stats.getItemId(), stats.getPurchaseCountAll()));
+        return countByItem;
+    }
+
+    private int jannaGameCount() {
+        return championItemStatsRepository
+                .findByChampionIdAndPosition(Math.toIntExact(JANNA), ChampionPosition.SUPPORT)
+                .stream()
+                .mapToInt(dfgg.domain.itemstats.ChampionItemStats::getChampionGameCountAll)
+                .max().orElse(0);
     }
 
     private RecommendationQuery queryWithAllies(List<Long> allyChampionIds) {
@@ -106,7 +133,8 @@ class AllySynergyCandidateGeneratorTest {
     void retrieve_WhenScoringPerAlly_KeepsEachAllyScoreSeparately() {
         // when
         Map<Long, PairScoreAggregate> byItem =
-                retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW), PairRelation.ALLY);
+                retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW), PairRelation.ALLY,
+                        jannaBaseCounts(), jannaGameCount());
 
         // then: 향로는 징크스와 8/10, 코그모와 1/10
         PairScoreAggregate incense = byItem.get(INCENSE);
@@ -117,11 +145,13 @@ class AllySynergyCandidateGeneratorTest {
     @DisplayName("아군을 추가해도 기존 아군과의 점수는 변하지 않는다 — 5명을 하나의 window로 묶지 않는다는 증거")
     void retrieve_WhenAnotherAllyAdded_DoesNotChangeExistingAllyScores() {
         // given
-        double beforeAdding = retriever.scoresByItem(JANNA, List.of(JINX), PairRelation.ALLY)
+        double beforeAdding = retriever.scoresByItem(JANNA, List.of(JINX), PairRelation.ALLY,
+                        jannaBaseCounts(), jannaGameCount())
                 .get(INCENSE).scoreOf(JINX);
 
         // when: 관계없는 아군을 하나 더 넣는다
-        double afterAdding = retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW, ORNN), PairRelation.ALLY)
+        double afterAdding = retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW, ORNN), PairRelation.ALLY,
+                        jannaBaseCounts(), jannaGameCount())
                 .get(INCENSE).scoreOf(JINX);
 
         // then: 통짜 window라면 아군이 늘 때마다 점수가 흔들린다
@@ -187,7 +217,8 @@ class AllySynergyCandidateGeneratorTest {
     @Test
     @DisplayName("남긴 아군별 점수가 개별 조회 결과와 같다 — 다시 계산하면 값이 갈릴 수 있다")
     void generate_PreservedAllyScoreMatchesTheDirectLookup() {
-        double direct = retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW), PairRelation.ALLY)
+        double direct = retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW), PairRelation.ALLY,
+                        jannaBaseCounts(), jannaGameCount())
                 .get(INCENSE).scoreOf(JINX);
 
         GeneratorResult result = generator.generate(queryWithAllies(List.of(JINX, KOGMAW)), 10);

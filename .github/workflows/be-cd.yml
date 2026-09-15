@@ -306,7 +306,7 @@ jobs:
           probe "$DFGG_NEW_PORT" /api/recommendations/v2 \
             '(.champion | type == "string") and (.builds | type == "array" and length > 0)' "$DFGG_V2_BODY"
           probe "$DFGG_NEW_PORT" /api/recommendations/v3 \
-            '(.recommendedItems | type == "array" and length > 0) and (.servedBy | type == "string")' "$DFGG_V3_BODY"
+            '(.recommendedItems | type == "array" and length > 0)' "$DFGG_V3_BODY"
 
           # 4. 설정 백업 → 구문 검사 → reload. Nginx restart는 사용하지 않는다.
           sudo -n install -o root -g root -m 0644 "$DFGG_TMP/upstream.before" "$DFGG_BACKUP"

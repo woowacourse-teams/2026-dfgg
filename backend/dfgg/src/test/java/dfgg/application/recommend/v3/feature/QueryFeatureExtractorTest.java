@@ -15,6 +15,8 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class QueryFeatureExtractorTest {
 
@@ -133,6 +135,37 @@ class QueryFeatureExtractorTest {
     void extract_WhenTierGiven_EncodesAsOrdinal() {
         FeatureVector vector = extract(query(ChampionPosition.MID, List.of()));
         assertThat(vector.get(FeatureName.TIER_ORDINAL)).isPositive();
+    }
+
+    @ParameterizedTest(name = "{0} → {1}")
+    @CsvSource({
+            "IRON, 1.0", "BRONZE, 2.0", "SILVER, 3.0", "GOLD, 4.0", "PLATINUM, 5.0",
+            "EMERALD, 6.0", "DIAMOND, 7.0", "MASTER, 8.0", "GRANDMASTER, 9.0", "CHALLENGER, 10.0"
+    })
+    @DisplayName("지원 티어는 모두 정해진 순서값을 갖는다")
+    void extract_WhenSupportedTier_EncodesExactOrdinal(String tier, double expected) {
+        // given
+        RecommendationQuery tierQuery = new RecommendationQuery(
+                YASUO, ChampionPosition.MID, List.of(),
+                List.of(JINX), List.of(RAMMUS), tier, "16.17");
+
+        // when
+        FeatureVector vector = extract(tierQuery);
+
+        // then
+        assertThat(vector.get(FeatureName.TIER_ORDINAL)).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("소문자로 와도 같은 순서값이다")
+    void extract_WhenTierLowerCase_EncodesSameOrdinal() {
+        // given
+        RecommendationQuery lowerCase = new RecommendationQuery(
+                YASUO, ChampionPosition.MID, List.of(),
+                List.of(JINX), List.of(RAMMUS), "challenger", "16.17");
+
+        // when & then
+        assertThat(extract(lowerCase).get(FeatureName.TIER_ORDINAL)).isEqualTo(10.0);
     }
 
     @Test

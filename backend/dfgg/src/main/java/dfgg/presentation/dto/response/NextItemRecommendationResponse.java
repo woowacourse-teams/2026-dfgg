@@ -4,7 +4,6 @@ import dfgg.presentation.dto.RecommendedItemDto;
 import java.util.List;
 
 public record NextItemRecommendationResponse(
-        List<RecommendedItemDto> recommendedItems,
-        String servedBy
+        List<RecommendedItemDto> recommendedItems
 ) {
 }

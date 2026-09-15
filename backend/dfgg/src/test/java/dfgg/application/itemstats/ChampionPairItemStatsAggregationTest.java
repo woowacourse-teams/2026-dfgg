@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dfgg.domain.itemstats.ChampionPairItemStats;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.domain.itemstats.PairRelation;
+import dfgg.infrastructure.config.TierScopeConfiguration;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,7 +20,7 @@ import org.springframework.test.context.jdbc.Sql;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(ItemStatsAggregationService.class)
+@Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/item-stats-aggregation-test-data.sql")
 class ChampionPairItemStatsAggregationTest {
 
@@ -149,5 +151,21 @@ class ChampionPairItemStatsAggregationTest {
         // then
         assertThat(pairRepository.count()).isEqualTo(countAfterFirstRun);
         assertThat(pairOf(YASUO, RAMMUS, PairRelation.ENEMY, KRAKEN_SLAYER).getCoCountAll()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("pair 게임 수와 함께 승수도 남긴다 — 아군이 세서 모든 아이템이 좋아 보이는 것을 상쇄한다")
+    void aggregate_StoresPairWinCountAsBaseline() {
+        // given: 야스오와 징크스는 M1(야스오 승) M2(야스오 패)에서 같은 팀이다
+        // when
+        ChampionPairItemStats stats = pairRepository
+                .findByMyChampionIdAndRelationAndOtherChampionIdIn(
+                        YASUO, PairRelation.ALLY, List.of(JINX)).stream()
+                .filter(stat -> stat.getItemId().equals(KRAKEN_SLAYER))
+                .findFirst().orElseThrow();
+
+        // then
+        assertThat(stats.getPairGameCountAll()).isEqualTo(2);
+        assertThat(stats.getPairWinCountAll()).isEqualTo(1);
     }
 }

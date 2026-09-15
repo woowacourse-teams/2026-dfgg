@@ -111,14 +111,20 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
      * 자르면 가장 오래된 매치만 뽑힌다 — 실제로 학습 데이터 30,000 query가 전부 16.1~16.4에서만
      * 나와 최신 패치 test 세트가 비었다. 해시로 정렬하면 순서가 시간과 무관해지고,
      * 같은 입력에 같은 순서라 학습 데이터를 재현할 수 있다.
+     *
+     * <p>{@code tiers}는 학습 대상 티어다. 범위 밖 매치를 여기서 미리 빼지 않으면 절반 이상을
+     * 읽고 버리게 된다. 다만 이 조건은 <b>참가자가 한 명이라도 범위에 들면 그 매치를 준다</b> —
+     * 한 매치에 티어가 섞일 수 있으므로 참가자 단위 필터가 따로 필요하다
+     * ({@code ParticipantSampler}).
      */
     @Query(value = """
             SELECT match_id
             FROM normalized_match_participants
+            WHERE tier IN (:tiers)
             GROUP BY match_id
             ORDER BY md5(match_id)
             """, nativeQuery = true)
-    List<String> findSampledMatchIds(Pageable pageable);
+    List<String> findSampledMatchIds(@Param("tiers") Collection<String> tiers, Pageable pageable);
 
     @Query("""
             SELECT DISTINCT p.patch

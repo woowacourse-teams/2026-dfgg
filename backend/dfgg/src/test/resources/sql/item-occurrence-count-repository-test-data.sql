@@ -8,3 +8,5 @@ INSERT INTO normalized_match_participants (
     ('KR_FREQ_2', '14.1', 420, 'puuid-2', 1, 1, 100, 'TOP', true, '1001', '1001', true),
     ('KR_FREQ_3', '14.1', 420, 'puuid-3', 1, 1, 100, 'TOP', true, '1001,2002', '1001,2002', true),
     ('KR_FREQ_4', '14.1', 420, 'puuid-4', 1, 1, 100, 'TOP', true, '2002', '2002', true);
+
+UPDATE normalized_match_participants SET tier = 'EMERALD' WHERE tier IS NULL;

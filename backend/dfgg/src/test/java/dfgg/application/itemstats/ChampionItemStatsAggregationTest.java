@@ -7,6 +7,7 @@ import dfgg.domain.itemstats.ChampionItemRollup;
 import dfgg.domain.itemstats.ChampionItemRollupRepository;
 import dfgg.domain.itemstats.ChampionItemStats;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
+import dfgg.infrastructure.config.TierScopeConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,7 @@ import org.springframework.test.context.jdbc.Sql;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(ItemStatsAggregationService.class)
+@Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/item-stats-aggregation-test-data.sql")
 class ChampionItemStatsAggregationTest {
 
@@ -148,5 +149,20 @@ class ChampionItemStatsAggregationTest {
         // then
         assertThat(championItemStatsRepository.count()).isEqualTo(countAfterFirstRun);
         assertThat(statsOf(YASUO, ChampionPosition.MID, KRAKEN_SLAYER).getPurchaseCountAll()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("챔피언 게임 수와 함께 승수도 남긴다 — 아이템 무관 기준선이 있어야 시너지를 잰다")
+    void aggregate_StoresChampionWinCountAsBaseline() {
+        // given: 야스오 MID는 M1(승) M2(패) 두 판이다
+        // when
+        ChampionItemStats stats = championItemStatsRepository
+                .findByChampionIdAndPosition(YASUO, ChampionPosition.MID).stream()
+                .filter(stat -> stat.getItemId().equals(KRAKEN_SLAYER))
+                .findFirst().orElseThrow();
+
+        // then
+        assertThat(stats.getChampionGameCountAll()).isEqualTo(2);
+        assertThat(stats.getChampionWinCountAll()).isEqualTo(1);
     }
 }

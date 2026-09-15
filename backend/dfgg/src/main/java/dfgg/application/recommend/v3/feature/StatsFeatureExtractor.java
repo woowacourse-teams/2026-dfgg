@@ -1,12 +1,12 @@
 package dfgg.application.recommend.v3.feature;
 
 import dfgg.application.recommend.v3.RecommendationQuery;
-import dfgg.application.recommend.v3.generator.CounterLift;
-import dfgg.application.recommend.v3.generator.CounterLiftCalculator;
+import dfgg.application.recommend.v3.generator.PairLift;
+import dfgg.application.recommend.v3.generator.PairLiftCalculator;
 import dfgg.application.recommend.v3.generator.PairScoreAggregate;
+import dfgg.application.recommend.v3.generator.ChampionBaseline;
+import dfgg.application.recommend.v3.generator.ChampionBaselineReader;
 import dfgg.application.recommend.v3.generator.PairSynergyRetriever;
-import dfgg.domain.itemstats.ChampionItemStats;
-import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.itemstats.ChampionPairItemStats;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.domain.itemstats.ItemMetaStats;
@@ -31,24 +31,24 @@ import org.springframework.stereotype.Component;
 @Component
 public class StatsFeatureExtractor {
 
-    private final ChampionItemStatsRepository championItemStatsRepository;
+    private final ChampionBaselineReader championBaselineReader;
     private final ChampionPairItemStatsRepository pairRepository;
     private final ItemMetaStatsRepository itemMetaStatsRepository;
     private final PairSynergyRetriever pairSynergyRetriever;
-    private final CounterLiftCalculator counterLiftCalculator;
+    private final PairLiftCalculator pairLiftCalculator;
 
     public StatsFeatureExtractor(
-            ChampionItemStatsRepository championItemStatsRepository,
+            ChampionBaselineReader championBaselineReader,
             ChampionPairItemStatsRepository pairRepository,
             ItemMetaStatsRepository itemMetaStatsRepository,
             PairSynergyRetriever pairSynergyRetriever,
-            CounterLiftCalculator counterLiftCalculator
+            PairLiftCalculator pairLiftCalculator
     ) {
-        this.championItemStatsRepository = championItemStatsRepository;
+        this.championBaselineReader = championBaselineReader;
         this.pairRepository = pairRepository;
         this.itemMetaStatsRepository = itemMetaStatsRepository;
         this.pairSynergyRetriever = pairSynergyRetriever;
-        this.counterLiftCalculator = counterLiftCalculator;
+        this.pairLiftCalculator = pairLiftCalculator;
     }
 
     /**
@@ -59,12 +59,16 @@ public class StatsFeatureExtractor {
      * 학습 데이터 30만 query 규모에서는 시간 차이가 몇 시간 단위로 벌어진다.
      */
     public StatsContext prepare(RecommendationQuery query) {
+        // 분모는 generator와 같은 곳에서 읽는다 — off-role이면 챔피언 전체로 물러선다.
+        ChampionBaseline baseline = championBaselineReader.read(query.myChampionId(), query.position());
         return new StatsContext(
-                championGameCounts(query),
-                purchaseCountsByItem(query),
+                baseline,
                 counterStatsByItem(query),
+                // ally 점수도 lift다. 분모(base rate)는 counter와 같은 값을 쓴다 —
+                // 여기서 다른 분모를 쓰면 두 묶음의 feature가 서로 다른 축을 갖게 된다.
                 pairSynergyRetriever.scoresByItem(
-                        query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY)
+                        query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
+                        baseline.purchaseCountAllByItem(), baseline.gameCountAll())
         );
     }
 
@@ -81,32 +85,6 @@ public class StatsFeatureExtractor {
     }
 
     // ── 챔피언 base rate ────────────────────────────────────────────────────
-
-    /**
-     * 관측된 챔피언이면 구매 0회도 {@code 0.0}으로 남긴다 — "0번 샀다"는 결측이 아니라
-     * 강한 관측이다. 야스오가 9,343판 동안 존야를 한 번도 안 샀다는 사실이 바로 그 신호다.
-     */
-    private int[] championGameCounts(RecommendationQuery query) {
-        List<ChampionItemStats> stats = championStats(query);
-        return new int[]{
-                stats.stream().mapToInt(ChampionItemStats::getChampionGameCountAll).max().orElse(0),
-                stats.stream().mapToInt(ChampionItemStats::getChampionGameCountRecent).max().orElse(0)
-        };
-    }
-
-    private Map<Long, int[]> purchaseCountsByItem(RecommendationQuery query) {
-        Map<Long, int[]> byItem = new HashMap<>();
-        for (ChampionItemStats stats : championStats(query)) {
-            byItem.put(stats.getItemId(),
-                    new int[]{stats.getPurchaseCountAll(), stats.getPurchaseCountRecent()});
-        }
-        return byItem;
-    }
-
-    private List<ChampionItemStats> championStats(RecommendationQuery query) {
-        return championItemStatsRepository
-                .findByChampionIdAndPosition(Math.toIntExact(query.myChampionId()), query.position());
-    }
 
     private Map<Long, List<ChampionPairItemStats>> counterStatsByItem(RecommendationQuery query) {
         if (query.enemyChampionIds().isEmpty()) {
@@ -143,10 +121,10 @@ public class StatsFeatureExtractor {
         if (baseRate.gameCountAll() <= 0) {
             return;
         }
-        List<CounterLift> lifts = context.counterStatsByItem()
+        List<PairLift> lifts = context.counterStatsByItem()
                 .getOrDefault(itemId, List.of())
                 .stream()
-                .map(stats -> counterLiftCalculator.calculate(
+                .map(stats -> pairLiftCalculator.calculate(
                         stats.getCoCountAll(), stats.getPairGameCountAll(),
                         baseRate.purchaseCountAll(), baseRate.gameCountAll()))
                 .toList();
@@ -155,7 +133,7 @@ public class StatsFeatureExtractor {
         }
 
         List<Double> descending = lifts.stream()
-                .map(CounterLift::lift)
+                .map(PairLift::lift)
                 .sorted(Comparator.reverseOrder())
                 .toList();
         vector.set(FeatureName.COUNTER_LIFT_MAX, descending.get(0));
@@ -164,7 +142,7 @@ public class StatsFeatureExtractor {
         vector.set(FeatureName.COUNTER_LIFT_MEAN,
                 descending.stream().mapToDouble(Double::doubleValue).average().orElse(0.0));
         vector.set(FeatureName.COUNTER_PAIR_PROBABILITY_MAX,
-                lifts.stream().mapToDouble(CounterLift::pairProbability).max().orElse(0.0));
+                lifts.stream().mapToDouble(PairLift::pairProbability).max().orElse(0.0));
     }
 
     // ── Ally ───────────────────────────────────────────────────────────────
@@ -227,23 +205,23 @@ public class StatsFeatureExtractor {
 
     /**
      * 질의 단위로 한 번만 읽는 통계 묶음. 후보마다 같은 조회를 반복하지 않기 위한 것이다.
-     *
-     * @param championGameCounts {@code [전체 판수, 최근 판수]}
      */
     public record StatsContext(
-            int[] championGameCounts,
-            Map<Long, int[]> purchaseCountsByItem,
+            ChampionBaseline baseline,
             Map<Long, List<ChampionPairItemStats>> counterStatsByItem,
             Map<Long, PairScoreAggregate> allyScoresByItem
     ) {
 
+        /**
+         * 관측된 챔피언이면 구매 0회도 {@code 0.0}으로 남긴다 — "0번 샀다"는 결측이 아니라 강한 관측이다.
+         */
         private ChampionBaseRate baseRateOf(long itemId) {
-            if (championGameCounts[0] == 0) {
+            if (!baseline.isObserved()) {
                 return ChampionBaseRate.UNKNOWN;
             }
-            int[] purchases = purchaseCountsByItem.getOrDefault(itemId, new int[]{0, 0});
             return new ChampionBaseRate(
-                    purchases[0], championGameCounts[0], purchases[1], championGameCounts[1]);
+                    baseline.purchaseCountAll(itemId), baseline.gameCountAll(),
+                    baseline.purchaseCountRecent(itemId), baseline.gameCountRecent());
         }
     }
 

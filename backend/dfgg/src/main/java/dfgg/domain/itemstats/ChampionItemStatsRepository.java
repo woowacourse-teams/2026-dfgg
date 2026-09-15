@@ -35,7 +35,8 @@ public interface ChampionItemStatsRepository extends JpaRepository<ChampionItemS
                 champion_id, position, item_id,
                 purchase_count_all, purchase_count_recent,
                 win_count_all, win_count_recent,
-                champion_game_count_all, champion_game_count_recent
+                champion_game_count_all, champion_game_count_recent,
+                champion_win_count_all
             )
             WITH participant AS (
                 SELECT champion_id,
@@ -49,12 +50,15 @@ public interface ChampionItemStatsRepository extends JpaRepository<ChampionItemS
                 WHERE (patch IS NULL OR patch NOT IN (:excludedPatches))
                   AND core_item_purchase_order_complete
                   AND core_item_purchase_order <> ''
+                  AND tier IN (:tiers)
                   AND position IN ('TOP', 'JUNGLE', 'MID', 'MIDDLE', 'BOTTOM', 'SUPPORT', 'UTILITY')
             ),
             champion_games AS (
                 SELECT champion_id, normalized_position,
                        count(*) AS game_all,
-                       count(*) FILTER (WHERE patch IN (:recentPatches)) AS game_recent
+                       count(*) FILTER (WHERE patch IN (:recentPatches)) AS game_recent,
+                       -- 아이템과 무관한 기준선. 시너지는 이 값 대비로만 말할 수 있다.
+                       count(*) FILTER (WHERE win) AS win_all
                 FROM participant
                 GROUP BY champion_id, normalized_position
             ),
@@ -69,7 +73,8 @@ public interface ChampionItemStatsRepository extends JpaRepository<ChampionItemS
                    count(*) FILTER (WHERE purchase.win),
                    count(*) FILTER (WHERE purchase.win AND purchase.patch IN (:recentPatches)),
                    max(champion_games.game_all),
-                   max(champion_games.game_recent)
+                   max(champion_games.game_recent),
+                   max(champion_games.win_all)
             FROM purchase
             JOIN champion_games
               ON champion_games.champion_id = purchase.champion_id
@@ -77,5 +82,6 @@ public interface ChampionItemStatsRepository extends JpaRepository<ChampionItemS
             GROUP BY purchase.champion_id, purchase.normalized_position, purchase.item_id
             """, nativeQuery = true)
     void aggregateFrom(@Param("recentPatches") Collection<String> recentPatches,
-                       @Param("excludedPatches") Collection<String> excludedPatches);
+                       @Param("excludedPatches") Collection<String> excludedPatches,
+                       @Param("tiers") Collection<String> tiers);
 }

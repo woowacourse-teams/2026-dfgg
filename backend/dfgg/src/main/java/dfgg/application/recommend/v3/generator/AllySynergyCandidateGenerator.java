@@ -31,21 +31,26 @@ import org.springframework.stereotype.Component;
 @Component
 public class AllySynergyCandidateGenerator implements CandidateGenerator {
 
+    private static final int MINIMUM_WIN_SAMPLES = 30;
+
     private final PairSynergyRetriever pairSynergyRetriever;
     private final ChampionItemStatsRepository championItemStatsRepository;
     private final ChampionItemRollupRepository championItemRollupRepository;
     private final WilsonScoreCalculator wilsonScoreCalculator;
+    private final ChampionBaselineReader championBaselineReader;
 
     public AllySynergyCandidateGenerator(
             PairSynergyRetriever pairSynergyRetriever,
             ChampionItemStatsRepository championItemStatsRepository,
             ChampionItemRollupRepository championItemRollupRepository,
-            WilsonScoreCalculator wilsonScoreCalculator
+            WilsonScoreCalculator wilsonScoreCalculator,
+            ChampionBaselineReader championBaselineReader
     ) {
         this.pairSynergyRetriever = pairSynergyRetriever;
         this.championItemStatsRepository = championItemStatsRepository;
         this.championItemRollupRepository = championItemRollupRepository;
         this.wilsonScoreCalculator = wilsonScoreCalculator;
+        this.championBaselineReader = championBaselineReader;
     }
 
     @Override
@@ -55,8 +60,18 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
 
     @Override
     public GeneratorResult generate(RecommendationQuery query, int topK) {
+        // lift 분모는 off-role이면 챔피언 전체로 물러선다. feature 추출기와 같은 곳에서 읽는다.
+        ChampionBaseline baseline = championBaselineReader.read(query.myChampionId(), query.position());
         Map<Long, PairScoreAggregate> scoresByItem = pairSynergyRetriever.scoresByItem(
-                query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY);
+                query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
+                baseline.purchaseCountAllByItem(), baseline.gameCountAll());
+        List<ChampionItemStats> positionStats =
+                championItemStatsRepository.findByChampionIdAndPosition(
+                        Math.toIntExact(query.myChampionId()), query.position());
+        Map<Long, Map<Long, Double>> winLiftsByItem = pairSynergyRetriever.winLiftsByItem(
+                query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
+                itemWinRates(positionStats), championWinRate(positionStats),
+                MINIMUM_WIN_SAMPLES);
 
         if (!scoresByItem.isEmpty()) {
             List<ScoredItem> ranked = scoresByItem.entrySet().stream()
@@ -64,7 +79,8 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
                     // 랭킹에는 최댓값 하나를 쓰지만 아군별 점수도 함께 남긴다. retriever가
                     // 이미 계산해 둔 값이라 여기서 버리면 나중에 다시 조회해야 한다.
                     .map(entry -> new ScoredItem(entry.getKey(), entry.getValue().max(),
-                            entry.getValue().scoreByOtherChampionId()))
+                            entry.getValue().scoreByOtherChampionId(),
+                            winLiftsByItem.getOrDefault(entry.getKey(), Map.of())))
                     .sorted(byScoreThenItemId())
                     .limit(topK)
                     .toList();
@@ -72,6 +88,35 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
         }
 
         return GeneratorResult.of(source(), championBaseRate(query, topK), PairBackoffLevel.BASE_RATE.ordinal());
+    }
+
+    /**
+     * 승률 lift의 분모 — 이 챔피언이 이 아이템을 샀을 때의 평소 승률.
+     * 상대와 무관한 값이라 "이 아군과 함께일 때 특별히 잘 되는가"를 물을 수 있다.
+     * 표본이 얇은 아이템은 빼둔다 — 분모가 튀면 lift도 튄다.
+     */
+    private Map<Long, Double> itemWinRates(List<ChampionItemStats> positionStats) {
+        Map<Long, Double> winRateByItem = new java.util.HashMap<>();
+        for (ChampionItemStats stats : positionStats) {
+            if (stats.getPurchaseCountAll() >= MINIMUM_WIN_SAMPLES) {
+                winRateByItem.put(stats.getItemId(),
+                        (double) stats.getWinCountAll() / stats.getPurchaseCountAll());
+            }
+        }
+        return winRateByItem;
+    }
+
+    /**
+     * 이 챔피언·포지션의 아이템 무관 승률. 이중 차분의 마지막 항이다 —
+     * 조합 승률을 이것으로 나눠야 "이 조합이 평소보다 잘 이기는 정도"가 나온다.
+     */
+    private double championWinRate(List<ChampionItemStats> positionStats) {
+        return positionStats.stream()
+                .filter(stats -> stats.getChampionGameCountAll() > 0)
+                .mapToDouble(stats ->
+                        (double) stats.getChampionWinCountAll() / stats.getChampionGameCountAll())
+                .findFirst()
+                .orElse(0.0);
     }
 
     /**

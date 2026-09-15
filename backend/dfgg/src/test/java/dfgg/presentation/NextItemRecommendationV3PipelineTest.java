@@ -4,12 +4,10 @@ import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
-import dfgg.application.recommend.v3.feature.FeatureName;
-import dfgg.application.recommend.v3.feature.ReasonGroup;
-import dfgg.presentation.dto.GroupContribution;
+import dfgg.domain.item.trait.ItemTrait;
+import dfgg.presentation.dto.ChampionRefDto;
 import dfgg.presentation.dto.RecommendedItemDto;
 import java.util.Arrays;
-import java.util.Comparator;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
 import dfgg.application.recommend.v3.ranker.LambdaMartRanker;
 import dfgg.presentation.dto.ChampionDto;
@@ -45,6 +43,12 @@ class NextItemRecommendationV3PipelineTest {
     private static final long DOMINIK = 3036L;
     private static final long BERSERKERS_GREAVES = 3006L;
     private static final long PLATED_STEELCAPS = 3047L;
+
+    private static final long RAMMUS_ID = 33L;
+    private static final long AHRI_ID = 103L;
+    private static final long CAITLYN_ID = 51L;
+    private static final long LEONA_ID = 89L;
+    private static final long ELISE_ID = 60L;
 
     @LocalServerPort
     private int port;
@@ -173,106 +177,89 @@ class NextItemRecommendationV3PipelineTest {
     }
 
     @Test
-    @DisplayName("폴백 체인이 아니라 학습된 랭커가 순위를 정했음을 응답에 남긴다")
-    void recommendV3_WhenServed_ReportsLtrModelVersionNotFallbackStage() {
+    @DisplayName("응답에 서빙한 모델 정보가 실리지 않는다 — 클라이언트가 쓸 정보가 아니다")
+    void recommendV3_WhenServed_CarriesNoServingModelInfo() {
         // when
-        NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
+        String body = given().contentType(ContentType.JSON)
+                .body(requestWith(List.of(KRAKEN, INFINITY_EDGE)))
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(200)
+                .extract().asString();
 
-        // then: 구 파이프라인은 FallbackStage 이름(PRIMARY 등)을 돌려줬다
-        assertThat(response.servedBy())
-                .contains("lambdamart", FeatureName.schemaFingerprint())
-                .doesNotContain("PRIMARY", "COMPOSITION_STATS", "MOST_FREQUENT_BUILD");
+        // then
+        assertThat(body).doesNotContain("servedBy");
     }
 
     @Test
-    @DisplayName("추천마다 어느 묶음이 점수를 올렸는지를 이유로 함께 낸다")
-    void recommendV3_IncludesGroupContributionsForEachItem() {
-        NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
-
-        assertThat(response.recommendedItems())
-                .allSatisfy(item -> assertThat(item.reasons().contributions())
-                        .as("묶음이 빠지면 그 기여도가 응답에서 사라진다")
-                        .hasSize(ReasonGroup.values().length));
-    }
-
-    @Test
-    @DisplayName("이유의 묶음 이름이 실제 ReasonGroup 값이다")
-    void recommendV3_ReasonsUseRealGroupNames() {
-        List<String> groupNames = Arrays.stream(ReasonGroup.values()).map(Enum::name).toList();
-
-        NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
-
-        assertThat(response.recommendedItems())
-                .flatMap(item -> item.reasons().contributions())
-                .extracting(GroupContribution::group)
-                .isSubsetOf(groupNames);
-    }
-
-    @Test
-    @DisplayName("기여가 큰 묶음이 앞에 온다 — 가장 큰 이유를 먼저 읽게 한다")
-    void recommendV3_OrdersReasonsByContributionDescending() {
+    @DisplayName("추천마다 구조화된 이유를 낸다 — 문장이 아니라 클라이언트가 렌더링할 단어다")
+    void recommendV3_IncludesStructuredDescription() {
         NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
 
         assertThat(response.recommendedItems()).allSatisfy(item -> {
-            List<Double> values = item.reasons().contributions().stream()
-                    .map(GroupContribution::value)
-                    .toList();
-            assertThat(values).isSortedAccordingTo(Comparator.reverseOrder());
+            assertThat(item.description()).isNotNull();
+            assertThat(item.description().counter()).isNotNull();
+            assertThat(item.description().ally()).isNotNull();
+            assertThat(item.description().traits()).isNotNull();
         });
     }
 
     @Test
-    @DisplayName("추천마다 사람이 읽을 수 있는 한 문장을 함께 낸다")
-    void recommendV3_IncludesAHumanReadableDescription() {
+    @DisplayName("counter로 지목한 챔피언이 질의에 있던 적이다 — 엉뚱한 챔피언을 지목하지 않는다")
+    void recommendV3_CounterNamesOnlyEnemiesFromTheQuery() {
+        List<Long> enemyIds = List.of(RAMMUS_ID, AHRI_ID, CAITLYN_ID, LEONA_ID, ELISE_ID);
+
         NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
 
         assertThat(response.recommendedItems())
-                .allSatisfy(item -> assertThat(item.description())
-                        .isNotBlank()
-                        // 단서가 붙으면 문장이 그쪽으로 끝나므로 endsWith로 볼 수 없다.
-                        .contains("추천했어요.")
-                        .endsWith(".")
-                        .doesNotContain("null", "%s"));
+                .flatMap(RecommendedItemDto::description)
+                .isNotNull();
+        response.recommendedItems().forEach(item ->
+                assertThat(item.description().counter())
+                        .extracting(ChampionRefDto::id)
+                        .isSubsetOf(enemyIds));
     }
 
     @Test
-    @DisplayName("설명에 SHAP 수치나 내부 묶음 이름이 새어나가지 않는다")
-    void recommendV3_DescriptionLeaksNoInternalNames() {
+    @DisplayName("지목한 챔피언에 한글 이름이 붙는다 — id만으로는 화면에 못 쓴다")
+    void recommendV3_CounterCarriesKoreanNames() {
         NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
 
         assertThat(response.recommendedItems())
-                .extracting(RecommendedItemDto::description)
-                .allSatisfy(description -> assertThat(description)
-                        .doesNotContain("BUILD", "COUNTER", "SHAP", "PATCH_META", "baseValue"));
+                .flatMap(item -> item.description().counter())
+                .allSatisfy(champion -> assertThat(champion.name()).isNotBlank());
     }
 
     @Test
-    @DisplayName("설명이 응답 안의 이유 선택과 어긋나지 않는다")
-    void recommendV3_DescriptionAgreesWithTheSelectedReasons() {
-        // reasons는 아직 응답에 남아 있다(E8에서 제거). 둘이 어긋나면 한쪽이 거짓말이다.
+    @DisplayName("counter는 두 명을 넘지 않는다")
+    void recommendV3_CounterIsCappedAtTwo() {
         NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
 
-        assertThat(response.recommendedItems()).allSatisfy(item -> {
-            GroupContribution largest = item.reasons().contributions().getFirst();
-            if (largest.value() > 0) {
-                assertThat(item.description())
-                        .as("가장 크게 밀어올린 묶음 %s의 문구가 설명에 있어야 한다", largest.group())
-                        .contains(expectedFragmentOf(largest.group()));
-            }
-        });
+        assertThat(response.recommendedItems()).allSatisfy(item ->
+                assertThat(item.description().counter()).hasSizeLessThanOrEqualTo(2));
     }
 
-    private String expectedFragmentOf(String group) {
-        return switch (group) {
-            case "BUILD" -> "빌드 흐름";
-            case "COUNTER" -> "상대 조합";
-            case "PATCH_META" -> "패치";
-            case "ALLY_SYNERGY" -> "아군 조합";
-            case "SELF_SYNERGY" -> "특성";
-            case "TEAM_COMPOSITION" -> "양 팀 조합";
-            case "CONTEXT" -> "지금 상황";
-            default -> throw new IllegalStateException("알 수 없는 묶음: " + group);
-        };
+    @Test
+    @DisplayName("traits는 팀 어휘의 표시명만 낸다 — Data Dragon 원본 태그도 enum 이름도 새어나가지 않는다")
+    void recommendV3_TraitsUseTheTeamVocabularyOnly() {
+        List<String> vocabulary = Arrays.stream(ItemTrait.values()).map(ItemTrait::getDisplayName).toList();
+
+        NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
+
+        assertThat(response.recommendedItems())
+                .flatMap(item -> item.description().traits())
+                .isSubsetOf(vocabulary);
+    }
+
+    @Test
+    @DisplayName("응답에 문장이 남아 있지 않다 — 클라이언트가 단어를 조립한다")
+    void recommendV3_NoLongerReturnsASentence() {
+        String body = given().contentType(ContentType.JSON)
+                .body(requestWith(List.of(KRAKEN, INFINITY_EDGE)))
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(200)
+                .extract().asString();
+
+        assertThat(body).doesNotContain("추천했어요");
     }
 
     @Test
@@ -285,20 +272,21 @@ class NextItemRecommendationV3PipelineTest {
                 .then().statusCode(200)
                 .extract().asString();
 
-        assertThat(body).contains("reasons").doesNotContain("NaN", "Infinity");
+        assertThat(body).doesNotContain("NaN", "Infinity");
     }
 
     @Test
-    @DisplayName("근거의 통계가 결측이면 null로 나간다 — NaN이 섞이면 JSON 파싱이 깨진다")
-    void recommendV3_MissingStatsSerializeAsNull() {
-        // 응답이 실제로 역직렬화됐다는 것 자체가 NaN이 실려나가지 않았다는 뜻이다.
-        NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
+    @DisplayName("응답에 SHAP 기여도가 실리지 않는다 — '예측을 얼마나 밀었나'는 사용자에게 보일 이유가 아니다")
+    void recommendV3_WhenServed_CarriesNoShapContributions() {
+        // when
+        String body = given().contentType(ContentType.JSON)
+                .body(requestWith(List.of(KRAKEN, INFINITY_EDGE)))
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(200)
+                .extract().asString();
 
-        assertThat(response.recommendedItems())
-                .allSatisfy(item -> assertThat(item.reasons().contributions())
-                        .allSatisfy(contribution -> assertThat(contribution.value())
-                                .isNotNaN()
-                                .isFinite()));
+        // then: SHAP은 서버 DEBUG 로그로만 남는다(NextItemRecommendationServiceTest)
+        assertThat(body).doesNotContain("reasons", "contributions", "baseValue");
     }
 
     @Test

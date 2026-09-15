@@ -64,6 +64,15 @@ public class ChampionItemStats {
     @Column(name = "champion_game_count_recent", nullable = false)
     private int championGameCountRecent;
 
+    /**
+     * 이 챔피언·포지션이 아이템과 무관하게 이긴 판 수.
+     * <p>
+     * 시너지를 재려면 기준선이 있어야 한다. "이 아이템을 샀을 때 승률"만으로는
+     * 챔피언이 원래 센 것인지 아이템이 좋은 것인지 구분할 수 없다.
+     */
+    @Column(name = "champion_win_count_all", nullable = false)
+    private int championWinCountAll;
+
     protected ChampionItemStats() {
     }
 
@@ -101,6 +110,10 @@ public class ChampionItemStats {
 
     public int getChampionGameCountAll() {
         return championGameCountAll;
+    }
+
+    public int getChampionWinCountAll() {
+        return championWinCountAll;
     }
 
     public int getChampionGameCountRecent() {

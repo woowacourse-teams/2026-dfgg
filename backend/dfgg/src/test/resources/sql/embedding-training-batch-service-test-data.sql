@@ -308,3 +308,5 @@ INSERT INTO normalized_match_participants (
     ('KR_MATCH_29', '14.1', 420, 'puuid-enemy-8', 8, 8, 200, 'TOP', false, '3020', '3020', true),
     ('KR_MATCH_29', '14.1', 420, 'puuid-enemy-9', 9, 9, 200, 'TOP', false, '3020', '3020', true),
     ('KR_MATCH_29', '14.1', 420, 'puuid-enemy-10', 10, 10, 200, 'TOP', false, '3020', '3020', true);
+
+UPDATE normalized_match_participants SET tier = 'EMERALD' WHERE tier IS NULL;

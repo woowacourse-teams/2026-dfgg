@@ -78,7 +78,8 @@ public record CandidateUnion(List<ItemCandidate> candidates) {
                     .computeIfAbsent(scoredItem.itemId(), itemId -> new EnumMap<>(CandidateSource.class))
                     .put(generatorResult.source(),
                             new SourceEvidence(scoredItem.score(), index + 1,
-                                    generatorResult.backoffLevel(), scoredItem.scoreByChampionId()));
+                                    generatorResult.backoffLevel(), scoredItem.scoreByChampionId(),
+                                    scoredItem.winLiftByChampionId()));
         }
     }
 }

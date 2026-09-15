@@ -6,6 +6,7 @@ import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.recommend.v3.RecommendationQuery;
 import dfgg.domain.champion.ChampionPosition;
 import java.util.List;
+import dfgg.infrastructure.config.TierScopeConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,9 +20,9 @@ import org.springframework.test.context.jdbc.Sql;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ItemStatsAggregationService.class, StatsFeatureExtractor.class,
-        dfgg.application.recommend.v3.generator.PairSynergyRetriever.class,
-        dfgg.application.recommend.v3.generator.CounterLiftCalculator.class,
+@Import({TierScopeConfiguration.class, ItemStatsAggregationService.class, StatsFeatureExtractor.class,
+        dfgg.application.recommend.v3.generator.PairSynergyRetriever.class, dfgg.application.recommend.v3.generator.ChampionBaselineReader.class,
+        dfgg.application.recommend.v3.generator.PairLiftCalculator.class,
         dfgg.application.utils.WilsonScoreCalculator.class})
 @Sql("/sql/counter-test-data.sql")
 class StatsFeatureExtractorTest {
@@ -79,7 +80,7 @@ class StatsFeatureExtractorTest {
 
     @Test
     @DisplayName("counter lift를 적별로 계산해 집계한다")
-    void extract_WhenEnemiesObserved_SetsCounterLiftAggregates() {
+    void extract_WhenEnemiesObserved_SetsPairLiftAggregates() {
         // when: 야스오의 도미닉은 평소 45%인데 람머스 상대로는 80%
         FeatureVector vector = extract(DOMINIK);
 

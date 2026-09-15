@@ -4,6 +4,7 @@ import dfgg.domain.itemstats.ChampionItemRollupRepository;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.domain.itemstats.ItemMetaStatsRepository;
+import dfgg.domain.match.TierScope;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import dfgg.domain.match.RecentPatchWindow;
 import java.util.Collection;
@@ -33,19 +34,22 @@ public class ItemStatsAggregationService {
     private final ChampionItemRollupRepository championItemRollupRepository;
     private final ChampionPairItemStatsRepository championPairItemStatsRepository;
     private final ItemMetaStatsRepository itemMetaStatsRepository;
+    private final TierScope tierScope;
 
     public ItemStatsAggregationService(
             NormalizedMatchParticipantRepository participantRepository,
             ChampionItemStatsRepository championItemStatsRepository,
             ChampionItemRollupRepository championItemRollupRepository,
             ChampionPairItemStatsRepository championPairItemStatsRepository,
-            ItemMetaStatsRepository itemMetaStatsRepository
+            ItemMetaStatsRepository itemMetaStatsRepository,
+            TierScope tierScope
     ) {
         this.participantRepository = participantRepository;
         this.championItemStatsRepository = championItemStatsRepository;
         this.championItemRollupRepository = championItemRollupRepository;
         this.championPairItemStatsRepository = championPairItemStatsRepository;
         this.itemMetaStatsRepository = itemMetaStatsRepository;
+        this.tierScope = tierScope;
     }
 
     @Transactional
@@ -69,16 +73,16 @@ public class ItemStatsAggregationService {
         Collection<String> excluded = excludedPatchParameter(excludedPatches);
 
         championItemStatsRepository.deleteAllInBatch();
-        championItemStatsRepository.aggregateFrom(recentPatches, excluded);
+        championItemStatsRepository.aggregateFrom(recentPatches, excluded, tierScope.values());
 
         championItemRollupRepository.deleteAllInBatch();
-        championItemRollupRepository.aggregateFrom(recentPatches, excluded);
+        championItemRollupRepository.aggregateFrom(recentPatches, excluded, tierScope.values());
 
         championPairItemStatsRepository.deleteAllInBatch();
-        championPairItemStatsRepository.aggregateFrom(recentPatches, excluded);
+        championPairItemStatsRepository.aggregateFrom(recentPatches, excluded, tierScope.values());
 
         itemMetaStatsRepository.deleteAllInBatch();
-        itemMetaStatsRepository.aggregateFrom(excluded);
+        itemMetaStatsRepository.aggregateFrom(excluded, tierScope.values());
 
         ItemStatsAggregationResult result = new ItemStatsAggregationResult(
                 window.patches(),

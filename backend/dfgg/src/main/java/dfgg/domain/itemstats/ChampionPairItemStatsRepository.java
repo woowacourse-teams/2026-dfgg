@@ -41,7 +41,8 @@ public interface ChampionPairItemStatsRepository extends JpaRepository<ChampionP
                 my_champion_id, other_champion_id, relation, item_id,
                 co_count_all, co_count_recent,
                 win_count_all, win_count_recent,
-                pair_game_count_all, pair_game_count_recent
+                pair_game_count_all, pair_game_count_recent,
+                pair_win_count_all
             )
             WITH purchaser AS (
                 SELECT match_id, puuid, team_id, champion_id, patch, win, core_item_purchase_order
@@ -49,6 +50,7 @@ public interface ChampionPairItemStatsRepository extends JpaRepository<ChampionP
                 WHERE (patch IS NULL OR patch NOT IN (:excludedPatches))
                   AND core_item_purchase_order_complete
                   AND core_item_purchase_order <> ''
+                  AND tier IN (:tiers)
             ),
             context AS (
                 SELECT match_id, puuid, team_id, champion_id
@@ -67,7 +69,10 @@ public interface ChampionPairItemStatsRepository extends JpaRepository<ChampionP
             pair_games AS (
                 SELECT my_champion_id, other_champion_id, relation,
                        count(*) AS game_all,
-                       count(*) FILTER (WHERE patch IN (:recentPatches)) AS game_recent
+                       count(*) FILTER (WHERE patch IN (:recentPatches)) AS game_recent,
+                       -- 아이템과 무관한 조합 자체의 승수. 아군이 세서 모든 아이템이
+                       -- 좋아 보이는 것을 상쇄하는 데 쓴다.
+                       count(*) FILTER (WHERE win) AS win_all
                 FROM pair
                 GROUP BY my_champion_id, other_champion_id, relation
             ),
@@ -83,7 +88,8 @@ public interface ChampionPairItemStatsRepository extends JpaRepository<ChampionP
                    count(*) FILTER (WHERE pair_items.win),
                    count(*) FILTER (WHERE pair_items.win AND pair_items.patch IN (:recentPatches)),
                    max(pair_games.game_all),
-                   max(pair_games.game_recent)
+                   max(pair_games.game_recent),
+                   max(pair_games.win_all)
             FROM pair_items
             JOIN pair_games
               ON pair_games.my_champion_id = pair_items.my_champion_id
@@ -93,5 +99,6 @@ public interface ChampionPairItemStatsRepository extends JpaRepository<ChampionP
                      pair_items.item_id
             """, nativeQuery = true)
     void aggregateFrom(@Param("recentPatches") Collection<String> recentPatches,
-                       @Param("excludedPatches") Collection<String> excludedPatches);
+                       @Param("excludedPatches") Collection<String> excludedPatches,
+                       @Param("tiers") Collection<String> tiers);
 }

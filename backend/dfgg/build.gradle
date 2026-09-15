@@ -50,9 +50,11 @@ tasks.register('evaluationTest', Test) {
     testLogging {
         showStandardStreams = true
     }
-    // -Devaluation.* 를 테스트 JVM으로 넘긴다. 없으면 기본값이 조용히 쓰인다.
+    // -Devaluation.* 와 -Drecommendation.* 를 테스트 JVM으로 넘긴다. 없으면 기본값이 조용히 쓰인다.
+    // recommendation.* 까지 넘기는 이유: 후보 생성 파라미터를 바꿔가며 export를 비교해야 하는데,
+    // 접두사가 걸러지면 오타든 누락이든 에러 없이 기본값으로 돌아 "차이가 없다"는 결론이 나온다.
     systemProperties = System.properties.findAll { key, value ->
-        key.toString().startsWith('evaluation.')
+        key.toString().startsWith('evaluation.') || key.toString().startsWith('recommendation.')
     }
     outputs.upToDateWhen { false }
 }

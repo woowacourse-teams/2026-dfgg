@@ -3,9 +3,9 @@ package dfgg.application.recommend.v3;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
+import dfgg.application.recommend.v3.generator.ChampionBaselineReader;
 import dfgg.application.recommend.v3.generator.CounterCandidateGenerator;
-import dfgg.application.recommend.v3.generator.CounterLift;
-import dfgg.application.recommend.v3.generator.CounterLiftCalculator;
+import dfgg.application.recommend.v3.generator.PairLiftCalculator;
 import dfgg.application.recommend.v3.generator.PairBackoffLevel;
 import dfgg.application.utils.WilsonScoreCalculator;
 import dfgg.domain.champion.ChampionPosition;
@@ -13,7 +13,7 @@ import dfgg.domain.itemstats.ChampionItemRollupRepository;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import java.util.List;
-import java.util.Map;
+import dfgg.infrastructure.config.TierScopeConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ import org.springframework.test.context.jdbc.Sql;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(ItemStatsAggregationService.class)
+@Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/counter-test-data.sql")
 class CounterCandidateGeneratorTest {
 
@@ -48,6 +48,9 @@ class CounterCandidateGeneratorTest {
     @Autowired
     private ChampionItemRollupRepository championItemRollupRepository;
 
+    /** 이 테스트는 하한 도입 이전의 동작을 고정한다. 하한 자체는 별도 테스트에서 다룬다. */
+    private static final double NO_BASE_RATE_FLOOR = 0.0;
+
     private CounterCandidateGenerator generator;
 
     @BeforeEach
@@ -55,7 +58,8 @@ class CounterCandidateGeneratorTest {
         aggregationService.aggregate(1);
         generator = new CounterCandidateGenerator(
                 pairRepository, championItemStatsRepository, championItemRollupRepository,
-                new CounterLiftCalculator(1.0, 159), new WilsonScoreCalculator(), 5
+                new PairLiftCalculator(1.0, 159), new WilsonScoreCalculator(), 5, NO_BASE_RATE_FLOOR,
+                new ChampionBaselineReader(championItemStatsRepository, championItemRollupRepository)
         );
     }
 
@@ -69,6 +73,14 @@ class CounterCandidateGeneratorTest {
 
     private List<Long> itemIdsOf(GeneratorResult result) {
         return result.rankedItems().stream().map(ScoredItem::itemId).toList();
+    }
+
+    /** generator가 후보에 남긴 적별 lift. 랭킹 점수로 접기 전의 값이다. */
+    private double liftAgainst(GeneratorResult result, long itemId, long enemyId) {
+        return result.rankedItems().stream()
+                .filter(item -> item.itemId() == itemId)
+                .findFirst().orElseThrow()
+                .scoreByChampionId().get(enemyId);
     }
 
     @Test
@@ -85,32 +97,26 @@ class CounterCandidateGeneratorTest {
     @DisplayName("내가 이 적 상대로 실제로 더 사는 아이템은 lift가 1보다 크다")
     void generate_WhenIBuyMoreAgainstThisEnemy_LiftExceedsOne() {
         // given: 야스오의 도미닉 구매율은 평소 45%(18/40)인데 람머스 상대로는 80%(16/20)
-        Map<Long, CounterLift> lifts = generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS);
+        RecommendationQuery query = queryAgainst(List.of(RAMMUS));
+
+        // when
+        GeneratorResult result = generator.generate(query, 20);
 
         // then
-        assertThat(lifts.get(DOMINIK).lift()).isGreaterThan(1.0);
+        assertThat(liftAgainst(result, DOMINIK, RAMMUS)).isGreaterThan(1.0);
     }
 
     @Test
     @DisplayName("내가 이 적 상대로 덜 사는 아이템은 lift가 1보다 작다")
     void generate_WhenIBuyLessAgainstThisEnemy_LiftIsBelowOne() {
         // given: 무한의 대검은 평소 55%(22/40)인데 람머스 상대로는 20%(4/20)
-        Map<Long, CounterLift> lifts = generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS);
+        RecommendationQuery query = queryAgainst(List.of(RAMMUS));
+
+        // when
+        GeneratorResult result = generator.generate(query, 20);
 
         // then
-        assertThat(lifts.get(INFINITY_EDGE).lift()).isLessThan(1.0);
-    }
-
-    @Test
-    @DisplayName("lift와 함께 내 챔피언의 base rate를 별도로 남긴다 — 셋을 구분해야 실패 유형을 잡는다")
-    void liftsByItem_WhenComputed_PreservesBaseRateSeparately() {
-        // when
-        Map<Long, CounterLift> lifts = generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS);
-
-        // then: 야스오의 도미닉 base rate는 18/40 = 0.45
-        CounterLift dominik = lifts.get(DOMINIK);
-        assertThat(dominik.baseRate()).isEqualTo(0.45);
-        assertThat(dominik.pairProbability()).isEqualTo(16.0 / 20.0);
+        assertThat(liftAgainst(result, INFINITY_EDGE, RAMMUS)).isLessThan(1.0);
     }
 
     @Test
@@ -150,19 +156,6 @@ class CounterCandidateGeneratorTest {
     }
 
     @Test
-    @DisplayName("남긴 적별 lift가 개별 조회 결과와 같다 — 다시 계산하면 값이 갈릴 수 있다")
-    void generate_PreservedLiftMatchesTheDirectLookup() {
-        double direct = generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS).get(DOMINIK).lift();
-
-        GeneratorResult result = generator.generate(queryAgainst(List.of(RAMMUS)), 10);
-        ScoredItem dominik = result.rankedItems().stream()
-                .filter(item -> item.itemId() == DOMINIK)
-                .findFirst().orElseThrow();
-
-        assertThat(dominik.scoreByChampionId().get(RAMMUS)).isEqualTo(direct);
-    }
-
-    @Test
     @DisplayName("랭킹 점수는 적별 lift의 최댓값 그대로다 — 근거를 남겨도 순위는 달라지지 않는다")
     void generate_RankingScoreStillEqualsTheMaximumPerEnemyLift() {
         GeneratorResult result = generator.generate(queryAgainst(List.of(RAMMUS, AHRI)), 10);
@@ -175,18 +168,16 @@ class CounterCandidateGeneratorTest {
 
     @Test
     @DisplayName("적을 추가해도 기존 적과의 lift는 변하지 않는다 — 적 5명을 하나의 window로 묶지 않는다")
-    void liftsByItem_WhenAnotherEnemyAdded_DoesNotChangeExistingEnemyLift() {
+    void generate_WhenAnotherEnemyAdded_DoesNotChangeExistingEnemyLift() {
         // given
-        double aloneAgainstRammus = generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS).get(DOMINIK).lift();
+        double aloneAgainstRammus =
+                liftAgainst(generator.generate(queryAgainst(List.of(RAMMUS)), 20), DOMINIK, RAMMUS);
 
         // when
-        GeneratorResult withBothEnemies = generator.generate(queryAgainst(List.of(RAMMUS, AHRI)), 10);
-        double stillAgainstRammus =
-                generator.liftsByItem(YASUO, ChampionPosition.MID, RAMMUS).get(DOMINIK).lift();
+        GeneratorResult withBothEnemies = generator.generate(queryAgainst(List.of(RAMMUS, AHRI)), 20);
 
         // then
-        assertThat(stillAgainstRammus).isEqualTo(aloneAgainstRammus);
-        assertThat(withBothEnemies.rankedItems()).isNotEmpty();
+        assertThat(liftAgainst(withBothEnemies, DOMINIK, RAMMUS)).isEqualTo(aloneAgainstRammus);
     }
 
     @Test

@@ -533,17 +533,6 @@ class MultiBuildRecommendationServiceTest {
 
     private RecommendationProperties recommendationProperties(int v2MinSampleCount) {
         return new RecommendationProperties(
-                "checkpoint-a-4",
-                "checkpoint-c-1-counter",
-                "checkpoint-d-1",
-                2,
-                10,
-                5,
-                0.8,
-                1.0,
-                1.0,
-                1.0,
-                1.0,
                 v2MinSampleCount,
                 RECOMMENDATION_TIERS
         );
