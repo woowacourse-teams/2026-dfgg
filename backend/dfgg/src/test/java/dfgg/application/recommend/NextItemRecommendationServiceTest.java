@@ -308,4 +308,45 @@ class NextItemRecommendationServiceTest {
                 .isInstanceOf(InvalidRecommendationRequestException.class)
                 .hasMessageContaining("징크스");
     }
+
+    @Test
+    @DisplayName("구매 아이템이 포지션 상한에 닿아 풀템이면 빈 추천을 낸다")
+    void recommendNextItem_WhenFullBuild_ReturnsEmptyRecommendation() {
+        // given
+        NextItemRecommendationRequest request = midRequestWithPurchased(
+                List.of(3031L, 3036L, 3046L, 3072L, 3094L, 6672L));
+
+        // when
+        NextItemRecommendationResponse response = service.recommendNextItem(request);
+
+        // then
+        assertThat(response.recommendedItems()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("상한 아래면 평소대로 추천한다 — 풀템 처리가 정상 요청을 막지 않는다")
+    void recommendNextItem_WhenBelowPositionLimit_RecommendsAsUsual() {
+        // given
+        givenCandidates(KRAKEN);
+        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(KRAKEN));
+        NextItemRecommendationRequest request = midRequestWithPurchased(
+                List.of(3031L, 3036L, 3046L, 3072L, 3094L));
+
+        // when
+        NextItemRecommendationResponse response = service.recommendNextItem(request);
+
+        // then
+        assertThat(response.recommendedItems()).extracting(item -> item.id()).containsExactly(KRAKEN);
+    }
+
+    private NextItemRecommendationRequest midRequestWithPurchased(List<Long> purchasedItemIds) {
+        return new NextItemRecommendationRequest(
+                new ChampionDto("야스오", "MID"), purchasedItemIds,
+                List.of(new ChampionDto("징크스", "BOTTOM"), new ChampionDto("쓰레쉬", "SUPPORT"),
+                        new ChampionDto("리신", "JUNGLE"), new ChampionDto("오른", "TOP")),
+                List.of(new ChampionDto("람머스", "TOP"), new ChampionDto("아리", "MID"),
+                        new ChampionDto("케이틀린", "BOTTOM"), new ChampionDto("레오나", "SUPPORT"),
+                        new ChampionDto("엘리스", "JUNGLE")),
+                "EMERALD", "16.17");
+    }
 }

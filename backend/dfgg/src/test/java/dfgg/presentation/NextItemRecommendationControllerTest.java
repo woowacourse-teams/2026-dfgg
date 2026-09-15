@@ -2,7 +2,7 @@ package dfgg.presentation;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.empty;
 
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.item.ItemRepository;
@@ -183,27 +183,29 @@ class NextItemRecommendationControllerTest {
     }
 
     @Test
-    @DisplayName("BOTTOM은 구매 아이템 7개까지 받는다 — 상한은 포함이다")
-    void recommendV3_WhenBottomPurchasedExactlySeven_IsNotRejected() {
+    @DisplayName("BOTTOM이 구매 아이템 7개로 풀템이면 빈 추천이다")
+    void recommendV3_WhenBottomHasFullBuildOfSeven_ReturnsEmptyRecommendation() {
         // given
         String request = body("야스오", "BOTTOM", SEVEN_ITEMS, ALLIES, ENEMIES, "EMERALD");
 
         // when & then
         given().contentType(ContentType.JSON).body(request)
                 .when().post("/api/recommendations/v3")
-                .then().statusCode(not(400));
+                .then().statusCode(200)
+                .body("recommendedItems", empty());
     }
 
     @Test
-    @DisplayName("BOTTOM이 아닌 포지션은 구매 아이템 6개까지 받는다 — 상한은 포함이다")
-    void recommendV3_WhenNonBottomPurchasedExactlySix_IsNotRejected() {
+    @DisplayName("BOTTOM이 아닌 포지션이 구매 아이템 6개로 풀템이면 빈 추천이다")
+    void recommendV3_WhenNonBottomHasFullBuildOfSix_ReturnsEmptyRecommendation() {
         // given
         String request = body("야스오", "MID", SIX_ITEMS, ALLIES, ENEMIES, "EMERALD");
 
         // when & then
         given().contentType(ContentType.JSON).body(request)
                 .when().post("/api/recommendations/v3")
-                .then().statusCode(not(400));
+                .then().statusCode(200)
+                .body("recommendedItems", empty());
     }
 
     @Test

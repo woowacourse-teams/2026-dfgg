@@ -98,6 +98,9 @@ public class NextItemRecommendationService {
     public NextItemRecommendationResponse recommendNextItem(NextItemRecommendationRequest request) {
         Champion myChampion = championService.findChampionByName(request.myChampion().name());
         RecommendationQuery query = toQuery(request, myChampion);
+        if (query.position().isFullBuild(query.purchasedItemCount())) {
+            return new NextItemRecommendationResponse(List.of());
+        }
 
         List<GeneratorResult> generatorResults = new ArrayList<>();
         for (CandidateGenerator generator : generators) {
