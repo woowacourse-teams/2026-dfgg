@@ -4,6 +4,10 @@
  * 정리했다. 한 챔피언이 여러 라인에 들어있는 건 정상이다(예: 스웨인은
  * 미드·원딜·서폿 다 감).
  *
+ * 값은 한글명으로 적혀 있다. 화면 언어가 영어여도 이 목록을 그대로 쓰고,
+ * 쓰는 쪽(ChampionSelect)에서 Data Dragon 한글명 → riotKey 로 옮겨 맞춘다.
+ * 173개 이름을 영어로 한 벌 더 적는 대신, 이미 받아둔 조회표를 쓰는 쪽이 싸다.
+ *
  * 출처: https://op.gg/ko/lol/champions?position={top|jungle|mid|adc|support}
  */
 export const champion = {
