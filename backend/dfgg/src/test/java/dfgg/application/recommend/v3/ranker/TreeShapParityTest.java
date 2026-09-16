@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -68,6 +69,7 @@ class TreeShapParityTest {
     }
 
     @Test
+    @Tag("evaluation")
     @DisplayName("모든 케이스에서 feature별 기여도가 LightGBM과 1e-6 이내로 일치한다")
     void contributions_MatchLightGbmPredContrib() {
         List<String> mismatches = new ArrayList<>();
@@ -90,6 +92,7 @@ class TreeShapParityTest {
     }
 
     @Test
+    @Tag("evaluation")
     @DisplayName("기준값이 LightGBM의 base value와 일치한다 — 마지막 칸이 그 값이다")
     void baseValue_MatchesLightGbmBaseValue() {
         JsonNode expected = fixture.get("cases").get(0).get("expected_contributions");
