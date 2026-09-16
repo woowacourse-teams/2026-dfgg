@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -70,6 +71,7 @@ class LightGbmParityTest {
     }
 
     @Test
+    @Tag("evaluation")
     @DisplayName("모든 케이스에서 Java 예측이 Python 예측과 1e-6 이내로 일치한다")
     void predict_MatchesPythonReferenceScores() {
         List<String> mismatches = new ArrayList<>();
@@ -111,6 +113,7 @@ class LightGbmParityTest {
     }
 
     @Test
+    @Tag("evaluation")
     @DisplayName("케이스들의 점수가 서로 다르다 — 상수를 내도 통과하는 게이트는 게이트가 아니다")
     void fixture_ScoresAreNotAllIdentical() {
         List<Double> scores = new ArrayList<>();
