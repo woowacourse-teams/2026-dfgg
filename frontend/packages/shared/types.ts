@@ -88,25 +88,3 @@ export interface RecommendationV3Response {
   /** 어떤 방식으로 추천했는지 백엔드가 알려주는 값. 그대로 화면에 표시한다. */
   servedBy: string;
 }
-
-/** direction 코드를 UI에 보여줄 한글 라벨로 바꾼다. API가 한글 설명을 내려주지 않는다. */
-export const DIRECTION_LABEL: Record<Direction, string> = {
-  PHYSICAL_DAMAGE: '물리 피해 대응',
-  MAGIC_DAMAGE: '마법 피해 대응',
-  MIXED_DAMAGE: '복합 피해 대응',
-  ANTI_TANK: '탱커 대응',
-  BURST_SURVIVAL: '순간 피해 생존',
-  SUSTAINED_COMBAT: '지속 전투',
-  BURST_DAMAGE: '순간 피해',
-  SUSTAINED_DAMAGE: '지속 피해',
-  SURVIVAL_RESPONSE: '생존 대응',
-  BURST_ASSASSINATION: '순간 암살',
-  DEFENSE_NEUTRALIZATION: '방어 무력화',
-  ENGAGE_SURVIVAL: '진입 후 생존',
-  CRITICAL_STRIKE_DAMAGE: '치명타 피해',
-  ANTI_TANK_SUSTAINED_DAMAGE: '대탱커 지속 피해',
-  SURVIVAL_KITING: '생존 및 카이팅',
-  ENGAGE_INITIATION: '전투 개시',
-  ALLY_PROTECTION: '아군 보호',
-  HEALING_ENHANCEMENT: '회복 및 강화',
-};

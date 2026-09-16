@@ -1,5 +1,8 @@
+import { FOOTER_TEXT, POSITION_LABEL } from '../../../../packages/i18n/common';
+import { DESKTOP_TEXT } from '../../../../packages/i18n/desktop';
+import LangToggle from '../../../../packages/i18n/LangToggle';
+import { useDict, useLang } from '../../../../packages/i18n/useLang';
 import type { DDragonData } from '../../../../packages/shared/ddragon';
-import type { Position } from '../../../../packages/shared/types';
 import BuildList from '../../components/BuildList';
 import ItemBuild from '../../components/ItemBuild';
 import OverlayControls from '../../components/OverlayControls';
@@ -11,14 +14,6 @@ import { useRecommendationV3 } from '../../components/useRecommendationV3';
 import { useRecommendMode } from '../../components/useRecommendMode';
 import type { LineupSlot } from '../../electron/types';
 
-const POSITION_LABEL: Record<Position, string> = {
-  TOP: '탑',
-  JUNGLE: '정글',
-  MID: '미드',
-  BOTTOM: '원딜',
-  SUPPORT: '서폿',
-};
-
 /** 메인 프로세스가 기본 브라우저로 열어준다. 앱 창 안에서는 열리지 않는다. */
 const PRIVACY_URL = 'https://dfgg.pro/privacy';
 
@@ -28,13 +23,15 @@ const FEEDBACK_URL = 'https://www.dfgg.pro/feedback';
 /** 서비스를 처음 공개한 해. 해가 바뀌어도 그대로 둔다. */
 const COPYRIGHT_YEAR = 2026;
 
-const STATUS_LABEL = {
-  connected: '롤 클라이언트 연결됨',
-  disconnected: '롤 클라이언트를 기다리는 중',
-  unavailable: '데스크톱 앱에서만 동작해요',
-};
-
-function ChampionRow({ slots, ddragon }: { slots: LineupSlot[]; ddragon: DDragonData | null }) {
+function ChampionRow({
+  slots,
+  ddragon,
+  undecided,
+}: {
+  slots: LineupSlot[];
+  ddragon: DDragonData | null;
+  undecided: string;
+}) {
   return (
     <ul className='flex gap-2'>
       {slots.map((slot, index) => {
@@ -46,7 +43,9 @@ function ChampionRow({ slots, ddragon }: { slots: LineupSlot[]; ddragon: DDragon
             ) : (
               <div className='size-14 rounded bg-neutral-800' />
             )}
-            <p className='mt-1 truncate text-[11px] text-neutral-400'>{champion?.name ?? '미정'}</p>
+            <p className='mt-1 truncate text-[11px] text-neutral-400'>
+              {champion?.name ?? undecided}
+            </p>
           </li>
         );
       })}
@@ -56,6 +55,11 @@ function ChampionRow({ slots, ddragon }: { slots: LineupSlot[]; ddragon: DDragon
 
 export default function App() {
   useAnalyticsBridge();
+
+  const t = useDict(DESKTOP_TEXT);
+  const footer = useDict(FOOTER_TEXT);
+  const { lang } = useLang();
+  const positionLabel = POSITION_LABEL[lang];
 
   // 1번(빌드 세트)과 2번(구매할 때마다 갱신) 두 방식을 항상 같이 돌려두고,
   // 버튼은 어느 결과를 보여줄지만 바꾼다 — 전환할 때마다 다시 기다리지 않아도 된다.
@@ -93,9 +97,14 @@ export default function App() {
 
       <div className='px-6 pb-6'>
         <header className='flex flex-wrap items-baseline justify-between gap-2'>
-          <h1 className='text-xl font-bold'>밴픽 아이템 추천</h1>
+          <h1 className='text-xl font-bold'>{t.title}</h1>
           <div className='flex items-baseline gap-3'>
-            <p className='text-sm text-neutral-400'>{STATUS_LABEL[status]}</p>
+            <LangToggle
+              label={t.langLabel}
+              activeClass='bg-emerald-500 text-neutral-950'
+              inactiveClass='text-neutral-400 hover:text-neutral-200'
+            />
+            <p className='text-sm text-neutral-400'>{t.status[status]}</p>
             {/* 눌러도 앱 창 안에서 열리지 않고 기본 브라우저로 넘어간다. */}
             <a
               href={FEEDBACK_URL}
@@ -104,17 +113,17 @@ export default function App() {
               onClick={() => window.umami?.track('desktop-feedback-click')}
               className='cursor-pointer rounded bg-neutral-800 px-2.5 py-1 text-xs font-bold text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-neutral-100'
             >
-              피드백 보내기
+              {t.feedback}
             </a>
           </div>
         </header>
 
         {/* 두 추천 방식은 항상 같이 돌고 있다. 버튼은 결과 표시만 바꾼다. */}
-        <div className='mt-3 flex gap-1.5' role='tablist' aria-label='추천 방식'>
+        <div className='mt-3 flex gap-1.5' role='tablist' aria-label={t.modeTablist}>
           {(
             [
-              [1, '1번 · 빌드 추천'],
-              [2, '2번 · 실시간 추천'],
+              [1, t.mode1],
+              [2, t.mode2],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -145,50 +154,50 @@ export default function App() {
         {windowMode === WINDOW_MODE_FULLSCREEN && (
           <div className='mt-4 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-300'>
             <p>
-              롤이 <strong>전체 화면</strong>이라 오버레이가 게임에 가려집니다.
+              {t.fullscreenTitle[0]}
+              <strong>{t.fullscreenTitle[1]}</strong>
+              {t.fullscreenTitle[2]}
             </p>
             <p className='mt-1.5 text-xs text-amber-300/80'>
-              롤 설정 → 그래픽 → 창 모드를 <strong>테두리 없음</strong>이나 <strong>창 모드</strong>
-              로 바꿔주세요.
+              {t.fullscreenHint[0]}
+              <strong>{t.fullscreenHint[1]}</strong>
+              {t.fullscreenHint[2]}
+              <strong>{t.fullscreenHint[3]}</strong>
+              {t.fullscreenHint[4]}
             </p>
           </div>
         )}
 
-        {!lineup && (
-          <p className='mt-8 text-sm text-neutral-400'>
-            챔피언 선택이나 게임이 시작되면 조합을 자동으로 읽어옵니다.
-          </p>
-        )}
+        {!lineup && <p className='mt-8 text-sm text-neutral-400'>{t.idle}</p>}
 
         {lineup && (
           <>
             <section className='mt-6 space-y-4'>
               <div>
                 <h2 className='mb-1.5 text-xs font-bold tracking-wider text-emerald-400'>
-                  아군 {allyPicked} / 5
+                  {t.allies} {allyPicked} / 5
                 </h2>
-                <ChampionRow slots={lineup.allies} ddragon={ddragon} />
+                <ChampionRow slots={lineup.allies} ddragon={ddragon} undecided={t.undecided} />
               </div>
               <div>
                 <h2 className='mb-1.5 text-xs font-bold tracking-wider text-rose-400'>
-                  상대 {enemyPicked} / 5
+                  {t.enemies} {enemyPicked} / 5
                 </h2>
-                <ChampionRow slots={lineup.enemies} ddragon={ddragon} />
+                <ChampionRow slots={lineup.enemies} ddragon={ddragon} undecided={t.undecided} />
               </div>
             </section>
 
             {!request && (
               <p className='mt-6 text-sm text-neutral-400'>
-                {!lineup.myPosition && '내 포지션을 아직 알 수 없어요. '}
+                {!lineup.myPosition && t.noPosition}
                 {!isPicked({
                   cellId: lineup.myCellId,
                   championId: lineup.myChampionId,
                   championName: lineup.myChampionName,
                   position: null,
-                }) && '내 챔피언을 고르면 '}
-                {enemyPicked < 5 &&
-                  '상대 챔피언이 모두 공개되면 추천을 요청합니다. 블라인드 픽에서는 게임 시작 전까지 상대가 보이지 않아요.'}
-                {enemyPicked === 5 && allyPicked < 5 && '아군이 모두 확정되면 추천을 요청합니다.'}
+                }) && t.pickMine}
+                {enemyPicked < 5 && t.waitingEnemies}
+                {enemyPicked === 5 && allyPicked < 5 && t.waitingAllies}
               </p>
             )}
           </>
@@ -196,7 +205,7 @@ export default function App() {
 
         {mode === 1 && (
           <>
-            {loading && <p className='mt-6 text-sm text-neutral-400'>분석 중...</p>}
+            {loading && <p className='mt-6 text-sm text-neutral-400'>{t.analyzing}</p>}
 
             {error && (
               <p className='mt-6 text-sm text-rose-400' role='alert'>
@@ -206,7 +215,7 @@ export default function App() {
 
             {/* 빌드가 아예 없거나(빈 배열) 다 있는데 아이템(build)이 null인 경우 모두 포함한다. */}
             {result && result.builds.every((build) => !build.build?.length) && !loading && (
-              <p className='mt-8 text-sm text-neutral-400'>이 조합은 아직 데이터가 부족해요.</p>
+              <p className='mt-8 text-sm text-neutral-400'>{t.noData}</p>
             )}
 
             {result &&
@@ -219,7 +228,7 @@ export default function App() {
                       findChampion(ddragon, lineup.myChampionId, lineup.myChampionName)?.name) ??
                       result.champion}
                     <span className='ml-2 text-sm font-normal text-neutral-400'>
-                      {POSITION_LABEL[result.position] ?? result.position}
+                      {positionLabel[result.position] ?? result.position}
                     </span>
                   </h2>
                   <div className='mt-3'>
@@ -236,7 +245,7 @@ export default function App() {
 
         {mode === 2 && (
           <>
-            {loadingV3 && <p className='mt-6 text-sm text-neutral-400'>분석 중...</p>}
+            {loadingV3 && <p className='mt-6 text-sm text-neutral-400'>{t.analyzing}</p>}
 
             {errorV3 && (
               <p className='mt-6 text-sm text-rose-400' role='alert'>
@@ -245,7 +254,7 @@ export default function App() {
             )}
 
             {resultV3 && resultV3.recommendedItems.length === 0 && !loadingV3 && (
-              <p className='mt-8 text-sm text-neutral-400'>이 조합은 아직 데이터가 부족해요.</p>
+              <p className='mt-8 text-sm text-neutral-400'>{t.noData}</p>
             )}
 
             {resultV3 && ddragon && !loadingV3 && resultV3.recommendedItems.length > 0 && (
@@ -253,14 +262,12 @@ export default function App() {
                 <h2 className='text-lg font-bold'>
                   {(lineup &&
                     findChampion(ddragon, lineup.myChampionId, lineup.myChampionName)?.name) ??
-                    '추천 아이템'}
+                    t.recommendedItems}
                   <span className='ml-2 text-sm font-normal text-neutral-400'>
                     {resultV3.servedBy}
                   </span>
                 </h2>
-                <p className='mt-1 text-xs text-neutral-500'>
-                  이 중 하나를 다음 코어템으로 선택하세요. 순서가 아니라 후보예요.
-                </p>
+                <p className='mt-1 text-xs text-neutral-500'>{t.pickNextCore}</p>
                 <div className='mt-3'>
                   <ItemBuild
                     items={resultV3.recommendedItems}
@@ -276,7 +283,7 @@ export default function App() {
 
         <footer className='mt-10 border-t border-neutral-800 pt-4 text-xs text-neutral-500'>
           <p>
-            개인정보처리방침{' '}
+            {footer.privacy}{' '}
             {/* 눌러도 기본 브라우저로 열리니, 주소를 그대로 적어 옮겨적을 수도 있게 한다. */}
             <a
               href={PRIVACY_URL}
@@ -287,10 +294,7 @@ export default function App() {
               {PRIVACY_URL}
             </a>
           </p>
-          <p className='mt-2 leading-relaxed'>
-            dfgg는 Riot Games와 제휴하거나 승인받은 서비스가 아닙니다. League of Legends와 Riot
-            Games는 Riot Games, Inc.의 상표입니다.
-          </p>
+          <p className='mt-2 leading-relaxed'>{footer.disclaimer}</p>
           {/* Riot 이 요구하는 고지문 원문. 의역하지 않고 그대로 둔다. */}
           <p className='mt-1.5 leading-relaxed'>
             dfgg isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or opinions of

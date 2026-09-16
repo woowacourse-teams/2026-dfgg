@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { DESKTOP_TEXT } from '../../../packages/i18n/desktop';
+import { useDict } from '../../../packages/i18n/useLang';
 import type { UpdateState } from '../electron/updater';
 
 const IDLE: UpdateState = { status: 'idle', version: null, percent: 0 };
@@ -12,6 +14,7 @@ const IDLE: UpdateState = { status: 'idle', version: null, percent: 0 };
  */
 export default function UpdateBanner() {
   const [state, setState] = useState<UpdateState>(IDLE);
+  const t = useDict(DESKTOP_TEXT).update;
   const api = window.lcu?.update;
 
   useEffect(() => {
@@ -26,7 +29,7 @@ export default function UpdateBanner() {
   if (state.status === 'downloading') {
     return (
       <p className='mt-4 rounded border border-neutral-800 bg-neutral-900/60 p-3 text-xs text-neutral-400'>
-        새 버전 {state.version} 을 받는 중이에요 · {state.percent}%
+        {t.downloading(state.version, state.percent)}
       </p>
     );
   }
@@ -34,14 +37,16 @@ export default function UpdateBanner() {
   return (
     <div className='mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-emerald-500/40 bg-emerald-500/10 p-3'>
       <p className='text-sm text-emerald-300'>
-        새 버전 <strong>{state.version}</strong> 이 준비됐어요. 다시 시작하면 적용됩니다.
+        {t.readyBefore}
+        <strong>{state.version}</strong>
+        {t.readyAfter}
       </p>
       <button
         type='button'
         onClick={() => void api.install()}
         className='shrink-0 cursor-pointer rounded bg-emerald-500 px-3 py-1.5 text-xs font-bold text-emerald-950'
       >
-        지금 다시 시작
+        {t.restart}
       </button>
     </div>
   );

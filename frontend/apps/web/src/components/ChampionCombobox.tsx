@@ -1,5 +1,7 @@
 import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 
+import { useDict } from '../../../../packages/i18n/useLang';
+import { CHAMPION_SELECT_TEXT } from '../../../../packages/i18n/web';
 import { type ChampionInfo, isChosungOnly, useDebounced } from '../hooks/useChampions';
 
 const DEBOUNCE_MS = 120;
@@ -29,6 +31,7 @@ export default function ChampionCombobox({
   highlighted = false,
   onChange,
 }: ChampionComboboxProps) {
+  const t = useDict(CHAMPION_SELECT_TEXT);
   const [query, setQuery] = useState(value);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -158,7 +161,7 @@ export default function ChampionCombobox({
         <ul
           id={listboxId}
           role='listbox'
-          aria-label={`${label} 추천`}
+          aria-label={t.recommend(label)}
           className='chamfer-sm absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden bg-surface shadow-[inset_0_0_0_1px_var(--color-accent),0_12px_28px_rgb(0_0_0/0.6)]'
         >
           {suggestions.map((champion, index) => (

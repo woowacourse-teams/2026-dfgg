@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import { DESKTOP_TEXT } from '../../../packages/i18n/desktop';
+import { useDict, useLang } from '../../../packages/i18n/useLang';
 import {
   canonicalItemId,
   type DDragonData,
@@ -50,6 +52,8 @@ function toRequestV3(lineup: Lineup, ddragon: DDragonData): RecommendationV3Requ
  */
 export function useRecommendationV3() {
   const { lineup, status, windowMode } = useLineup();
+  const { lang } = useLang();
+  const t = useDict(DESKTOP_TEXT);
   const [ddragon, setDDragon] = useState<DDragonData | null>(null);
   const [result, setResult] = useState<RecommendationV3Response | null>(null);
   const [error, setError] = useState('');
@@ -63,13 +67,13 @@ export function useRecommendationV3() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadDDragon(controller.signal)
+    loadDDragon(lang, controller.signal)
       .then(setDDragon)
       .catch(() => {
-        if (!controller.signal.aborted) setDdragonError('챔피언 정보를 불러오지 못했어요.');
+        if (!controller.signal.aborted) setDdragonError(t.ddragonFailed);
       });
     return () => controller.abort();
-  }, []);
+  }, [lang, t]);
 
   const request = useMemo(
     () => (lineup && ddragon ? toRequestV3(lineup, ddragon) : null),
@@ -111,7 +115,7 @@ export function useRecommendationV3() {
         if (controller.signal.aborted) return;
         console.error(cause);
         setErrorKey(fetchKey);
-        setError('추천을 불러오지 못했어요. 다시 시도 중...');
+        setError(t.retrying);
         window.umami?.track('desktop-recommend-v3-fail', {
           reason: cause instanceof Error ? cause.message : 'unknown',
         });
@@ -122,7 +126,7 @@ export function useRecommendationV3() {
       controller.abort();
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [request, fetchKey, retryTick, resultKey]);
+  }, [request, fetchKey, retryTick, resultKey, t]);
 
   const allyPicked = lineup?.allies.filter(isPicked).length ?? 0;
   const enemyPicked = lineup?.enemies.filter(isPicked).length ?? 0;

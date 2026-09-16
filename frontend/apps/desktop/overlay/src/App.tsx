@@ -1,17 +1,11 @@
-import type { Position } from '../../../../packages/shared/types';
+import { POSITION_LABEL } from '../../../../packages/i18n/common';
+import { DESKTOP_TEXT } from '../../../../packages/i18n/desktop';
+import { useDict, useLang } from '../../../../packages/i18n/useLang';
 import BuildList from '../../components/BuildList';
 import ItemBuild from '../../components/ItemBuild';
 import { findChampion, useRecommendation } from '../../components/useRecommendation';
 import { useRecommendationV3 } from '../../components/useRecommendationV3';
 import { useRecommendMode } from '../../components/useRecommendMode';
-
-const POSITION_LABEL: Record<Position, string> = {
-  TOP: '탑',
-  JUNGLE: '정글',
-  MID: '미드',
-  BOTTOM: '원딜',
-  SUPPORT: '서폿',
-};
 
 /**
  * 밴픽 중 롤 클라이언트 위에 얹히는 창.
@@ -21,6 +15,9 @@ export default function App() {
   // 오버레이는 클릭이 통과하는 창이라 버튼을 못 단다. 메인 창에서 고른 모드를
   // 그대로 따라간다. 두 방식 다 항상 돌고 있어서 전환 지연 없이 바로 보인다.
   const [mode] = useRecommendMode();
+  const { lang } = useLang();
+  const t = useDict(DESKTOP_TEXT);
+  const positionLabel = POSITION_LABEL[lang];
 
   const { lineup, ddragon, result, error, loading, enemyPicked, allyPicked } = useRecommendation();
   const { result: resultV3, error: errorV3, loading: loadingV3 } = useRecommendationV3();
@@ -45,7 +42,7 @@ export default function App() {
             {myChampion?.name ?? 'dfgg'}
             {mode === 1 && result && (
               <span className='ml-1 text-[11px] font-normal text-white/80'>
-                {POSITION_LABEL[result.position] ?? result.position}
+                {positionLabel[result.position] ?? result.position}
               </span>
             )}
             {mode === 2 && resultV3 && (
@@ -59,7 +56,7 @@ export default function App() {
           </span>
         </header>
 
-        {activeLoading && <p className='mt-1.5 text-[11px] text-white/80'>분석 중...</p>}
+        {activeLoading && <p className='mt-1.5 text-[11px] text-white/80'>{t.overlay.loading}</p>}
 
         {activeError && (
           <p className='mt-1.5 text-[11px] font-medium text-rose-300' role='alert'>
@@ -70,17 +67,17 @@ export default function App() {
         {!hasResult && !activeLoading && !activeError && (
           <p className='mt-1.5 text-[11px] text-white/80'>
             {!lineup
-              ? '밴픽이나 게임이 시작되면 표시돼요'
+              ? t.overlay.waitingStart
               : enemyPicked < 5
-                ? '상대 챔피언을 기다리는 중'
-                : '조합을 분석하는 중'}
+                ? t.overlay.waitingEnemies
+                : t.overlay.analyzing}
           </p>
         )}
 
         {mode === 1 && (
           <>
             {result && result.builds.every((build) => !build.build?.length) && !loading && (
-              <p className='mt-1.5 text-[11px] text-white/80'>데이터가 부족해요</p>
+              <p className='mt-1.5 text-[11px] text-white/80'>{t.overlay.noData}</p>
             )}
 
             {result &&
@@ -102,7 +99,7 @@ export default function App() {
         {mode === 2 && (
           <>
             {resultV3 && resultV3.recommendedItems.length === 0 && !loadingV3 && (
-              <p className='mt-1.5 text-[11px] text-white/80'>데이터가 부족해요</p>
+              <p className='mt-1.5 text-[11px] text-white/80'>{t.overlay.noData}</p>
             )}
 
             {resultV3 && ddragon && !loadingV3 && resultV3.recommendedItems.length > 0 && (

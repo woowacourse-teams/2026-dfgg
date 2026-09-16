@@ -57,6 +57,22 @@ const lcuApi = {
   },
 
   /**
+   * 화면 언어. 추천 방식과 같은 이유로 메인 프로세스가 값을 들고 있다.
+   * get 이 null 을 주면 아직 아무도 안 정한 것이라 각 창이 OS 언어를 따른다.
+   */
+  lang: {
+    get: (): Promise<'ko' | 'en' | null> => ipcRenderer.invoke('lang:get'),
+    set: (lang: 'ko' | 'en'): Promise<'ko' | 'en'> => ipcRenderer.invoke('lang:set', lang),
+    onChange: (callback: (lang: 'ko' | 'en') => void) => {
+      const handler = (_event: unknown, lang: 'ko' | 'en') => callback(lang);
+      ipcRenderer.on('lang:changed', handler);
+      return () => {
+        ipcRenderer.removeListener('lang:changed', handler);
+      };
+    },
+  },
+
+  /**
    * 1번/2번 추천 방식 중 어느 걸 화면에 보여줄지. 오버레이는 버튼을 못 다니까
    * 메인 프로세스가 값을 들고 있다가, 메인 창에서 바꾸면 오버레이에도 흘려보낸다.
    */

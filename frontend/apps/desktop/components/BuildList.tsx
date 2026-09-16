@@ -1,5 +1,7 @@
+import { DIRECTION_LABEL } from '../../../packages/i18n/common';
+import { useLang } from '../../../packages/i18n/useLang';
 import { canonicalItemId, type DDragonData } from '../../../packages/shared/ddragon';
-import { type Build, DIRECTION_LABEL } from '../../../packages/shared/types';
+import type { Build } from '../../../packages/shared/types';
 import ItemBuild from './ItemBuild';
 
 interface BuildListProps {
@@ -25,6 +27,10 @@ export default function BuildList({
   compact = false,
   ownedItemIds = [],
 }: BuildListProps) {
+  // 아래 early return 보다 먼저 불러야 한다 — 훅은 조건부로 호출할 수 없다.
+  const { lang } = useLang();
+  const directionLabel = DIRECTION_LABEL[lang];
+
   // 문서엔 build가 null이 아니라고 돼 있지만, 실제 응답은 아이템이 없는
   // 빌드에 build: null을 준다. 걸러내지 않으면 아래 .filter에서 화면이 죽는다.
   const usableBuilds = builds.filter((build) => build.build?.length);
@@ -58,7 +64,7 @@ export default function BuildList({
                 <p
                   className={`truncate font-bold tracking-wide uppercase ${ACCENT_BY_RANK[rank]} ${compact ? 'text-[9.5px]' : 'text-xs'}`}
                 >
-                  {DIRECTION_LABEL[build.direction]}
+                  {directionLabel[build.direction] ?? build.direction}
                 </p>
               </div>
               {ownedCount > 0 && (

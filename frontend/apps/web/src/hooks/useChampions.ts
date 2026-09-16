@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 
+import { DDRAGON_LOCALE, SORT_LOCALE } from '../../../../packages/i18n/lang';
+import { useLang } from '../../../../packages/i18n/useLang';
+
 const DDRAGON = 'https://ddragon.leagueoflegends.com';
-const LOCALE = 'ko_KR';
 
 const HANGUL_BASE = 0xac00;
 const HANGUL_LAST = 0xd7a3;
@@ -50,12 +52,12 @@ export function isChosungOnly(text: string): boolean {
 export interface ChampionInfo {
   /** Data Dragon 고유 키. 이미지 경로에 쓰인다. (예: MonkeyKing) */
   id: string;
-  /** 백엔드로 보내는 표시 이름. (예: 손오공) */
+  /** 화면에 보여줄 이름. 선택한 언어를 따른다. (예: 손오공 / Wukong) */
   name: string;
   imageUrl: string;
-  /** 한글명 + 영문 id를 소문자로 합친 검색 키 */
+  /** 표시명 + 영문 id를 소문자로 합친 검색 키 */
   searchKey: string;
-  /** 한글명의 초성. "아리" → "ㅇㄹ" */
+  /** 표시명의 초성. "아리" → "ㅇㄹ". 영어 이름이면 그냥 그 이름이 된다. */
   chosung: string;
 }
 
@@ -73,14 +75,18 @@ export function itemImageUrl(version: string, id: number): string {
 }
 
 /**
- * Data Dragon 챔피언 목록을 한 번만 받아온다.
+ * Data Dragon 챔피언 목록을 받아온다. 언어를 바꾸면 그 언어로 다시 받는다.
  * 버전은 하드코딩하지 않고 versions.json의 최신값을 쓴다.
  */
 export function useChampions() {
+  const { lang } = useLang();
   const [champions, setChampions] = useState<ChampionInfo[]>([]);
   // 아이템 아이콘 URL을 만들 때도 같은 버전을 써야 해서 밖으로 내보낸다.
   const [version, setVersion] = useState('');
   const [failed, setFailed] = useState(false);
+  // 라인별 후보 목록(Champion.ts)이 한글명으로 적혀 있어서, 영어 화면에서도
+  // 그 목록을 쓰려면 한글명 → riotKey 다리가 필요하다.
+  const [koreanNameToId, setKoreanNameToId] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const controller = new AbortController();
@@ -93,14 +99,29 @@ export function useChampions() {
         if (!versionRes.ok) throw new Error(String(versionRes.status));
         const [latestVersion]: string[] = await versionRes.json();
 
-        const listRes = await fetch(
-          `${DDRAGON}/cdn/${latestVersion}/data/${LOCALE}/champion.json`,
-          {
+        const [listRes, koreanRes] = await Promise.all([
+          fetch(`${DDRAGON}/cdn/${latestVersion}/data/${DDRAGON_LOCALE[lang]}/champion.json`, {
             signal: controller.signal,
-          },
-        );
+          }),
+          // 화면이 한국어면 같은 응답을 두 번 쓰지 않도록 재요청하지 않는다.
+          lang === 'ko'
+            ? null
+            : fetch(`${DDRAGON}/cdn/${latestVersion}/data/${DDRAGON_LOCALE.ko}/champion.json`, {
+                signal: controller.signal,
+              }),
+        ]);
         if (!listRes.ok) throw new Error(String(listRes.status));
         const { data }: { data: Record<string, DDragonChampion> } = await listRes.json();
+
+        const koreanData: Record<string, DDragonChampion> = koreanRes
+          ? (await koreanRes.json()).data
+          : data;
+        const koreanMap: Record<string, string> = {};
+        for (const key of Object.keys(koreanData)) {
+          if (key.indexOf('_') !== -1) continue;
+          koreanMap[koreanData[key].name] = koreanData[key].id;
+        }
+        setKoreanNameToId(koreanMap);
 
         setChampions(
           Object.keys(data)
@@ -117,9 +138,11 @@ export function useChampions() {
                 chosung: toChosung(name.replace(/\s/g, '')),
               };
             })
-            .sort((a, b) => a.name.localeCompare(b.name, 'ko')),
+            .sort((a, b) => a.name.localeCompare(b.name, SORT_LOCALE[lang])),
         );
         setVersion(latestVersion);
+        // 지난 언어에서 실패했더라도 이번에 성공했으면 경고를 내린다.
+        setFailed(false);
       } catch (error) {
         if (controller.signal.aborted) return;
         console.error(error);
@@ -129,9 +152,9 @@ export function useChampions() {
 
     load();
     return () => controller.abort();
-  }, []);
+  }, [lang]);
 
-  return { champions, version, failed };
+  return { champions, version, failed, koreanNameToId };
 }
 
 /** 값이 delay 동안 안정될 때까지 갱신을 미룬다. */

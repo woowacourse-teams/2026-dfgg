@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import { DESKTOP_TEXT } from '../../../packages/i18n/desktop';
+import { useDict, useLang } from '../../../packages/i18n/useLang';
 import { type DDragonData, loadDDragon } from '../../../packages/shared/ddragon';
 import type {
   Champion,
@@ -86,6 +88,8 @@ function toRequest(lineup: Lineup, ddragon: DDragonData): RecommendationRequest 
 /** 밴픽 현황을 추천 결과까지 이어주는 훅. 메인 창과 오버레이가 함께 쓴다. */
 export function useRecommendation() {
   const { lineup, status, windowMode } = useLineup();
+  const { lang } = useLang();
+  const t = useDict(DESKTOP_TEXT);
   const [ddragon, setDDragon] = useState<DDragonData | null>(null);
   const [result, setResult] = useState<RecommendationResponse | null>(null);
   const [error, setError] = useState('');
@@ -95,16 +99,16 @@ export function useRecommendation() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadDDragon(controller.signal)
+    loadDDragon(lang, controller.signal)
       .then(setDDragon)
       .catch(() => {
         if (!controller.signal.aborted) {
-          setDdragonError('챔피언 정보를 불러오지 못했어요.');
+          setDdragonError(t.ddragonFailed);
           window.umami?.track('desktop-ddragon-load-failed');
         }
       });
     return () => controller.abort();
-  }, []);
+  }, [lang, t]);
 
   const request = useMemo(
     () => (lineup && ddragon ? toRequest(lineup, ddragon) : null),
@@ -142,7 +146,7 @@ export function useRecommendation() {
         if (controller.signal.aborted) return;
         console.error(cause);
         setErrorSession(sessionId);
-        setError('추천을 불러오지 못했어요. 다시 시도 중...');
+        setError(t.retrying);
         window.umami?.track('desktop-recommend-fail', {
           reason: cause instanceof Error ? cause.message : 'unknown',
         });
@@ -153,7 +157,7 @@ export function useRecommendation() {
       controller.abort();
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [request, sessionId, retryTick, fetchedSession]);
+  }, [request, sessionId, retryTick, fetchedSession, t]);
 
   const allyPicked = lineup?.allies.filter(isPicked).length ?? 0;
   const enemyPicked = lineup?.enemies.filter(isPicked).length ?? 0;

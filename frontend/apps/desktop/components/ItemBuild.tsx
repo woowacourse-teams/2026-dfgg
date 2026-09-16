@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { DESKTOP_TEXT } from '../../../packages/i18n/desktop';
+import { useDict } from '../../../packages/i18n/useLang';
 import { canonicalItemId, type DDragonData, itemImageUrl } from '../../../packages/shared/ddragon';
 import type { Item } from '../../../packages/shared/types';
 
@@ -37,6 +39,8 @@ export default function ItemBuild({
   ownedItemIds = [],
   showRank = true,
 }: ItemBuildProps) {
+  const t = useDict(DESKTOP_TEXT);
+
   // 사용자가 순서를 바꿀 수 있게 로컬 상태로 둔다. 새 추천이 오면(items가 바뀌면)
   // 직전에 바꾼 순서를 버리고 서버가 준 순서로 되돌린다. effect 대신 렌더 중에
   // 바로 맞춰준다 — React가 리렌더를 한 번으로 묶어줘서 깜빡임 없이 처리된다.
@@ -139,7 +143,7 @@ export default function ItemBuild({
               />
               {owned ? (
                 <span
-                  aria-label='구매함'
+                  aria-label={t.owned}
                   className='absolute inset-0 flex items-center justify-center bg-black/40 text-emerald-400'
                 >
                   <svg viewBox='0 0 20 20' fill='currentColor' className='size-1/2'>

@@ -127,6 +127,13 @@ let overlayVisible = true;
 /** 1번/2번 추천 방식 중 화면에 보여줄 것. 메인 창에서 바꾸면 오버레이도 따라간다. */
 let recommendMode: 1 | 2 = 1;
 
+/**
+ * 화면 언어. 오버레이도 같은 언어로 보여야 하므로 추천 방식과 똑같이 메인
+ * 프로세스가 값을 들고 있다가 두 창에 같이 흘려보낸다.
+ * null 이면 아직 렌더러가 정하지 않았다는 뜻 — 이때는 각 창이 OS 언어를 따른다.
+ */
+let uiLang: 'ko' | 'en' | null = null;
+
 let unwatchClient: (() => void) | null = null;
 /** 마지막으로 실제로 옮겨 붙인 우리 창의 위치·크기. 흔들림 판단 기준이 된다. */
 let lastDockedBounds: { x: number; y: number; width: number; height: number } | null = null;
@@ -676,6 +683,15 @@ ipcMain.handle('lcu:getStatus', () => lastStatus);
 // 렌더러 대신 여기서 백엔드를 호출한다. 패키징된 앱의 CORS·CSP 제약을 피한다.
 ipcMain.handle('api:recommend', (_event, body: unknown) => requestRecommendation(body));
 ipcMain.handle('api:recommendV3', (_event, body: unknown) => requestRecommendationV3(body));
+
+// 언어도 추천 방식과 같다. 메인 창에서 바꾸면 오버레이까지 같이 알린다.
+ipcMain.handle('lang:get', () => uiLang);
+ipcMain.handle('lang:set', (_event, lang: 'ko' | 'en') => {
+  uiLang = lang;
+  track('lang-change', { lang });
+  broadcast('lang:changed', uiLang);
+  return uiLang;
+});
 
 // 오버레이는 버튼을 못 다니 메인 창에서 바꾸면 여기서 오버레이까지 같이 알린다.
 ipcMain.handle('recommend:getMode', () => recommendMode);
