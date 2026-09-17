@@ -49,9 +49,10 @@ public class DataDragonClient {
     }
 
     public ChampionResponse getChampions() {
+        String version = getLatestDataVersion();
         ChampionResponse response = restClient.get()
                 .uri("/cdn/{version}/data/ko_KR/champion.json",
-                        getLatestDataVersion())
+                        version)
                 .retrieve()
                 .body(ChampionResponse.class);
 
@@ -72,7 +73,20 @@ public class DataDragonClient {
             throw new IllegalStateException("[Error] Data Dragon champion data is invalid");
         }
 
-        return response;
+        return new ChampionResponse(normalizePatch(version), version, response.data());
+    }
+
+    public byte[] getChampionImage(String version, String filename) {
+        byte[] image = restClient.get()
+                .uri("/cdn/{version}/img/champion/{filename}", version, filename)
+                .retrieve()
+                .body(byte[].class);
+        byte[] signature = {(byte) 137, 80, 78, 71, 13, 10, 26, 10};
+        if (image == null || image.length < signature.length
+                || !java.util.Arrays.equals(signature, java.util.Arrays.copyOf(image, signature.length))) {
+            throw new IllegalStateException("[Error] Data Dragon champion image is not PNG: " + filename);
+        }
+        return image;
     }
 
     public ItemResponse getItems() {

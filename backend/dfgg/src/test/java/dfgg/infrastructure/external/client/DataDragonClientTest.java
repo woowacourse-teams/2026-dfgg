@@ -119,7 +119,8 @@ public class DataDragonClientTest {
                             "Aatrox": {
                               "key": "266",
                               "name": "아트록스",
-                              "tags": ["Fighter", "Tank"]
+                              "tags": ["Fighter", "Tank"],
+                              "image": {"full": "Aatrox.png"}
                             }
                           }
                         }
@@ -129,6 +130,9 @@ public class DataDragonClientTest {
         ChampionResponse response = client.getChampions();
 
         // then
+        assertThat(response.version()).isEqualTo("16.15");
+        assertThat(response.dataVersion()).isEqualTo("16.15.1");
+        assertThat(response.data().get("Aatrox").image().full()).isEqualTo("Aatrox.png");
         assertThat(response.data().get("Aatrox").name()).isEqualTo("아트록스");
         assertThat(response.data().get("Aatrox").key()).isEqualTo("266");
         assertThat(response.data().get("Aatrox").tags())
@@ -242,6 +246,24 @@ public class DataDragonClientTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("[Error] Data Dragon item response is empty");
 
+        server.verify();
+    }
+
+    @Test
+    void 지정한_버전의_PNG_이미지를_다운로드한다() {
+        byte[] png = {(byte) 137, 80, 78, 71, 13, 10, 26, 10, 0};
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/img/champion/Aatrox.png"))
+                .andRespond(withSuccess(png, MediaType.IMAGE_PNG));
+        assertThat(client.getChampionImage("16.15.1", "Aatrox.png")).isEqualTo(png);
+        server.verify();
+    }
+
+    @Test
+    void 이미지가_비어있거나_PNG가_아니면_실패한다() {
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/img/champion/Aatrox.png"))
+                .andRespond(withSuccess("not an image", MediaType.TEXT_PLAIN));
+        assertThatThrownBy(() -> client.getChampionImage("16.15.1", "Aatrox.png"))
+                .isInstanceOf(IllegalStateException.class);
         server.verify();
     }
 
