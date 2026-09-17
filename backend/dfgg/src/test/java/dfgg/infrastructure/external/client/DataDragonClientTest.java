@@ -196,6 +196,11 @@ public class DataDragonClientTest {
                           "data": {
                             "1036": {
                               "name": "롱소드",
+                              "gold": {"base": 350, "total": 350, "purchasable": true},
+                              "image": {"full": "1036.png"},
+                              "maps": {"11": true},
+                              "inStore": true,
+                              "hideFromAll": false,
                               "into": ["3071"]
                             },
                             "3071": {
@@ -209,6 +214,14 @@ public class DataDragonClientTest {
         ItemResponse response = client.getItems();
 
         // then
+        assertThat(response.version()).isEqualTo("16.15");
+        assertThat(response.dataVersion()).isEqualTo("16.15.1");
+        assertThat(response.data().get("1036").gold().purchasable()).isTrue();
+        assertThat(response.data().get("1036").gold().base()).isEqualTo(350);
+        assertThat(response.data().get("1036").image().full()).isEqualTo("1036.png");
+        assertThat(response.data().get("1036").inStore()).isTrue();
+        assertThat(response.data().get("1036").hideFromAll()).isFalse();
+        assertThat(response.data().get("1036").maps()).containsEntry("11", true);
         assertThat(response.data().get("1036").into()).containsExactly("3071");
         assertThat(response.data().get("3071").into()).isNull();
 
@@ -264,6 +277,24 @@ public class DataDragonClientTest {
                 .andRespond(withSuccess("not an image", MediaType.TEXT_PLAIN));
         assertThatThrownBy(() -> client.getChampionImage("16.15.1", "Aatrox.png"))
                 .isInstanceOf(IllegalStateException.class);
+        server.verify();
+    }
+
+    @Test
+    void 전체_버전으로_아이템_PNG를_다운로드한다() {
+        byte[] png = {(byte) 137, 80, 78, 71, 13, 10, 26, 10, 0};
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/img/item/1036.png"))
+                .andRespond(withSuccess(png, MediaType.IMAGE_PNG));
+        assertThat(client.getItemImage("16.18.1", "1036.png")).isEqualTo(png);
+        server.verify();
+    }
+
+    @Test
+    void 빈_아이템_이미지는_실패한다() {
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/img/item/1036.png"))
+                .andRespond(withNoContent());
+        assertThatThrownBy(() -> client.getItemImage("16.18.1", "1036.png"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("PNG");
         server.verify();
     }
 

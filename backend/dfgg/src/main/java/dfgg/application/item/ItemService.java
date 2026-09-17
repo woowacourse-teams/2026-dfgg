@@ -15,39 +15,44 @@ import org.springframework.stereotype.Service;
 @Service
 public class ItemService {
 
-    private static final String BOOTS_TAG = "Boots";
     private static final String CONSUMABLE_TAG = "Consumable";
     private static final String TRINKET_TAG = "Trinket";
 
     private final DataDragonClient dataDragonClient;
     private final ItemRepository itemRepository;
+    private final ItemImageService itemImageService;
 
-    public ItemService(DataDragonClient dataDragonClient, ItemRepository itemRepository) {
+    public ItemService(DataDragonClient dataDragonClient, ItemRepository itemRepository,
+                       ItemImageService itemImageService) {
         this.dataDragonClient = dataDragonClient;
         this.itemRepository = itemRepository;
+        this.itemImageService = itemImageService;
     }
 
-    public void syncCoreItems() {
+    public void syncItems() {
         ItemResponse response = dataDragonClient.getItems();
-        List<Item> coreItems = response.data()
+        List<Item> items = response.data()
                 .entrySet()
                 .stream()
-                .filter(entry -> isCoreItem(entry.getValue()))
+                .filter(entry -> isSummonersRiftItem(entry.getValue()))
                 .map(entry -> {
                     Long itemId = Long.parseLong(entry.getKey());
                     ItemData data = entry.getValue();
+                    if (data.image() == null) {
+                        throw new IllegalStateException("[Error] 아이템 이미지 정보가 없습니다: " + itemId);
+                    }
                     return new Item(
                             itemId,
                             Map.of("ko-KR", data.name()),
                             goldOf(data),
-                            null,
+                            itemImageService.store(response.version(), response.dataVersion(), data.image().full()),
                             data.from(),
                             data.into(),
                             data.tags()
                     );
                 }).toList();
 
-        itemRepository.saveAll(coreItems);
+        itemRepository.saveAll(items);
     }
 
     private Map<String, Integer> goldOf(ItemData data) {
@@ -55,8 +60,8 @@ public class ItemService {
             return null;
         }
         return Map.of(
-                "base", data.gold().get("base"),
-                "total", data.gold().get("total")
+                "base", data.gold().base(),
+                "total", data.gold().total()
         );
     }
 
@@ -71,32 +76,17 @@ public class ItemService {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    private boolean isCoreItem(ItemData data) {
-        if (isStartingItem(data)) {
+    private boolean isSummonersRiftItem(ItemData data) {
+        if (data.maps() == null || !Boolean.TRUE.equals(data.maps().get("11"))) {
+            return false;
+        }
+        if (data.gold() == null || !Boolean.TRUE.equals(data.gold().purchasable())
+                || Boolean.FALSE.equals(data.inStore()) || Boolean.TRUE.equals(data.hideFromAll())) {
             return false;
         }
         List<String> tags = tagsOf(data);
-        if (!tags.contains(BOOTS_TAG) && hasRemainingUpgrade(data)) {
-            return false;
-        }
-        if (data.depth() != null && data.depth() <= 1) {
-            return false;
-        }
-        if (Boolean.TRUE.equals(data.consumed())) {
-            return false;
-        }
-        if (tags.contains(CONSUMABLE_TAG) || tags.contains(TRINKET_TAG)) {
-            return false;
-        }
-        return data.maps() == null || !Boolean.FALSE.equals(data.maps().get("11"));
-    }
-
-    private boolean isStartingItem(ItemData data) {
-        return data.from() == null || data.from().isEmpty();
-    }
-
-    private boolean hasRemainingUpgrade(ItemData data) {
-        return data.into() != null && !data.into().isEmpty();
+        return !Boolean.TRUE.equals(data.consumed())
+                && !tags.contains(CONSUMABLE_TAG) && !tags.contains(TRINKET_TAG);
     }
 
     private List<String> tagsOf(ItemData data) {

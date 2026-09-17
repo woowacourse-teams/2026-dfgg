@@ -2,7 +2,6 @@ package dfgg.application.item;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -15,7 +14,6 @@ import dfgg.infrastructure.external.dto.ItemResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -32,146 +30,96 @@ class ItemServiceTest {
     @Mock
     private ItemRepository itemRepository;
 
+    @Mock
+    private ItemImageService itemImageService;
+
     @InjectMocks
     private ItemService itemService;
 
-    @Test
-    void 상위_아이템이_없는_최종_아이템만_저장한다() {
-        // given
-        ItemResponse response = new ItemResponse(Map.of(
-                "1036", new ItemData("롱소드", null, List.of("3071")),
-                "3071", new ItemData("칠흑의 양날 도끼", List.of("3044", "3067", "1037"), null),
-                "6672", new ItemData("크라켄 학살자", List.of("6690", "3051", "1043"), List.of()),
-                "1058", new ItemData(
-                        "재료 단계 아이템", List.of("2003"), List.of(), List.of("Damage"), Map.of("11", true), false, 1
-                ),
-                "2003", new ItemData(
-                        "체력 물약", List.of("2010"), List.of(), List.of("Consumable"), Map.of("11", true), true
-                ),
-                "3340", new ItemData(
-                        "와드 토템", List.of("1000"), List.of(), List.of("Trinket"), Map.of("11", true), false
-                ),
-                "9999", new ItemData(
-                        "다른 맵 아이템", List.of("1001"), List.of(), List.of(), Map.of("11", false), false
-                )
-        ));
-        when(dataDragonClient.getItems()).thenReturn(response);
+    private ItemData item(String filename, List<String> from, List<String> into, List<String> tags,
+                          Map<String, Boolean> maps, Boolean purchasable, Boolean inStore,
+                          Boolean hidden, Boolean consumed) {
+        return new ItemData(filename, from, into, tags, maps, consumed, 1,
+                new ItemData.Gold(350, 350, purchasable), new ItemData.Image(filename), inStore, hidden);
+    }
 
-        // when
-        itemService.syncCoreItems();
-
-        // then
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<Item>> captor = ArgumentCaptor.forClass(List.class);
-        verify(itemRepository).saveAll(captor.capture());
-
-        assertThat(captor.getValue())
-                .extracting(Item::getItemId, Item::getName)
-                .containsExactlyInAnyOrder(
-                        tuple(3071L, Map.of("ko-KR", "칠흑의 양날 도끼")),
-                        tuple(6672L, Map.of("ko-KR", "크라켄 학살자"))
-                );
+    private ItemData equipment(String filename, List<String> from, List<String> into) {
+        return item(filename, from, into, List.of("Damage"), Map.of("11", true), true, null, null, false);
     }
 
     @Test
-    @DisplayName("신발은 마법 부여 업그레이드 경로가 남아있어도 코어 아이템으로 저장한다")
-    void syncCoreItems_WhenBootsHaveEnchantUpgradePath_TreatAsCoreItem() {
-        // given
-        ItemResponse response = new ItemResponse(Map.of(
-                "3006", new ItemData(
-                        "광전사의 군화",
-                        List.of("1001"),
-                        List.of("3172"),
-                        List.of("Boots", "AttackSpeed", "FutureTag"),
-                        Map.of("11", true),
-                        false
-                )
-        ));
-        when(dataDragonClient.getItems()).thenReturn(response);
+    void 협곡의_시작_조합_완성_아이템과_기본_장화를_이미지와_함께_저장한다() {
+        when(dataDragonClient.getItems()).thenReturn(new ItemResponse("16.18", "16.18.1", Map.of(
+                "1036", equipment("1036.png", null, List.of("3133")),
+                "3133", equipment("3133.png", List.of("1036"), List.of("3071")),
+                "3071", equipment("3071.png", List.of("3133"), null),
+                "1055", equipment("1055.png", null, null),
+                "1001", item("1001.png", null, List.of("3006"), List.of("Boots"),
+                        Map.of("11", true), true, null, null, false))));
+        when(itemImageService.store(org.mockito.ArgumentMatchers.eq("16.18"),
+                org.mockito.ArgumentMatchers.eq("16.18.1"), org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(call -> "https://cdn.example.com/images/16.18/items/" + call.getArgument(2));
 
-        // when
-        itemService.syncCoreItems();
+        itemService.syncItems();
 
-        // then
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Item>> captor = ArgumentCaptor.forClass(List.class);
         verify(itemRepository).saveAll(captor.capture());
-
-        assertThat(captor.getValue())
-                .extracting(Item::getItemId, Item::getName)
-                .containsExactly(tuple(3006L, Map.of("ko-KR", "광전사의 군화")));
-        assertThat(captor.getValue().getFirst().getTags())
-                .containsExactly("Boots", "AttackSpeed", "FutureTag");
+        assertThat(captor.getValue()).extracting(Item::getItemId)
+                .containsExactlyInAnyOrder(1036L, 3133L, 3071L, 1055L, 1001L);
+        assertThat(captor.getValue()).allSatisfy(saved -> {
+            assertThat(saved.getUrl()).isEqualTo("https://cdn.example.com/images/16.18/items/" + saved.getItemId() + ".png");
+            assertThat(saved.getGold()).containsEntry("total", 350);
+        });
+        Item component = captor.getValue().stream().filter(i -> i.getItemId() == 3133L).findFirst().orElseThrow();
+        assertThat(component.getFromItemIds()).containsExactly("1036");
+        assertThat(component.getIntoItemIds()).containsExactly("3071");
     }
 
     @Test
-    @DisplayName("컴포넌트(from)가 없는 시작 아이템은 업그레이드 경로가 없어도 코어 아이템으로 저장하지 않는다")
-    void syncCoreItems_WhenItemHasNoFromComponents_ExcludeAsStartingItem() {
-        // given
-        ItemResponse response = new ItemResponse(Map.of(
-                "1055", new ItemData(
-                        "도란의 검", null, null, List.of("Health", "Damage", "Lane"), Map.of("11", true), false
-                )
-        ));
-        when(dataDragonClient.getItems()).thenReturn(response);
-
-        // when
-        itemService.syncCoreItems();
-
-        // then
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<Item>> captor = ArgumentCaptor.forClass(List.class);
-        verify(itemRepository).saveAll(captor.capture());
-
-        assertThat(captor.getValue()).isEmpty();
+    void 소모품_장신구_다른맵_구매불가_숨김_아이템을_제외한다() {
+        Map<String, ItemData> excluded = new java.util.LinkedHashMap<>();
+        excluded.put("2003", item("2003.png", null, null, List.of("Consumable"), Map.of("11", true), true, null, null, false));
+        excluded.put("3340", item("3340.png", null, null, List.of("Trinket"), Map.of("11", true), true, null, null, false));
+        excluded.put("1", item("1.png", null, null, List.of(), Map.of("11", false, "12", true), true, null, null, false));
+        excluded.put("2", item("2.png", null, null, List.of(), Map.of("12", true), true, null, null, false));
+        excluded.put("3", item("3.png", null, null, List.of(), null, true, null, null, false));
+        excluded.put("4", item("4.png", null, null, List.of(), Map.of("11", true), false, null, null, false));
+        excluded.put("5", item("5.png", null, null, List.of(), Map.of("11", true), true, false, null, false));
+        excluded.put("6", item("6.png", null, null, List.of(), Map.of("11", true), true, null, true, false));
+        excluded.put("7", item("7.png", null, null, List.of(), Map.of("11", true), true, null, null, true));
+        when(dataDragonClient.getItems()).thenReturn(new ItemResponse("16.18", "16.18.1", excluded));
+        itemService.syncItems();
+        verify(itemRepository).saveAll(List.of());
+        verifyNoInteractions(itemImageService);
     }
 
     @Test
-    @DisplayName("컴포넌트(from)가 없는 기본 장화는 신발이어도 코어 아이템으로 저장하지 않는다")
-    void syncCoreItems_WhenBaseBootsHaveNoFromComponents_ExcludeAsStartingItem() {
-        // given
-        ItemResponse response = new ItemResponse(Map.of(
-                "1001", new ItemData(
-                        "장화", null, List.of("3006", "3009"), List.of("Boots"), Map.of("11", true), false
-                )
-        ));
-        when(dataDragonClient.getItems()).thenReturn(response);
+    void 이미지_실패시_앞선_업로드가_있어도_DB를_저장하지_않는다() {
+        Map<String, ItemData> data = new java.util.LinkedHashMap<>();
+        data.put("1036", equipment("1036.png", null, List.of("3133")));
+        data.put("3133", equipment("3133.png", List.of("1036"), List.of("3071")));
+        when(dataDragonClient.getItems()).thenReturn(new ItemResponse("16.18", "16.18.1", data));
+        when(itemImageService.store("16.18", "16.18.1", "1036.png")).thenReturn("https://cdn.example.com/1036.png");
+        when(itemImageService.store("16.18", "16.18.1", "3133.png")).thenThrow(new IllegalStateException("업로드 실패"));
+        assertThatThrownBy(itemService::syncItems).hasMessage("업로드 실패");
+        verifyNoInteractions(itemRepository);
+    }
 
-        // when
-        itemService.syncCoreItems();
-
-        // then
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<Item>> captor = ArgumentCaptor.forClass(List.class);
-        verify(itemRepository).saveAll(captor.capture());
-
-        assertThat(captor.getValue()).isEmpty();
+    @Test
+    void 이미지_정보_누락시_DB를_저장하지_않는다() {
+        ItemData missing = new ItemData("롱소드", null, null, List.of(), Map.of("11", true), false, 1,
+                new ItemData.Gold(350, 350, true), null, null, null);
+        when(dataDragonClient.getItems()).thenReturn(new ItemResponse("16.18", "16.18.1", Map.of("1036", missing)));
+        assertThatThrownBy(itemService::syncItems).hasMessageContaining("이미지 정보가 없습니다");
+        verifyNoInteractions(itemRepository, itemImageService);
     }
 
     @Test
     void 데이터_드래곤_조회가_실패하면_저장하지_않는다() {
-        // given
-        IllegalStateException exception = new IllegalStateException("API failure");
-        when(dataDragonClient.getItems()).thenThrow(exception);
-
-        // when & then
-        assertThatThrownBy(itemService::syncCoreItems)
-                .isSameAs(exception);
-        verifyNoInteractions(itemRepository);
-    }
-
-    @Test
-    void 최종_아이템_ID가_숫자가_아니면_저장하지_않는다() {
-        // given
-        ItemResponse response = new ItemResponse(Map.of(
-                "invalid-id", new ItemData("잘못된 아이템", List.of("1036"), null)
-        ));
-        when(dataDragonClient.getItems()).thenReturn(response);
-
-        // when & then
-        assertThatThrownBy(itemService::syncCoreItems)
-                .isInstanceOf(NumberFormatException.class);
-        verifyNoInteractions(itemRepository);
+        when(dataDragonClient.getItems()).thenThrow(new IllegalStateException("API failure"));
+        assertThatThrownBy(itemService::syncItems).hasMessage("API failure");
+        verifyNoInteractions(itemRepository, itemImageService);
     }
 
     @Test

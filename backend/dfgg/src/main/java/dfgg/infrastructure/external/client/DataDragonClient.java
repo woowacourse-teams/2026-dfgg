@@ -89,9 +89,23 @@ public class DataDragonClient {
         return image;
     }
 
+    public byte[] getItemImage(String version, String filename) {
+        byte[] image = restClient.get()
+                .uri("/cdn/{version}/img/item/{filename}", version, filename)
+                .retrieve()
+                .body(byte[].class);
+        byte[] signature = {(byte) 137, 80, 78, 71, 13, 10, 26, 10};
+        if (image == null || image.length < signature.length
+                || !java.util.Arrays.equals(signature, java.util.Arrays.copyOf(image, signature.length))) {
+            throw new IllegalStateException("[Error] 아이템 이미지가 PNG 형식이 아닙니다: " + filename);
+        }
+        return image;
+    }
+
     public ItemResponse getItems() {
+        String version = getLatestDataVersion();
         ItemResponse response = restClient.get()
-                .uri("/cdn/{version}/data/ko_KR/item.json", getLatestDataVersion())
+                .uri("/cdn/{version}/data/ko_KR/item.json", version)
                 .retrieve()
                 .body(ItemResponse.class);
 
@@ -99,6 +113,6 @@ public class DataDragonClient {
             throw new IllegalStateException("[Error] Data Dragon item response is empty");
         }
 
-        return response;
+        return new ItemResponse(normalizePatch(version), version, response.data());
     }
 }
