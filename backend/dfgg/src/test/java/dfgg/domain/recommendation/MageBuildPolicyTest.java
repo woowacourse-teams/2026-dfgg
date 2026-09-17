@@ -10,14 +10,15 @@ import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class MageBuildPolicyTest {
 
-    private final Item neutralMageItem = new Item(1L, "일반 주문력 아이템", List.of("SpellDamage"));
-    private final Item neutralItemA = new Item(2L, "일반 아이템 A");
-    private final Item neutralItemB = new Item(3L, "일반 아이템 B");
+    private final Item neutralMageItem = new Item(1L, Map.of("ko-KR", "일반 주문력 아이템"), List.of("SpellDamage"));
+    private final Item neutralItemA = new Item(2L, Map.of("ko-KR", "일반 아이템 A"));
+    private final Item neutralItemB = new Item(3L, Map.of("ko-KR", "일반 아이템 B"));
 
     private final MageBuildPolicy policy = new MageBuildPolicy();
 
@@ -27,17 +28,17 @@ class MageBuildPolicyTest {
         // given
         Item burstItem = new Item(
                 4L,
-                "순간 화력 아이템",
+                Map.of("ko-KR", "순간 화력 아이템"),
                 List.of("SpellDamage", "MagicPenetration")
         );
         Item sustainedItem = new Item(
                 5L,
-                "지속 화력 아이템",
+                Map.of("ko-KR", "지속 화력 아이템"),
                 List.of("SpellDamage", "AbilityHaste", "Mana", "SpellVamp")
         );
         Item survivalItem = new Item(
                 6L,
-                "생존 대응 아이템",
+                Map.of("ko-KR", "생존 대응 아이템"),
                 List.of(
                         "SpellDamage",
                         "Health",
@@ -72,15 +73,15 @@ class MageBuildPolicyTest {
         // given
         Item ludens = new Item(
                 7L,
-                "루덴의 메아리",
+                Map.of("ko-KR", "루덴의 메아리"),
                 List.of("SpellDamage", "AbilityHaste", "CooldownReduction", "Mana")
         );
         Item shadowflame = new Item(
                 8L,
-                "그림자불꽃",
+                Map.of("ko-KR", "그림자불꽃"),
                 List.of("SpellDamage", "MagicPenetration")
         );
-        Item rabadonsDeathcap = new Item(9L, "라바돈의 죽음모자", List.of("SpellDamage"));
+        Item rabadonsDeathcap = new Item(9L, Map.of("ko-KR", "라바돈의 죽음모자"), List.of("SpellDamage"));
         CoreBuildCluster cluster = cluster(ludens, shadowflame, rabadonsDeathcap);
 
         // when
@@ -99,7 +100,7 @@ class MageBuildPolicyTest {
     @DisplayName("SpellDamage가 없는 군집은 MAGE 빌드 후보에서 제외한다")
     void evaluate_WhenSpellDamageTagIsMissing_ExcludesCluster() {
         // given
-        Item penetrationItem = new Item(10L, "관통 아이템", List.of("MagicPenetration"));
+        Item penetrationItem = new Item(10L, Map.of("ko-KR", "관통 아이템"), List.of("MagicPenetration"));
         CoreBuildCluster cluster = cluster(penetrationItem, neutralItemA, neutralItemB);
 
         // when
@@ -113,8 +114,8 @@ class MageBuildPolicyTest {
     @DisplayName("SpellDamage와 MagicPenetration이 같은 아이템에 있을 때만 순간 화력 점수를 준다")
     void evaluate_WhenBurstTagsBelongToDifferentItems_DoesNotCombineThem() {
         // given
-        Item spellDamageItem = new Item(11L, "주문력 아이템", List.of("SpellDamage"));
-        Item penetrationItem = new Item(12L, "관통 아이템", List.of("MagicPenetration"));
+        Item spellDamageItem = new Item(11L, Map.of("ko-KR", "주문력 아이템"), List.of("SpellDamage"));
+        Item penetrationItem = new Item(12L, Map.of("ko-KR", "관통 아이템"), List.of("MagicPenetration"));
         CoreBuildCluster cluster = cluster(spellDamageItem, penetrationItem, neutralItemA);
 
         // when
@@ -130,7 +131,7 @@ class MageBuildPolicyTest {
         // given
         Item item = new Item(
                 13L,
-                "재사용 대기시간 아이템",
+                Map.of("ko-KR", "재사용 대기시간 아이템"),
                 List.of("SpellDamage", "AbilityHaste", "CooldownReduction", "Mana", "SpellVamp")
         );
         CoreBuildCluster cluster = cluster(item, neutralItemA, neutralItemB);
@@ -153,7 +154,7 @@ class MageBuildPolicyTest {
         // given
         Item item = new Item(
                 14L,
-                "마법 저항력 아이템",
+                Map.of("ko-KR", "마법 저항력 아이템"),
                 List.of("SpellDamage", "SpellBlock", "MagicResist")
         );
         CoreBuildCluster cluster = cluster(item, neutralItemA, neutralItemB);
@@ -176,15 +177,15 @@ class MageBuildPolicyTest {
         // given
         Item burstItem = new Item(
                 15L,
-                "순간 화력 아이템",
+                Map.of("ko-KR", "순간 화력 아이템"),
                 List.of("SpellDamage", "MagicPenetration")
         );
         Item cooldownAndManaItem = new Item(
                 16L,
-                "스킬 순환 아이템",
+                Map.of("ko-KR", "스킬 순환 아이템"),
                 List.of("AbilityHaste", "Mana")
         );
-        Item spellVampItem = new Item(17L, "주문 흡혈 아이템", List.of("SpellVamp"));
+        Item spellVampItem = new Item(17L, Map.of("ko-KR", "주문 흡혈 아이템"), List.of("SpellVamp"));
         CoreBuildCluster cluster = cluster(burstItem, cooldownAndManaItem, spellVampItem);
 
         // when
@@ -213,17 +214,17 @@ class MageBuildPolicyTest {
         // given
         Item burstItem = new Item(
                 18L,
-                "순간 화력 아이템",
+                Map.of("ko-KR", "순간 화력 아이템"),
                 List.of("SpellDamage", "MagicPenetration")
         );
         Item sustainedItem = new Item(
                 19L,
-                "지속 화력 아이템",
+                Map.of("ko-KR", "지속 화력 아이템"),
                 List.of("SpellDamage", "AbilityHaste", "Mana", "SpellVamp")
         );
         Item survivalItem = new Item(
                 20L,
-                "생존 대응 아이템",
+                Map.of("ko-KR", "생존 대응 아이템"),
                 List.of(
                         "SpellDamage",
                         "Health",
@@ -272,7 +273,7 @@ class MageBuildPolicyTest {
         return new Champion(
                 (long) tags.hashCode(),
                 "enemy-" + tags.hashCode(),
-                "적 챔피언",
+                Map.of("ko-KR", "적 챔피언"),
                 List.of(tags)
         );
     }

@@ -93,3 +93,8 @@ management:
       group:
         readiness:
           include: readinessState,db
+
+assets:
+  s3:
+    bucket: "${ASSETS_S3_BUCKET:}"
+    region: "${ASSETS_S3_REGION:ap-northeast-2}"

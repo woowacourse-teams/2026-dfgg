@@ -21,6 +21,7 @@ import dfgg.presentation.dto.ChampionDto;
 import dfgg.presentation.dto.request.RecommendationRequest;
 import dfgg.presentation.dto.response.RecommendationResponse;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,7 +59,7 @@ class RecommendationServiceTest {
 
         Champion myChampion = mock(Champion.class);
         when(myChampion.getChampionId()).thenReturn(1L);
-        when(myChampion.getName()).thenReturn("징크스");
+        when(myChampion.getName()).thenReturn(java.util.Map.of("ko-KR", "징크스"));
 
         Champion thresh = mock(Champion.class);
         when(thresh.getChampionTags()).thenReturn(List.of(ChampionTag.SUPPORT));
@@ -70,13 +71,13 @@ class RecommendationServiceTest {
         when(championService.findChampionByName("쓰레쉬")).thenReturn(thresh);
         when(championService.findChampionByName("케이틀린")).thenReturn(caitlyn);
 
-        Item item1 = new Item(1L, "아이템1");
-        Item boots = new Item(2L, "신발", List.of("Boots"));
-        Item item2 = new Item(3L, "아이템2");
-        Item item3 = new Item(4L, "아이템3");
-        Item item4 = new Item(5L, "아이템4");
-        Item item5 = new Item(6L, "아이템5");
-        Item item6 = new Item(7L, "아이템6");
+        Item item1 = new Item(1L, Map.of("ko-KR", "아이템1"));
+        Item boots = new Item(2L, Map.of("ko-KR", "신발"), List.of("Boots"));
+        Item item2 = new Item(3L, Map.of("ko-KR", "아이템2"));
+        Item item3 = new Item(4L, Map.of("ko-KR", "아이템3"));
+        Item item4 = new Item(5L, Map.of("ko-KR", "아이템4"));
+        Item item5 = new Item(6L, Map.of("ko-KR", "아이템5"));
+        Item item6 = new Item(7L, Map.of("ko-KR", "아이템6"));
 
         ChampionBuildStats shortPopularStats = new ChampionBuildStats(
                 "16.15", 420, myChampion, ChampionPosition.BOTTOM,
@@ -115,7 +116,7 @@ class RecommendationServiceTest {
 
         Champion myChampion = mock(Champion.class);
         when(myChampion.getChampionId()).thenReturn(1L);
-        when(myChampion.getName()).thenReturn("징크스");
+        when(myChampion.getName()).thenReturn(java.util.Map.of("ko-KR", "징크스"));
 
         when(championService.findChampionByName(anyString())).thenReturn(myChampion);
 
@@ -141,7 +142,7 @@ class RecommendationServiceTest {
         );
         Champion myChampion = mock(Champion.class);
         when(myChampion.getChampionId()).thenReturn(1L);
-        when(myChampion.getName()).thenReturn("징크스");
+        when(myChampion.getName()).thenReturn(java.util.Map.of("ko-KR", "징크스"));
         when(championService.findChampionByName("징크스")).thenReturn(myChampion);
 
         ChampionBuildStats bootlessStats = new ChampionBuildStats(
@@ -157,13 +158,13 @@ class RecommendationServiceTest {
                 "PLATINUM",
                 "BOOTLESS",
                 List.of(
-                        new Item(10L, "아이템0"),
-                        new Item(11L, "아이템1"),
-                        new Item(12L, "아이템2"),
-                        new Item(13L, "아이템3"),
-                        new Item(14L, "아이템4"),
-                        new Item(15L, "아이템5"),
-                        new Item(16L, "아이템6")
+                        new Item(10L, Map.of("ko-KR", "아이템0")),
+                        new Item(11L, Map.of("ko-KR", "아이템1")),
+                        new Item(12L, Map.of("ko-KR", "아이템2")),
+                        new Item(13L, Map.of("ko-KR", "아이템3")),
+                        new Item(14L, Map.of("ko-KR", "아이템4")),
+                        new Item(15L, Map.of("ko-KR", "아이템5")),
+                        new Item(16L, Map.of("ko-KR", "아이템6"))
                 ),
                 50,
                 100

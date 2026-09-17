@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -26,8 +27,8 @@ class ChampionBuildPolicyScoreContractTest {
         // given
         CoreBuildCluster cluster = cluster(
                 directionItem,
-                new Item(directionItem.getItemId() + 100L, "일반 아이템 A"),
-                new Item(directionItem.getItemId() + 200L, "일반 아이템 B")
+                new Item(directionItem.getItemId() + 100L, Map.of("ko-KR", "일반 아이템 A")),
+                new Item(directionItem.getItemId() + 200L, Map.of("ko-KR", "일반 아이템 B"))
         );
 
         // when
@@ -46,36 +47,36 @@ class ChampionBuildPolicyScoreContractTest {
                 Arguments.of(
                         "TANK",
                         new TankBuildPolicy(),
-                        new Item(1L, "물리 방어", List.of("Armor"))
+                        new Item(1L, Map.of("ko-KR", "물리 방어"), List.of("Armor"))
                 ),
                 Arguments.of(
                         "FIGHTER",
                         new FighterBuildPolicy(),
-                        new Item(2L, "대탱커", List.of("OnHit"))
+                        new Item(2L, Map.of("ko-KR", "대탱커"), List.of("OnHit"))
                 ),
                 Arguments.of(
                         "MAGE",
                         new MageBuildPolicy(),
                         new Item(
                                 3L,
-                                "순간 화력",
+                                Map.of("ko-KR", "순간 화력"),
                                 List.of("SpellDamage", "MagicPenetration")
                         )
                 ),
                 Arguments.of(
                         "ASSASSIN",
                         new AssassinBuildPolicy(),
-                        new Item(4L, "순간 암살", List.of("Damage"))
+                        new Item(4L, Map.of("ko-KR", "순간 암살"), List.of("Damage"))
                 ),
                 Arguments.of(
                         "MARKSMAN",
                         new MarksmanBuildPolicy(),
-                        new Item(5L, "치명타", List.of("CriticalStrike"))
+                        new Item(5L, Map.of("ko-KR", "치명타"), List.of("CriticalStrike"))
                 ),
                 Arguments.of(
                         "SUPPORT",
                         new SupportBuildPolicy(),
-                        new Item(6L, "진입", List.of("NonbootsMovement"))
+                        new Item(6L, Map.of("ko-KR", "진입"), List.of("NonbootsMovement"))
                 )
         );
     }

@@ -17,7 +17,7 @@ public class ItemController {
 
     @PostMapping("/items")
     public ResponseEntity<Void> getItems() {
-        itemService.syncCoreItems();
+        itemService.syncItems();
         return ResponseEntity.noContent().build();
     }
 }

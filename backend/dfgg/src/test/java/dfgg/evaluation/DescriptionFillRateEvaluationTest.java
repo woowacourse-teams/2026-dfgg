@@ -83,7 +83,7 @@ class DescriptionFillRateEvaluationTest {
 
         ItemStatsAggregationResult aggregation = aggregationService.aggregate(RECENT_PATCH_WINDOW);
         Map<Long, String> championNames = championRepository.findAll().stream()
-                .collect(Collectors.toMap(Champion::getChampionId, Champion::getName, (a, b) -> a));
+                .collect(Collectors.toMap(Champion::getChampionId, champion -> champion.getName().get("ko-KR"), (a, b) -> a));
 
         FillTally tally = new FillTally(itemTraitCatalog);
         long startedAt = System.currentTimeMillis();
@@ -209,7 +209,7 @@ class DescriptionFillRateEvaluationTest {
                 if (!item.description().ally().isEmpty()) {
                     allyFilled++;
                     counts[2]++;
-                    Synergy synergy = itemTraitCatalog.synergyOf(new Item(item.id(), item.name()));
+                    Synergy synergy = itemTraitCatalog.synergyOf(new Item(item.id(), Map.of("ko-KR", item.name())));
                     if (synergy == Synergy.ALLY) {
                         allyOnAllyItems++;
                         counts[4]++;

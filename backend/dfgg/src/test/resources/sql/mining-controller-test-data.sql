@@ -2,7 +2,7 @@ DELETE FROM normalized_match_participants;
 DELETE FROM items;
 
 INSERT INTO items (item_id, name, tags) VALUES
-    (3071, '칠흑의 양날 도끼', '["Damage"]'::jsonb);
+    (3071, jsonb_build_object('ko-KR', '칠흑의 양날 도끼'), '["Damage"]'::jsonb);
 
 INSERT INTO normalized_match_participants (
     match_id, patch, queue_id, puuid, participant_id, champion_id, team_id, position, tier, win,

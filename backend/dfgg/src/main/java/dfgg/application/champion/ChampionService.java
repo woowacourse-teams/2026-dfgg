@@ -7,6 +7,7 @@ import dfgg.domain.champion.ChampionTag;
 import dfgg.infrastructure.external.client.DataDragonClient;
 import dfgg.infrastructure.external.dto.ChampionResponse;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -14,25 +15,41 @@ public class ChampionService {
 
     private final DataDragonClient dataDragonClient;
     private final ChampionRepository championRepository;
+    private final ChampionImageService championImageService;
 
-    public ChampionService(DataDragonClient dataDragonClient, ChampionRepository championRepository) {
+    public ChampionService(DataDragonClient dataDragonClient, ChampionRepository championRepository,
+                           ChampionImageService championImageService) {
         this.dataDragonClient = dataDragonClient;
         this.championRepository = championRepository;
+        this.championImageService = championImageService;
     }
 
     public void syncChampions() {
         ChampionResponse response = dataDragonClient.getChampions();
 
+        boolean missingImage = response.data().entrySet().stream()
+                .filter(entry -> !entry.getKey().startsWith("Jade_"))
+                .anyMatch(entry -> entry.getValue().image() == null);
+        if (missingImage) {
+            throw new IllegalStateException("[Error] Data Dragon champion image metadata is missing");
+        }
+
         List<Champion> champions = response.data().entrySet().stream()
                 .filter(entry -> !entry.getKey().startsWith("Jade_"))
-                .map(entry -> new Champion(
-                        Long.parseLong(entry.getValue().key()),
-                        entry.getKey(),
-                        entry.getValue().name(),
-                        entry.getValue().tags().stream()
-                                .map(ChampionTag::from)
-                                .toList()
-                ))
+                .map(entry -> {
+                    Long championId = Long.parseLong(entry.getValue().key());
+                    Map<String, String> names = response.localizedName(entry.getKey());
+                    championImageService.store(response.version(), response.dataVersion(),
+                            entry.getValue().image().full());
+                    return new Champion(
+                            championId,
+                            entry.getKey(),
+                            names,
+                            entry.getValue().tags().stream()
+                                    .map(ChampionTag::from)
+                                    .toList()
+                    );
+                })
                 .toList();
 
         championRepository.saveAll(champions);

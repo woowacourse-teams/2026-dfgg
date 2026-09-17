@@ -32,6 +32,7 @@ import dfgg.presentation.dto.response.BuildOptionResponse;
 import dfgg.presentation.dto.response.MultiBuildRecommendationResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -73,7 +74,7 @@ class MultiBuildRecommendationServiceTest {
         myChampion = new Champion(
                 1L,
                 "Malphite",
-                "말파이트",
+                Map.of("ko-KR", "말파이트"),
                 List.of(ChampionTag.TANK)
         );
     }
@@ -170,9 +171,9 @@ class MultiBuildRecommendationServiceTest {
         Item firstCore = armorItem(151L);
         Item secondCore = armorItem(152L);
         Item thirdCore = armorItem(153L);
-        Item boots = new Item(154L, "신발", List.of("Boots"));
-        Item fourthItem = new Item(155L, "네 번째 아이템");
-        Item fifthItem = new Item(156L, "다섯 번째 아이템");
+        Item boots = new Item(154L, Map.of("ko-KR", "신발"), List.of("Boots"));
+        Item fourthItem = new Item(155L, Map.of("ko-KR", "네 번째 아이템"));
+        Item fifthItem = new Item(156L, Map.of("ko-KR", "다섯 번째 아이템"));
         ChampionBuildStats firstPartial = stats(
                 ChampionPosition.TOP,
                 "FIRST_PARTIAL",
@@ -229,9 +230,9 @@ class MultiBuildRecommendationServiceTest {
                 ChampionPosition.TOP,
                 "HIGH_INCOMPLETE",
                 List.of(
-                        new Item(201L, "고득점 방어 아이템 201", List.of("Armor", "Health")),
-                        new Item(202L, "고득점 방어 아이템 202", List.of("Armor", "Health")),
-                        new Item(203L, "고득점 방어 아이템 203", List.of("Armor", "Health"))
+                        new Item(201L, Map.of("ko-KR", "고득점 방어 아이템 201"), List.of("Armor", "Health")),
+                        new Item(202L, Map.of("ko-KR", "고득점 방어 아이템 202"), List.of("Armor", "Health")),
+                        new Item(203L, Map.of("ko-KR", "고득점 방어 아이템 203"), List.of("Armor", "Health"))
                 ),
                 100
         );
@@ -239,12 +240,12 @@ class MultiBuildRecommendationServiceTest {
                 ChampionPosition.TOP,
                 "LOW_COMPLETE",
                 List.of(
-                        new Item(301L, "마법 방어 아이템 301", List.of("SpellBlock")),
-                        new Item(302L, "마법 방어 아이템 302", List.of("SpellBlock")),
-                        new Item(303L, "마법 방어 아이템 303", List.of("SpellBlock")),
-                        new Item(304L, "신발", List.of("Boots")),
-                        new Item(305L, "후반 아이템 4"),
-                        new Item(306L, "후반 아이템 5")
+                        new Item(301L, Map.of("ko-KR", "마법 방어 아이템 301"), List.of("SpellBlock")),
+                        new Item(302L, Map.of("ko-KR", "마법 방어 아이템 302"), List.of("SpellBlock")),
+                        new Item(303L, Map.of("ko-KR", "마법 방어 아이템 303"), List.of("SpellBlock")),
+                        new Item(304L, Map.of("ko-KR", "신발"), List.of("Boots")),
+                        new Item(305L, Map.of("ko-KR", "후반 아이템 4")),
+                        new Item(306L, Map.of("ko-KR", "후반 아이템 5"))
                 ),
                 10
         );
@@ -277,7 +278,7 @@ class MultiBuildRecommendationServiceTest {
         myChampion = new Champion(
                 1L,
                 "Galio",
-                "갈리오",
+                Map.of("ko-KR", "갈리오"),
                 List.of(ChampionTag.TANK, ChampionTag.MAGE)
         );
         ChampionBuildPolicy tankPolicy = policy(ChampionTag.TANK);
@@ -321,21 +322,21 @@ class MultiBuildRecommendationServiceTest {
         myChampion = new Champion(
                 1L,
                 "TwistedFate",
-                "트위스티드 페이트",
+                Map.of("ko-KR", "트위스티드 페이트"),
                 List.of(ChampionTag.MAGE, ChampionTag.MARKSMAN)
         );
         RecommendationRequest request = prepareRequest(ChampionPosition.MID);
         List<Item> hybridBuild = List.of(
-                new Item(401L, "성장 아이템", List.of("SpellDamage", "Mana", "Health")),
+                new Item(401L, Map.of("ko-KR", "성장 아이템"), List.of("SpellDamage", "Mana", "Health")),
                 new Item(
                         402L,
-                        "가속 아이템",
+                        Map.of("ko-KR", "가속 아이템"),
                         List.of("SpellDamage", "AbilityHaste", "NonbootsMovement")
                 ),
-                new Item(403L, "유틸 아이템", List.of("SpellDamage", "Mana", "Slow")),
-                new Item(404L, "신발", List.of("Boots")),
-                new Item(405L, "후반 아이템 A"),
-                new Item(406L, "후반 아이템 B")
+                new Item(403L, Map.of("ko-KR", "유틸 아이템"), List.of("SpellDamage", "Mana", "Slow")),
+                new Item(404L, Map.of("ko-KR", "신발"), List.of("Boots")),
+                new Item(405L, Map.of("ko-KR", "후반 아이템 A")),
+                new Item(406L, Map.of("ko-KR", "후반 아이템 B"))
         );
         ChampionBuildStats observedBuild = stats(
                 ChampionPosition.MID,
@@ -364,14 +365,14 @@ class MultiBuildRecommendationServiceTest {
         myChampion = new Champion(
                 1L,
                 "Kaisa",
-                "카이사",
+                Map.of("ko-KR", "카이사"),
                 List.of(ChampionTag.MAGE, ChampionTag.MARKSMAN)
         );
         RecommendationRequest request = prepareRequest(ChampionPosition.BOTTOM);
         List<Item> criticalStrikeBuild = List.of(
                 new Item(
                         501L,
-                        "치명타 주문 아이템",
+                        Map.of("ko-KR", "치명타 주문 아이템"),
                         List.of(
                                 "SpellDamage",
                                 "MagicPenetration",
@@ -383,18 +384,18 @@ class MultiBuildRecommendationServiceTest {
                 ),
                 new Item(
                         502L,
-                        "치명타 아이템 A",
+                        Map.of("ko-KR", "치명타 아이템 A"),
                         List.of("CriticalStrike", "Damage", "AttackSpeed", "ArmorPenetration")
                 ),
                 new Item(
                         503L,
-                        "치명타 아이템 B",
+                        Map.of("ko-KR", "치명타 아이템 B"),
                         List.of("CriticalStrike", "Damage", "AttackSpeed", "ArmorPenetration")
                 ),
-                new Item(504L, "신발", List.of("Boots")),
-                new Item(505L, "후반 아이템 A"),
-                new Item(506L, "후반 아이템 B"),
-                new Item(507L, "후반 아이템 C")
+                new Item(504L, Map.of("ko-KR", "신발"), List.of("Boots")),
+                new Item(505L, Map.of("ko-KR", "후반 아이템 A")),
+                new Item(506L, Map.of("ko-KR", "후반 아이템 B")),
+                new Item(507L, Map.of("ko-KR", "후반 아이템 C"))
         );
         ChampionBuildStats observedBuild = stats(
                 ChampionPosition.BOTTOM,
@@ -571,19 +572,19 @@ class MultiBuildRecommendationServiceTest {
         items.add(armorItem(firstItemId));
         items.add(armorItem(firstItemId + 1));
         items.add(armorItem(firstItemId + 2));
-        items.add(new Item(firstItemId + 3, "신발", List.of("Boots")));
+        items.add(new Item(firstItemId + 3, Map.of("ko-KR", "신발"), List.of("Boots")));
         for (int index = 4; index < itemCount; index++) {
-            items.add(new Item(firstItemId + index, "후반 아이템 " + index));
+            items.add(new Item(firstItemId + index, Map.of("ko-KR", "후반 아이템 " + index)));
         }
         return List.copyOf(items);
     }
 
     private Item armorItem(long itemId) {
-        return new Item(itemId, "방어 아이템 " + itemId, List.of("Armor"));
+        return new Item(itemId, Map.of("ko-KR", "방어 아이템 " + itemId), List.of("Armor"));
     }
 
     private Champion champion(long id, String name, ChampionTag tag) {
-        return new Champion(id, name, name, List.of(tag));
+        return new Champion(id, name, Map.of("ko-KR", name), List.of(tag));
     }
 
     private ChampionBuildPolicy policy(ChampionTag tag) {

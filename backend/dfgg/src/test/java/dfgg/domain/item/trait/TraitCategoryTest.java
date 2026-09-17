@@ -46,7 +46,7 @@ class TraitCategoryTest {
 
         for (RoleFile roleFile : roleFiles()) {
             roleFile.byItemId().forEach((itemId, traits) -> {
-                if (!catalog.traitsOf(new Item(itemId, "아이템 " + itemId)).containsAll(traits)) {
+                if (!catalog.traitsOf(new Item(itemId, Map.of("ko-KR", "아이템 " + itemId))).containsAll(traits)) {
                     unreachable.add("%s의 %d".formatted(roleFile.name(), itemId));
                 }
             });

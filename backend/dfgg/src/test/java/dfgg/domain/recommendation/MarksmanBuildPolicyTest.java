@@ -10,13 +10,14 @@ import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class MarksmanBuildPolicyTest {
 
-    private final Item neutralItemA = new Item(1L, "일반 아이템 A");
-    private final Item neutralItemB = new Item(2L, "일반 아이템 B");
+    private final Item neutralItemA = new Item(1L, Map.of("ko-KR", "일반 아이템 A"));
+    private final Item neutralItemB = new Item(2L, Map.of("ko-KR", "일반 아이템 B"));
 
     private final MarksmanBuildPolicy policy = new MarksmanBuildPolicy();
 
@@ -26,17 +27,17 @@ class MarksmanBuildPolicyTest {
         // given
         Item criticalStrikeItem = new Item(
                 3L,
-                "치명타 화력 아이템",
+                Map.of("ko-KR", "치명타 화력 아이템"),
                 List.of("CriticalStrike", "Damage", "AttackSpeed")
         );
         Item antiTankItem = new Item(
                 4L,
-                "대탱커 지속딜 아이템",
+                Map.of("ko-KR", "대탱커 지속딜 아이템"),
                 List.of("OnHit", "AttackSpeed", "ArmorPenetration", "MagicPenetration")
         );
         Item survivalKitingItem = new Item(
                 5L,
-                "생존 카이팅 아이템",
+                Map.of("ko-KR", "생존 카이팅 아이템"),
                 List.of("LifeSteal", "NonbootsMovement", "Health", "Tenacity", "Slow")
         );
         CoreBuildCluster criticalStrikeCluster = cluster(criticalStrikeItem, neutralItemA, neutralItemB);
@@ -70,9 +71,9 @@ class MarksmanBuildPolicyTest {
     @DisplayName("CriticalStrike와 OnHit으로 두 공격 방향을 구분한다")
     void evaluate_UsesCriticalStrikeAndOnHitAsPrimarySignals() {
         // given
-        Item sharedAttackSpeedItem = new Item(6L, "공격 속도 아이템", List.of("AttackSpeed"));
-        Item criticalStrikeItem = new Item(7L, "치명타 아이템", List.of("CriticalStrike"));
-        Item onHitItem = new Item(8L, "적중 아이템", List.of("OnHit"));
+        Item sharedAttackSpeedItem = new Item(6L, Map.of("ko-KR", "공격 속도 아이템"), List.of("AttackSpeed"));
+        Item criticalStrikeItem = new Item(7L, Map.of("ko-KR", "치명타 아이템"), List.of("CriticalStrike"));
+        Item onHitItem = new Item(8L, Map.of("ko-KR", "적중 아이템"), List.of("OnHit"));
         CoreBuildCluster criticalStrikeCluster = cluster(
                 sharedAttackSpeedItem,
                 criticalStrikeItem,
@@ -98,7 +99,7 @@ class MarksmanBuildPolicyTest {
         // given
         Item sharedItem = new Item(
                 9L,
-                "공통 공격 아이템",
+                Map.of("ko-KR", "공통 공격 아이템"),
                 List.of("AttackSpeed", "ArmorPenetration")
         );
         CoreBuildCluster cluster = cluster(sharedItem, neutralItemA, neutralItemB);
@@ -114,11 +115,11 @@ class MarksmanBuildPolicyTest {
     @DisplayName("LifeSteal과 함께 관측된 태그로 대탱커와 생존 카이팅을 구분한다")
     void evaluate_UsesTagsObservedWithLifeSteal() {
         // given
-        Item lifeStealItem = new Item(10L, "생명력 흡수 아이템", List.of("LifeSteal"));
-        Item onHitItem = new Item(11L, "적중 아이템", List.of("OnHit", "AttackSpeed"));
+        Item lifeStealItem = new Item(10L, Map.of("ko-KR", "생명력 흡수 아이템"), List.of("LifeSteal"));
+        Item onHitItem = new Item(11L, Map.of("ko-KR", "적중 아이템"), List.of("OnHit", "AttackSpeed"));
         Item movementItem = new Item(
                 12L,
-                "카이팅 아이템",
+                Map.of("ko-KR", "카이팅 아이템"),
                 List.of("NonbootsMovement", "Slow")
         );
         CoreBuildCluster antiTankCluster = cluster(lifeStealItem, onHitItem, neutralItemA);
@@ -142,7 +143,7 @@ class MarksmanBuildPolicyTest {
         // given
         Item magicResistanceItem = new Item(
                 13L,
-                "마법 저항력 아이템",
+                Map.of("ko-KR", "마법 저항력 아이템"),
                 List.of("SpellBlock", "MagicResist")
         );
         CoreBuildCluster cluster = cluster(magicResistanceItem, neutralItemA, neutralItemB);
@@ -166,12 +167,12 @@ class MarksmanBuildPolicyTest {
         // given
         Item criticalStrikeItem = new Item(
                 18L,
-                "치명타 최대 점수 아이템",
+                Map.of("ko-KR", "치명타 최대 점수 아이템"),
                 List.of("CriticalStrike", "Damage", "AttackSpeed", "ArmorPenetration")
         );
         Item antiTankItem = new Item(
                 19L,
-                "대탱커 최대 점수 아이템",
+                Map.of("ko-KR", "대탱커 최대 점수 아이템"),
                 List.of(
                         "OnHit",
                         "AttackSpeed",
@@ -182,7 +183,7 @@ class MarksmanBuildPolicyTest {
         );
         Item survivalItem = new Item(
                 20L,
-                "생존 최대 점수 아이템",
+                Map.of("ko-KR", "생존 최대 점수 아이템"),
                 List.of(
                         "LifeSteal",
                         "NonbootsMovement",
@@ -217,7 +218,7 @@ class MarksmanBuildPolicyTest {
         CoreBuildCluster cluster = cluster(
                 neutralItemA,
                 neutralItemB,
-                new Item(14L, "일반 아이템 C")
+                new Item(14L, Map.of("ko-KR", "일반 아이템 C"))
         );
 
         // when
@@ -231,9 +232,9 @@ class MarksmanBuildPolicyTest {
     @DisplayName("복수 태그를 가진 적 챔피언을 각 MARKSMAN 방향의 적합도에 반영한다")
     void evaluate_WhenEnemyHasMultipleTags_CountsEveryRelevantTag() {
         // given
-        Item criticalStrikeItem = new Item(15L, "치명타 단일 태그", List.of("CriticalStrike"));
-        Item antiTankItem = new Item(16L, "적중 단일 태그", List.of("OnHit"));
-        Item survivalItem = new Item(17L, "이동 단일 태그", List.of("NonbootsMovement"));
+        Item criticalStrikeItem = new Item(15L, Map.of("ko-KR", "치명타 단일 태그"), List.of("CriticalStrike"));
+        Item antiTankItem = new Item(16L, Map.of("ko-KR", "적중 단일 태그"), List.of("OnHit"));
+        Item survivalItem = new Item(17L, Map.of("ko-KR", "이동 단일 태그"), List.of("NonbootsMovement"));
         CoreBuildCluster criticalStrikeCluster = cluster(
                 criticalStrikeItem,
                 neutralItemA,
@@ -281,7 +282,7 @@ class MarksmanBuildPolicyTest {
         return new Champion(
                 (long) tags.hashCode(),
                 "enemy-" + tags.hashCode(),
-                "적 챔피언",
+                Map.of("ko-KR", "적 챔피언"),
                 List.of(tags)
         );
     }

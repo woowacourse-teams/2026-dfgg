@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
 import dfgg.application.item.ItemService;
+import dfgg.application.item.ItemImageService;
 import dfgg.application.match.CoreItemPurchaseOrderCalculator;
 import dfgg.application.match.MatchNormalizationService;
 import dfgg.application.player.RiotPlayerSyncService;
@@ -34,6 +35,7 @@ import dfgg.domain.stats.StatsAggregationCompletionRepository;
 import dfgg.infrastructure.external.client.DataDragonClient;
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -89,6 +91,9 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
 
     @MockitoBean
     private DataDragonClient dataDragonClient;
+
+    @MockitoBean
+    private ItemImageService itemImageService;
 
     @Autowired
     private PlayerRepository playerRepository;
@@ -195,10 +200,10 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
         Champion champion = championRepository.save(new Champion(
                 1L,
                 "Aatrox",
-                "아트록스",
+                Map.of("ko-KR", "아트록스"),
                 List.of(ChampionTag.FIGHTER)
         ));
-        Item item = itemRepository.save(new Item(3071L, "아이템 A"));
+        Item item = itemRepository.save(new Item(3071L, Map.of("ko-KR", "아이템 A")));
         NormalizedMatch existingMatch = new NormalizedMatch(
                 "KR_EXISTING",
                 "16.15",
@@ -256,13 +261,13 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
     @Test
     void 같은_raw_데이터를_반복_집계해도_정규화와_통계가_중복되지_않는다() {
         championRepository.saveAll(List.of(
-                new Champion(1L, "Aatrox", "아트록스", List.of(ChampionTag.FIGHTER)),
-                new Champion(2L, "Ally", "아군", List.of(ChampionTag.FIGHTER)),
-                new Champion(3L, "Enemy", "적군", List.of(ChampionTag.TANK))
+                new Champion(1L, "Aatrox", Map.of("ko-KR", "아트록스"), List.of(ChampionTag.FIGHTER)),
+                new Champion(2L, "Ally", Map.of("ko-KR", "아군"), List.of(ChampionTag.FIGHTER)),
+                new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), List.of(ChampionTag.TANK))
         ));
         itemRepository.saveAll(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
         savePlatinumPlayer("KR_1", "p-focal");
         rawMatchRepository.save(new RawMatch("KR_1", """
@@ -319,13 +324,13 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
     @Test
     void 한_매치가_실패해도_성공한_매치의_통계는_독립적으로_커밋된다() {
         championRepository.saveAll(List.of(
-                new Champion(1L, "Aatrox", "아트록스", List.of(ChampionTag.FIGHTER)),
-                new Champion(2L, "Ally", "아군", List.of(ChampionTag.FIGHTER)),
-                new Champion(3L, "Enemy", "적군", List.of(ChampionTag.TANK))
+                new Champion(1L, "Aatrox", Map.of("ko-KR", "아트록스"), List.of(ChampionTag.FIGHTER)),
+                new Champion(2L, "Ally", Map.of("ko-KR", "아군"), List.of(ChampionTag.FIGHTER)),
+                new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), List.of(ChampionTag.TANK))
         ));
         itemRepository.saveAll(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
         savePlatinumPlayer("KR_VALID", "p-focal");
         savePlatinumPlayer("KR_INVALID", "p-focal");
@@ -646,13 +651,13 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
 
     private void prepareReferenceData() {
         championRepository.saveAll(List.of(
-                new Champion(1L, "Aatrox", "아트록스", List.of(ChampionTag.FIGHTER)),
-                new Champion(2L, "Ally", "아군", List.of(ChampionTag.FIGHTER)),
-                new Champion(3L, "Enemy", "적군", List.of(ChampionTag.TANK))
+                new Champion(1L, "Aatrox", Map.of("ko-KR", "아트록스"), List.of(ChampionTag.FIGHTER)),
+                new Champion(2L, "Ally", Map.of("ko-KR", "아군"), List.of(ChampionTag.FIGHTER)),
+                new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), List.of(ChampionTag.TANK))
         ));
         itemRepository.saveAll(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
     }
 

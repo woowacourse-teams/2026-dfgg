@@ -10,13 +10,14 @@ import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class AssassinBuildPolicyTest {
 
-    private final Item neutralItemA = new Item(1L, "일반 아이템 A");
-    private final Item neutralItemB = new Item(2L, "일반 아이템 B");
+    private final Item neutralItemA = new Item(1L, Map.of("ko-KR", "일반 아이템 A"));
+    private final Item neutralItemB = new Item(2L, Map.of("ko-KR", "일반 아이템 B"));
 
     private final AssassinBuildPolicy policy = new AssassinBuildPolicy();
 
@@ -26,17 +27,17 @@ class AssassinBuildPolicyTest {
         // given
         Item burstItem = new Item(
                 3L,
-                "순간 암살 아이템",
+                Map.of("ko-KR", "순간 암살 아이템"),
                 List.of("Damage", "ArmorPenetration", "NonbootsMovement")
         );
         Item defenseNeutralizationItem = new Item(
                 4L,
-                "방어 무력화 아이템",
+                Map.of("ko-KR", "방어 무력화 아이템"),
                 List.of("ArmorPenetration", "OnHit", "AttackSpeed", "AbilityHaste")
         );
         Item engageSurvivalItem = new Item(
                 5L,
-                "진입 생존 아이템",
+                Map.of("ko-KR", "진입 생존 아이템"),
                 List.of("Health", "Armor", "SpellBlock", "Tenacity", "LifeSteal", "SpellVamp")
         );
         CoreBuildCluster burstCluster = cluster(burstItem, neutralItemA, neutralItemB);
@@ -70,9 +71,9 @@ class AssassinBuildPolicyTest {
     @DisplayName("관통 태그와 함께 관측된 태그 조합으로 대표 방향을 결정한다")
     void evaluate_UsesTagsObservedWithPenetration() {
         // given
-        Item penetrationItem = new Item(6L, "관통 아이템", List.of("ArmorPenetration"));
-        Item movementItem = new Item(7L, "접근 아이템", List.of("Damage", "NonbootsMovement"));
-        Item onHitItem = new Item(8L, "적중 아이템", List.of("OnHit", "AttackSpeed"));
+        Item penetrationItem = new Item(6L, Map.of("ko-KR", "관통 아이템"), List.of("ArmorPenetration"));
+        Item movementItem = new Item(7L, Map.of("ko-KR", "접근 아이템"), List.of("Damage", "NonbootsMovement"));
+        Item onHitItem = new Item(8L, Map.of("ko-KR", "적중 아이템"), List.of("OnHit", "AttackSpeed"));
         CoreBuildCluster burstCluster = cluster(penetrationItem, movementItem, neutralItemA);
         CoreBuildCluster defenseCluster = cluster(penetrationItem, onHitItem, neutralItemA);
 
@@ -92,7 +93,7 @@ class AssassinBuildPolicyTest {
     @DisplayName("관통 태그만으로 최고점이 같으면 임의의 대표 방향을 선택하지 않는다")
     void evaluate_WhenPenetrationScoresAreTied_ExcludesCluster() {
         // given
-        Item penetrationItem = new Item(9L, "관통 아이템", List.of("MagicPenetration"));
+        Item penetrationItem = new Item(9L, Map.of("ko-KR", "관통 아이템"), List.of("MagicPenetration"));
         CoreBuildCluster cluster = cluster(penetrationItem, neutralItemA, neutralItemB);
 
         // when
@@ -108,7 +109,7 @@ class AssassinBuildPolicyTest {
         // given
         Item magicResistanceItem = new Item(
                 10L,
-                "마법 저항력 아이템",
+                Map.of("ko-KR", "마법 저항력 아이템"),
                 List.of("SpellBlock", "MagicResist")
         );
         CoreBuildCluster cluster = cluster(magicResistanceItem, neutralItemA, neutralItemB);
@@ -133,7 +134,7 @@ class AssassinBuildPolicyTest {
         CoreBuildCluster cluster = cluster(
                 neutralItemA,
                 neutralItemB,
-                new Item(11L, "일반 아이템 C")
+                new Item(11L, Map.of("ko-KR", "일반 아이템 C"))
         );
 
         // when
@@ -147,9 +148,9 @@ class AssassinBuildPolicyTest {
     @DisplayName("복수 태그를 가진 적 챔피언을 각 ASSASSIN 방향의 적합도에 반영한다")
     void evaluate_WhenEnemyHasMultipleTags_CountsEveryRelevantTag() {
         // given
-        Item burstItem = new Item(12L, "순간 암살 단일 태그", List.of("Damage"));
-        Item defenseItem = new Item(13L, "방어 무력화 단일 태그", List.of("OnHit"));
-        Item survivalItem = new Item(14L, "진입 생존 단일 태그", List.of("Health"));
+        Item burstItem = new Item(12L, Map.of("ko-KR", "순간 암살 단일 태그"), List.of("Damage"));
+        Item defenseItem = new Item(13L, Map.of("ko-KR", "방어 무력화 단일 태그"), List.of("OnHit"));
+        Item survivalItem = new Item(14L, Map.of("ko-KR", "진입 생존 단일 태그"), List.of("Health"));
         CoreBuildCluster burstCluster = cluster(burstItem, neutralItemA, neutralItemB);
         CoreBuildCluster defenseCluster = cluster(defenseItem, neutralItemA, neutralItemB);
         CoreBuildCluster survivalCluster = cluster(survivalItem, neutralItemA, neutralItemB);
@@ -189,7 +190,7 @@ class AssassinBuildPolicyTest {
         return new Champion(
                 (long) tags.hashCode(),
                 "enemy-" + tags.hashCode(),
-                "적 챔피언",
+                Map.of("ko-KR", "적 챔피언"),
                 List.of(tags)
         );
     }

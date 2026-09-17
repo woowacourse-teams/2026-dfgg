@@ -25,12 +25,12 @@ class HardValidityFilterTest {
     private final HardValidityFilter filter = new HardValidityFilter(new ItemExclusionGroups());
 
     private final Map<Long, Item> itemById = Map.of(
-            BERSERKERS_GREAVES, new Item(BERSERKERS_GREAVES, "광전사의 군화", List.of("Boots")),
-            PLATED_STEELCAPS, new Item(PLATED_STEELCAPS, "판금 장화", List.of("Boots")),
-            INFINITY_EDGE, new Item(INFINITY_EDGE, "무한의 대검", List.of("Damage", "CriticalStrike")),
-            LIANDRY, new Item(LIANDRY, "리안드리의 고통", List.of("SpellDamage", "Health")),
-            BLACK_CLEAVER, new Item(BLACK_CLEAVER, "칠흑의 양날도끼", List.of("Damage", "ArmorPenetration")),
-            SERYLDAS_GRUDGE, new Item(SERYLDAS_GRUDGE, "셰릴다의 원한", List.of("Damage", "ArmorPenetration"))
+            BERSERKERS_GREAVES, new Item(BERSERKERS_GREAVES, Map.of("ko-KR", "광전사의 군화"), List.of("Boots")),
+            PLATED_STEELCAPS, new Item(PLATED_STEELCAPS, Map.of("ko-KR", "판금 장화"), List.of("Boots")),
+            INFINITY_EDGE, new Item(INFINITY_EDGE, Map.of("ko-KR", "무한의 대검"), List.of("Damage", "CriticalStrike")),
+            LIANDRY, new Item(LIANDRY, Map.of("ko-KR", "리안드리의 고통"), List.of("SpellDamage", "Health")),
+            BLACK_CLEAVER, new Item(BLACK_CLEAVER, Map.of("ko-KR", "칠흑의 양날도끼"), List.of("Damage", "ArmorPenetration")),
+            SERYLDAS_GRUDGE, new Item(SERYLDAS_GRUDGE, Map.of("ko-KR", "셰릴다의 원한"), List.of("Damage", "ArmorPenetration"))
     ).entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
     private CandidateUnion unionOf(long... itemIds) {

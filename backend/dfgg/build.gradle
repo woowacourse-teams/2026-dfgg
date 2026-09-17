@@ -18,6 +18,8 @@ repositories {
 }
 
 dependencies {
+    implementation platform("software.amazon.awssdk:bom:2.54.20")
+    implementation "software.amazon.awssdk:s3"
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.1'

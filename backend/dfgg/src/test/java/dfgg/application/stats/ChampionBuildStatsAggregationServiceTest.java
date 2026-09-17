@@ -20,6 +20,7 @@ import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.stats.CompositionStatsSampleRepository;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -54,8 +55,8 @@ class ChampionBuildStatsAggregationServiceTest {
         Champion enemy = champion(3L, "TANK");
         when(championRepository.findAllById(any())).thenReturn(List.of(focal, ally, enemy));
         when(itemService.findItemsByIds(any())).thenReturn(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
         when(statsRepository.insertIfAbsent(
                 anyString(),
@@ -124,8 +125,8 @@ class ChampionBuildStatsAggregationServiceTest {
         Champion enemy = champion(3L, "TANK");
         when(championRepository.findAllById(any())).thenReturn(List.of(focal, ally, enemy));
         when(itemService.findItemsByIds(any())).thenReturn(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
 
         NormalizedMatch match = new NormalizedMatch(
@@ -158,7 +159,7 @@ class ChampionBuildStatsAggregationServiceTest {
     }
 
     private Champion champion(Long id, String tag) {
-        return new Champion(id, "champion-" + id, "챔피언" + id, List.of(ChampionTag.valueOf(tag)));
+        return new Champion(id, "champion-" + id, Map.of("ko-KR", "챔피언" + id), List.of(ChampionTag.valueOf(tag)));
     }
 
     private NormalizedMatchParticipant participant(

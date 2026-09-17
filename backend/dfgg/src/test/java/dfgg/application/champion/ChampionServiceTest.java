@@ -32,20 +32,30 @@ class ChampionServiceTest {
     @Mock
     private ChampionRepository championRepository;
 
+    @Mock
+    private ChampionImageService championImageService;
+
     @InjectMocks
     private ChampionService championService;
+
+    private ChampionResponse response(String version, String dataVersion, Map<String, ChampionData> data) {
+        Map<String, String> englishNames = new java.util.HashMap<>();
+        data.keySet().forEach(id -> englishNames.put(id, id));
+        return new ChampionResponse(version, dataVersion, data, englishNames);
+    }
 
     @Test
     void 데이터_드래곤_응답을_챔피언으로_변환해_저장한다() {
         // given
-        ChampionResponse response = new ChampionResponse(Map.of(
+        ChampionResponse response = response("16.15", "16.15.1", Map.of(
                 "Aatrox", new ChampionData(
                         "266",
                         "아트록스",
-                        List.of("Fighter", "Tank")
+                        List.of("Fighter", "Tank"), new ChampionData.Image("Aatrox.png")
                 )
         ));
         when(dataDragonClient.getChampions()).thenReturn(response);
+
 
         // when
         championService.syncChampions();
@@ -54,11 +64,12 @@ class ChampionServiceTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Champion>> captor = ArgumentCaptor.forClass(List.class);
         verify(championRepository).saveAll(captor.capture());
+        verify(championImageService).store("16.15", "16.15.1", "Aatrox.png");
 
         assertThat(captor.getValue()).singleElement().satisfies(champion -> {
             assertThat(champion.getChampionId()).isEqualTo(266L);
             assertThat(champion.getRiotKey()).isEqualTo("Aatrox");
-            assertThat(champion.getName()).isEqualTo("아트록스");
+            assertThat(champion.getName()).isEqualTo(Map.of("ko-KR", "아트록스", "en-US", "Aatrox"));
             assertThat(champion.getChampionTags())
                     .containsExactly(ChampionTag.FIGHTER, ChampionTag.TANK);
         });
@@ -79,11 +90,11 @@ class ChampionServiceTest {
     @Test
     void 챔피언_ID가_숫자가_아니면_저장하지_않는다() {
         // given
-        ChampionResponse response = new ChampionResponse(Map.of(
+        ChampionResponse response = response("16.15", "16.15.1", Map.of(
                 "Aatrox", new ChampionData(
                         "invalid-id",
                         "아트록스",
-                        List.of("Fighter")
+                        List.of("Fighter"), new ChampionData.Image("Aatrox.png")
                 )
         ));
         when(dataDragonClient.getChampions()).thenReturn(response);
@@ -95,9 +106,29 @@ class ChampionServiceTest {
     }
 
     @Test
+    void 이미지_업로드가_실패하면_DB에_저장하지_않는다() {
+        when(dataDragonClient.getChampions()).thenReturn(response("16.15", "16.15.1", Map.of(
+                "Aatrox", new ChampionData("266", "아트록스", List.of("Fighter"),
+                        new ChampionData.Image("Aatrox.png")))));
+        org.mockito.Mockito.doThrow(new IllegalStateException("S3 failure"))
+                .when(championImageService).store("16.15", "16.15.1", "Aatrox.png");
+        assertThatThrownBy(championService::syncChampions).hasMessage("S3 failure");
+        verifyNoInteractions(championRepository);
+    }
+
+    @Test
+    void Jade_챔피언은_이미지를_수집하지_않는다() {
+        when(dataDragonClient.getChampions()).thenReturn(response("16.15", "16.15.1", Map.of(
+                "Jade_Test", new ChampionData("1", "제외", List.of("Fighter")))));
+        championService.syncChampions();
+        verifyNoInteractions(championImageService);
+        verify(championRepository).saveAll(List.of());
+    }
+
+    @Test
     void 라이엇_키로_챔피언을_찾는다() {
         // given
-        Champion champion = new Champion(266L, "Aatrox", "아트록스", List.of(ChampionTag.FIGHTER));
+        Champion champion = new Champion(266L, "Aatrox", Map.of("ko-KR", "아트록스"), List.of(ChampionTag.FIGHTER));
         when(championRepository.findByRiotKeyIgnoreCase("Aatrox"))
                 .thenReturn(Optional.of(champion));
 
@@ -114,7 +145,7 @@ class ChampionServiceTest {
         Champion champion = new Champion(
                 897L,
                 "KSante",
-                "크산테",
+                Map.of("ko-KR", "크산테"),
                 List.of(ChampionTag.TANK, ChampionTag.FIGHTER)
         );
         when(championRepository.findByRiotKeyIgnoreCase("크산테"))
@@ -148,5 +179,12 @@ class ChampionServiceTest {
         assertThatThrownBy(() -> championService.findChampionByName("Unknown"))
                 .isInstanceOf(ChampionNotFoundException.class)
                 .hasMessageContaining("Unknown");
+    }
+    @Test
+    void 영문_이름_누락시_이미지와_DB를_저장하지_않는다() {
+        when(dataDragonClient.getChampions()).thenReturn(new ChampionResponse(
+                "16.18", "16.18.1", Map.of("Aatrox", new ChampionData("266", "아트록스", List.of("Fighter"), new ChampionData.Image("Aatrox.png"))), Map.of()));
+        assertThatThrownBy(championService::syncChampions).hasMessageContaining("영문 이름이 없습니다");
+        verifyNoInteractions(championRepository, championImageService);
     }
 }

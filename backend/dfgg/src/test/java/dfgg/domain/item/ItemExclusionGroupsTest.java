@@ -19,7 +19,7 @@ class ItemExclusionGroupsTest {
     private final ItemExclusionGroups exclusionGroups = new ItemExclusionGroups();
 
     private Item item(long itemId, String name, List<String> tags) {
-        return new Item(itemId, name, tags);
+        return new Item(itemId, Map.of("ko-KR", name), tags);
     }
 
     @Test

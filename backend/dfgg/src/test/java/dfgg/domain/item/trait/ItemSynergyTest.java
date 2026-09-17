@@ -22,8 +22,8 @@ class ItemSynergyTest {
     @DisplayName("아군에게 작용하는 서포터 아이템은 ALLY다")
     void synergyOf_WhenSupportItemActsOnAllies_IsAlly() {
         // given
-        Item mikaelsBlessing = new Item(3222L, "미카엘의 축복");
-        Item ardentCenser = new Item(3504L, "불타는 향로");
+        Item mikaelsBlessing = new Item(3222L, Map.of("ko-KR", "미카엘의 축복"));
+        Item ardentCenser = new Item(3504L, Map.of("ko-KR", "불타는 향로"));
 
         // when
         Synergy mikaelsSynergy = catalog.synergyOf(mikaelsBlessing);
@@ -38,7 +38,7 @@ class ItemSynergyTest {
     @DisplayName("서포터 파일에 있어도 자기에게만 작용하면 SELF다 — 포지션이 아니라 아이템이 기준이다")
     void synergyOf_WhenSupportItemActsOnlyOnSelf_IsSelf() {
         // given
-        Item zazzaksRealmspike = new Item(3871L, "자자크의 세계가시");
+        Item zazzaksRealmspike = new Item(3871L, Map.of("ko-KR", "자자크의 세계가시"));
 
         // when
         Synergy synergy = catalog.synergyOf(zazzaksRealmspike);
@@ -51,7 +51,7 @@ class ItemSynergyTest {
     @DisplayName("synergy를 선언하지 않은 역할 파일의 아이템은 SELF다")
     void synergyOf_WhenItemIsFromUndeclaredRoleFile_IsSelf() {
         // given
-        Item mortalReminder = new Item(3033L, "필멸자의 운명");
+        Item mortalReminder = new Item(3033L, Map.of("ko-KR", "필멸자의 운명"));
 
         // when
         Synergy synergy = catalog.synergyOf(mortalReminder);
@@ -64,7 +64,7 @@ class ItemSynergyTest {
     @DisplayName("어느 파일에도 없는 아이템은 SELF다")
     void synergyOf_WhenItemIsUnmapped_IsSelf() {
         // given
-        Item doransShield = new Item(1054L, "도란의 방패");
+        Item doransShield = new Item(1054L, Map.of("ko-KR", "도란의 방패"));
 
         // when
         Synergy synergy = catalog.synergyOf(doransShield);
@@ -107,8 +107,8 @@ class ItemSynergyTest {
                 Map.of(3871L, Synergy.ALLY));
 
         // when
-        Synergy declared = custom.synergyOf(new Item(3871L, "자자크의 세계가시"));
-        Synergy undeclared = custom.synergyOf(new Item(3222L, "미카엘의 축복"));
+        Synergy declared = custom.synergyOf(new Item(3871L, Map.of("ko-KR", "자자크의 세계가시")));
+        Synergy undeclared = custom.synergyOf(new Item(3222L, Map.of("ko-KR", "미카엘의 축복")));
 
         // then
         assertThat(declared).isEqualTo(Synergy.ALLY);

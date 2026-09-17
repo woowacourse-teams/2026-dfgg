@@ -6,6 +6,7 @@ import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -26,9 +27,11 @@ class ItemRepositoryTest {
     @Test
     void 아이템을_저장하고_조회한다() {
         // given
+        Map<String, String> names = Map.of("ko-KR", "칠흑의 양날 도끼", "en-US", "Black Cleaver");
         Item item = new Item(
                 3071L,
-                "칠흑의 양날 도끼",
+                names,
+                Map.of("base", 1100, "total", 1100),
                 List.of("Damage", "Health", "FutureTag")
         );
 
@@ -40,7 +43,8 @@ class ItemRepositoryTest {
         // then
         Item saved = itemRepository.findById(3071L).orElseThrow();
         assertThat(saved.getItemId()).isEqualTo(3071L);
-        assertThat(saved.getName()).isEqualTo("칠흑의 양날 도끼");
+        assertThat(saved.getName()).isEqualTo(names);
+        assertThat(saved.getGold()).isEqualTo(Map.of("base", 1100, "total", 1100));
         assertThat(saved.getTags())
                 .containsExactly("Damage", "Health", "FutureTag");
         assertThat(saved.hasTag("Health")).isTrue();
@@ -49,7 +53,7 @@ class ItemRepositoryTest {
     @Test
     void 아이템을_태그와_함께_저장하고_조회한다() {
         // given
-        Item item = new Item(3071L, "칠흑의 양날 도끼", List.of("Damage", "ArmorPenetration"));
+        Item item = new Item(3071L, Map.of("ko-KR", "칠흑의 양날 도끼"), List.of("Damage", "ArmorPenetration"));
 
         // when
         itemRepository.save(item);
@@ -64,12 +68,12 @@ class ItemRepositoryTest {
     @Test
     void 같은_ID의_아이템을_다시_저장하면_기존_데이터를_갱신한다() {
         // given
-        itemRepository.save(new Item(3071L, "이전 이름"));
+        itemRepository.save(new Item(3071L, Map.of("ko-KR", "이전 이름")));
         entityManager.flush();
         entityManager.clear();
 
         // when
-        itemRepository.saveAll(List.of(new Item(3071L, "칠흑의 양날 도끼")));
+        itemRepository.saveAll(List.of(new Item(3071L, Map.of("ko-KR", "칠흑의 양날 도끼"))));
         entityManager.flush();
         entityManager.clear();
 
@@ -77,6 +81,6 @@ class ItemRepositoryTest {
         assertThat(itemRepository.count()).isEqualTo(1);
 
         Item updated = itemRepository.findById(3071L).orElseThrow();
-        assertThat(updated.getName()).isEqualTo("칠흑의 양날 도끼");
+        assertThat(updated.getName()).isEqualTo(Map.of("ko-KR", "칠흑의 양날 도끼"));
     }
 }

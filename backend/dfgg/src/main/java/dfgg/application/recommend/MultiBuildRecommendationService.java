@@ -89,7 +89,7 @@ public class MultiBuildRecommendationService {
         );
         if (matchingStats.isEmpty()) {
             throw new CompositionStatsNotFoundException(
-                    myChampion.getName(),
+                    myChampion.getName().get("ko-KR"),
                     position.name()
             );
         }
@@ -125,7 +125,7 @@ public class MultiBuildRecommendationService {
         );
 
         return new MultiBuildRecommendationResponse(
-                myChampion.getName(),
+                myChampion.getName().get("ko-KR"),
                 position.name(),
                 createBuildOptions(
                         selectedCandidates,

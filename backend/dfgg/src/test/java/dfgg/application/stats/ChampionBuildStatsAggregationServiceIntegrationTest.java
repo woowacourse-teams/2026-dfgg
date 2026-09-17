@@ -3,6 +3,7 @@ package dfgg.application.stats;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.item.ItemService;
+import dfgg.application.item.ItemImageService;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.champion.ChampionTag;
@@ -15,6 +16,7 @@ import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.stats.CompositionStatsSampleRepository;
 import dfgg.infrastructure.external.client.DataDragonClient;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,6 +58,9 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
 
     @MockitoBean
     private DataDragonClient dataDragonClient;
+
+    @MockitoBean
+    private ItemImageService itemImageService;
 
     @BeforeEach
     @AfterEach
@@ -118,13 +123,13 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
 
     private void prepareReferenceData() {
         championRepository.saveAll(List.of(
-                new Champion(1L, "Aatrox", "아트록스", List.of(ChampionTag.FIGHTER)),
-                new Champion(2L, "Ally", "아군", List.of(ChampionTag.FIGHTER)),
-                new Champion(3L, "Enemy", "적군", List.of(ChampionTag.TANK))
+                new Champion(1L, "Aatrox", Map.of("ko-KR", "아트록스"), List.of(ChampionTag.FIGHTER)),
+                new Champion(2L, "Ally", Map.of("ko-KR", "아군"), List.of(ChampionTag.FIGHTER)),
+                new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), List.of(ChampionTag.TANK))
         ));
         itemRepository.saveAll(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
     }
 

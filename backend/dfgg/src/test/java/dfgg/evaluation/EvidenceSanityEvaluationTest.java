@@ -72,7 +72,7 @@ class EvidenceSanityEvaluationTest {
     void evidenceNamesOnlyChampionsFromTheRightSide() {
         aggregationService.aggregate(RECENT_PATCH_WINDOW);
         Map<Long, String> championNames = championRepository.findAll().stream()
-                .collect(Collectors.toMap(Champion::getChampionId, Champion::getName, (a, b) -> a));
+                .collect(Collectors.toMap(Champion::getChampionId, champion -> champion.getName().get("ko-KR"), (a, b) -> a));
 
         Map<String, Map<String, String>> samplesByPosition = new LinkedHashMap<>();
         Map<String, Integer> championsWithEvidence = new LinkedHashMap<>();

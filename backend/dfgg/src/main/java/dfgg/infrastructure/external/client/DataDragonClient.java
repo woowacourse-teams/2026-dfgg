@@ -49,9 +49,10 @@ public class DataDragonClient {
     }
 
     public ChampionResponse getChampions() {
+        String version = getLatestDataVersion();
         ChampionResponse response = restClient.get()
                 .uri("/cdn/{version}/data/ko_KR/champion.json",
-                        getLatestDataVersion())
+                        version)
                 .retrieve()
                 .body(ChampionResponse.class);
 
@@ -72,12 +73,52 @@ public class DataDragonClient {
             throw new IllegalStateException("[Error] Data Dragon champion data is invalid");
         }
 
-        return response;
+        ChampionResponse english = restClient.get()
+                .uri("/cdn/{version}/data/en_US/champion.json", version)
+                .retrieve()
+                .body(ChampionResponse.class);
+        if (english == null || english.data() == null || english.data().isEmpty()) {
+            throw new IllegalStateException("[Error] 영문 챔피언 응답이 비어 있습니다.");
+        }
+        java.util.Map<String, String> englishNames = new java.util.HashMap<>();
+        english.data().forEach((id, data) -> {
+            if (data != null && data.name() != null && !data.name().isBlank()) {
+                englishNames.put(id, data.name());
+            }
+        });
+        return new ChampionResponse(normalizePatch(version), version, response.data(), englishNames);
+    }
+
+    public byte[] getChampionImage(String version, String filename) {
+        byte[] image = restClient.get()
+                .uri("/cdn/{version}/img/champion/{filename}", version, filename)
+                .retrieve()
+                .body(byte[].class);
+        byte[] signature = {(byte) 137, 80, 78, 71, 13, 10, 26, 10};
+        if (image == null || image.length < signature.length
+                || !java.util.Arrays.equals(signature, java.util.Arrays.copyOf(image, signature.length))) {
+            throw new IllegalStateException("[Error] Data Dragon champion image is not PNG: " + filename);
+        }
+        return image;
+    }
+
+    public byte[] getItemImage(String version, String filename) {
+        byte[] image = restClient.get()
+                .uri("/cdn/{version}/img/item/{filename}", version, filename)
+                .retrieve()
+                .body(byte[].class);
+        byte[] signature = {(byte) 137, 80, 78, 71, 13, 10, 26, 10};
+        if (image == null || image.length < signature.length
+                || !java.util.Arrays.equals(signature, java.util.Arrays.copyOf(image, signature.length))) {
+            throw new IllegalStateException("[Error] 아이템 이미지가 PNG 형식이 아닙니다: " + filename);
+        }
+        return image;
     }
 
     public ItemResponse getItems() {
+        String version = getLatestDataVersion();
         ItemResponse response = restClient.get()
-                .uri("/cdn/{version}/data/ko_KR/item.json", getLatestDataVersion())
+                .uri("/cdn/{version}/data/ko_KR/item.json", version)
                 .retrieve()
                 .body(ItemResponse.class);
 
@@ -85,6 +126,19 @@ public class DataDragonClient {
             throw new IllegalStateException("[Error] Data Dragon item response is empty");
         }
 
-        return response;
+        ItemResponse english = restClient.get()
+                .uri("/cdn/{version}/data/en_US/item.json", version)
+                .retrieve()
+                .body(ItemResponse.class);
+        if (english == null || english.data() == null || english.data().isEmpty()) {
+            throw new IllegalStateException("[Error] 영문 아이템 응답이 비어 있습니다.");
+        }
+        java.util.Map<String, String> englishNames = new java.util.HashMap<>();
+        english.data().forEach((id, data) -> {
+            if (data != null && data.name() != null && !data.name().isBlank()) {
+                englishNames.put(id, data.name());
+            }
+        });
+        return new ItemResponse(normalizePatch(version), version, response.data(), englishNames);
     }
 }

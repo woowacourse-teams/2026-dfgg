@@ -219,7 +219,7 @@ public class NextItemRecommendationService {
         for (Champion champion : everyone) {
             if (!seen.add(champion.getChampionId())) {
                 throw new InvalidRecommendationRequestException(
-                        "같은 챔피언이 두 번 이상 들어 있습니다: " + champion.getName());
+                        "같은 챔피언이 두 번 이상 들어 있습니다: " + champion.getName().get("ko-KR"));
             }
         }
     }

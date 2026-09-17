@@ -9,7 +9,7 @@ public record ItemDto(
     public static ItemDto from(Item item) {
         return new ItemDto(
                 item.getItemId(),
-                item.getName()
+                item.getName().get("ko-KR")
         );
     }
 }
