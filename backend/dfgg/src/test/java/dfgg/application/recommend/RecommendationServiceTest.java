@@ -58,7 +58,7 @@ class RecommendationServiceTest {
 
         Champion myChampion = mock(Champion.class);
         when(myChampion.getChampionId()).thenReturn(1L);
-        when(myChampion.getName()).thenReturn("징크스");
+        when(myChampion.getName()).thenReturn(java.util.Map.of("ko-KR", "징크스"));
 
         Champion thresh = mock(Champion.class);
         when(thresh.getChampionTags()).thenReturn(List.of(ChampionTag.SUPPORT));
@@ -115,7 +115,7 @@ class RecommendationServiceTest {
 
         Champion myChampion = mock(Champion.class);
         when(myChampion.getChampionId()).thenReturn(1L);
-        when(myChampion.getName()).thenReturn("징크스");
+        when(myChampion.getName()).thenReturn(java.util.Map.of("ko-KR", "징크스"));
 
         when(championService.findChampionByName(anyString())).thenReturn(myChampion);
 
@@ -141,7 +141,7 @@ class RecommendationServiceTest {
         );
         Champion myChampion = mock(Champion.class);
         when(myChampion.getChampionId()).thenReturn(1L);
-        when(myChampion.getName()).thenReturn("징크스");
+        when(myChampion.getName()).thenReturn(java.util.Map.of("ko-KR", "징크스"));
         when(championService.findChampionByName("징크스")).thenReturn(myChampion);
 
         ChampionBuildStats bootlessStats = new ChampionBuildStats(

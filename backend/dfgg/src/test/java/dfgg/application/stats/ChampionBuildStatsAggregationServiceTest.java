@@ -20,6 +20,7 @@ import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import dfgg.domain.stats.CompositionStatsSampleRepository;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -158,7 +159,7 @@ class ChampionBuildStatsAggregationServiceTest {
     }
 
     private Champion champion(Long id, String tag) {
-        return new Champion(id, "champion-" + id, "챔피언" + id, List.of(ChampionTag.valueOf(tag)));
+        return new Champion(id, "champion-" + id, Map.of("ko-KR", "챔피언" + id), null, List.of(ChampionTag.valueOf(tag)));
     }
 
     private NormalizedMatchParticipant participant(

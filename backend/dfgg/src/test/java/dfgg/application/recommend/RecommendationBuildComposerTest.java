@@ -8,6 +8,7 @@ import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +16,7 @@ class RecommendationBuildComposerTest {
 
     private final RecommendationBuildComposer composer = new RecommendationBuildComposer();
 
-    private final Champion champion = new Champion(1L, "riot-key", "챔피언", List.of(ChampionTag.FIGHTER));
+    private final Champion champion = new Champion(1L, "riot-key", Map.of("ko-KR", "챔피언"), null, List.of(ChampionTag.FIGHTER));
 
     private final Item boots = new Item(1L, "신발", List.of("Boots"));
     private final Item itemA2 = new Item(2L, "아이템A2");

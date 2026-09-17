@@ -13,6 +13,7 @@ import dfgg.domain.stats.ChampionBuildStats;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +43,8 @@ class ChampionBuildStatsRepositoryTest {
         Champion champion = championRepository.save(new Champion(
                 266L,
                 "Aatrox",
-                "아트록스",
+                Map.of("ko-KR", "아트록스"),
+                null,
                 List.of(ChampionTag.FIGHTER, ChampionTag.TANK)
         ));
         Item item = itemRepository.save(new Item(3071L, "칠흑의 양날 도끼"));
@@ -79,7 +81,8 @@ class ChampionBuildStatsRepositoryTest {
         Champion champion = championRepository.save(new Champion(
                 266L,
                 "Aatrox",
-                "아트록스",
+                Map.of("ko-KR", "아트록스"),
+                null,
                 List.of(ChampionTag.FIGHTER)
         ));
         ChampionBuildStats first = statsRepository.save(new ChampionBuildStats(
@@ -106,7 +109,8 @@ class ChampionBuildStatsRepositoryTest {
         Champion champion = championRepository.save(new Champion(
                 266L,
                 "Aatrox",
-                "아트록스",
+                Map.of("ko-KR", "아트록스"),
+                null,
                 List.of(ChampionTag.FIGHTER)
         ));
         ChampionBuildStats shortBuild = statsRepository.save(new ChampionBuildStats(
@@ -135,7 +139,8 @@ class ChampionBuildStatsRepositoryTest {
         Champion champion = championRepository.save(new Champion(
                 266L,
                 "Aatrox",
-                "아트록스",
+                Map.of("ko-KR", "아트록스"),
+                null,
                 List.of(ChampionTag.FIGHTER)
         ));
         ChampionBuildStats emptyBuild = statsRepository.save(new ChampionBuildStats(
@@ -162,10 +167,10 @@ class ChampionBuildStatsRepositoryTest {
     @DisplayName("챔피언 또는 포지션이 다르면 제외한다")
     void findAllMatchingStats_WhenChampionOrPositionDiffers_ExcludeRow() {
         Champion aatrox = championRepository.save(new Champion(
-                266L, "Aatrox", "아트록스", List.of(ChampionTag.FIGHTER)
+                266L, "Aatrox", Map.of("ko-KR", "아트록스"), null, List.of(ChampionTag.FIGHTER)
         ));
         Champion ahri = championRepository.save(new Champion(
-                103L, "Ahri", "아리", List.of(ChampionTag.MAGE)
+                103L, "Ahri", Map.of("ko-KR", "아리"), null, List.of(ChampionTag.MAGE)
         ));
         ChampionBuildStats otherChampion = statsRepository.save(new ChampionBuildStats(
                 "16.15", 420, ahri, ChampionPosition.TOP,
@@ -191,7 +196,8 @@ class ChampionBuildStatsRepositoryTest {
         Champion champion = championRepository.save(new Champion(
                 266L,
                 "Aatrox",
-                "아트록스",
+                Map.of("ko-KR", "아트록스"),
+                null,
                 List.of(ChampionTag.FIGHTER)
         ));
         ChampionBuildStats emptySpecificStats = statsRepository.save(new ChampionBuildStats(
@@ -226,7 +232,8 @@ class ChampionBuildStatsRepositoryTest {
         Champion champion = championRepository.save(new Champion(
                 266L,
                 "Aatrox",
-                "아트록스",
+                Map.of("ko-KR", "아트록스"),
+                null,
                 List.of(ChampionTag.FIGHTER)
         ));
         ChampionBuildStats emerald = stats(
@@ -281,7 +288,8 @@ class ChampionBuildStatsRepositoryTest {
         Champion champion = championRepository.save(new Champion(
                 266L,
                 "Aatrox",
-                "아트록스",
+                Map.of("ko-KR", "아트록스"),
+                null,
                 List.of(ChampionTag.FIGHTER)
         ));
         stats(champion, "16.9", 420, "EMERALD", "PATCH_16_9", false, 10);

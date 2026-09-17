@@ -28,6 +28,7 @@ import dfgg.domain.stats.StatsAggregationCompletionRepository;
 import dfgg.infrastructure.external.client.RiotClient;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -193,7 +194,8 @@ class RiotMatchControllerIntegrationTest {
         championRepository.save(new Champion(
                 1L,
                 "Aatrox",
-                "아트록스",
+                Map.of("ko-KR", "아트록스"),
+                null,
                 List.of(ChampionTag.FIGHTER)
         ));
         itemRepository.save(new Item(3071L, "칠흑의 양날 도끼"));

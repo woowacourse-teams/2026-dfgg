@@ -8,10 +8,10 @@ DELETE FROM champions;
 DELETE FROM items;
 
 INSERT INTO champions (champion_id, riot_key, name) VALUES
-    (157, 'Yasuo', '야스오'),
-    (222, 'Jinx', '징크스'), (412, 'Thresh', '쓰레쉬'), (64, 'LeeSin', '리신'), (516, 'Ornn', '오른'),
-    (33, 'Rammus', '람머스'), (103, 'Ahri', '아리'), (51, 'Caitlyn', '케이틀린'),
-    (89, 'Leona', '레오나'), (60, 'Elise', '엘리스');
+    (157, 'Yasuo', jsonb_build_object('ko-KR', '야스오')),
+    (222, 'Jinx', jsonb_build_object('ko-KR', '징크스')), (412, 'Thresh', jsonb_build_object('ko-KR', '쓰레쉬')), (64, 'LeeSin', jsonb_build_object('ko-KR', '리신')), (516, 'Ornn', jsonb_build_object('ko-KR', '오른')),
+    (33, 'Rammus', jsonb_build_object('ko-KR', '람머스')), (103, 'Ahri', jsonb_build_object('ko-KR', '아리')), (51, 'Caitlyn', jsonb_build_object('ko-KR', '케이틀린')),
+    (89, 'Leona', jsonb_build_object('ko-KR', '레오나')), (60, 'Elise', jsonb_build_object('ko-KR', '엘리스'));
 
 INSERT INTO items (item_id, name, tags) VALUES
     (6673, '몰락한 왕의 검', '["Damage"]'::jsonb),

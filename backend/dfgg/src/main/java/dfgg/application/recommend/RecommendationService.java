@@ -72,14 +72,14 @@ public class RecommendationService {
         );
         if (matchingStats.isEmpty()) {
             // 해당 챔피언과 포지션에 저장된 통계가 없으면 추천을 만들 수 없다.
-            throw new CompositionStatsNotFoundException(myChampion.getName(), position.name());
+            throw new CompositionStatsNotFoundException(myChampion.getName().get("ko-KR"), position.name());
         }
 
         // 여러 통계 행을 슬롯별 후보로 합쳐 최종 추천 아이템 순서를 만든다.
         List<Item> bestItems = buildComposer.compose(matchingStats, position);
         if (bestItems.isEmpty()) {
             // 통계 행은 존재하지만 실제 아이템 후보가 없는 경우도 추천 불가로 처리한다.
-            throw new CompositionStatsNotFoundException(myChampion.getName(), position.name());
+            throw new CompositionStatsNotFoundException(myChampion.getName().get("ko-KR"), position.name());
         }
         // 도메인 Item을 외부 응답 전용 DTO로 변환해 내부 모델을 노출하지 않는다.
         List<ItemDto> itemDtos = bestItems.stream()
@@ -87,7 +87,7 @@ public class RecommendationService {
                 .toList();
 
         return new RecommendationResponse(
-                myChampion.getName(),
+                myChampion.getName().get("ko-KR"),
                 position.name(),
                 itemDtos
         );

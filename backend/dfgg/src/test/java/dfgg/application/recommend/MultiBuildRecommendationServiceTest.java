@@ -32,6 +32,7 @@ import dfgg.presentation.dto.response.BuildOptionResponse;
 import dfgg.presentation.dto.response.MultiBuildRecommendationResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -73,7 +74,8 @@ class MultiBuildRecommendationServiceTest {
         myChampion = new Champion(
                 1L,
                 "Malphite",
-                "말파이트",
+                Map.of("ko-KR", "말파이트"),
+                null,
                 List.of(ChampionTag.TANK)
         );
     }
@@ -277,7 +279,8 @@ class MultiBuildRecommendationServiceTest {
         myChampion = new Champion(
                 1L,
                 "Galio",
-                "갈리오",
+                Map.of("ko-KR", "갈리오"),
+                null,
                 List.of(ChampionTag.TANK, ChampionTag.MAGE)
         );
         ChampionBuildPolicy tankPolicy = policy(ChampionTag.TANK);
@@ -321,7 +324,8 @@ class MultiBuildRecommendationServiceTest {
         myChampion = new Champion(
                 1L,
                 "TwistedFate",
-                "트위스티드 페이트",
+                Map.of("ko-KR", "트위스티드 페이트"),
+                null,
                 List.of(ChampionTag.MAGE, ChampionTag.MARKSMAN)
         );
         RecommendationRequest request = prepareRequest(ChampionPosition.MID);
@@ -364,7 +368,8 @@ class MultiBuildRecommendationServiceTest {
         myChampion = new Champion(
                 1L,
                 "Kaisa",
-                "카이사",
+                Map.of("ko-KR", "카이사"),
+                null,
                 List.of(ChampionTag.MAGE, ChampionTag.MARKSMAN)
         );
         RecommendationRequest request = prepareRequest(ChampionPosition.BOTTOM);
@@ -583,7 +588,7 @@ class MultiBuildRecommendationServiceTest {
     }
 
     private Champion champion(long id, String name, ChampionTag tag) {
-        return new Champion(id, name, name, List.of(tag));
+        return new Champion(id, name, Map.of("ko-KR", name), null, List.of(tag));
     }
 
     private ChampionBuildPolicy policy(ChampionTag tag) {

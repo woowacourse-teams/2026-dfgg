@@ -28,7 +28,7 @@ public class ChampionDirectory {
         Map<Long, ChampionProfile> profiles = new HashMap<>();
         for (Champion champion : championRepository.findAllById(Set.copyOf(championIds))) {
             profiles.put(champion.getChampionId(),
-                    new ChampionProfile(champion.getChampionId(), champion.getName()));
+                    new ChampionProfile(champion.getChampionId(), champion.getName().get("ko-KR")));
         }
         return Map.copyOf(profiles);
     }

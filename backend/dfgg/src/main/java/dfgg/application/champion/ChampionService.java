@@ -7,6 +7,7 @@ import dfgg.domain.champion.ChampionTag;
 import dfgg.infrastructure.external.client.DataDragonClient;
 import dfgg.infrastructure.external.dto.ChampionResponse;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -28,7 +29,8 @@ public class ChampionService {
                 .map(entry -> new Champion(
                         Long.parseLong(entry.getValue().key()),
                         entry.getKey(),
-                        entry.getValue().name(),
+                        Map.of("ko-KR", entry.getValue().name()),
+                        null,
                         entry.getValue().tags().stream()
                                 .map(ChampionTag::from)
                                 .toList()

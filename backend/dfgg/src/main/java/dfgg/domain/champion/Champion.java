@@ -11,6 +11,9 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "champions")
@@ -23,8 +26,12 @@ public class Champion {
     @Column(name = "riot_key", nullable = false, unique = true)
     private String riotKey;
 
-    @Column(nullable = false)
-    private String name;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false, columnDefinition = "jsonb")
+    private Map<String, String> name;
+
+    @Column(columnDefinition = "text")
+    private String url;
 
     @ElementCollection
     @CollectionTable(
@@ -38,10 +45,11 @@ public class Champion {
     protected Champion() {
     }
 
-    public Champion(Long championId, String riotKey, String name, List<ChampionTag> championTags) {
+    public Champion(Long championId, String riotKey, Map<String, String> name, String url, List<ChampionTag> championTags) {
         this.championId = championId;
         this.riotKey = riotKey;
-        this.name = name;
+        this.name = Map.copyOf(name);
+        this.url = url;
         this.championTags = new ArrayList<>(championTags);
     }
 
@@ -53,8 +61,12 @@ public class Champion {
         return riotKey;
     }
 
-    public String getName() {
-        return name;
+    public Map<String, String> getName() {
+        return Map.copyOf(name);
+    }
+
+    public String getUrl() {
+        return url;
     }
 
     public List<ChampionTag> getChampionTags() {

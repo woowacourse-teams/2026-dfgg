@@ -11,7 +11,16 @@ public interface ChampionRepository extends JpaRepository<Champion, Long> {
 
     Optional<Champion> findByRiotKeyIgnoreCase(String riotKey);
 
-    Optional<Champion> findByNameIgnoreCase(String name);
+    @Query(value = """
+            SELECT champion.*
+            FROM champions champion
+            WHERE EXISTS (
+                SELECT 1
+                FROM jsonb_each_text(champion.name) AS localized_name(language, value)
+                WHERE lower(localized_name.value) = lower(:name)
+            )
+            """, nativeQuery = true)
+    Optional<Champion> findByNameIgnoreCase(@Param("name") String name);
 
     /**
      * 태그까지 함께 읽어온다. {@code championTags}는 {@code @ElementCollection}이라 기본이 지연

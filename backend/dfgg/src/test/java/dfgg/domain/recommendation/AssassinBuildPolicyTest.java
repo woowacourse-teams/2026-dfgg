@@ -10,6 +10,7 @@ import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -189,7 +190,8 @@ class AssassinBuildPolicyTest {
         return new Champion(
                 (long) tags.hashCode(),
                 "enemy-" + tags.hashCode(),
-                "적 챔피언",
+                Map.of("ko-KR", "적 챔피언"),
+                null,
                 List.of(tags)
         );
     }

@@ -68,7 +68,7 @@ class NextItemRecommendationServiceTest {
         when(championService.findChampionByName(any())).thenAnswer(invocation -> {
             Champion champion = mock(Champion.class);
             when(champion.getChampionId()).thenReturn(championIdOf(invocation.getArgument(0)));
-            when(champion.getName()).thenReturn(invocation.getArgument(0));
+            when(champion.getName()).thenReturn(java.util.Map.of("ko-KR", invocation.getArgument(0)));
             return champion;
         });
         when(buildGenerator.source()).thenReturn(CandidateSource.BUILD);

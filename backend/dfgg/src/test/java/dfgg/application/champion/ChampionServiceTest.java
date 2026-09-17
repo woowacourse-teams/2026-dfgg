@@ -58,7 +58,7 @@ class ChampionServiceTest {
         assertThat(captor.getValue()).singleElement().satisfies(champion -> {
             assertThat(champion.getChampionId()).isEqualTo(266L);
             assertThat(champion.getRiotKey()).isEqualTo("Aatrox");
-            assertThat(champion.getName()).isEqualTo("아트록스");
+            assertThat(champion.getName()).isEqualTo(java.util.Map.of("ko-KR", "아트록스"));
             assertThat(champion.getChampionTags())
                     .containsExactly(ChampionTag.FIGHTER, ChampionTag.TANK);
         });
@@ -97,7 +97,7 @@ class ChampionServiceTest {
     @Test
     void 라이엇_키로_챔피언을_찾는다() {
         // given
-        Champion champion = new Champion(266L, "Aatrox", "아트록스", List.of(ChampionTag.FIGHTER));
+        Champion champion = new Champion(266L, "Aatrox", Map.of("ko-KR", "아트록스"), null, List.of(ChampionTag.FIGHTER));
         when(championRepository.findByRiotKeyIgnoreCase("Aatrox"))
                 .thenReturn(Optional.of(champion));
 
@@ -114,7 +114,8 @@ class ChampionServiceTest {
         Champion champion = new Champion(
                 897L,
                 "KSante",
-                "크산테",
+                Map.of("ko-KR", "크산테"),
+                null,
                 List.of(ChampionTag.TANK, ChampionTag.FIGHTER)
         );
         when(championRepository.findByRiotKeyIgnoreCase("크산테"))
