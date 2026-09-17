@@ -12,11 +12,24 @@ public record ItemData(
         List<String> tags,
         Map<String, Boolean> maps,
         Boolean consumed,
-        Integer depth
+        Integer depth,
+        Map<String, Integer> gold
 ) {
 
+    public ItemData(
+            String name,
+            List<String> from,
+            List<String> into,
+            List<String> tags,
+            Map<String, Boolean> maps,
+            Boolean consumed,
+            Integer depth
+    ) {
+        this(name, from, into, tags, maps, consumed, depth, null);
+    }
+
     public ItemData(String name, List<String> from, List<String> into) {
-        this(name, from, into, null, null, null, null);
+        this(name, from, into, null, null, null, null, null);
     }
 
     public ItemData(
@@ -27,6 +40,6 @@ public record ItemData(
             Map<String, Boolean> maps,
             Boolean consumed
     ) {
-        this(name, from, into, tags, maps, consumed, null);
+        this(name, from, into, tags, maps, consumed, null, null);
     }
 }

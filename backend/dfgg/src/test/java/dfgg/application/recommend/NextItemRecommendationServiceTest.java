@@ -33,6 +33,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -144,7 +145,7 @@ class NextItemRecommendationServiceTest {
                 .thenReturn(GeneratorResult.of(CandidateSource.BUILD, scored));
         when(itemService.findItemsByIds(any())).thenReturn(
                 java.util.stream.LongStream.of(itemIds)
-                        .mapToObj(id -> new Item(id, "아이템" + id, List.of()))
+                        .mapToObj(id -> new Item(id, Map.of("ko-KR", "아이템" + id), List.of()))
                         .toList()
         );
     }

@@ -175,8 +175,8 @@ class MatchParticipantWindowBuilderTest {
     @DisplayName("태그가 있는 아이템만 콘텐츠 문맥 윈도우로 만들고, 태그 없는 아이템은 건너뛴다")
     void buildContentContextWindows_WhenItemHasNoTags_SkipsItemAndCreatesWindowOnlyForItemsWithTags() {
         // given
-        Item withTags = new Item(3071L, "칠흑의 양날 도끼", List.of("Armor", "Mana"));
-        Item withoutTags = new Item(9999L, "태그 없는 아이템", List.of());
+        Item withTags = new Item(3071L, Map.of("ko-KR", "칠흑의 양날 도끼"), List.of("Armor", "Mana"));
+        Item withoutTags = new Item(9999L, Map.of("ko-KR", "태그 없는 아이템"), List.of());
 
         // when
         List<Window> windows = builder.buildContentContextWindows(List.of(withTags, withoutTags));

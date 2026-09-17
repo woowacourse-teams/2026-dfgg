@@ -15,12 +15,12 @@ import org.junit.jupiter.api.Test;
 
 class TankBuildPolicyTest {
 
-    private final Item armorItem = new Item(1L, "방어력 아이템", List.of("Armor"));
-    private final Item spellBlockItem = new Item(2L, "마법 저항력 아이템", List.of("SpellBlock"));
-    private final Item healthItem = new Item(3L, "체력 아이템", List.of("Health"));
-    private final Item neutralItem = new Item(4L, "일반 아이템");
-    private final Item secondArmorItem = new Item(5L, "방어력 아이템 2", List.of("Armor"));
-    private final Item secondSpellBlockItem = new Item(6L, "마법 저항력 아이템 2", List.of("SpellBlock"));
+    private final Item armorItem = new Item(1L, Map.of("ko-KR", "방어력 아이템"), List.of("Armor"));
+    private final Item spellBlockItem = new Item(2L, Map.of("ko-KR", "마법 저항력 아이템"), List.of("SpellBlock"));
+    private final Item healthItem = new Item(3L, Map.of("ko-KR", "체력 아이템"), List.of("Health"));
+    private final Item neutralItem = new Item(4L, Map.of("ko-KR", "일반 아이템"));
+    private final Item secondArmorItem = new Item(5L, Map.of("ko-KR", "방어력 아이템 2"), List.of("Armor"));
+    private final Item secondSpellBlockItem = new Item(6L, Map.of("ko-KR", "마법 저항력 아이템 2"), List.of("SpellBlock"));
 
     private final TankBuildPolicy policy = new TankBuildPolicy();
 
@@ -52,7 +52,7 @@ class TankBuildPolicyTest {
     @DisplayName("Health만 있는 군집은 혼합 피해 대응으로 분류하지 않는다")
     void evaluate_WhenClusterHasOnlyHealth_ExcludesCluster() {
         // given
-        CoreBuildCluster healthOnlyCluster = cluster(healthItem, neutralItem, new Item(7L, "일반 아이템 2"));
+        CoreBuildCluster healthOnlyCluster = cluster(healthItem, neutralItem, new Item(7L, Map.of("ko-KR", "일반 아이템 2")));
 
         // when
         List<BuildCandidate> candidates = policy.evaluate(

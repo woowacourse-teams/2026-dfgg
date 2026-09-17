@@ -14,6 +14,6 @@ public record RecommendedItemDto(
         RecommendationDescription description
 ) {
     public static RecommendedItemDto of(Item item, RecommendationDescription description) {
-        return new RecommendedItemDto(item.getItemId(), item.getName(), description);
+        return new RecommendedItemDto(item.getItemId(), item.getName().get("ko-KR"), description);
     }
 }

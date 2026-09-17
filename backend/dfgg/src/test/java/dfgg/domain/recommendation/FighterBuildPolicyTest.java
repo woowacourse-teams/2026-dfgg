@@ -17,21 +17,21 @@ class FighterBuildPolicyTest {
 
     private final Item antiTankItem = new Item(
             1L,
-            "대탱커 아이템",
+            Map.of("ko-KR", "대탱커 아이템"),
             List.of("ArmorPenetration", "OnHit", "AttackSpeed")
     );
     private final Item burstSurvivalItem = new Item(
             2L,
-            "폭발 피해 생존 아이템",
+            Map.of("ko-KR", "폭발 피해 생존 아이템"),
             List.of("Health", "Armor", "Tenacity")
     );
     private final Item sustainedCombatItem = new Item(
             3L,
-            "지속 교전 아이템",
+            Map.of("ko-KR", "지속 교전 아이템"),
             List.of("LifeSteal", "AbilityHaste", "HealthRegen")
     );
-    private final Item neutralItemA = new Item(4L, "일반 아이템 A");
-    private final Item neutralItemB = new Item(5L, "일반 아이템 B");
+    private final Item neutralItemA = new Item(4L, Map.of("ko-KR", "일반 아이템 A"));
+    private final Item neutralItemB = new Item(5L, Map.of("ko-KR", "일반 아이템 B"));
 
     private final FighterBuildPolicy policy = new FighterBuildPolicy();
 
@@ -62,8 +62,8 @@ class FighterBuildPolicyTest {
     @DisplayName("아이템이 가진 모든 관련 태그를 방향 점수에 반영한다")
     void evaluate_CountsEveryRelevantItemTag() {
         // given
-        Item hybridItem = new Item(6L, "복합 아이템", List.of("OnHit", "LifeSteal"));
-        Item attackSpeedItem = new Item(7L, "공격 속도 아이템", List.of("AttackSpeed"));
+        Item hybridItem = new Item(6L, Map.of("ko-KR", "복합 아이템"), List.of("OnHit", "LifeSteal"));
+        Item attackSpeedItem = new Item(7L, Map.of("ko-KR", "공격 속도 아이템"), List.of("AttackSpeed"));
         CoreBuildCluster cluster = cluster(hybridItem, attackSpeedItem, neutralItemA);
 
         // when
@@ -80,8 +80,8 @@ class FighterBuildPolicyTest {
     @DisplayName("최고점 방향이 여러 개면 임의의 대표 방향을 선택하지 않는다")
     void evaluate_WhenHighestDirectionIsTied_ExcludesCluster() {
         // given
-        Item onHitItem = new Item(8L, "적중 아이템", List.of("OnHit"));
-        Item lifeStealItem = new Item(9L, "흡혈 아이템", List.of("LifeSteal"));
+        Item onHitItem = new Item(8L, Map.of("ko-KR", "적중 아이템"), List.of("OnHit"));
+        Item lifeStealItem = new Item(9L, Map.of("ko-KR", "흡혈 아이템"), List.of("LifeSteal"));
         CoreBuildCluster tiedCluster = cluster(onHitItem, lifeStealItem, neutralItemA);
 
         // when
@@ -98,7 +98,7 @@ class FighterBuildPolicyTest {
         CoreBuildCluster unclassifiedCluster = cluster(
                 neutralItemA,
                 neutralItemB,
-                new Item(10L, "일반 아이템 C")
+                new Item(10L, Map.of("ko-KR", "일반 아이템 C"))
         );
 
         // when
@@ -112,9 +112,9 @@ class FighterBuildPolicyTest {
     @DisplayName("복수 태그를 가진 적 챔피언을 각 FIGHTER 방향의 적합도에 반영한다")
     void evaluate_WhenEnemyHasMultipleTags_CountsEveryRelevantTag() {
         // given
-        Item antiTankSingleTag = new Item(11L, "대탱커 단일 태그", List.of("OnHit"));
-        Item burstSingleTag = new Item(12L, "폭발 생존 단일 태그", List.of("Health"));
-        Item sustainedSingleTag = new Item(13L, "지속 교전 단일 태그", List.of("LifeSteal"));
+        Item antiTankSingleTag = new Item(11L, Map.of("ko-KR", "대탱커 단일 태그"), List.of("OnHit"));
+        Item burstSingleTag = new Item(12L, Map.of("ko-KR", "폭발 생존 단일 태그"), List.of("Health"));
+        Item sustainedSingleTag = new Item(13L, Map.of("ko-KR", "지속 교전 단일 태그"), List.of("LifeSteal"));
         CoreBuildCluster antiTankCluster = cluster(antiTankSingleTag, neutralItemA, neutralItemB);
         CoreBuildCluster burstCluster = cluster(burstSingleTag, neutralItemA, neutralItemB);
         CoreBuildCluster sustainedCluster = cluster(sustainedSingleTag, neutralItemA, neutralItemB);

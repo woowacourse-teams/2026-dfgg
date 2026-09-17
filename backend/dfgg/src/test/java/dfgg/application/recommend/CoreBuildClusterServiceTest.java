@@ -8,6 +8,7 @@ import dfgg.domain.item.Item;
 import dfgg.domain.recommendation.CoreBuildCluster;
 import dfgg.domain.stats.ChampionBuildStats;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -16,10 +17,10 @@ class CoreBuildClusterServiceTest {
     private final CoreBuildClusterService service =
             new CoreBuildClusterService();
 
-    private final Item itemA = new Item(1L, "아이템 A");
-    private final Item itemB = new Item(2L, "아이템 B");
-    private final Item itemC = new Item(3L, "아이템 C");
-    private final Item itemD = new Item(4L, "아이템 D");
+    private final Item itemA = new Item(1L, Map.of("ko-KR", "아이템 A"));
+    private final Item itemB = new Item(2L, Map.of("ko-KR", "아이템 B"));
+    private final Item itemC = new Item(3L, Map.of("ko-KR", "아이템 C"));
+    private final Item itemD = new Item(4L, Map.of("ko-KR", "아이템 D"));
 
     @Test
     @DisplayName("같은 clusterKey의 통계는 하나의 군집으로 묶고 다른 키는 별도 군집으로 분리한다")

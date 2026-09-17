@@ -14,14 +14,14 @@ INSERT INTO champions (champion_id, riot_key, name) VALUES
     (89, 'Leona', jsonb_build_object('ko-KR', '레오나')), (60, 'Elise', jsonb_build_object('ko-KR', '엘리스'));
 
 INSERT INTO items (item_id, name, tags) VALUES
-    (6673, '몰락한 왕의 검', '["Damage"]'::jsonb),
-    (3031, '무한의 대검', '["Damage","CriticalStrike"]'::jsonb),
-    (3036, '도미닉 경의 인사', '["Damage","ArmorPenetration"]'::jsonb),
-    (3072, '피바라기', '["Damage","LifeSteal"]'::jsonb),
-    (3033, '필멸자의 운명', '["Damage"]'::jsonb),
-    (3153, '몰락한 왕의 검(급등)', '["Damage","AttackSpeed"]'::jsonb),
-    (3006, '광전사의 군화', '["Boots"]'::jsonb),
-    (3047, '판금 장화', '["Boots"]'::jsonb);
+    (6673, jsonb_build_object('ko-KR', '몰락한 왕의 검'), '["Damage"]'::jsonb),
+    (3031, jsonb_build_object('ko-KR', '무한의 대검'), '["Damage","CriticalStrike"]'::jsonb),
+    (3036, jsonb_build_object('ko-KR', '도미닉 경의 인사'), '["Damage","ArmorPenetration"]'::jsonb),
+    (3072, jsonb_build_object('ko-KR', '피바라기'), '["Damage","LifeSteal"]'::jsonb),
+    (3033, jsonb_build_object('ko-KR', '필멸자의 운명'), '["Damage"]'::jsonb),
+    (3153, jsonb_build_object('ko-KR', '몰락한 왕의 검(급등)'), '["Damage","AttackSpeed"]'::jsonb),
+    (3006, jsonb_build_object('ko-KR', '광전사의 군화'), '["Boots"]'::jsonb),
+    (3047, jsonb_build_object('ko-KR', '판금 장화'), '["Boots"]'::jsonb);
 
 -- 전개 표본: [6673,3031] 다음은 3036(3판) 또는 3006(2판)
 INSERT INTO normalized_match_participants (

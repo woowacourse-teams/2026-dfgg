@@ -7,6 +7,7 @@ import dfgg.infrastructure.external.dto.ItemData;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -37,12 +38,26 @@ public class ItemService {
                     ItemData data = entry.getValue();
                     return new Item(
                             itemId,
-                            data.name(),
+                            Map.of("ko-KR", data.name()),
+                            goldOf(data),
+                            null,
+                            data.from(),
+                            data.into(),
                             data.tags()
                     );
                 }).toList();
 
         itemRepository.saveAll(coreItems);
+    }
+
+    private Map<String, Integer> goldOf(ItemData data) {
+        if (data.gold() == null) {
+            return null;
+        }
+        return Map.of(
+                "base", data.gold().get("base"),
+                "total", data.gold().get("total")
+        );
     }
 
     public List<Item> findItemsByIds(Collection<Long> itemIds) {

@@ -19,6 +19,7 @@ import dfgg.presentation.dto.ChampionRefDto;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -116,7 +117,7 @@ class AllyEvidenceInResponseTest {
 
         // then
         response.recommendedItems().stream()
-                .filter(item -> itemTraitCatalog.synergyOf(new Item(item.id(), item.name())) == Synergy.SELF)
+                .filter(item -> itemTraitCatalog.synergyOf(new Item(item.id(), Map.of("ko-KR", item.name()))) == Synergy.SELF)
                 .forEach(item -> assertThat(item.description().ally()).as(item.name()).isEmpty());
     }
 

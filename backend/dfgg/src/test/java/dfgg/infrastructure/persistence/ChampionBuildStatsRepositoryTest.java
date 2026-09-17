@@ -47,7 +47,7 @@ class ChampionBuildStatsRepositoryTest {
                 null,
                 List.of(ChampionTag.FIGHTER, ChampionTag.TANK)
         ));
-        Item item = itemRepository.save(new Item(3071L, "칠흑의 양날 도끼"));
+        Item item = itemRepository.save(new Item(3071L, Map.of("ko-KR", "칠흑의 양날 도끼")));
 
         ChampionBuildStats stats = statsRepository.save(new ChampionBuildStats(
                 "16.15",

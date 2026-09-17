@@ -124,8 +124,8 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
                 new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), null, List.of(ChampionTag.TANK))
         ));
         itemRepository.saveAll(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
     }
 

@@ -55,8 +55,8 @@ class ChampionBuildStatsAggregationServiceTest {
         Champion enemy = champion(3L, "TANK");
         when(championRepository.findAllById(any())).thenReturn(List.of(focal, ally, enemy));
         when(itemService.findItemsByIds(any())).thenReturn(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
         when(statsRepository.insertIfAbsent(
                 anyString(),
@@ -125,8 +125,8 @@ class ChampionBuildStatsAggregationServiceTest {
         Champion enemy = champion(3L, "TANK");
         when(championRepository.findAllById(any())).thenReturn(List.of(focal, ally, enemy));
         when(itemService.findItemsByIds(any())).thenReturn(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
 
         NormalizedMatch match = new NormalizedMatch(

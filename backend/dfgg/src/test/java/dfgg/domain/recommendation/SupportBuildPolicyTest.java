@@ -21,8 +21,8 @@ import org.junit.jupiter.api.Test;
 
 class SupportBuildPolicyTest {
 
-    private final Item neutralItemA = new Item(1L, "일반 아이템 A");
-    private final Item neutralItemB = new Item(2L, "일반 아이템 B");
+    private final Item neutralItemA = new Item(1L, Map.of("ko-KR", "일반 아이템 A"));
+    private final Item neutralItemB = new Item(2L, Map.of("ko-KR", "일반 아이템 B"));
 
     private final SupportBuildPolicy policy = new SupportBuildPolicy();
 
@@ -32,17 +32,17 @@ class SupportBuildPolicyTest {
         // given
         Item engageItem = new Item(
                 100L,
-                "진입 아이템",
+                Map.of("ko-KR", "진입 아이템"),
                 List.of("Health", "Tenacity", "NonbootsMovement", "Active")
         );
         Item protectionItem = new Item(
                 101L,
-                "아군 보호 아이템",
+                Map.of("ko-KR", "아군 보호 아이템"),
                 List.of("AbilityHaste", "Slow", "Aura", "Armor")
         );
         Item enhancementItem = new Item(
                 102L,
-                "회복 강화 아이템",
+                Map.of("ko-KR", "회복 강화 아이템"),
                 List.of("ManaRegen", "HealthRegen", "AbilityHaste", "SpellDamage")
         );
         CoreBuildCluster engageCluster = cluster(engageItem, neutralItemA, neutralItemB);
@@ -68,9 +68,9 @@ class SupportBuildPolicyTest {
     @DisplayName("수동 trait를 Data Dragon 태그와 함께 방향 점수에 반영한다")
     void evaluate_UsesManualItemTraits() {
         // given
-        Item engageItem = new Item(200L, "ENGAGE 아이템");
-        Item peelItem = new Item(201L, "PEEL 아이템");
-        Item healItem = new Item(202L, "HEAL 아이템");
+        Item engageItem = new Item(200L, Map.of("ko-KR", "ENGAGE 아이템"));
+        Item peelItem = new Item(201L, Map.of("ko-KR", "PEEL 아이템"));
+        Item healItem = new Item(202L, Map.of("ko-KR", "HEAL 아이템"));
         ItemTraitCatalog catalog = new ItemTraitCatalog(Map.of(
                 200L, Set.of(ENGAGE),
                 201L, Set.of(PEEL),
@@ -102,7 +102,7 @@ class SupportBuildPolicyTest {
         // given
         Item item = new Item(
                 300L,
-                "스킬 가속 아이템",
+                Map.of("ko-KR", "스킬 가속 아이템"),
                 List.of("AbilityHaste", "CooldownReduction", "ManaRegen", "SpellDamage")
         );
         CoreBuildCluster cluster = cluster(item, neutralItemA, neutralItemB);
@@ -126,10 +126,10 @@ class SupportBuildPolicyTest {
         // given
         Item magicResistanceItem = new Item(
                 301L,
-                "마법 저항력 아이템",
+                Map.of("ko-KR", "마법 저항력 아이템"),
                 List.of("SpellBlock", "MagicResist")
         );
-        Item engageTraitItem = new Item(302L, "진입 trait 아이템");
+        Item engageTraitItem = new Item(302L, Map.of("ko-KR", "진입 trait 아이템"));
         ItemTraitCatalog catalog = new ItemTraitCatalog(Map.of(302L, Set.of(ENGAGE)));
         SupportBuildPolicy traitPolicy = new SupportBuildPolicy(catalog);
         CoreBuildCluster cluster = cluster(
@@ -155,7 +155,7 @@ class SupportBuildPolicyTest {
     @DisplayName("최고점 방향이 여러 개면 임의의 대표 방향을 선택하지 않는다")
     void evaluate_WhenHighestDirectionIsTied_ExcludesCluster() {
         // given
-        Item sharedItem = new Item(400L, "공통 아이템", List.of("Health"));
+        Item sharedItem = new Item(400L, Map.of("ko-KR", "공통 아이템"), List.of("Health"));
         CoreBuildCluster cluster = cluster(sharedItem, neutralItemA, neutralItemB);
 
         // when
@@ -172,7 +172,7 @@ class SupportBuildPolicyTest {
         CoreBuildCluster cluster = cluster(
                 neutralItemA,
                 neutralItemB,
-                new Item(401L, "일반 아이템 C")
+                new Item(401L, Map.of("ko-KR", "일반 아이템 C"))
         );
 
         // when
@@ -186,9 +186,9 @@ class SupportBuildPolicyTest {
     @DisplayName("복수 태그를 가진 적 챔피언을 각 SUPPORT 방향의 적합도에 반영한다")
     void evaluate_WhenEnemyHasMultipleTags_CountsEveryRelevantTag() {
         // given
-        Item engageItem = new Item(500L, "진입 단일 태그", List.of("NonbootsMovement"));
-        Item peelItem = new Item(501L, "PEEL trait 아이템");
-        Item enhancementItem = new Item(502L, "회복 강화 단일 태그", List.of("ManaRegen"));
+        Item engageItem = new Item(500L, Map.of("ko-KR", "진입 단일 태그"), List.of("NonbootsMovement"));
+        Item peelItem = new Item(501L, Map.of("ko-KR", "PEEL trait 아이템"));
+        Item enhancementItem = new Item(502L, Map.of("ko-KR", "회복 강화 단일 태그"), List.of("ManaRegen"));
         ItemTraitCatalog catalog = new ItemTraitCatalog(Map.of(501L, Set.of(PEEL)));
         SupportBuildPolicy traitPolicy = new SupportBuildPolicy(catalog);
         CoreBuildCluster engageCluster = cluster(engageItem, neutralItemA, neutralItemB);

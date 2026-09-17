@@ -200,7 +200,7 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
                 null,
                 List.of(ChampionTag.FIGHTER)
         ));
-        Item item = itemRepository.save(new Item(3071L, "아이템 A"));
+        Item item = itemRepository.save(new Item(3071L, Map.of("ko-KR", "아이템 A")));
         NormalizedMatch existingMatch = new NormalizedMatch(
                 "KR_EXISTING",
                 "16.15",
@@ -263,8 +263,8 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
                 new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), null, List.of(ChampionTag.TANK))
         ));
         itemRepository.saveAll(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
         savePlatinumPlayer("KR_1", "p-focal");
         rawMatchRepository.save(new RawMatch("KR_1", """
@@ -326,8 +326,8 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
                 new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), null, List.of(ChampionTag.TANK))
         ));
         itemRepository.saveAll(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
         savePlatinumPlayer("KR_VALID", "p-focal");
         savePlatinumPlayer("KR_INVALID", "p-focal");
@@ -653,8 +653,8 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
                 new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), null, List.of(ChampionTag.TANK))
         ));
         itemRepository.saveAll(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
     }
 

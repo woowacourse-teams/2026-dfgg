@@ -9,14 +9,15 @@ import dfgg.domain.champion.ChampionTag;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class BuildCandidateTest {
 
-    private final Item itemA = new Item(1L, "아이템 A");
-    private final Item itemB = new Item(2L, "아이템 B");
-    private final Item itemC = new Item(3L, "아이템 C");
+    private final Item itemA = new Item(1L, Map.of("ko-KR", "아이템 A"));
+    private final Item itemB = new Item(2L, Map.of("ko-KR", "아이템 B"));
+    private final Item itemC = new Item(3L, Map.of("ko-KR", "아이템 C"));
 
     @Test
     @DisplayName("빌드 방향과 군집과 적합도를 후보에 보관한다")

@@ -209,7 +209,7 @@ class DescriptionFillRateEvaluationTest {
                 if (!item.description().ally().isEmpty()) {
                     allyFilled++;
                     counts[2]++;
-                    Synergy synergy = itemTraitCatalog.synergyOf(new Item(item.id(), item.name()));
+                    Synergy synergy = itemTraitCatalog.synergyOf(new Item(item.id(), Map.of("ko-KR", item.name())));
                     if (synergy == Synergy.ALLY) {
                         allyOnAllyItems++;
                         counts[4]++;

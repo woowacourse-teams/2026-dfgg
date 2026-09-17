@@ -68,8 +68,8 @@ class ItemServiceTest {
         assertThat(captor.getValue())
                 .extracting(Item::getItemId, Item::getName)
                 .containsExactlyInAnyOrder(
-                        tuple(3071L, "칠흑의 양날 도끼"),
-                        tuple(6672L, "크라켄 학살자")
+                        tuple(3071L, Map.of("ko-KR", "칠흑의 양날 도끼")),
+                        tuple(6672L, Map.of("ko-KR", "크라켄 학살자"))
                 );
     }
 
@@ -99,7 +99,7 @@ class ItemServiceTest {
 
         assertThat(captor.getValue())
                 .extracting(Item::getItemId, Item::getName)
-                .containsExactly(tuple(3006L, "광전사의 군화"));
+                .containsExactly(tuple(3006L, Map.of("ko-KR", "광전사의 군화")));
         assertThat(captor.getValue().getFirst().getTags())
                 .containsExactly("Boots", "AttackSpeed", "FutureTag");
     }
@@ -179,8 +179,8 @@ class ItemServiceTest {
         // given
         List<Long> itemIds = List.of(3071L, 6610L);
         List<Item> items = List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         );
         when(itemRepository.findAllById(itemIds)).thenReturn(items);
 
@@ -195,8 +195,8 @@ class ItemServiceTest {
     void 코어_아이템_ID를_조회한다() {
         // given
         when(itemRepository.findAll()).thenReturn(List.of(
-                new Item(3071L, "아이템 A"),
-                new Item(6610L, "아이템 B")
+                new Item(3071L, Map.of("ko-KR", "아이템 A")),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"))
         ));
 
         // when

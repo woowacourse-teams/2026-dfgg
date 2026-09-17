@@ -8,19 +8,20 @@ import static org.mockito.Mockito.mock;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 public class CoreBuildClusterTest {
 
-    private final Item itemA = new Item(1L, "아이템 A");
-    private final Item itemB = new Item(2L, "아이템 B");
-    private final Item itemC = new Item(3L, "아이템 C");
-    private final Item itemD = new Item(4L, "아이템 D");
-    private final Item itemE = new Item(5L, "아이템 E");
-    private final Item itemF = new Item(6L, "아이템 F");
-    private final Item boots = new Item(10L, "신발", List.of("Boots"));
+    private final Item itemA = new Item(1L, Map.of("ko-KR", "아이템 A"));
+    private final Item itemB = new Item(2L, Map.of("ko-KR", "아이템 B"));
+    private final Item itemC = new Item(3L, Map.of("ko-KR", "아이템 C"));
+    private final Item itemD = new Item(4L, Map.of("ko-KR", "아이템 D"));
+    private final Item itemE = new Item(5L, Map.of("ko-KR", "아이템 E"));
+    private final Item itemF = new Item(6L, Map.of("ko-KR", "아이템 F"));
+    private final Item boots = new Item(10L, Map.of("ko-KR", "신발"), List.of("Boots"));
 
     @Test
     @DisplayName("같은 clusterKey의 원본 통계를 군집 안에 보존한다")

@@ -11,8 +11,8 @@ INSERT INTO champions (champion_id, riot_key, name) VALUES
 ON CONFLICT (champion_id) DO NOTHING;
 
 INSERT INTO items (item_id, name, tags) VALUES
-    (3504, '불타는 향로', '["SpellDamage","AbilityHaste"]'::jsonb),
-    (6617, '월석 재생기', '["SpellDamage","AbilityHaste"]'::jsonb),
-    (3222, '미카엘의 도가니', '["Tenacity","AbilityHaste"]'::jsonb),
-    (3190, '강철의 솔라리 펜던트', '["Armor","SpellBlock"]'::jsonb)
+    (3504, jsonb_build_object('ko-KR', '불타는 향로'), '["SpellDamage","AbilityHaste"]'::jsonb),
+    (6617, jsonb_build_object('ko-KR', '월석 재생기'), '["SpellDamage","AbilityHaste"]'::jsonb),
+    (3222, jsonb_build_object('ko-KR', '미카엘의 도가니'), '["Tenacity","AbilityHaste"]'::jsonb),
+    (3190, jsonb_build_object('ko-KR', '강철의 솔라리 펜던트'), '["Armor","SpellBlock"]'::jsonb)
 ON CONFLICT (item_id) DO NOTHING;

@@ -18,12 +18,12 @@ class RecommendationBuildComposerTest {
 
     private final Champion champion = new Champion(1L, "riot-key", Map.of("ko-KR", "챔피언"), null, List.of(ChampionTag.FIGHTER));
 
-    private final Item boots = new Item(1L, "신발", List.of("Boots"));
-    private final Item itemA2 = new Item(2L, "아이템A2");
-    private final Item itemA3 = new Item(3L, "아이템A3");
-    private final Item itemB4 = new Item(4L, "아이템B4");
-    private final Item itemB5 = new Item(5L, "아이템B5");
-    private final Item itemB6 = new Item(6L, "아이템B6");
+    private final Item boots = new Item(1L, Map.of("ko-KR", "신발"), List.of("Boots"));
+    private final Item itemA2 = new Item(2L, Map.of("ko-KR", "아이템A2"));
+    private final Item itemA3 = new Item(3L, Map.of("ko-KR", "아이템A3"));
+    private final Item itemB4 = new Item(4L, Map.of("ko-KR", "아이템B4"));
+    private final Item itemB5 = new Item(5L, Map.of("ko-KR", "아이템B5"));
+    private final Item itemB6 = new Item(6L, Map.of("ko-KR", "아이템B6"));
 
     @Test
     @DisplayName("표본이 많은 짧은 빌드와 표본이 적은 긴 빌드를 슬롯별로 병합해 최대 6개까지 채운다")
@@ -44,9 +44,9 @@ class RecommendationBuildComposerTest {
     @Test
     @DisplayName("같은 아이템이 여러 슬롯의 후보로 나오면 먼저 채택된 슬롯에서만 사용하고 이후 슬롯에서는 제외한다")
     void compose_WhenSameItemCandidatesMultipleSlots_KeepFirstSlotAndExcludeFromLaterSlots() {
-        Item itemP = new Item(10L, "P");
-        Item itemQ = new Item(11L, "Q");
-        Item itemR = new Item(12L, "R");
+        Item itemP = new Item(10L, Map.of("ko-KR", "P"));
+        Item itemQ = new Item(11L, Map.of("ko-KR", "Q"));
+        Item itemR = new Item(12L, Map.of("ko-KR", "R"));
 
         ChampionBuildStats buildX = stats(
                 "X", List.of(itemP, itemQ), 20, 10, false, false, false, false, false
@@ -64,8 +64,8 @@ class RecommendationBuildComposerTest {
     @Test
     @DisplayName("같은 buildKey의 여러 통계 중 표본이 가장 많은 행만 반영하고 이중 집계하지 않는다")
     void compose_WhenBuildKeyHasMultipleRows_UseOnlyMostObservedRow() {
-        Item itemZ = new Item(20L, "Z");
-        Item itemW = new Item(21L, "W");
+        Item itemZ = new Item(20L, Map.of("ko-KR", "Z"));
+        Item itemW = new Item(21L, Map.of("ko-KR", "W"));
 
         ChampionBuildStats zLessObserved = stats(
                 "Z", List.of(itemZ), 40, 20, true, true, true, true, true
@@ -96,13 +96,13 @@ class RecommendationBuildComposerTest {
     @Test
     @DisplayName("BOTTOM은 일반 아이템의 표본이 더 많아도 신발을 관측된 구매 슬롯에 배치한다")
     void compose_WhenBottomBootIsOutrankedInItsSlot_KeepExactlyOneBootAtObservedSlot() {
-        Item item0 = new Item(30L, "아이템0");
-        Item item1 = new Item(31L, "아이템1");
-        Item item2 = new Item(32L, "아이템2");
-        Item item3 = new Item(33L, "아이템3");
-        Item item4 = new Item(34L, "아이템4");
-        Item item5 = new Item(35L, "아이템5");
-        Item item6 = new Item(36L, "아이템6");
+        Item item0 = new Item(30L, Map.of("ko-KR", "아이템0"));
+        Item item1 = new Item(31L, Map.of("ko-KR", "아이템1"));
+        Item item2 = new Item(32L, Map.of("ko-KR", "아이템2"));
+        Item item3 = new Item(33L, Map.of("ko-KR", "아이템3"));
+        Item item4 = new Item(34L, Map.of("ko-KR", "아이템4"));
+        Item item5 = new Item(35L, Map.of("ko-KR", "아이템5"));
+        Item item6 = new Item(36L, Map.of("ko-KR", "아이템6"));
 
         ChampionBuildStats popularBootlessBuild = stats(
                 "BOOTLESS",
@@ -127,14 +127,14 @@ class RecommendationBuildComposerTest {
     @Test
     @DisplayName("BOTTOM의 여러 신발 후보 중 표본이 가장 많은 신발 하나와 그 구매 슬롯을 사용한다")
     void compose_WhenBottomHasMultipleBootCandidates_PickOneWithItsObservedSlot() {
-        Item otherBoots = new Item(40L, "다른 신발", List.of("Boots"));
-        Item item0 = new Item(41L, "아이템0");
-        Item item1 = new Item(42L, "아이템1");
-        Item item2 = new Item(43L, "아이템2");
-        Item item3 = new Item(44L, "아이템3");
-        Item item4 = new Item(45L, "아이템4");
-        Item item5 = new Item(46L, "아이템5");
-        Item item6 = new Item(47L, "아이템6");
+        Item otherBoots = new Item(40L, Map.of("ko-KR", "다른 신발"), List.of("Boots"));
+        Item item0 = new Item(41L, Map.of("ko-KR", "아이템0"));
+        Item item1 = new Item(42L, Map.of("ko-KR", "아이템1"));
+        Item item2 = new Item(43L, Map.of("ko-KR", "아이템2"));
+        Item item3 = new Item(44L, Map.of("ko-KR", "아이템3"));
+        Item item4 = new Item(45L, Map.of("ko-KR", "아이템4"));
+        Item item5 = new Item(46L, Map.of("ko-KR", "아이템5"));
+        Item item6 = new Item(47L, Map.of("ko-KR", "아이템6"));
 
         ChampionBuildStats popularBootBuild = stats(
                 "POPULAR_BOOT",
@@ -162,13 +162,13 @@ class RecommendationBuildComposerTest {
         ChampionBuildStats bootlessBuild = stats(
                 "BOOTLESS",
                 List.of(
-                        new Item(50L, "아이템0"),
-                        new Item(51L, "아이템1"),
-                        new Item(52L, "아이템2"),
-                        new Item(53L, "아이템3"),
-                        new Item(54L, "아이템4"),
-                        new Item(55L, "아이템5"),
-                        new Item(56L, "아이템6")
+                        new Item(50L, Map.of("ko-KR", "아이템0")),
+                        new Item(51L, Map.of("ko-KR", "아이템1")),
+                        new Item(52L, Map.of("ko-KR", "아이템2")),
+                        new Item(53L, Map.of("ko-KR", "아이템3")),
+                        new Item(54L, Map.of("ko-KR", "아이템4")),
+                        new Item(55L, Map.of("ko-KR", "아이템5")),
+                        new Item(56L, Map.of("ko-KR", "아이템6"))
                 ),
                 100, 50, false, false, false, false, false
         );
