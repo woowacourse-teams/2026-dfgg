@@ -1,6 +1,5 @@
 package dfgg.infrastructure.storage;
 
-import java.net.URI;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
@@ -15,17 +14,14 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 public class S3ImageStorage {
     private final S3Client client;
     private final String bucket;
-    private final String publicBaseUrl;
 
     public S3ImageStorage(@Lazy S3Client client,
-                          @Value("${assets.s3.bucket:}") String bucket,
-                          @Value("${assets.s3.public-base-url:}") String publicBaseUrl) {
+                          @Value("${assets.s3.bucket:}") String bucket) {
         this.client = client;
         this.bucket = bucket;
-        this.publicBaseUrl = publicBaseUrl.replaceAll("/+$", "");
     }
 
-    public String store(String key, Supplier<byte[]> content) {
+    public void store(String key, Supplier<byte[]> content) {
         validateConfiguration();
         try {
             client.headObject(HeadObjectRequest.builder().bucket(bucket).key(key).build());
@@ -40,17 +36,11 @@ public class S3ImageStorage {
                             .build(),
                     RequestBody.fromBytes(content.get()));
         }
-        return publicBaseUrl + "/" + key;
     }
 
     private void validateConfiguration() {
-        if (bucket.isBlank() || publicBaseUrl.isBlank()) {
-            throw new IllegalStateException("이미지 수집을 위해 ASSETS_S3_BUCKET과 ASSETS_PUBLIC_BASE_URL을 설정해야 합니다.");
-        }
-        URI uri = URI.create(publicBaseUrl);
-        if (!"https".equals(uri.getScheme()) || uri.getHost() == null
-                || uri.getQuery() != null || uri.getFragment() != null || uri.getUserInfo() != null) {
-            throw new IllegalStateException("ASSETS_PUBLIC_BASE_URL은 쿼리, 프래그먼트, 사용자 정보가 없는 HTTPS 기본 주소여야 합니다.");
+        if (bucket.isBlank()) {
+            throw new IllegalStateException("이미지 수집을 위해 ASSETS_S3_BUCKET을 설정해야 합니다.");
         }
     }
 }

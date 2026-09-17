@@ -18,13 +18,12 @@ class ChampionImageServiceTest {
         var storage = mock(S3ImageStorage.class);
         byte[] png = {1, 2};
         when(dragon.getChampionImage("16.15.1", "Aatrox.png")).thenReturn(png);
-        when(storage.store(eq("images/16.15/champions/Aatrox.png"), any())).thenAnswer(call -> {
+        doAnswer(call -> {
             Supplier<byte[]> content = call.getArgument(1);
             assertThat(content.get()).isEqualTo(png);
-            return "https://cdn.example.com/images/16.15/champions/Aatrox.png";
-        });
-        assertThat(new ChampionImageService(dragon, storage).store("16.15", "16.15.1", "Aatrox.png"))
-                .isEqualTo("https://cdn.example.com/images/16.15/champions/Aatrox.png");
+            return null;
+        }).when(storage).store(eq("images/16.15/champions/Aatrox.png"), any());
+        new ChampionImageService(dragon, storage).store("16.15", "16.15.1", "Aatrox.png");
     }
 
     @Test

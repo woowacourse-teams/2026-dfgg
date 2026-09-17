@@ -14,11 +14,11 @@ public class ItemImageService {
         this.storage = storage;
     }
 
-    public String store(String version, String dataVersion, String filename) {
+    public void store(String version, String dataVersion, String filename) {
         if (filename == null || !filename.matches("[A-Za-z0-9_-]+\\.png")) {
             throw new IllegalStateException("[Error] 아이템 이미지 파일명이 올바르지 않습니다.");
         }
         String key = "images/" + version + "/items/" + filename;
-        return storage.store(key, () -> dataDragonClient.getItemImage(dataVersion, filename));
+        storage.store(key, () -> dataDragonClient.getItemImage(dataVersion, filename));
     }
 }

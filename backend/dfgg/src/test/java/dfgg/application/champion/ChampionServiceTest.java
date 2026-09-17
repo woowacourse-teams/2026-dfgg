@@ -50,8 +50,6 @@ class ChampionServiceTest {
         ));
         when(dataDragonClient.getChampions()).thenReturn(response);
 
-        when(championImageService.store("16.15", "16.15.1", "Aatrox.png"))
-                .thenReturn("https://assets.example.com/images/16.15/champions/Aatrox.png");
 
         // when
         championService.syncChampions();
@@ -106,8 +104,8 @@ class ChampionServiceTest {
         when(dataDragonClient.getChampions()).thenReturn(new ChampionResponse("16.15", "16.15.1", Map.of(
                 "Aatrox", new ChampionData("266", "아트록스", List.of("Fighter"),
                         new ChampionData.Image("Aatrox.png")))));
-        when(championImageService.store("16.15", "16.15.1", "Aatrox.png"))
-                .thenThrow(new IllegalStateException("S3 failure"));
+        org.mockito.Mockito.doThrow(new IllegalStateException("S3 failure"))
+                .when(championImageService).store("16.15", "16.15.1", "Aatrox.png");
         assertThatThrownBy(championService::syncChampions).hasMessage("S3 failure");
         verifyNoInteractions(championRepository);
     }

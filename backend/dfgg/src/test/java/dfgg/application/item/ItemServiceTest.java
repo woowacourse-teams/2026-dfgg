@@ -56,9 +56,6 @@ class ItemServiceTest {
                 "1055", equipment("1055.png", null, null),
                 "1001", item("1001.png", null, List.of("3006"), List.of("Boots"),
                         Map.of("11", true), true, null, null, false))));
-        when(itemImageService.store(org.mockito.ArgumentMatchers.eq("16.18"),
-                org.mockito.ArgumentMatchers.eq("16.18.1"), org.mockito.ArgumentMatchers.anyString()))
-                .thenAnswer(call -> "https://cdn.example.com/images/16.18/items/" + call.getArgument(2));
 
         itemService.syncItems();
 
@@ -100,8 +97,9 @@ class ItemServiceTest {
         data.put("1036", equipment("1036.png", null, List.of("3133")));
         data.put("3133", equipment("3133.png", List.of("1036"), List.of("3071")));
         when(dataDragonClient.getItems()).thenReturn(new ItemResponse("16.18", "16.18.1", data));
-        when(itemImageService.store("16.18", "16.18.1", "1036.png")).thenReturn("https://cdn.example.com/1036.png");
-        when(itemImageService.store("16.18", "16.18.1", "3133.png")).thenThrow(new IllegalStateException("업로드 실패"));
+        org.mockito.Mockito.doNothing().when(itemImageService).store("16.18", "16.18.1", "1036.png");
+        org.mockito.Mockito.doThrow(new IllegalStateException("업로드 실패"))
+                .when(itemImageService).store("16.18", "16.18.1", "3133.png");
         assertThatThrownBy(itemService::syncItems).hasMessage("업로드 실패");
         verifyNoInteractions(itemRepository);
     }

@@ -22,13 +22,12 @@ class S3ImageStorageTest {
     @BeforeEach
     void setUp() {
         client = mock(S3Client.class);
-        storage = new S3ImageStorage(client, "assets", "https://cdn.example.com/");
+        storage = new S3ImageStorage(client, "assets");
     }
 
     @Test
     void 기존_파일이면_다운로드와_업로드를_생략한다() {
-        assertThat(storage.store(key, () -> { throw new AssertionError("must not download"); }))
-                .isEqualTo("https://cdn.example.com/" + key);
+        storage.store(key, () -> { throw new AssertionError("must not download"); });
         verify(client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
     }
 
@@ -37,7 +36,7 @@ class S3ImageStorageTest {
         when(client.headObject(any(HeadObjectRequest.class)))
                 .thenThrow(S3Exception.builder().statusCode(404).build());
         byte[] image = {1, 2, 3};
-        assertThat(storage.store(key, () -> image)).isEqualTo("https://cdn.example.com/" + key);
+        storage.store(key, () -> image);
         ArgumentCaptor<PutObjectRequest> request = ArgumentCaptor.forClass(PutObjectRequest.class);
         ArgumentCaptor<RequestBody> body = ArgumentCaptor.forClass(RequestBody.class);
         verify(client).putObject(request.capture(), body.capture());
@@ -60,7 +59,7 @@ class S3ImageStorageTest {
     }
 
     @Test
-    void 업로드_실패시_URL을_반환하지_않는다() {
+    void 업로드_실패를_전파한다() {
         when(client.headObject(any(HeadObjectRequest.class)))
                 .thenThrow(S3Exception.builder().statusCode(404).build());
         when(client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
@@ -79,7 +78,7 @@ class S3ImageStorageTest {
 
     @Test
     void 설정_누락은_AWS_호출_전에_실패한다() {
-        storage = new S3ImageStorage(client, "", "");
+        storage = new S3ImageStorage(client, "");
         assertThatThrownBy(() -> storage.store(key, () -> new byte[]{1}))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("ASSETS_S3_BUCKET");
         verifyNoInteractions(client);
