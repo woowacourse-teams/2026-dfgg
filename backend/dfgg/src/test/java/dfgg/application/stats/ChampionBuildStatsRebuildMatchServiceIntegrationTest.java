@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
 import dfgg.application.item.ItemService;
+import dfgg.application.item.ItemImageService;
 import dfgg.application.match.CoreItemPurchaseOrderCalculator;
 import dfgg.application.match.MatchNormalizationService;
 import dfgg.application.player.RiotPlayerSyncService;
@@ -90,6 +91,9 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
 
     @MockitoBean
     private DataDragonClient dataDragonClient;
+
+    @MockitoBean
+    private ItemImageService itemImageService;
 
     @Autowired
     private PlayerRepository playerRepository;

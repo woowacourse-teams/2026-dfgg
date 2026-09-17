@@ -127,7 +127,13 @@ public class DataDragonClientTest {
                         """, MediaType.APPLICATION_JSON));
 
         // when
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/data/en_US/champion.json"))
+                .andRespond(withSuccess("""
+                        {"data":{"Aatrox":{"name":"Aatrox"}}}
+                        """, MediaType.APPLICATION_JSON));
         ChampionResponse response = client.getChampions();
+        assertThat(response.localizedName("Aatrox"))
+                .containsEntry("ko-KR", "아트록스").containsEntry("en-US", "Aatrox");
 
         // then
         assertThat(response.version()).isEqualTo("16.15");
@@ -211,7 +217,14 @@ public class DataDragonClientTest {
                         """, MediaType.APPLICATION_JSON));
 
         // when
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/data/en_US/item.json"))
+                .andRespond(withSuccess("""
+                        {"data":{"3071":{"name":"Black Cleaver"},"1036":{"name":"Long Sword"}}}
+                        """, MediaType.APPLICATION_JSON));
         ItemResponse response = client.getItems();
+        assertThat(response.localizedName("1036"))
+                .containsEntry("ko-KR", "롱소드").containsEntry("en-US", "Long Sword");
+        assertThat(response.localizedName("3071")).containsEntry("en-US", "Black Cleaver");
 
         // then
         assertThat(response.version()).isEqualTo("16.15");
@@ -298,4 +311,32 @@ public class DataDragonClientTest {
         server.verify();
     }
 
+
+    @Test
+    void 영문_챔피언_조회_실패를_전파한다() {
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.18.1\"]", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/data/ko_KR/champion.json"))
+                .andRespond(withSuccess("""
+                        {"data":{"Aatrox":{"key":"266","name":"아트록스","tags":["Fighter"]}}}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/data/en_US/champion.json"))
+                .andRespond(withServerError());
+        assertThatThrownBy(client::getChampions).isInstanceOf(HttpServerErrorException.class);
+        server.verify();
+    }
+
+    @Test
+    void 영문_아이템_응답이_비어있으면_실패한다() {
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.18.1\"]", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/data/ko_KR/item.json"))
+                .andRespond(withSuccess("""
+                        {"data":{"1036":{"name":"롱소드"}}}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/data/en_US/item.json"))
+                .andRespond(withNoContent());
+        assertThatThrownBy(client::getItems).hasMessageContaining("영문 아이템 응답이 비어 있습니다");
+        server.verify();
+    }
 }

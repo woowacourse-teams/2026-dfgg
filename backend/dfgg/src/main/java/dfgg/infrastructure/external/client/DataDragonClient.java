@@ -73,7 +73,20 @@ public class DataDragonClient {
             throw new IllegalStateException("[Error] Data Dragon champion data is invalid");
         }
 
-        return new ChampionResponse(normalizePatch(version), version, response.data());
+        ChampionResponse english = restClient.get()
+                .uri("/cdn/{version}/data/en_US/champion.json", version)
+                .retrieve()
+                .body(ChampionResponse.class);
+        if (english == null || english.data() == null || english.data().isEmpty()) {
+            throw new IllegalStateException("[Error] 영문 챔피언 응답이 비어 있습니다.");
+        }
+        java.util.Map<String, String> englishNames = new java.util.HashMap<>();
+        english.data().forEach((id, data) -> {
+            if (data != null && data.name() != null && !data.name().isBlank()) {
+                englishNames.put(id, data.name());
+            }
+        });
+        return new ChampionResponse(normalizePatch(version), version, response.data(), englishNames);
     }
 
     public byte[] getChampionImage(String version, String filename) {
@@ -113,6 +126,19 @@ public class DataDragonClient {
             throw new IllegalStateException("[Error] Data Dragon item response is empty");
         }
 
-        return new ItemResponse(normalizePatch(version), version, response.data());
+        ItemResponse english = restClient.get()
+                .uri("/cdn/{version}/data/en_US/item.json", version)
+                .retrieve()
+                .body(ItemResponse.class);
+        if (english == null || english.data() == null || english.data().isEmpty()) {
+            throw new IllegalStateException("[Error] 영문 아이템 응답이 비어 있습니다.");
+        }
+        java.util.Map<String, String> englishNames = new java.util.HashMap<>();
+        english.data().forEach((id, data) -> {
+            if (data != null && data.name() != null && !data.name().isBlank()) {
+                englishNames.put(id, data.name());
+            }
+        });
+        return new ItemResponse(normalizePatch(version), version, response.data(), englishNames);
     }
 }

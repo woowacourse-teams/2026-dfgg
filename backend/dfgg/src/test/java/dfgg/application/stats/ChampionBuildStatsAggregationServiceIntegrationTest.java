@@ -3,6 +3,7 @@ package dfgg.application.stats;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.item.ItemService;
+import dfgg.application.item.ItemImageService;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.champion.ChampionTag;
@@ -57,6 +58,9 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
 
     @MockitoBean
     private DataDragonClient dataDragonClient;
+
+    @MockitoBean
+    private ItemImageService itemImageService;
 
     @BeforeEach
     @AfterEach

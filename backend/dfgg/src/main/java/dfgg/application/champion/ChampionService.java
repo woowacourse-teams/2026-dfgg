@@ -38,12 +38,13 @@ public class ChampionService {
                 .filter(entry -> !entry.getKey().startsWith("Jade_"))
                 .map(entry -> {
                     Long championId = Long.parseLong(entry.getValue().key());
+                    Map<String, String> names = response.localizedName(entry.getKey());
                     championImageService.store(response.version(), response.dataVersion(),
                             entry.getValue().image().full());
                     return new Champion(
                             championId,
                             entry.getKey(),
-                            Map.of("ko-KR", entry.getValue().name()),
+                            names,
                             entry.getValue().tags().stream()
                                     .map(ChampionTag::from)
                                     .toList()

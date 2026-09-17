@@ -47,9 +47,15 @@ class ItemServiceTest {
         return item(filename, from, into, List.of("Damage"), Map.of("11", true), true, null, null, false);
     }
 
+    private ItemResponse response(String version, String dataVersion, Map<String, ItemData> data) {
+        Map<String, String> englishNames = new java.util.HashMap<>();
+        data.keySet().forEach(id -> englishNames.put(id, "English " + id));
+        return new ItemResponse(version, dataVersion, data, englishNames);
+    }
+
     @Test
     void 협곡의_시작_조합_완성_아이템과_기본_장화를_이미지와_함께_저장한다() {
-        when(dataDragonClient.getItems()).thenReturn(new ItemResponse("16.18", "16.18.1", Map.of(
+        when(dataDragonClient.getItems()).thenReturn(response("16.18", "16.18.1", Map.of(
                 "1036", equipment("1036.png", null, List.of("3133")),
                 "3133", equipment("3133.png", List.of("1036"), List.of("3071")),
                 "3071", equipment("3071.png", List.of("3133"), null),
@@ -66,6 +72,8 @@ class ItemServiceTest {
                 .containsExactlyInAnyOrder(1036L, 3133L, 3071L, 1055L, 1001L);
         assertThat(captor.getValue()).allSatisfy(saved -> {
             verify(itemImageService).store("16.18", "16.18.1", saved.getItemId() + ".png");
+            assertThat(saved.getName()).containsEntry("en-US", "English " + saved.getItemId())
+                    .containsEntry("ko-KR", saved.getItemId() + ".png");
             assertThat(saved.getGold()).containsEntry("total", 350);
         });
         Item component = captor.getValue().stream().filter(i -> i.getItemId() == 3133L).findFirst().orElseThrow();
@@ -85,7 +93,7 @@ class ItemServiceTest {
         excluded.put("5", item("5.png", null, null, List.of(), Map.of("11", true), true, false, null, false));
         excluded.put("6", item("6.png", null, null, List.of(), Map.of("11", true), true, null, true, false));
         excluded.put("7", item("7.png", null, null, List.of(), Map.of("11", true), true, null, null, true));
-        when(dataDragonClient.getItems()).thenReturn(new ItemResponse("16.18", "16.18.1", excluded));
+        when(dataDragonClient.getItems()).thenReturn(response("16.18", "16.18.1", excluded));
         itemService.syncItems();
         verify(itemRepository).saveAll(List.of());
         verifyNoInteractions(itemImageService);
@@ -96,7 +104,7 @@ class ItemServiceTest {
         Map<String, ItemData> data = new java.util.LinkedHashMap<>();
         data.put("1036", equipment("1036.png", null, List.of("3133")));
         data.put("3133", equipment("3133.png", List.of("1036"), List.of("3071")));
-        when(dataDragonClient.getItems()).thenReturn(new ItemResponse("16.18", "16.18.1", data));
+        when(dataDragonClient.getItems()).thenReturn(response("16.18", "16.18.1", data));
         org.mockito.Mockito.doNothing().when(itemImageService).store("16.18", "16.18.1", "1036.png");
         org.mockito.Mockito.doThrow(new IllegalStateException("업로드 실패"))
                 .when(itemImageService).store("16.18", "16.18.1", "3133.png");
@@ -108,7 +116,7 @@ class ItemServiceTest {
     void 이미지_정보_누락시_DB를_저장하지_않는다() {
         ItemData missing = new ItemData("롱소드", null, null, List.of(), Map.of("11", true), false, 1,
                 new ItemData.Gold(350, 350, true), null, null, null);
-        when(dataDragonClient.getItems()).thenReturn(new ItemResponse("16.18", "16.18.1", Map.of("1036", missing)));
+        when(dataDragonClient.getItems()).thenReturn(response("16.18", "16.18.1", Map.of("1036", missing)));
         assertThatThrownBy(itemService::syncItems).hasMessageContaining("이미지 정보가 없습니다");
         verifyNoInteractions(itemRepository, itemImageService);
     }
@@ -150,5 +158,12 @@ class ItemServiceTest {
 
         // then
         assertThat(coreItemIds).containsExactlyInAnyOrder(3071, 6610);
+    }
+    @Test
+    void 영문_이름_누락시_이미지와_DB를_저장하지_않는다() {
+        when(dataDragonClient.getItems()).thenReturn(new ItemResponse(
+                "16.18", "16.18.1", Map.of("1036", equipment("1036.png", null, List.of("3133"))), Map.of()));
+        assertThatThrownBy(itemService::syncItems).hasMessageContaining("영문 이름이 없습니다");
+        verifyNoInteractions(itemRepository, itemImageService);
     }
 }
