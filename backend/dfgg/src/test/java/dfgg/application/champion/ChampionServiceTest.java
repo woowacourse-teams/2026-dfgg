@@ -32,20 +32,26 @@ class ChampionServiceTest {
     @Mock
     private ChampionRepository championRepository;
 
+    @Mock
+    private ChampionImageService championImageService;
+
     @InjectMocks
     private ChampionService championService;
 
     @Test
     void 데이터_드래곤_응답을_챔피언으로_변환해_저장한다() {
         // given
-        ChampionResponse response = new ChampionResponse(Map.of(
+        ChampionResponse response = new ChampionResponse("16.15", "16.15.1", Map.of(
                 "Aatrox", new ChampionData(
                         "266",
                         "아트록스",
-                        List.of("Fighter", "Tank")
+                        List.of("Fighter", "Tank"), new ChampionData.Image("Aatrox.png")
                 )
         ));
         when(dataDragonClient.getChampions()).thenReturn(response);
+
+        when(championImageService.store("16.15", "16.15.1", "Aatrox.png"))
+                .thenReturn("https://assets.example.com/images/16.15/champions/Aatrox.png");
 
         // when
         championService.syncChampions();
@@ -56,6 +62,7 @@ class ChampionServiceTest {
         verify(championRepository).saveAll(captor.capture());
 
         assertThat(captor.getValue()).singleElement().satisfies(champion -> {
+            assertThat(champion.getUrl()).isEqualTo("https://assets.example.com/images/16.15/champions/Aatrox.png");
             assertThat(champion.getChampionId()).isEqualTo(266L);
             assertThat(champion.getRiotKey()).isEqualTo("Aatrox");
             assertThat(champion.getName()).isEqualTo(java.util.Map.of("ko-KR", "아트록스"));
@@ -79,11 +86,11 @@ class ChampionServiceTest {
     @Test
     void 챔피언_ID가_숫자가_아니면_저장하지_않는다() {
         // given
-        ChampionResponse response = new ChampionResponse(Map.of(
+        ChampionResponse response = new ChampionResponse("16.15", "16.15.1", Map.of(
                 "Aatrox", new ChampionData(
                         "invalid-id",
                         "아트록스",
-                        List.of("Fighter")
+                        List.of("Fighter"), new ChampionData.Image("Aatrox.png")
                 )
         ));
         when(dataDragonClient.getChampions()).thenReturn(response);
@@ -92,6 +99,26 @@ class ChampionServiceTest {
         assertThatThrownBy(championService::syncChampions)
                 .isInstanceOf(NumberFormatException.class);
         verifyNoInteractions(championRepository);
+    }
+
+    @Test
+    void 이미지_업로드가_실패하면_DB에_저장하지_않는다() {
+        when(dataDragonClient.getChampions()).thenReturn(new ChampionResponse("16.15", "16.15.1", Map.of(
+                "Aatrox", new ChampionData("266", "아트록스", List.of("Fighter"),
+                        new ChampionData.Image("Aatrox.png")))));
+        when(championImageService.store("16.15", "16.15.1", "Aatrox.png"))
+                .thenThrow(new IllegalStateException("S3 failure"));
+        assertThatThrownBy(championService::syncChampions).hasMessage("S3 failure");
+        verifyNoInteractions(championRepository);
+    }
+
+    @Test
+    void Jade_챔피언은_이미지를_수집하지_않는다() {
+        when(dataDragonClient.getChampions()).thenReturn(new ChampionResponse("16.15", "16.15.1", Map.of(
+                "Jade_Test", new ChampionData("1", "제외", List.of("Fighter")))));
+        championService.syncChampions();
+        verifyNoInteractions(championImageService);
+        verify(championRepository).saveAll(List.of());
     }
 
     @Test

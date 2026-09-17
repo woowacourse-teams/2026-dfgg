@@ -15,14 +15,24 @@ public class ChampionService {
 
     private final DataDragonClient dataDragonClient;
     private final ChampionRepository championRepository;
+    private final ChampionImageService championImageService;
 
-    public ChampionService(DataDragonClient dataDragonClient, ChampionRepository championRepository) {
+    public ChampionService(DataDragonClient dataDragonClient, ChampionRepository championRepository,
+                           ChampionImageService championImageService) {
         this.dataDragonClient = dataDragonClient;
         this.championRepository = championRepository;
+        this.championImageService = championImageService;
     }
 
     public void syncChampions() {
         ChampionResponse response = dataDragonClient.getChampions();
+
+        boolean missingImage = response.data().entrySet().stream()
+                .filter(entry -> !entry.getKey().startsWith("Jade_"))
+                .anyMatch(entry -> entry.getValue().image() == null);
+        if (missingImage) {
+            throw new IllegalStateException("[Error] Data Dragon champion image metadata is missing");
+        }
 
         List<Champion> champions = response.data().entrySet().stream()
                 .filter(entry -> !entry.getKey().startsWith("Jade_"))
@@ -30,7 +40,8 @@ public class ChampionService {
                         Long.parseLong(entry.getValue().key()),
                         entry.getKey(),
                         Map.of("ko-KR", entry.getValue().name()),
-                        null,
+                        championImageService.store(response.version(), response.dataVersion(),
+                                entry.getValue().image().full()),
                         entry.getValue().tags().stream()
                                 .map(ChampionTag::from)
                                 .toList()
