@@ -28,13 +28,10 @@ class ChampionRepositoryTest {
     @Test
     void 챔피언과_태그를_저장한다() {
         // given
-        String url = "https://example-bucket.s3.ap-northeast-2.amazonaws.com/"
-                + "champions/".repeat(30) + "aatrox.png";
         Champion champion = new Champion(
                 266L,
                 "Aatrox",
                 Map.of("ko-KR", "아트록스"),
-                url,
                 List.of(ChampionTag.FIGHTER, ChampionTag.TANK)
         );
 
@@ -45,7 +42,6 @@ class ChampionRepositoryTest {
 
         // then
         Champion saved = championRepository.findById(266L).orElseThrow();
-        assertThat(saved.getUrl()).isEqualTo(url);
         assertThat(saved.getRiotKey()).isEqualTo("Aatrox");
         assertThat(saved.getName()).isEqualTo(Map.of("ko-KR", "아트록스"));
         assertThat(saved.getChampionTags())
@@ -59,7 +55,6 @@ class ChampionRepositoryTest {
                 266L,
                 "Aatrox",
                 Map.of("ko-KR", "이전 이름"),
-                null,
                 List.of(ChampionTag.FIGHTER)
         ));
         entityManager.flush();
@@ -70,7 +65,6 @@ class ChampionRepositoryTest {
                 266L,
                 "Aatrox",
                 Map.of("ko-KR", "아트록스"),
-                null,
                 List.of(ChampionTag.FIGHTER, ChampionTag.TANK)
         )));
         entityManager.flush();
@@ -80,7 +74,6 @@ class ChampionRepositoryTest {
         assertThat(championRepository.count()).isEqualTo(1);
 
         Champion updated = championRepository.findById(266L).orElseThrow();
-        assertThat(updated.getUrl()).isNull();
         assertThat(updated.getName()).isEqualTo(Map.of("ko-KR", "아트록스"));
         assertThat(updated.getChampionTags())
                 .containsExactlyInAnyOrder(ChampionTag.FIGHTER, ChampionTag.TANK);
@@ -89,7 +82,7 @@ class ChampionRepositoryTest {
     void 다국어_이름을_JSONB로_저장하고_언어별_이름으로_검색한다() {
         Map<String, String> names = Map.of("ko-KR", "아리", "en-US", "Ahri");
         championRepository.save(new Champion(
-                103L, "Ahri", names, null, List.of(ChampionTag.MAGE)
+                103L, "Ahri", names, List.of(ChampionTag.MAGE)
         ));
         entityManager.flush();
         entityManager.clear();

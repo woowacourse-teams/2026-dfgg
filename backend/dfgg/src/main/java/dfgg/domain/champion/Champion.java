@@ -30,9 +30,6 @@ public class Champion {
     @Column(nullable = false, columnDefinition = "jsonb")
     private Map<String, String> name;
 
-    @Column(columnDefinition = "text")
-    private String url;
-
     @ElementCollection
     @CollectionTable(
             name = "champion_tags",
@@ -45,11 +42,10 @@ public class Champion {
     protected Champion() {
     }
 
-    public Champion(Long championId, String riotKey, Map<String, String> name, String url, List<ChampionTag> championTags) {
+    public Champion(Long championId, String riotKey, Map<String, String> name, List<ChampionTag> championTags) {
         this.championId = championId;
         this.riotKey = riotKey;
         this.name = Map.copyOf(name);
-        this.url = url;
         this.championTags = new ArrayList<>(championTags);
     }
 
@@ -63,10 +59,6 @@ public class Champion {
 
     public Map<String, String> getName() {
         return Map.copyOf(name);
-    }
-
-    public String getUrl() {
-        return url;
     }
 
     public List<ChampionTag> getChampionTags() {

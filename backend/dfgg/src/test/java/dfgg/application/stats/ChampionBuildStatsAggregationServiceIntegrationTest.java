@@ -119,9 +119,9 @@ class ChampionBuildStatsAggregationServiceIntegrationTest {
 
     private void prepareReferenceData() {
         championRepository.saveAll(List.of(
-                new Champion(1L, "Aatrox", Map.of("ko-KR", "아트록스"), null, List.of(ChampionTag.FIGHTER)),
-                new Champion(2L, "Ally", Map.of("ko-KR", "아군"), null, List.of(ChampionTag.FIGHTER)),
-                new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), null, List.of(ChampionTag.TANK))
+                new Champion(1L, "Aatrox", Map.of("ko-KR", "아트록스"), List.of(ChampionTag.FIGHTER)),
+                new Champion(2L, "Ally", Map.of("ko-KR", "아군"), List.of(ChampionTag.FIGHTER)),
+                new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), List.of(ChampionTag.TANK))
         ));
         itemRepository.saveAll(List.of(
                 new Item(3071L, Map.of("ko-KR", "아이템 A")),

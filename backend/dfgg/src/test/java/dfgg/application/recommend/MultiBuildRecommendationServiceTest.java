@@ -75,7 +75,6 @@ class MultiBuildRecommendationServiceTest {
                 1L,
                 "Malphite",
                 Map.of("ko-KR", "말파이트"),
-                null,
                 List.of(ChampionTag.TANK)
         );
     }
@@ -280,7 +279,6 @@ class MultiBuildRecommendationServiceTest {
                 1L,
                 "Galio",
                 Map.of("ko-KR", "갈리오"),
-                null,
                 List.of(ChampionTag.TANK, ChampionTag.MAGE)
         );
         ChampionBuildPolicy tankPolicy = policy(ChampionTag.TANK);
@@ -325,7 +323,6 @@ class MultiBuildRecommendationServiceTest {
                 1L,
                 "TwistedFate",
                 Map.of("ko-KR", "트위스티드 페이트"),
-                null,
                 List.of(ChampionTag.MAGE, ChampionTag.MARKSMAN)
         );
         RecommendationRequest request = prepareRequest(ChampionPosition.MID);
@@ -369,7 +366,6 @@ class MultiBuildRecommendationServiceTest {
                 1L,
                 "Kaisa",
                 Map.of("ko-KR", "카이사"),
-                null,
                 List.of(ChampionTag.MAGE, ChampionTag.MARKSMAN)
         );
         RecommendationRequest request = prepareRequest(ChampionPosition.BOTTOM);
@@ -588,7 +584,7 @@ class MultiBuildRecommendationServiceTest {
     }
 
     private Champion champion(long id, String name, ChampionTag tag) {
-        return new Champion(id, name, Map.of("ko-KR", name), null, List.of(tag));
+        return new Champion(id, name, Map.of("ko-KR", name), List.of(tag));
     }
 
     private ChampionBuildPolicy policy(ChampionTag tag) {

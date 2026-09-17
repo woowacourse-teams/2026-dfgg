@@ -197,7 +197,6 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
                 1L,
                 "Aatrox",
                 Map.of("ko-KR", "아트록스"),
-                null,
                 List.of(ChampionTag.FIGHTER)
         ));
         Item item = itemRepository.save(new Item(3071L, Map.of("ko-KR", "아이템 A")));
@@ -258,9 +257,9 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
     @Test
     void 같은_raw_데이터를_반복_집계해도_정규화와_통계가_중복되지_않는다() {
         championRepository.saveAll(List.of(
-                new Champion(1L, "Aatrox", Map.of("ko-KR", "아트록스"), null, List.of(ChampionTag.FIGHTER)),
-                new Champion(2L, "Ally", Map.of("ko-KR", "아군"), null, List.of(ChampionTag.FIGHTER)),
-                new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), null, List.of(ChampionTag.TANK))
+                new Champion(1L, "Aatrox", Map.of("ko-KR", "아트록스"), List.of(ChampionTag.FIGHTER)),
+                new Champion(2L, "Ally", Map.of("ko-KR", "아군"), List.of(ChampionTag.FIGHTER)),
+                new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), List.of(ChampionTag.TANK))
         ));
         itemRepository.saveAll(List.of(
                 new Item(3071L, Map.of("ko-KR", "아이템 A")),
@@ -321,9 +320,9 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
     @Test
     void 한_매치가_실패해도_성공한_매치의_통계는_독립적으로_커밋된다() {
         championRepository.saveAll(List.of(
-                new Champion(1L, "Aatrox", Map.of("ko-KR", "아트록스"), null, List.of(ChampionTag.FIGHTER)),
-                new Champion(2L, "Ally", Map.of("ko-KR", "아군"), null, List.of(ChampionTag.FIGHTER)),
-                new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), null, List.of(ChampionTag.TANK))
+                new Champion(1L, "Aatrox", Map.of("ko-KR", "아트록스"), List.of(ChampionTag.FIGHTER)),
+                new Champion(2L, "Ally", Map.of("ko-KR", "아군"), List.of(ChampionTag.FIGHTER)),
+                new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), List.of(ChampionTag.TANK))
         ));
         itemRepository.saveAll(List.of(
                 new Item(3071L, Map.of("ko-KR", "아이템 A")),
@@ -648,9 +647,9 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
 
     private void prepareReferenceData() {
         championRepository.saveAll(List.of(
-                new Champion(1L, "Aatrox", Map.of("ko-KR", "아트록스"), null, List.of(ChampionTag.FIGHTER)),
-                new Champion(2L, "Ally", Map.of("ko-KR", "아군"), null, List.of(ChampionTag.FIGHTER)),
-                new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), null, List.of(ChampionTag.TANK))
+                new Champion(1L, "Aatrox", Map.of("ko-KR", "아트록스"), List.of(ChampionTag.FIGHTER)),
+                new Champion(2L, "Ally", Map.of("ko-KR", "아군"), List.of(ChampionTag.FIGHTER)),
+                new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), List.of(ChampionTag.TANK))
         ));
         itemRepository.saveAll(List.of(
                 new Item(3071L, Map.of("ko-KR", "아이템 A")),

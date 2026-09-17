@@ -32,8 +32,8 @@ class ChampionTagFetchTest {
     @DisplayName("영속성 컨텍스트에서 분리된 뒤에도 태그를 읽을 수 있다 — feature 추출은 트랜잭션 밖에서도 돈다")
     void findAllWithTags_WhenDetached_TagsAreAlreadyLoaded() {
         // given
-        championRepository.save(new Champion(157L, "Yasuo", Map.of("ko-KR", "야스오"), null, List.of(ChampionTag.FIGHTER)));
-        championRepository.save(new Champion(33L, "Rammus", Map.of("ko-KR", "람머스"), null, List.of(ChampionTag.TANK)));
+        championRepository.save(new Champion(157L, "Yasuo", Map.of("ko-KR", "야스오"), List.of(ChampionTag.FIGHTER)));
+        championRepository.save(new Champion(33L, "Rammus", Map.of("ko-KR", "람머스"), List.of(ChampionTag.TANK)));
         entityManager.flush();
 
         // when: 조회 후 컨텍스트에서 분리한다 (평가 하네스·배치가 이 상태로 쓴다)
@@ -50,7 +50,7 @@ class ChampionTagFetchTest {
     @DisplayName("태그가 없는 챔피언도 조회된다")
     void findAllWithTags_WhenChampionHasNoTags_StillReturnsIt() {
         // given
-        championRepository.save(new Champion(999L, "NoTag", Map.of("ko-KR", "무태그"), null, List.of()));
+        championRepository.save(new Champion(999L, "NoTag", Map.of("ko-KR", "무태그"), List.of()));
         entityManager.flush();
         entityManager.clear();
 

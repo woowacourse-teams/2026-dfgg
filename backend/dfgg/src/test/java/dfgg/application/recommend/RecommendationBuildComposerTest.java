@@ -16,7 +16,7 @@ class RecommendationBuildComposerTest {
 
     private final RecommendationBuildComposer composer = new RecommendationBuildComposer();
 
-    private final Champion champion = new Champion(1L, "riot-key", Map.of("ko-KR", "챔피언"), null, List.of(ChampionTag.FIGHTER));
+    private final Champion champion = new Champion(1L, "riot-key", Map.of("ko-KR", "챔피언"), List.of(ChampionTag.FIGHTER));
 
     private final Item boots = new Item(1L, Map.of("ko-KR", "신발"), List.of("Boots"));
     private final Item itemA2 = new Item(2L, Map.of("ko-KR", "아이템A2"));

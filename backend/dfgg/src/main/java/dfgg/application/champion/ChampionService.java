@@ -36,16 +36,19 @@ public class ChampionService {
 
         List<Champion> champions = response.data().entrySet().stream()
                 .filter(entry -> !entry.getKey().startsWith("Jade_"))
-                .map(entry -> new Champion(
-                        Long.parseLong(entry.getValue().key()),
-                        entry.getKey(),
-                        Map.of("ko-KR", entry.getValue().name()),
-                        championImageService.store(response.version(), response.dataVersion(),
-                                entry.getValue().image().full()),
-                        entry.getValue().tags().stream()
-                                .map(ChampionTag::from)
-                                .toList()
-                ))
+                .map(entry -> {
+                    Long championId = Long.parseLong(entry.getValue().key());
+                    championImageService.store(response.version(), response.dataVersion(),
+                            entry.getValue().image().full());
+                    return new Champion(
+                            championId,
+                            entry.getKey(),
+                            Map.of("ko-KR", entry.getValue().name()),
+                            entry.getValue().tags().stream()
+                                    .map(ChampionTag::from)
+                                    .toList()
+                    );
+                })
                 .toList();
 
         championRepository.saveAll(champions);

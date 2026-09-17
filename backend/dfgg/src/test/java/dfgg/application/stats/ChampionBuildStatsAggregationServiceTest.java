@@ -159,7 +159,7 @@ class ChampionBuildStatsAggregationServiceTest {
     }
 
     private Champion champion(Long id, String tag) {
-        return new Champion(id, "champion-" + id, Map.of("ko-KR", "챔피언" + id), null, List.of(ChampionTag.valueOf(tag)));
+        return new Champion(id, "champion-" + id, Map.of("ko-KR", "챔피언" + id), List.of(ChampionTag.valueOf(tag)));
     }
 
     private NormalizedMatchParticipant participant(

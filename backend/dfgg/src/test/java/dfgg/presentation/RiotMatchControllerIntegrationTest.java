@@ -195,7 +195,6 @@ class RiotMatchControllerIntegrationTest {
                 1L,
                 "Aatrox",
                 Map.of("ko-KR", "아트록스"),
-                null,
                 List.of(ChampionTag.FIGHTER)
         ));
         itemRepository.save(new Item(3071L, Map.of("ko-KR", "칠흑의 양날 도끼")));

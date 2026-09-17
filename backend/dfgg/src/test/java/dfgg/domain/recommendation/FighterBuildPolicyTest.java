@@ -149,7 +149,6 @@ class FighterBuildPolicyTest {
                 (long) tags.hashCode(),
                 "enemy-" + tags.hashCode(),
                 Map.of("ko-KR", "적 챔피언"),
-                null,
                 List.of(tags)
         );
     }

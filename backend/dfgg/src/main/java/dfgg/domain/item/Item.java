@@ -26,9 +26,6 @@ public class Item {
     @Column(columnDefinition = "jsonb")
     private Map<String, Integer> gold;
 
-    @Column(columnDefinition = "text")
-    private String url;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "from_item_ids", columnDefinition = "jsonb")
     private List<String> fromItemIds;
@@ -53,24 +50,13 @@ public class Item {
     }
 
     public Item(Long itemId, Map<String, String> name, Map<String, Integer> gold, List<String> tags) {
-        this(itemId, name, gold, null, tags);
+        this(itemId, name, gold, null, null, tags);
     }
 
     public Item(
             Long itemId,
             Map<String, String> name,
             Map<String, Integer> gold,
-            String url,
-            List<String> tags
-    ) {
-        this(itemId, name, gold, url, null, null, tags);
-    }
-
-    public Item(
-            Long itemId,
-            Map<String, String> name,
-            Map<String, Integer> gold,
-            String url,
             List<String> fromItemIds,
             List<String> intoItemIds,
             List<String> tags
@@ -80,7 +66,6 @@ public class Item {
         if (gold != null) {
             this.gold = Map.copyOf(gold);
         }
-        this.url = url;
         if (fromItemIds != null) {
             this.fromItemIds = List.copyOf(fromItemIds);
         }
@@ -106,10 +91,6 @@ public class Item {
             return null;
         }
         return Map.copyOf(gold);
-    }
-
-    public String getUrl() {
-        return url;
     }
 
     public List<String> getFromItemIds() {

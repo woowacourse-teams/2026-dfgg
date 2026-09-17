@@ -68,7 +68,7 @@ class ItemServiceTest {
         assertThat(captor.getValue()).extracting(Item::getItemId)
                 .containsExactlyInAnyOrder(1036L, 3133L, 3071L, 1055L, 1001L);
         assertThat(captor.getValue()).allSatisfy(saved -> {
-            assertThat(saved.getUrl()).isEqualTo("https://cdn.example.com/images/16.18/items/" + saved.getItemId() + ".png");
+            verify(itemImageService).store("16.18", "16.18.1", saved.getItemId() + ".png");
             assertThat(saved.getGold()).containsEntry("total", 350);
         });
         Item component = captor.getValue().stream().filter(i -> i.getItemId() == 3133L).findFirst().orElseThrow();

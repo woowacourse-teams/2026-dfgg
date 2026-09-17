@@ -41,11 +41,11 @@ public class ItemService {
                     if (data.image() == null) {
                         throw new IllegalStateException("[Error] 아이템 이미지 정보가 없습니다: " + itemId);
                     }
+                    itemImageService.store(response.version(), response.dataVersion(), data.image().full());
                     return new Item(
                             itemId,
                             Map.of("ko-KR", data.name()),
                             goldOf(data),
-                            itemImageService.store(response.version(), response.dataVersion(), data.image().full()),
                             data.from(),
                             data.into(),
                             data.tags()
