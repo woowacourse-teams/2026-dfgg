@@ -17,7 +17,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 class S3ImageStorageTest {
     private S3Client client;
     private S3ImageStorage storage;
-    private final String key = "lol/16.15.1/champion/Aatrox.png";
+    private final String key = "dfgg/images/16.15/champions/Aatrox.png";
 
     @BeforeEach
     void setUp() {

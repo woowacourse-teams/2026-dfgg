@@ -18,7 +18,7 @@ public class ChampionImageService {
         if (filename == null || !filename.matches("[A-Za-z0-9_-]+\\.png")) {
             throw new IllegalStateException("[Error] 챔피언 이미지 파일명이 올바르지 않습니다.");
         }
-        String key = "images/" + version + "/champions/" + filename;
+        String key = "dfgg/images/" + version + "/champions/" + filename;
         storage.store(key, () -> dataDragonClient.getChampionImage(dataVersion, filename));
     }
 }

@@ -22,7 +22,7 @@ class ItemImageServiceTest {
             Supplier<byte[]> content = call.getArgument(1);
             assertThat(content.get()).isEqualTo(png);
             return null;
-        }).when(storage).store(eq("images/16.15/items/1036.png"), any());
+        }).when(storage).store(eq("dfgg/images/16.15/items/1036.png"), any());
         new ItemImageService(dragon, storage).store("16.15", "16.15.1", "1036.png");
     }
 
