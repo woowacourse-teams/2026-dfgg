@@ -2,7 +2,7 @@ package dfgg.infrastructure.external.client;
 
 import dfgg.infrastructure.external.config.RiotApiProperties;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
-import dfgg.infrastructure.external.dto.MatchResponse;
+import dfgg.infrastructure.external.dto.LeagueListResponse;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
@@ -32,7 +32,10 @@ public class RiotClient {
 
     @Autowired
     public RiotClient(RestClient.Builder builder, RiotApiProperties properties) {
-        this(builder, properties, new RiotRateLimitExecutor());
+        this(builder, properties, new RiotRateLimitExecutor(
+                properties.requestsPerSecond(),
+                properties.requestsPerTwoMinutes()
+        ));
     }
 
     RiotClient(
@@ -72,7 +75,7 @@ public class RiotClient {
         Assert.hasText(division, "division must not be blank");
         Assert.isTrue(page > 0, "page must be greater than zero");
 
-        List<LeagueEntryResponse> response = rateLimitExecutor.execute(() ->
+        List<LeagueEntryResponse> response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.PLATFORM, () ->
                 platformRestClient.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/league/v4/entries/{queue}/{tier}/{division}")
@@ -88,6 +91,50 @@ public class RiotClient {
         return List.copyOf(response);
     }
 
+    public List<LeagueEntryResponse> getLeagueEntriesByPuuid(String puuid) {
+        Assert.hasText(puuid, "puuid must not be blank");
+
+        List<LeagueEntryResponse> response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.PLATFORM, () ->
+                platformRestClient.get()
+                        .uri("/lol/league/v4/entries/by-puuid/{puuid}", puuid)
+                        .retrieve()
+                        .body(LEAGUE_ENTRY_LIST_TYPE)
+        );
+
+        if (response == null) {
+            throw new IllegalStateException("[Error] Riot League entries response is empty");
+        }
+        return List.copyOf(response);
+    }
+
+    public LeagueListResponse getMasterLeague(String queue) {
+        return getApexLeague(queue, "masterleagues", "Master");
+    }
+
+    public LeagueListResponse getGrandmasterLeague(String queue) {
+        return getApexLeague(queue, "grandmasterleagues", "Grandmaster");
+    }
+
+    public LeagueListResponse getChallengerLeague(String queue) {
+        return getApexLeague(queue, "challengerleagues", "Challenger");
+    }
+
+    private LeagueListResponse getApexLeague(String queue, String leaguePath, String tierName) {
+        Assert.hasText(queue, "queue must not be blank");
+
+        LeagueListResponse response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.PLATFORM, () ->
+                platformRestClient.get()
+                        .uri("/lol/league/v4/{leaguePath}/by-queue/{queue}", leaguePath, queue)
+                        .retrieve()
+                        .body(LeagueListResponse.class)
+        );
+
+        if (response == null) {
+            throw new IllegalStateException("[Error] Riot " + tierName + " league response is empty");
+        }
+        return response;
+    }
+
     public List<String> getMatchIds(String puuid) {
         return getMatchIds(puuid, DEFAULT_MATCH_START, DEFAULT_MATCH_COUNT);
     }
@@ -97,7 +144,7 @@ public class RiotClient {
         Assert.isTrue(start >= 0, "start must not be negative");
         Assert.isTrue(count >= 0 && count <= 100, "count must be between 0 and 100");
 
-        List<String> response = rateLimitExecutor.execute(() ->
+        List<String> response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.REGIONAL, () ->
                 regionalRestClient.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/match/v5/matches/by-puuid/{puuid}/ids")
@@ -115,28 +162,10 @@ public class RiotClient {
         return List.copyOf(response);
     }
 
-    public MatchResponse getMatch(String matchId) {
-        Assert.hasText(matchId, "matchId must not be blank");
-
-        MatchResponse response = rateLimitExecutor.execute(() ->
-                regionalRestClient.get()
-                        .uri(uriBuilder -> uriBuilder
-                                .path("/lol/match/v5/matches/{matchId}")
-                                .build(matchId))
-                        .retrieve()
-                        .body(MatchResponse.class)
-        );
-
-        if (response == null) {
-            throw new IllegalStateException("[Error] Riot Match response is empty");
-        }
-        return response;
-    }
-
     public String getRawMatch(String matchId) {
         Assert.hasText(matchId, "matchId must not be blank");
 
-        String response = rateLimitExecutor.execute(() ->
+        String response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.REGIONAL, () ->
                 regionalRestClient.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/match/v5/matches/{matchId}")
@@ -150,4 +179,23 @@ public class RiotClient {
         }
         return response;
     }
+
+    public String getRawMatchTimeline(String matchId) {
+        Assert.hasText(matchId, "matchId must not be blank");
+
+        String response = rateLimitExecutor.execute(RiotRateLimitExecutor.Scope.REGIONAL, () ->
+                regionalRestClient.get()
+                        .uri(uriBuilder -> uriBuilder
+                                .path("/lol/match/v5/matches/{matchId}/timeline")
+                                .build(matchId))
+                        .retrieve()
+                        .body(String.class)
+        );
+
+        if (response == null) {
+            throw new IllegalStateException("[Error] Riot raw Match timeline response is empty");
+        }
+        return response;
+    }
+
 }
