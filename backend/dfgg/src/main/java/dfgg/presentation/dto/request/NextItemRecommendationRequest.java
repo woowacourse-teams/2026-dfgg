@@ -32,7 +32,7 @@ public record NextItemRecommendationRequest(
         @NotBlank(message = "티어는 필수입니다")
         String tier,
 
-        @NotBlank(message = "패치는 필수입니다")
+        /** 선택. 비우면 서비스의 현재 버전({@code riot.version})으로 추천한다. */
         String patch
 ) {
 
