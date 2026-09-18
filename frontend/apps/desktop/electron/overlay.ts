@@ -18,15 +18,33 @@ interface GameInfo {
 }
 
 /**
+ * 입력을 오버레이가 먹을지 게임으로 흘려보낼지 정한다. 'noPassThrough'가 기본값이고,
+ * 롤처럼 마우스 커서가 보이는 게임("Standard mode")은 포커스를 뺏지 않고도 바로
+ * 클릭·키 입력이 오버레이로 들어온다.
+ */
+type OverlayPassthrough = 'noPassThrough' | 'passThrough' | 'passThroughAndNotify';
+
+interface OverlayWindowOptions extends BrowserWindowConstructorOptions {
+  name: string;
+  passthrough?: OverlayPassthrough;
+  zOrder?: 'default' | 'topMost' | 'bottomMost';
+  /** true면 오버레이가 키보드 입력을 가로채지 않는다. 기본값 false(가로챈다). */
+  ignoreKeyboardInput?: boolean;
+  /**
+   * true면 모니터 DPI를 반영해서 그린다. 기본값 false라, 배율이 100%가 아닌
+   * 화면에서는 클릭 좌표와 실제 렌더링 위치가 어긋날 수 있다.
+   */
+  dpiAware?: boolean;
+}
+
+/**
  * ow-electron 오버레이 API 중 우리가 쓰는 부분만 좁게 선언한다.
  * 전체 타입은 @overwolf/ow-electron-packages-types 에 있지만, 일반 electron 으로
  * 실행할 때도 컴파일이 되어야 하므로 여기서 최소한만 정의한다.
  */
 interface OverlayApi {
   registerGames(filter: { gamesIds?: number[]; includeUnsupported?: boolean }): void;
-  createWindow(
-    options: BrowserWindowConstructorOptions & { name: string },
-  ): Promise<{ window: BrowserWindow }>;
+  createWindow(options: OverlayWindowOptions): Promise<{ window: BrowserWindow }>;
   on(event: string, listener: (...args: never[]) => void): unknown;
 }
 
@@ -79,7 +97,7 @@ function waitForOverlayApi(timeoutMs = 10_000): Promise<OverlayApi | null> {
  * 동작에는 영향이 없다(메인 창이 아직 안 뜬 시점에 호출될 수 있어 선택값이다).
  */
 export async function createGameOverlay(
-  options: BrowserWindowConstructorOptions & { name: string },
+  options: OverlayWindowOptions,
   getMainWindow?: () => BrowserWindow | null,
 ): Promise<BrowserWindow | null> {
   const fallback = (reason: string) => {

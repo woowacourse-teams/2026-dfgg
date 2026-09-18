@@ -123,6 +123,12 @@ let seenItemsSessionId = -1;
 
 let overlayScale = 1;
 let overlayVisible = true;
+/**
+ * 일반 창 fallback인지. 이 창은 focusable이라, 롤이 독점 전체화면일 때 떠 있으면
+ * Windows가 "다른 창이 활성화를 시도했다"고 보고 게임을 최소화시켜버린다.
+ * 게임 프로세스에 직접 그려지는 ow-electron 인게임 오버레이는 이 문제가 없다.
+ */
+let overlayIsPlainWindow = false;
 
 /** 1번/2번 추천 방식 중 화면에 보여줄 것. 메인 창에서 바꾸면 오버레이도 따라간다. */
 let recommendMode: 1 | 2 = 1;
@@ -255,6 +261,7 @@ async function refreshSession() {
       lastWindowMode = mode;
       console.log('[lcu] 창 모드', mode, '(0=전체 화면, 1=테두리 없음, 2=창 모드)');
       broadcast('lcu:windowMode', mode);
+      applyOverlayVisibility();
     }
 
     // 밴픽·로딩·인게임을 한 판으로 묶어주는 유일한 신호다.
@@ -562,11 +569,22 @@ function applyOverlayBounds() {
 function setOverlayVisible(visible: boolean, source: 'hotkey' | 'button' = 'button') {
   overlayVisible = visible;
   track('overlay-toggle', { visible, source });
-  if (!overlayWindow || overlayWindow.isDestroyed()) return;
-  if (visible) overlayWindow.showInactive();
-  else overlayWindow.hide();
+  applyOverlayVisibility();
   // 메인 창의 토글 상태를 실제와 맞춘다. 단축키로 바꿨을 때도 반영된다.
   mainWindow?.webContents.send('overlay:state', { scale: overlayScale, visible: overlayVisible });
+}
+
+/**
+ * overlayVisible(사용자가 원하는 상태)과 전체화면 여부를 합쳐 실제로 보일지 정한다.
+ * 독점 전체화면 + 일반 창 fallback 조합이면 사용자가 켜놔도 강제로 숨긴다 —
+ * 안 그러면 그 창이 뜨는 순간 롤이 최소화된다. 모드가 바뀌면 다시 평가해야 하므로
+ * lastWindowMode가 바뀔 때도 이 함수를 불러야 한다.
+ */
+function applyOverlayVisibility() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const suppressed = overlayIsPlainWindow && lastWindowMode === 0;
+  if (overlayVisible && !suppressed) overlayWindow.showInactive();
+  else overlayWindow.hide();
 }
 
 /**
@@ -582,7 +600,13 @@ function startTopmostGuard() {
   }, TOPMOST_GUARD_MS);
 }
 
-/** ow-electron 이 아닐 때 쓰는 일반 창. 전체 화면 게임에는 가려진다. */
+/**
+ * ow-electron 이 아닐 때 쓰는 일반 창. 전체 화면 게임에는 가려진다.
+ *
+ * 게임 프로세스에 주입되는 게 아니라 그냥 위에 떠 있는 창이라, 클릭이 오버레이로
+ * 들어와도 Vanguard 같은 안티치트가 감시하는 "주입"에 해당하지 않는다. 그래서
+ * 여기선 클릭스루를 걸지 않고 그대로 상호작용되게 둔다.
+ */
 function createPlainOverlayWindow(): BrowserWindow {
   const { height } = screen.getPrimaryDisplay().workAreaSize;
 
@@ -597,8 +621,7 @@ function createPlainOverlayWindow(): BrowserWindow {
     skipTaskbar: true,
     alwaysOnTop: true,
     show: true,
-    // 포커스를 가져가지 않는다. 게임 중에 클릭이 오버레이로 새면 안 된다.
-    focusable: false,
+    focusable: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -608,7 +631,6 @@ function createPlainOverlayWindow(): BrowserWindow {
 
   created.setAlwaysOnTop(true, 'screen-saver');
   created.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  created.setIgnoreMouseEvents(true, { forward: true });
 
   // 게임이 포그라운드를 잡으면 Windows가 최상위 지정을 풀어버린다.
   return created;
@@ -628,6 +650,13 @@ async function createOverlayWindow() {
       frame: false,
       resizable: false,
       show: true,
+      // 롤은 마우스 커서가 보이는 "Standard mode" 게임이라 포커스를 뺏지 않아도
+      // 클릭·키 입력이 바로 들어온다. noPassThrough가 기본값이지만 나중에
+      // SDK 기본값이 바뀌어도 깨지지 않도록 명시해둔다.
+      passthrough: 'noPassThrough',
+      zOrder: 'topMost',
+      // 배율 100%가 아닌 화면에서 클릭 좌표가 밀리는 걸 막는다.
+      dpiAware: true,
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
@@ -639,6 +668,7 @@ async function createOverlayWindow() {
 
   const created = inGame ?? createPlainOverlayWindow();
   overlayWindow = created;
+  overlayIsPlainWindow = !inGame;
 
   // 일반 창으로 떨어졌을 때만 최상위 다툼을 해야 한다.
   if (!inGame) startTopmostGuard();
@@ -647,7 +677,7 @@ async function createOverlayWindow() {
 
   created.once('ready-to-show', () => {
     applyOverlayBounds();
-    if (overlayVisible) created.showInactive();
+    applyOverlayVisibility();
     console.log('[overlay] 표시됨', inGame ? '(게임 내 오버레이)' : '(일반 창)');
     // 오버레이는 메인 창과 별개 렌더러라 콘솔도 따로 뜬다. detach로 열어야
     // 작고 항상 위에 떠 있는 오버레이 창 안에 끼어들지 않는다.

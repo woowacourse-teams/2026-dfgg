@@ -18,8 +18,8 @@ const POSITION_LABEL: Record<Position, string> = {
  * 배경이 투명해야 하므로 바깥 div에 배경색을 주지 않는다 — 카드에만 준다.
  */
 export default function App() {
-  // 오버레이는 클릭이 통과하는 창이라 버튼을 못 단다. 메인 창에서 고른 모드를
-  // 그대로 따라간다. 두 방식 다 항상 돌고 있어서 전환 지연 없이 바로 보인다.
+  // 모드 전환은 여전히 메인 창에서만 한다 — 두 방식 다 항상 돌고 있어서
+  // 전환 지연 없이 바로 보인다. 닫기만 오버레이 자체에서 가능하다.
   const [mode] = useRecommendMode();
 
   const { lineup, ddragon, result, error, loading, enemyPicked, allyPicked } = useRecommendation();
@@ -54,9 +54,28 @@ export default function App() {
               </span>
             )}
           </h1>
-          <span className='shrink-0 text-[10px] text-white/70'>
-            {allyPicked}/5 · {enemyPicked}/5
-          </span>
+          <div className='flex shrink-0 items-center gap-1.5'>
+            <span className='text-[10px] text-white/70'>
+              {allyPicked}/5 · {enemyPicked}/5
+            </span>
+            <button
+              type='button'
+              onClick={() => {
+                // hover는 되는데 클릭이 안 먹는 것처럼 보이는 문제를 좁히려고 임시로 남긴다.
+                console.log('[overlay] 닫기 클릭됨');
+                void window.lcu?.overlay.setVisible(false).then((visible) => {
+                  console.log('[overlay] setVisible 결과', visible);
+                });
+              }}
+              aria-label='오버레이 닫기'
+              // 투명한 곳은 클릭이 게임으로 통과하는 오버레이라, 버튼 영역은 평소에도
+              // 충분히 불투명해야 클릭 판정이 흔들리지 않는다(hover만 있던 이전 버전은
+              // 마우스가 조금만 움직여도 판정 경계를 넘나들어 깜빡였다).
+              className='cursor-pointer rounded bg-black/60 px-1.5 py-0.5 text-xs leading-none text-white hover:bg-black/80'
+            >
+              ✕
+            </button>
+          </div>
         </header>
 
         {activeLoading && <p className='mt-1.5 text-[11px] text-white/80'>분석 중...</p>}
