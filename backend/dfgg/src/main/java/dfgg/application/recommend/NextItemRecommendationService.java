@@ -21,6 +21,7 @@ import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.common.exception.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
+import dfgg.domain.image.ImageUrls;
 import dfgg.domain.item.Item;
 import dfgg.domain.item.trait.ItemTrait;
 import dfgg.domain.item.trait.ItemTraitCatalog;
@@ -72,6 +73,7 @@ public class NextItemRecommendationService {
     private final TreeShapCalculator treeShapCalculator;
     private final ChampionDirectory championDirectory;
     private final ItemTraitCatalog itemTraitCatalog;
+    private final ImageUrls imageUrls;
 
     public NextItemRecommendationService(
             ChampionService championService,
@@ -82,7 +84,8 @@ public class NextItemRecommendationService {
             CandidateTopK candidateTopK,
             TreeShapCalculator treeShapCalculator,
             ChampionDirectory championDirectory,
-            ItemTraitCatalog itemTraitCatalog
+            ItemTraitCatalog itemTraitCatalog,
+            ImageUrls imageUrls
     ) {
         this.championService = championService;
         this.itemService = itemService;
@@ -93,6 +96,7 @@ public class NextItemRecommendationService {
         this.treeShapCalculator = treeShapCalculator;
         this.championDirectory = championDirectory;
         this.itemTraitCatalog = itemTraitCatalog;
+        this.imageUrls = imageUrls;
     }
 
     public NextItemRecommendationResponse recommendNextItem(NextItemRecommendationRequest request) {
@@ -130,7 +134,7 @@ public class NextItemRecommendationService {
             ItemCandidate evidence = valid.candidateOf(candidate.itemId());
             logContributions(candidate, evidence);
 
-            recommendedItems.add(RecommendedItemDto.of(item,
+            recommendedItems.add(RecommendedItemDto.of(item, imageUrls.itemOf(item.getItemId()),
                     new RecommendationDescription(
                             championRefs(CounterEvidence.championIdsFor(evidence), championProfiles),
                             championRefs(AllyEvidence.championIdsFor(
@@ -170,7 +174,8 @@ public class NextItemRecommendationService {
         return championIds.stream()
                 .map(championProfiles::get)
                 .filter(Objects::nonNull)
-                .map(profile -> new ChampionRefDto(profile.championId(), profile.name()))
+                .map(profile -> new ChampionRefDto(profile.championId(), profile.name(),
+                        imageUrls.championOf(profile.riotKey())))
                 .toList();
     }
 

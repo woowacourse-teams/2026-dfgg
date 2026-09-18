@@ -81,7 +81,8 @@ class NextItemRecommendationServiceTest {
                 new dfgg.application.recommend.v3.CandidateTopK(20, 20, 20, 30),
                 trivialShapCalculator(),
                 new dfgg.application.recommend.v3.explanation.ChampionDirectory(championRepository),
-                new dfgg.domain.item.trait.ItemTraitCatalog()
+                new dfgg.domain.item.trait.ItemTraitCatalog(),
+                new dfgg.domain.image.ImageUrls("test-bucket", "ap-northeast-2", "99.1")
         );
     }
 

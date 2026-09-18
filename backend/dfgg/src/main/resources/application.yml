@@ -24,6 +24,7 @@ spring:
     open-in-view: false
 
 riot:
+  version: "${LEAGUE_OF_LEGENDS_VERSION:16.18}"
   api:
     key: "${RIOT_API_KEY:}"
     platform-base-url: "${RIOT_PLATFORM_BASE_URL:https://kr.api.riotgames.com}"

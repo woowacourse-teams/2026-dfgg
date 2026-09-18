@@ -21,6 +21,7 @@ spring:
     database:
       replace: none
 riot:
+  version: "99.1"
   api:
     key: "test-riot-api-key"
     platform-base-url: "https://kr.api.riotgames.com"
@@ -51,3 +52,7 @@ recommendation:
     self-synergy: 20
     ally-synergy: 20
     counter: 30
+assets:
+  s3:
+    bucket: "test-bucket"
+    region: "ap-northeast-2"

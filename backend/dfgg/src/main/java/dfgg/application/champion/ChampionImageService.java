@@ -1,5 +1,6 @@
 package dfgg.application.champion;
 
+import dfgg.domain.image.ImageKeys;
 import dfgg.infrastructure.external.client.DataDragonClient;
 import dfgg.infrastructure.storage.S3ImageStorage;
 import org.springframework.stereotype.Service;
@@ -14,11 +15,15 @@ public class ChampionImageService {
         this.storage = storage;
     }
 
-    public void store(String version, String dataVersion, String filename) {
+    /**
+     * @param riotKey  저장 키. 응답 URL과 같은 규칙({@link ImageKeys})을 쓴다
+     * @param filename ddragon 원본 파일명. 내려받을 때만 쓴다
+     */
+    public void store(String version, String dataVersion, String riotKey, String filename) {
         if (filename == null || !filename.matches("[A-Za-z0-9_-]+\\.png")) {
             throw new IllegalStateException("[Error] 챔피언 이미지 파일명이 올바르지 않습니다.");
         }
-        String key = "dfgg/images/" + version + "/champions/" + filename;
-        storage.store(key, () -> dataDragonClient.getChampionImage(dataVersion, filename));
+        storage.store(ImageKeys.champion(version, riotKey),
+                () -> dataDragonClient.getChampionImage(dataVersion, filename));
     }
 }

@@ -4,6 +4,7 @@ import dfgg.application.champion.ChampionService;
 import dfgg.common.exception.CompositionStatsNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
+import dfgg.domain.image.ImageUrls;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
@@ -26,15 +27,18 @@ public class RecommendationService {
     private final ChampionService championService;
     private final ChampionBuildStatsRepository statsRepository;
     private final RecommendationBuildComposer buildComposer;
+    private final ImageUrls imageUrls;
 
     public RecommendationService(
             ChampionService championService,
             ChampionBuildStatsRepository statsRepository,
-            RecommendationBuildComposer buildComposer
+            RecommendationBuildComposer buildComposer,
+            ImageUrls imageUrls
     ) {
         this.championService = championService;
         this.statsRepository = statsRepository;
         this.buildComposer = buildComposer;
+        this.imageUrls = imageUrls;
     }
 
     /**
@@ -83,7 +87,7 @@ public class RecommendationService {
         }
         // 도메인 Item을 외부 응답 전용 DTO로 변환해 내부 모델을 노출하지 않는다.
         List<ItemDto> itemDtos = bestItems.stream()
-                .map(ItemDto::from)
+                .map(item -> ItemDto.of(item, imageUrls.itemOf(item.getItemId())))
                 .toList();
 
         return new RecommendationResponse(

@@ -127,6 +127,20 @@ class CounterEvidenceInResponseTest {
     }
 
     @Test
+    @DisplayName("지목한 적에 이미지 URL이 붙는다 — S3 키가 영문 키라 한글 이름이 아니라 riotKey로 만든다")
+    void recommend_WhenCounterEvidenceExists_CarriesChampionImageUrlByRiotKey() {
+        // when
+        NextItemRecommendationResponse response = recommendAgainstRammus();
+
+        // then
+        assertThat(response.recommendedItems())
+                .flatMap(item -> item.description().counter())
+                .isNotEmpty()
+                .allSatisfy(champion -> assertThat(champion.imageUrl())
+                        .isEqualTo("https://test-bucket.s3.ap-northeast-2.amazonaws.com/dfgg/images/99.1/champions/Rammus.png"));
+    }
+
+    @Test
     @DisplayName("counter는 두 명을 넘지 않는다")
     void recommend_CapsCounterAtTwo() {
         assertThat(recommendAgainstRammus().recommendedItems())

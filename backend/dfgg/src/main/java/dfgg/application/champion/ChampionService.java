@@ -40,7 +40,7 @@ public class ChampionService {
                     Long championId = Long.parseLong(entry.getValue().key());
                     Map<String, String> names = response.localizedName(entry.getKey());
                     championImageService.store(response.version(), response.dataVersion(),
-                            entry.getValue().image().full());
+                            entry.getKey(), entry.getValue().image().full());
                     return new Champion(
                             championId,
                             entry.getKey(),
