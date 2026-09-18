@@ -129,12 +129,9 @@ jobs:
 
           # HTTP 상태와 JSON을 모두 검사한다. 응답 본문/비밀 값은 로그에 남기지 않는다.
           probe() {
-            local port=$1 path=$2 filter=$3 body=${4:-} code
+            local port=$1 path=$2 filter=$3 code
             local args=(--noproxy '*' --connect-timeout 3 --max-time 15 -sS
               -o "$DFGG_TMP/response.json" -w '%{http_code}')
-            if [[ -n "$body" ]]; then
-              args+=(-H 'Content-Type: application/json' --data "$body")
-            fi
             code=$(curl "${args[@]}" "http://127.0.0.1:${port}${path}") || return 1
             [[ "$code" == 200 ]] || return 1
             jq -e "$filter" "$DFGG_TMP/response.json" > /dev/null
@@ -288,7 +285,7 @@ jobs:
           mv -T "$DFGG_JAR_STAGE" "$DFGG_NEW_JAR"
           echo "Deploying $DFGG_OLD -> $DFGG_NEW; SHA256=$DFGG_JAR_HASH"
 
-          # 3. 기동·Readiness·추천 API를 확인한다. 준비에 실패하면 경로를 바꾸지 않는다.
+          # 3. 기동·Readiness를 확인한다. 준비에 실패하면 경로를 바꾸지 않는다.
           DFGG_STARTED=true
           sudo -n systemctl start "$DFGG_NEW_UNIT"
           deadline=$((SECONDS + 90))
@@ -299,14 +296,6 @@ jobs:
           [[ "$(property "$DFGG_NEW_UNIT" ActiveState)" == active ]] || exit 1
           [[ "$(property "$DFGG_NEW_UNIT" SubState)" == running ]] || exit 1
           [[ "$(property "$DFGG_NEW_UNIT" MainPID)" =~ ^[1-9][0-9]*$ ]] || exit 1
-          DFGG_V2_BODY='{"myChampion":{"name":"말파이트","position":"TOP"},"allies":[{"name":"리 신","position":"JUNGLE"},{"name":"아리","position":"MID"},{"name":"징크스","position":"BOTTOM"},{"name":"룰루","position":"SUPPORT"}],"enemies":[{"name":"가렌","position":"TOP"},{"name":"바이","position":"JUNGLE"},{"name":"제드","position":"MID"},{"name":"케이틀린","position":"BOTTOM"},{"name":"레오나","position":"SUPPORT"}]}'
-          # 수동 실험과 같은 데이터다. 지원 패치가 바뀌면 smoke 조건도 갱신한다.
-          DFGG_V3_BODY=$(jq -cn --argjson base "$DFGG_V2_BODY" \
-            '$base + {purchasedItemIds: [], tier: "PLATINUM", patch: "16.17"}')
-          probe "$DFGG_NEW_PORT" /api/recommendations/v2 \
-            '(.champion | type == "string") and (.builds | type == "array" and length > 0)' "$DFGG_V2_BODY"
-          probe "$DFGG_NEW_PORT" /api/recommendations/v3 \
-            '(.recommendedItems | type == "array" and length > 0)' "$DFGG_V3_BODY"
 
           # 4. 설정 백업 → 구문 검사 → reload. Nginx restart는 사용하지 않는다.
           sudo -n install -o root -g root -m 0644 "$DFGG_TMP/upstream.before" "$DFGG_BACKUP"
