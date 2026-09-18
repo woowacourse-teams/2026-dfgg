@@ -16,6 +16,7 @@ import dfgg.presentation.dto.response.NextItemRecommendationResponse;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import java.util.List;
+import java.util.Map;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.item.ItemRepository;
 import dfgg.domain.itemstats.ChampionItemRollupRepository;
@@ -188,6 +189,24 @@ class NextItemRecommendationV3PipelineTest {
 
         // then
         assertThat(body).doesNotContain("servedBy");
+    }
+
+    @Test
+    @DisplayName("추천 아이템마다 S3 이미지 URL을 싣는다 — 클라이언트가 ddragon 주소를 조립하지 않아도 된다")
+    void recommendV3_WhenServed_EachItemCarriesImageUrl() {
+        // given
+        NextItemRecommendationRequest request = requestWith(List.of(KRAKEN, INFINITY_EDGE));
+
+        // when
+        List<Map<String, Object>> items = given().contentType(ContentType.JSON).body(request)
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(200)
+                .extract().jsonPath().getList("recommendedItems");
+
+        // then
+        assertThat(items).isNotEmpty().allSatisfy(item ->
+                assertThat(item.get("imageUrl"))
+                        .isEqualTo("https://test-bucket.s3.ap-northeast-2.amazonaws.com/dfgg/images/99.1/items/" + item.get("id") + ".png"));
     }
 
     @Test

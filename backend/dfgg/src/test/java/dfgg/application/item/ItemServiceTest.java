@@ -71,7 +71,7 @@ class ItemServiceTest {
         assertThat(captor.getValue()).extracting(Item::getItemId)
                 .containsExactlyInAnyOrder(1036L, 3133L, 3071L, 1055L, 1001L);
         assertThat(captor.getValue()).allSatisfy(saved -> {
-            verify(itemImageService).store("16.18", "16.18.1", saved.getItemId() + ".png");
+            verify(itemImageService).store("16.18", "16.18.1", saved.getItemId(), saved.getItemId() + ".png");
             assertThat(saved.getName()).containsEntry("en-US", "English " + saved.getItemId())
                     .containsEntry("ko-KR", saved.getItemId() + ".png");
             assertThat(saved.getGold()).containsEntry("total", 350);
@@ -105,9 +105,9 @@ class ItemServiceTest {
         data.put("1036", equipment("1036.png", null, List.of("3133")));
         data.put("3133", equipment("3133.png", List.of("1036"), List.of("3071")));
         when(dataDragonClient.getItems()).thenReturn(response("16.18", "16.18.1", data));
-        org.mockito.Mockito.doNothing().when(itemImageService).store("16.18", "16.18.1", "1036.png");
+        org.mockito.Mockito.doNothing().when(itemImageService).store("16.18", "16.18.1", 1036L, "1036.png");
         org.mockito.Mockito.doThrow(new IllegalStateException("업로드 실패"))
-                .when(itemImageService).store("16.18", "16.18.1", "3133.png");
+                .when(itemImageService).store("16.18", "16.18.1", 3133L, "3133.png");
         assertThatThrownBy(itemService::syncItems).hasMessage("업로드 실패");
         verifyNoInteractions(itemRepository);
     }

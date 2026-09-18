@@ -5,6 +5,7 @@ import dfgg.common.exception.CompositionStatsNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionTag;
+import dfgg.domain.image.ImageUrls;
 import dfgg.domain.item.Item;
 import dfgg.domain.recommendation.BuildCandidate;
 import dfgg.domain.recommendation.BuildDirection;
@@ -53,6 +54,7 @@ public class MultiBuildRecommendationService {
     private final CoreBuildClusterService clusterService;
     private final BuildCandidateSelectService candidateSelectService;
     private final Map<ChampionTag, ChampionBuildPolicy> policies;
+    private final ImageUrls imageUrls;
 
     public MultiBuildRecommendationService(
             ChampionService championService,
@@ -61,7 +63,8 @@ public class MultiBuildRecommendationService {
             RecommendationProperties recommendationProperties,
             CoreBuildClusterService clusterService,
             BuildCandidateSelectService candidateSelectService,
-            List<ChampionBuildPolicy> policies
+            List<ChampionBuildPolicy> policies,
+            ImageUrls imageUrls
     ) {
         this.championService = championService;
         this.statsRepository = statsRepository;
@@ -70,6 +73,7 @@ public class MultiBuildRecommendationService {
         this.clusterService = clusterService;
         this.candidateSelectService = candidateSelectService;
         this.policies = createPolicyMap(policies);
+        this.imageUrls = imageUrls;
     }
 
     public MultiBuildRecommendationResponse recommend(RecommendationRequest request) {
@@ -336,7 +340,7 @@ public class MultiBuildRecommendationService {
 
     private List<ItemDto> toItemDtos(List<Item> items) {
         return items.stream()
-                .map(ItemDto::from)
+                .map(item -> ItemDto.of(item, imageUrls.itemOf(item.getItemId())))
                 .toList();
     }
 }

@@ -23,7 +23,7 @@ class ItemImageServiceTest {
             assertThat(content.get()).isEqualTo(png);
             return null;
         }).when(storage).store(eq("dfgg/images/16.15/items/1036.png"), any());
-        new ItemImageService(dragon, storage).store("16.15", "16.15.1", "1036.png");
+        new ItemImageService(dragon, storage).store("16.15", "16.15.1", 1036L, "1036.png");
     }
 
     @Test
@@ -31,7 +31,7 @@ class ItemImageServiceTest {
         var dragon = mock(DataDragonClient.class);
         var storage = mock(S3ImageStorage.class);
         var service = new ItemImageService(dragon, storage);
-        assertThatThrownBy(() -> service.store("16.15", "16.15.1", "../1036.png")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.store("16.15", "16.15.1", 1036L, "../1036.png")).isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(dragon, storage);
     }
 }

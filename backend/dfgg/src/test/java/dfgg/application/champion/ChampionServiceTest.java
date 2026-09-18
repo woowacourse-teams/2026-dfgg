@@ -64,7 +64,7 @@ class ChampionServiceTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Champion>> captor = ArgumentCaptor.forClass(List.class);
         verify(championRepository).saveAll(captor.capture());
-        verify(championImageService).store("16.15", "16.15.1", "Aatrox.png");
+        verify(championImageService).store("16.15", "16.15.1", "Aatrox", "Aatrox.png");
 
         assertThat(captor.getValue()).singleElement().satisfies(champion -> {
             assertThat(champion.getChampionId()).isEqualTo(266L);
@@ -111,7 +111,7 @@ class ChampionServiceTest {
                 "Aatrox", new ChampionData("266", "아트록스", List.of("Fighter"),
                         new ChampionData.Image("Aatrox.png")))));
         org.mockito.Mockito.doThrow(new IllegalStateException("S3 failure"))
-                .when(championImageService).store("16.15", "16.15.1", "Aatrox.png");
+                .when(championImageService).store("16.15", "16.15.1", "Aatrox", "Aatrox.png");
         assertThatThrownBy(championService::syncChampions).hasMessage("S3 failure");
         verifyNoInteractions(championRepository);
     }

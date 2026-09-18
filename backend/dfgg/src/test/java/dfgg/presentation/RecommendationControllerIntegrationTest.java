@@ -61,7 +61,7 @@ class RecommendationControllerIntegrationTest {
                 new RecommendationResponse(
                         "말파이트",
                         "TOP",
-                        List.of(new ItemDto(1L, "아이템"))
+                        List.of(new ItemDto(1L, "아이템", "https://test-bucket.s3.ap-northeast-2.amazonaws.com/dfgg/images/99.1/items/1.png"))
                 )
         );
 
@@ -83,7 +83,7 @@ class RecommendationControllerIntegrationTest {
                                 new BuildOptionResponse(
                                         "TANK",
                                         "PHYSICAL_DAMAGE",
-                                        List.of(new ItemDto(1L, "아이템"))
+                                        List.of(new ItemDto(1L, "아이템", "https://test-bucket.s3.ap-northeast-2.amazonaws.com/dfgg/images/99.1/items/1.png"))
                                 ),
                                 new BuildOptionResponse(
                                         "TANK",

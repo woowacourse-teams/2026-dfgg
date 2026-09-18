@@ -13,6 +13,7 @@ import dfgg.application.champion.ChampionService;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionTag;
+import dfgg.domain.image.ImageUrls;
 import dfgg.domain.item.Item;
 import dfgg.domain.recommendation.AssassinBuildPolicy;
 import dfgg.domain.recommendation.ChampionBuildPolicy;
@@ -69,7 +70,8 @@ class MultiBuildRecommendationServiceTest {
                 recommendationProperties(1),
                 new CoreBuildClusterService(),
                 new BuildCandidateSelectService(),
-                buildPolicies()
+                buildPolicies(),
+                new ImageUrls("test-bucket", "ap-northeast-2", "99.1")
         );
         myChampion = new Champion(
                 1L,
@@ -77,6 +79,28 @@ class MultiBuildRecommendationServiceTest {
                 Map.of("ko-KR", "말파이트"),
                 List.of(ChampionTag.TANK)
         );
+    }
+
+    @Test
+    @DisplayName("빌드의 아이템마다 S3 이미지 URL을 싣는다")
+    void recommend_WhenBuildRecommended_EachItemCarriesImageUrl() {
+        // given
+        RecommendationRequest request = prepareRequest(ChampionPosition.TOP);
+        ChampionBuildStats completeBuild = stats(
+                ChampionPosition.TOP,
+                "NORMAL_COMPLETE",
+                completeItems(6),
+                30
+        );
+        givenMatchingStats(ChampionPosition.TOP, List.of(completeBuild));
+
+        // when
+        MultiBuildRecommendationResponse response = recommendationService.recommend(request);
+
+        // then
+        assertThat(response.builds().getFirst().build()).isNotEmpty().allSatisfy(item ->
+                assertThat(item.imageUrl())
+                        .isEqualTo("https://test-bucket.s3.ap-northeast-2.amazonaws.com/dfgg/images/99.1/items/" + item.id() + ".png"));
     }
 
     @Test
@@ -293,7 +317,8 @@ class MultiBuildRecommendationServiceTest {
                 recommendationProperties(1),
                 clusterService,
                 new BuildCandidateSelectService(),
-                List.of(tankPolicy, magePolicy, fighterPolicy)
+                List.of(tankPolicy, magePolicy, fighterPolicy),
+                new ImageUrls("test-bucket", "ap-northeast-2", "99.1")
         );
         RecommendationRequest request = prepareRequest(ChampionPosition.MID);
         ChampionBuildStats observedStats = stats(
@@ -427,7 +452,8 @@ class MultiBuildRecommendationServiceTest {
                 recommendationProperties(30),
                 new CoreBuildClusterService(),
                 new BuildCandidateSelectService(),
-                buildPolicies()
+                buildPolicies(),
+                new ImageUrls("test-bucket", "ap-northeast-2", "99.1")
         );
         RecommendationRequest request = prepareRequest(ChampionPosition.TOP);
         ChampionBuildStats latestStats = stats(
@@ -459,7 +485,8 @@ class MultiBuildRecommendationServiceTest {
                 recommendationProperties(30),
                 new CoreBuildClusterService(),
                 new BuildCandidateSelectService(),
-                buildPolicies()
+                buildPolicies(),
+                new ImageUrls("test-bucket", "ap-northeast-2", "99.1")
         );
         RecommendationRequest request = prepareRequest(ChampionPosition.TOP);
         ChampionBuildStats latestStats = stats(

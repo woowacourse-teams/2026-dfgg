@@ -14,6 +14,7 @@ import dfgg.common.exception.CompositionStatsNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionTag;
+import dfgg.domain.image.ImageUrls;
 import dfgg.domain.item.Item;
 import dfgg.domain.stats.ChampionBuildStats;
 import dfgg.domain.stats.ChampionBuildStatsRepository;
@@ -44,7 +45,8 @@ class RecommendationServiceTest {
 
     @BeforeEach
     void setUp() {
-        recommendationService = new RecommendationService(championService, statsRepository, buildComposer);
+        recommendationService = new RecommendationService(championService, statsRepository, buildComposer,
+                new ImageUrls("test-bucket", "ap-northeast-2", "99.1"));
     }
 
     @Test
@@ -102,6 +104,61 @@ class RecommendationServiceTest {
         assertThat(response.champion()).isEqualTo("징크스");
         assertThat(response.position()).isEqualTo("BOTTOM");
         assertThat(response.items()).hasSize(7);
+    }
+
+    @Test
+    @DisplayName("추천 아이템마다 S3 이미지 URL을 싣는다")
+    void recommend_WhenItemsRecommended_EachItemCarriesImageUrl() {
+        // given
+        RecommendationRequest request = new RecommendationRequest(
+                new ChampionDto("징크스", "BOTTOM"),
+                List.of(new ChampionDto("쓰레쉬", "SUPPORT")),
+                List.of(new ChampionDto("케이틀린", "BOTTOM"))
+        );
+
+        Champion myChampion = mock(Champion.class);
+        when(myChampion.getChampionId()).thenReturn(1L);
+        when(myChampion.getName()).thenReturn(java.util.Map.of("ko-KR", "징크스"));
+
+        Champion thresh = mock(Champion.class);
+        when(thresh.getChampionTags()).thenReturn(List.of(ChampionTag.SUPPORT));
+
+        Champion caitlyn = mock(Champion.class);
+        when(caitlyn.getChampionTags()).thenReturn(List.of(ChampionTag.MARKSMAN));
+
+        when(championService.findChampionByName("징크스")).thenReturn(myChampion);
+        when(championService.findChampionByName("쓰레쉬")).thenReturn(thresh);
+        when(championService.findChampionByName("케이틀린")).thenReturn(caitlyn);
+
+        Item item1 = new Item(1L, Map.of("ko-KR", "아이템1"));
+        Item boots = new Item(2L, Map.of("ko-KR", "신발"), List.of("Boots"));
+        Item item2 = new Item(3L, Map.of("ko-KR", "아이템2"));
+        Item item3 = new Item(4L, Map.of("ko-KR", "아이템3"));
+        Item item4 = new Item(5L, Map.of("ko-KR", "아이템4"));
+        Item item5 = new Item(6L, Map.of("ko-KR", "아이템5"));
+        Item item6 = new Item(7L, Map.of("ko-KR", "아이템6"));
+        ChampionBuildStats shortPopularStats = new ChampionBuildStats(
+                "16.15", 420, myChampion, ChampionPosition.BOTTOM,
+                null, null, null, null, null,
+                "PLATINUM", "SHORT", List.of(item1, boots, item2), 30, 50
+        );
+        ChampionBuildStats longRareStats = new ChampionBuildStats(
+                "16.15", 420, myChampion, ChampionPosition.BOTTOM,
+                null, null, null, null, null,
+                "PLATINUM", "LONG", List.of(item1, boots, item2, item3, item4, item5, item6), 2, 3
+        );
+        when(statsRepository.findAllMatchingStats(
+                eq(1L), eq("BOTTOM"),
+                anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean()
+        )).thenReturn(List.of(shortPopularStats, longRareStats));
+
+        // when
+        RecommendationResponse response = recommendationService.recommend(request);
+
+        // then
+        assertThat(response.items()).isNotEmpty().allSatisfy(recommended ->
+                assertThat(recommended.imageUrl())
+                        .isEqualTo("https://test-bucket.s3.ap-northeast-2.amazonaws.com/dfgg/images/99.1/items/" + recommended.id() + ".png"));
     }
 
     @Test
