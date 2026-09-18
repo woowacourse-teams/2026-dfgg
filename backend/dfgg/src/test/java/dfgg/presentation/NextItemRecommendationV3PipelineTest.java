@@ -192,6 +192,36 @@ class NextItemRecommendationV3PipelineTest {
     }
 
     @Test
+    @DisplayName("패치를 보내지 않아도 추천한다 — 클라이언트가 패치를 몰라도 된다")
+    void recommendV3_WhenPatchOmitted_Recommends() {
+        // given
+        String requestWithoutPatch = """
+                {
+                  "myChampion": {"name": "야스오", "position": "MID"},
+                  "purchasedItemIds": [6673, 3031],
+                  "allies": [
+                    {"name": "징크스", "position": "BOTTOM"}, {"name": "쓰레쉬", "position": "SUPPORT"},
+                    {"name": "리신", "position": "JUNGLE"}, {"name": "오른", "position": "TOP"}
+                  ],
+                  "enemies": [
+                    {"name": "람머스", "position": "TOP"}, {"name": "아리", "position": "MID"},
+                    {"name": "케이틀린", "position": "BOTTOM"}, {"name": "레오나", "position": "SUPPORT"},
+                    {"name": "엘리스", "position": "JUNGLE"}
+                  ],
+                  "tier": "EMERALD"
+                }""";
+
+        // when
+        List<Map<String, Object>> items = given().contentType(ContentType.JSON).body(requestWithoutPatch)
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(200)
+                .extract().jsonPath().getList("recommendedItems");
+
+        // then
+        assertThat(items).isNotEmpty();
+    }
+
+    @Test
     @DisplayName("추천 아이템마다 S3 이미지 URL을 싣는다 — 클라이언트가 ddragon 주소를 조립하지 않아도 된다")
     void recommendV3_WhenServed_EachItemCarriesImageUrl() {
         // given

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import dfgg.application.champion.ChampionService;
@@ -39,6 +40,10 @@ import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 class NextItemRecommendationServiceTest {
 
@@ -82,7 +87,8 @@ class NextItemRecommendationServiceTest {
                 trivialShapCalculator(),
                 new dfgg.application.recommend.v3.explanation.ChampionDirectory(championRepository),
                 new dfgg.domain.item.trait.ItemTraitCatalog(),
-                new dfgg.domain.image.ImageUrls("test-bucket", "ap-northeast-2", "99.1")
+                new dfgg.domain.image.ImageUrls("test-bucket", "ap-northeast-2", "99.1"),
+                new dfgg.infrastructure.config.LeagueOfLegendsVersionProperties("99.1")
         );
     }
 
@@ -138,6 +144,18 @@ class NextItemRecommendationServiceTest {
         );
     }
 
+    private NextItemRecommendationRequest requestWithPatch(String patch) {
+        return new NextItemRecommendationRequest(
+                new ChampionDto("야스오", "MID"), List.of(),
+                List.of(new ChampionDto("징크스", "BOTTOM"), new ChampionDto("쓰레쉬", "SUPPORT"),
+                        new ChampionDto("리신", "JUNGLE"), new ChampionDto("오른", "TOP")),
+                List.of(new ChampionDto("람머스", "TOP"), new ChampionDto("아리", "MID"),
+                        new ChampionDto("케이틀린", "BOTTOM"), new ChampionDto("레오나", "SUPPORT"),
+                        new ChampionDto("엘리스", "JUNGLE")),
+                "EMERALD", patch
+        );
+    }
+
     private void givenCandidates(long... itemIds) {
         List<ScoredItem> scored = java.util.stream.LongStream.of(itemIds)
                 .mapToObj(id -> new ScoredItem(id, 0.5))
@@ -156,6 +174,42 @@ class NextItemRecommendationServiceTest {
         return java.util.stream.LongStream.of(itemIds)
                 .mapToObj(id -> new RankedCandidate(id, 0.0, FeatureVector.empty()))
                 .toList();
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"  "})
+    @DisplayName("패치를 보내지 않으면 서비스의 현재 버전으로 추천한다")
+    void recommendNextItem_WhenPatchMissing_UseCurrentLeagueVersion(String patch) {
+        // given
+        givenCandidates(KRAKEN);
+        when(candidateRanker.rank(any(CandidateUnion.class), any(RecommendationQuery.class), anyInt()))
+                .thenReturn(rankedOf(KRAKEN));
+
+        // when
+        service.recommendNextItem(requestWithPatch(patch));
+
+        // then
+        ArgumentCaptor<RecommendationQuery> query = ArgumentCaptor.forClass(RecommendationQuery.class);
+        verify(buildGenerator).generate(query.capture(), anyInt());
+        assertThat(query.getValue().patch()).isEqualTo("99.1");
+    }
+
+    @Test
+    @DisplayName("패치를 보내면 그 패치로 추천한다")
+    void recommendNextItem_WhenPatchGiven_UseRequestedPatch() {
+        // given
+        givenCandidates(KRAKEN);
+        when(candidateRanker.rank(any(CandidateUnion.class), any(RecommendationQuery.class), anyInt()))
+                .thenReturn(rankedOf(KRAKEN));
+
+        // when
+        service.recommendNextItem(requestWithPatch("16.17"));
+
+        // then
+        ArgumentCaptor<RecommendationQuery> query = ArgumentCaptor.forClass(RecommendationQuery.class);
+        verify(buildGenerator).generate(query.capture(), anyInt());
+        assertThat(query.getValue().patch()).isEqualTo("16.17");
     }
 
     @Test

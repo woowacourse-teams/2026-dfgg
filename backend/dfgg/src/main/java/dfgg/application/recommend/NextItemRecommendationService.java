@@ -23,6 +23,7 @@ import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.image.ImageUrls;
 import dfgg.domain.item.Item;
+import dfgg.infrastructure.config.LeagueOfLegendsVersionProperties;
 import dfgg.domain.item.trait.ItemTrait;
 import dfgg.domain.item.trait.ItemTraitCatalog;
 import dfgg.presentation.dto.ChampionDto;
@@ -74,6 +75,7 @@ public class NextItemRecommendationService {
     private final ChampionDirectory championDirectory;
     private final ItemTraitCatalog itemTraitCatalog;
     private final ImageUrls imageUrls;
+    private final LeagueOfLegendsVersionProperties leagueOfLegendsVersion;
 
     public NextItemRecommendationService(
             ChampionService championService,
@@ -85,7 +87,8 @@ public class NextItemRecommendationService {
             TreeShapCalculator treeShapCalculator,
             ChampionDirectory championDirectory,
             ItemTraitCatalog itemTraitCatalog,
-            ImageUrls imageUrls
+            ImageUrls imageUrls,
+            LeagueOfLegendsVersionProperties leagueOfLegendsVersion
     ) {
         this.championService = championService;
         this.itemService = itemService;
@@ -97,6 +100,7 @@ public class NextItemRecommendationService {
         this.championDirectory = championDirectory;
         this.itemTraitCatalog = itemTraitCatalog;
         this.imageUrls = imageUrls;
+        this.leagueOfLegendsVersion = leagueOfLegendsVersion;
     }
 
     public NextItemRecommendationResponse recommendNextItem(NextItemRecommendationRequest request) {
@@ -203,8 +207,15 @@ public class NextItemRecommendationService {
                 championIdsOf(allies),
                 championIdsOf(enemies),
                 request.tier(),
-                request.patch()
+                patchOf(request)
         );
+    }
+
+    private String patchOf(NextItemRecommendationRequest request) {
+        if (request.patch() == null || request.patch().isBlank()) {
+            return leagueOfLegendsVersion.version();
+        }
+        return request.patch();
     }
 
     /**
