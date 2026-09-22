@@ -1,0 +1,99 @@
+{
+  "name": "desktop",
+  "version": "1.1.3",
+  "description": "League of Legends item build recommendations from the ten champions in your match",
+  "author": {
+    "name": "dfgg"
+  },
+  "private": true,
+  "main": "dist/main/main.js",
+  "scripts": {
+    "start": "webpack server --mode development",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "webpack --mode production",
+    "build": "pnpm build:main && pnpm build:renderer",
+    "typecheck": "tsc --noEmit",
+    "electron:start": "pnpm build:main && electron .",
+    "electron:dev": "concurrently -k \"pnpm start\" \"wait-on http://localhost:3001 && pnpm electron:start\"",
+    "package": "pnpm build && electron-builder --win nsis",
+    "package:store": "pnpm build && electron-builder --win appx",
+    "package:all": "pnpm build && electron-builder --win nsis appx",
+    "package:publish": "pnpm build && electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.1",
+    "concurrently": "^10.0.5",
+    "electron": "44.4.1",
+    "electron-builder": "^26.15.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "wait-on": "^9.1.0"
+  },
+  "build": {
+    "appId": "gg.dfgg.desktop",
+    "productName": "dfgg",
+    "directories": {
+      "output": "release",
+      "buildResources": "build-resources"
+    },
+    "files": [
+      "dist/**/*",
+      "build/**/*",
+      "package.json",
+      {
+        "from": "../../node_modules/ws",
+        "to": "node_modules/ws"
+      }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "appx",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "forceCodeSigning": false,
+    "artifactName": "dfgg-setup.${ext}",
+    "appx": {
+      "identityName": "DFGG.DFGG",
+      "publisher": "CN=9DD9FAAE-E9F4-42B1-B663-BF31249E9AB8",
+      "publisherDisplayName": "DFGG",
+      "applicationId": "dfgg",
+      "displayName": "dfgg",
+      "backgroundColor": "#0e1428",
+      "languages": [
+        "ko-KR"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "woowacourse-teams",
+        "repo": "2026-dfgg"
+      }
+    ]
+  }
+}
