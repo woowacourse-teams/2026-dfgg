@@ -1,0 +1,158 @@
+:root {
+  --bg: #10131a;
+  --surface: #1a1f2b;
+  --surface-hover: #212836;
+  --border: #2b3346;
+  --text: #e6e9f0;
+  --text-dim: #8d97ab;
+  --accent: #4f8cff;
+  --ok: #3ecf8e;
+  --warn: #e8b54a;
+  --off: #6b7488;
+}
+
+.app {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 상단 상태 바 ---------- */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  position: sticky;
+  top: 0;
+}
+
+.badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 12px;
+  background: var(--off);
+  color: #0d1017;
+}
+
+.badge-connected {
+  background: var(--ok);
+}
+.badge-connecting {
+  background: var(--warn);
+}
+.badge-disconnected,
+.badge-unknown {
+  background: var(--off);
+}
+
+.status-item {
+  color: var(--text-dim);
+}
+
+.status-summoner {
+  margin-left: auto;
+}
+
+/* ---------- 본문 ---------- */
+.content {
+  flex: 1;
+  padding: 16px;
+}
+
+.empty {
+  margin: 48px 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.cards {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* ---------- 아이템 카드 ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.item-image {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--surface-hover);
+  object-fit: cover;
+}
+
+.item-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.traits {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.reason + .reason {
+  margin-top: 10px;
+}
+
+.reason-title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.chip-image {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--border);
+  object-fit: cover;
+}
