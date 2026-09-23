@@ -16,7 +16,7 @@ concurrency:
 jobs:
   deploy:
     if: github.ref == 'refs/heads/BE/dev'
-    runs-on: self-hosted
+    runs-on: [self-hosted, dfgg-prod]
     timeout-minutes: 45
     defaults:
       run:
