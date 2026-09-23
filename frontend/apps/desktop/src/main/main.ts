@@ -67,6 +67,10 @@ function createWindow() {
 
   loadRenderer(home, 'home');
   loadRenderer(overlay, 'overlay');
+
+  home.on('closed', () => {
+    app.quit();
+  });
 }
 
 app.whenReady().then(async () => {
