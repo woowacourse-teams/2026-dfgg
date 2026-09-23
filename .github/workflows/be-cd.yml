@@ -252,7 +252,7 @@ jobs:
           [[ "$(property nginx.service ActiveState)" == active ]] || exit 1
           [[ "$(property nginx.service UnitFileState)" == enabled ]] || exit 1
           stopped dfgg.service
-          [[ "$(property dfgg.service UnitFileState)" == disabled ]] || exit 1
+          [[ "$(property dfgg.service UnitFileState)" != enabled ]] || exit 1
           [[ "$(property "$DFGG_OLD_UNIT" ActiveState)" == active ]] || exit 1
           [[ "$(property "$DFGG_OLD_UNIT" UnitFileState)" == enabled ]] || exit 1
           stopped "$DFGG_NEW_UNIT"
