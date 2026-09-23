@@ -1,0 +1,9 @@
+# backend/dfgg/.gitignore 도 루트 .gitignore 도 이 디렉터리를 덮지 않는다.
+.venv/
+__pycache__/
+*.pyc
+
+# 학습 데이터는 Java(T10)가 생성한다 — 커밋하지 않는다.
+data/*
+!data/.gitkeep
+out/

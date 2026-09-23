@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15
+    image: postgres:16
     container_name: dfgg-postgres
     environment:
       POSTGRES_USER: ${DB_USERNAME:-postgres}
@@ -9,6 +9,8 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
+    # 기본 /dev/shm 64MB로는 큰 해시 집계에서 병렬 워커가 죽는다
+    shm_size: 1gb
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
