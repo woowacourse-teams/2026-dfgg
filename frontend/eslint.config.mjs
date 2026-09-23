@@ -8,7 +8,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/build/**', '**/release/**', 'node_modules/**', '**/*.config.js'],
+    ignores: ['**/dist/**', '**/build/**', '**/out/**', '**/release/**', 'node_modules/**', '**/*.config.js'],
   },
 
   js.configs.recommended,
@@ -18,7 +18,7 @@ export default tseslint.config(
     files: [
       'apps/web/src/**/*.{ts,tsx}',
       // 렌더러 코드와 웹·앱 공용 코드는 브라우저에서 돈다.
-      'apps/desktop/src/**/*.{ts,tsx}',
+      'apps/desktop/src/renderer/**/*.{ts,tsx}',
       'packages/**/*.{ts,tsx}',
     ],
     languageOptions: {
@@ -41,7 +41,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['apps/desktop/main/**/*.ts'],
+    files: ['apps/desktop/src/main/**/*.ts'],
     languageOptions: { globals: globals.node },
   },
 

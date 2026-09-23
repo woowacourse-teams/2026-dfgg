@@ -1,4 +1,4 @@
-import type { GameflowPhase } from '../../types';
+import type { GameflowPhase } from '../../shared/types';
 import { fetchItemRecommendations } from '../api/recommendations';
 import { getLcuState, onPhaseChange, setRecommendations } from '../lcu/state';
 import { getDDragonData } from './ddragon';

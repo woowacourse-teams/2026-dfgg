@@ -1,4 +1,4 @@
-import { Lockfile } from '../../types';
+import { Lockfile } from '../../shared/types';
 import https from 'node:https';
 import { RIOT_ROOT_CERT } from './riotCert';
 

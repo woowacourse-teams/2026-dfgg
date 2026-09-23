@@ -17,7 +17,7 @@ function createWindow() {
     win.loadURL('http://localhost:3001');
     win.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(__dirname, '../../build/index.html'));
+    win.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 
   return win;

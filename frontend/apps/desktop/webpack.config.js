@@ -7,9 +7,9 @@ module.exports = (_env, argv) => {
 
   return {
     context: __dirname,
-    entry: './src/index.tsx',
+    entry: './src/renderer/index.tsx',
     output: {
-      path: path.resolve(__dirname, 'build'),
+      path: path.resolve(__dirname, 'out/renderer'),
       filename: 'bundle.js',
       publicPath: './',
       clean: true,
@@ -53,14 +53,14 @@ module.exports = (_env, argv) => {
     },
     plugins: [
       new HtmlWebpackPlugin({
-        template: './public/index.html',
+        template: './src/renderer/public/index.html',
         filename: 'index.html',
         inject: true,
       }),
       new CopyPlugin({
         patterns: [
           {
-            from: 'public',
+            from: 'src/renderer/public',
             to: '.',
             globOptions: { ignore: ['**/index.html'] },
             noErrorOnMissing: true,

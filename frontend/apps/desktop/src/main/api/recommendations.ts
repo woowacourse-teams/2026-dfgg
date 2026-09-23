@@ -1,4 +1,4 @@
-import type { RecommendationResponse } from '../../types';
+import type { RecommendationResponse } from '../../shared/types';
 import { RecommendationBody } from '../live/payload';
 import { apiPost } from './client';
 

@@ -1,4 +1,4 @@
-import type { Summoner, Lockfile, GameflowPhase } from '../../types';
+import type { Summoner, Lockfile, GameflowPhase } from '../../shared/types';
 import { lcuRequest } from './client';
 
 // 소환사 정보 얻는 api

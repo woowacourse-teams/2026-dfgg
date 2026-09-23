@@ -4,7 +4,7 @@ import type {
   LcuState,
   LcuStatus,
   RecommendedItem,
-} from '../../types';
+} from '../../shared/types';
 import { broadcastToAllWindows } from '../ipc/broadcast';
 
 const state: LcuState = {

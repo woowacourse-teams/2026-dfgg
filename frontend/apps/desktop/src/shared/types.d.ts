@@ -1,4 +1,4 @@
-import type { LcuEventMap } from './main/lcu/events';
+import type { LcuEventMap } from '../main/lcu/events';
 
 export type PhaseListener = (phase: GameflowPhase | null) => void;
 

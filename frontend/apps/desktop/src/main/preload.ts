@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
-import { GameflowPhase, LcuStatus, RecommendedItem } from '../types';
+import { GameflowPhase, LcuStatus, RecommendedItem } from '../shared/types';
 
 contextBridge.exposeInMainWorld('lcu', {
   currentSummoner: () => ipcRenderer.invoke('lcu:current-summoner'),

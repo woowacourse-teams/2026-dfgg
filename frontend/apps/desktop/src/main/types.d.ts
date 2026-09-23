@@ -1,4 +1,4 @@
-import type { GameflowPhase, LcuStatus, RecommendedItem } from '../types';
+import type { GameflowPhase, LcuStatus, RecommendedItem } from '../shared/types';
 
 export type BroadcastChannels = {
   'lcu:status': LcuStatus;

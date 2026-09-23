@@ -6,7 +6,7 @@
     "name": "dfgg"
   },
   "private": true,
-  "main": "dist/main/main.js",
+  "main": "out/main/main.js",
   "scripts": {
     "start": "webpack server --mode development",
     "build:main": "tsc -p tsconfig.main.json",
@@ -40,11 +40,10 @@
     "productName": "dfgg",
     "directories": {
       "output": "release",
-      "buildResources": "build-resources"
+      "buildResources": "resources/installer"
     },
     "files": [
-      "dist/**/*",
-      "build/**/*",
+      "out/**/*",
       "package.json",
       {
         "from": "../../node_modules/ws",
@@ -52,7 +51,7 @@
       }
     ],
     "win": {
-      "icon": "assets/icon.ico",
+      "icon": "resources/icons/icon.ico",
       "target": [
         {
           "target": "nsis",

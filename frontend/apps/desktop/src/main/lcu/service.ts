@@ -1,6 +1,6 @@
 import { getLockfileContent } from './lockfile';
 import { getCurrentSummoner, getGameflowPhase, getGameVersion } from './endpoints';
-import { GameflowPhase, Lockfile, Summoner } from '../../types';
+import { GameflowPhase, Lockfile, Summoner } from '../../shared/types';
 
 async function withLockfile<T>(
   errorLabel: string,

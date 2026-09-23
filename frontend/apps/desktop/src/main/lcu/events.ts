@@ -1,4 +1,4 @@
-import { GameflowPhase } from '../../types';
+import { GameflowPhase } from '../../shared/types';
 
 export const LCU_URI = {
   gameflowPhase: '/lol-gameflow/v1/gameflow-phase',

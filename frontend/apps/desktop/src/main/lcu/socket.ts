@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import type { LcuEvent, Lockfile } from '../../types';
+import type { LcuEvent, Lockfile } from '../../shared/types';
 import { RIOT_ROOT_CERT } from './riotCert';
 
 const SUBSCRIPTIONS = ['OnJsonApiEvent_lol-gameflow_v1_gameflow-phase'];

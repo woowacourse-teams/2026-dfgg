@@ -2,7 +2,7 @@ import './App.css';
 
 import { useEffect, useState } from 'react';
 
-import type { LcuStatus, NamedEntry, RecommendedItem, Summoner } from '../types';
+import type { LcuStatus, NamedEntry, RecommendedItem, Summoner } from '../shared/types';
 
 const STATUS_TEXT: Record<LcuStatus, string> = {
   disconnected: '롤 클라이언트 대기 중',
