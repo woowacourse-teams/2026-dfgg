@@ -21,7 +21,8 @@ module.exports = (_env, argv) => {
     output: {
       path: path.resolve(__dirname, 'out/renderer'),
       filename: '[name]/bundle.js',
-      publicPath: './',
+      // 창별 html 이 하위 폴더에 있으므로 상대경로를 webpack 이 계산하게 둔다.
+      publicPath: 'auto',
       clean: true,
     },
     module: {
@@ -61,6 +62,15 @@ module.exports = (_env, argv) => {
     resolve: {
       extensions: ['.tsx', '.ts', '.js'],
     },
+    optimization: {
+      // 창마다 react/react-dom 을 따로 번들링하지 않도록 공용 청크로 분리한다.
+      splitChunks: {
+        chunks: 'all',
+        cacheGroups: {
+          vendor: { test: /[\\/]node_modules[\\/]/, name: 'vendor' },
+        },
+      },
+    },
     plugins: [
       ...windows.map(
         (name) =>
@@ -84,7 +94,10 @@ module.exports = (_env, argv) => {
       port: 3001,
       open: ['/home/index.html'],
       hot: true,
-      historyApiFallback: true,
+      // 창별 static 은 CopyPlugin 이 번들에 넣으므로 dev-server 기본 public/ 은 끈다.
+      static: false,
+      // 루트로 들어오면 home 으로 (wait-on 및 수동 접속용)
+      historyApiFallback: { index: '/home/index.html' },
       proxy: [
         {
           context: ['/api', '/feedback'],

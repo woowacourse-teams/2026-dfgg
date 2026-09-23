@@ -14,7 +14,7 @@
     "build": "pnpm build:main && pnpm build:renderer",
     "typecheck": "tsc --noEmit",
     "electron:start": "pnpm build:main && electron .",
-    "electron:dev": "concurrently -k \"pnpm start\" \"wait-on http://localhost:3001 && pnpm electron:start\"",
+    "electron:dev": "concurrently -k \"pnpm start\" \"wait-on http://localhost:3001/home/index.html && pnpm electron:start\"",
     "package": "pnpm build && electron-builder --win nsis",
     "package:store": "pnpm build && electron-builder --win appx",
     "package:all": "pnpm build && electron-builder --win nsis appx",
