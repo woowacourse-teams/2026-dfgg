@@ -19,7 +19,11 @@ class DeploymentAvailabilityConfigurationTest {
         assertThat(property("management.endpoint.health.group.readiness.include"))
                 .isEqualTo("readinessState,db");
         assertThat(property("management.endpoints.web.exposure.include"))
-                .isEqualTo("health");
+                .asString()
+                .as("CD의 readiness 검사가 이 노출에 의존한다")
+                .contains("health")
+                .as("무엇을 더 열든 통째로 열지는 않는다. env·heapdump까지 열리면 내부 정보가 샌다")
+                .doesNotContain("*");
     }
 
     @Test

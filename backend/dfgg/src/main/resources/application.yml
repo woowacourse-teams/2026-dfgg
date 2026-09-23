@@ -86,7 +86,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       probes:
@@ -94,6 +94,14 @@ management:
       group:
         readiness:
           include: readinessState,db
+  metrics:
+    distribution:
+      percentiles-histogram:
+        "[http.server.requests]": true
+      minimum-expected-value:
+        "[http.server.requests]": 10ms
+      maximum-expected-value:
+        "[http.server.requests]": 10s
 
 assets:
   s3:
