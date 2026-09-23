@@ -22,5 +22,8 @@ declare global {
       onPhaseChange: (callback: PhaseListener) => Unsubscribe;
       onItemsRecommendationChange: (callback: ItemsListener) => Unsubscribe;
     };
+    windowControls: {
+      setCollapsed: (collapsed: boolean) => void;
+    };
   }
 }

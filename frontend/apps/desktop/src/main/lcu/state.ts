@@ -31,7 +31,13 @@ export function setLcuPhase(phase: GameflowPhase | null) {
 
   if (phase !== 'InProgress') setRecommendations(null);
 
-  for (const listener of phaseListeners) listener(phase);
+  for (const listener of phaseListeners) {
+    try {
+      listener(phase);
+    } catch (error) {
+      console.error('phase 구독자 실행 실패', error);
+    }
+  }
 }
 
 export function setLcuStatus(status: LcuStatus) {

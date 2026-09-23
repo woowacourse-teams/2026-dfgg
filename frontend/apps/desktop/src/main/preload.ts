@@ -24,3 +24,7 @@ contextBridge.exposeInMainWorld('lcu', {
     return () => ipcRenderer.removeListener('lcu:items-recommendation', listener);
   },
 });
+
+contextBridge.exposeInMainWorld('windowControls', {
+  setCollapsed: (collapsed: boolean) => ipcRenderer.send('window:set-collapsed', collapsed),
+});

@@ -1,0 +1,180 @@
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* transparent:true 창이라 캔버스는 투명하게 두고, 반투명 배경은 .app 이 그린다.
+   body 에 배경을 주면 캔버스 전체로 전파돼서 border-radius 가 먹지 않는다. */
+html,
+body {
+  margin: 0;
+  background: transparent;
+}
+
+body {
+  overflow: hidden;
+  color: #fff;
+  font-family: sans-serif;
+  /* 배경이 거의 없으므로 글자 자체에 그림자를 둘러 어떤 게임 화면 위에서도 읽히게 한다. */
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.95),
+    0 0 6px rgba(0, 0, 0, 0.8);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 10px;
+  background: rgba(10, 14, 28, 0.22);
+  transition: background 0.15s ease;
+}
+
+/* 마우스를 올렸을 때만 진해져서, 볼 때는 읽히고 평소엔 게임을 가리지 않는다. */
+.app:hover {
+  background: rgba(10, 14, 28, 0.72);
+}
+
+/* 드래그 가능한 타이틀바 영역 */
+.title-bar {
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+  height: 40px;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 20px;
+  transition: background 0.15s ease;
+}
+
+.app:hover .title-bar {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* 내부의 버튼이나 텍스트를 클릭/더블클릭해야 한다면 drag를 해제해야 합니다 */
+button,
+input {
+  -webkit-app-region: no-drag;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.window-controls {
+  display: flex;
+  align-self: stretch;
+}
+
+.control {
+  width: 40px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.control:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 접힌 상태: 타이틀 텍스트가 없으므로 버튼을 가운데로.
+   버튼을 창보다 좁게 둬서 주변에 드래그할 여백을 남긴다. */
+.app.collapsed .title-bar {
+  justify-content: center;
+  padding-left: 0;
+}
+
+.app.collapsed .control {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 아이템 줄에만 옅은 판을 깔아, 패널 전체를 어둡게 하지 않고도 글자가 뜨게 한다. */
+.item {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  transition: background 0.15s ease;
+}
+
+.app:hover .item {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.item-image {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.item-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.traits li {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 11px;
+}
+
+.empty {
+  margin: 0;
+  padding: 16px 8px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  text-align: center;
+}
+
+.content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.content::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.25);
+}
