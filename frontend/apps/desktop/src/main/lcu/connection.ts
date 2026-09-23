@@ -27,6 +27,26 @@ function scheduleRetry(interval: number) {
   }, interval);
 }
 
+async function syncInitialPhase(ws: WebSocket, attemptsLeft = 3) {
+  ws.on('open', async () => {
+    if (ws !== activeSocket) return;
+
+    retryDelay = MIN_RETRY_MS;
+    setLcuStatus('connected');
+
+    try {
+      const phase = await fetchGameflowPhase();
+      if (ws !== activeSocket) return;
+
+      const state = getLcuState();
+      if (phase && state.status === 'connected' && state.phase === null) setLcuPhase(phase);
+    } catch (error) {
+      if (attemptsLeft <= 1) return console.debug('초기 phase 조회 포기', error);
+      setTimeout(() => syncInitialPhase(ws, attemptsLeft - 1), 1000);
+    }
+  });
+}
+
 function connect() {
   if (stopped) return;
   const lockfile = getLockfileContent();
@@ -68,22 +88,7 @@ function connect() {
     retryDelay = Math.min(retryDelay * 2, MAX_RETRY_MS);
   };
 
-  ws.on('open', async () => {
-    if (ws !== activeSocket) return;
-
-    retryDelay = MIN_RETRY_MS;
-    setLcuStatus('connected');
-
-    try {
-      const phase = await fetchGameflowPhase();
-      if (ws !== activeSocket) return;
-
-      const state = getLcuState();
-      if (phase && state.status === 'connected' && state.phase === null) setLcuPhase(phase);
-    } catch (error) {
-      console.debug('phase 조회 실패', error);
-    }
-  });
+  syncInitialPhase(ws);
 
   ws.on('error', cleanup);
   ws.on('close', cleanup);
