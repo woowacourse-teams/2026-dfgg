@@ -1,4 +1,10 @@
-import type { GameflowPhase, LcuState, LcuStatus, RecommendedItem, Summoner } from '../shared/types';
+import type {
+  GameflowPhase,
+  LcuState,
+  LcuStatus,
+  RecommendedItem,
+  Summoner,
+} from '../shared/types';
 
 export {};
 
