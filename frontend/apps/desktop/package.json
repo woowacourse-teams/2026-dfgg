@@ -78,7 +78,8 @@
       "backgroundColor": "#0e1428",
       "languages": [
         "ko-KR"
-      ]
+      ],
+      "customExtensionsPath": "resources/installer/appx-extensions.xml"
     },
     "nsis": {
       "oneClick": true,
@@ -92,6 +93,12 @@
         "provider": "github",
         "owner": "woowacourse-teams",
         "repo": "2026-dfgg"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "resources/icons",
+        "to": "icons"
       }
     ]
   }
