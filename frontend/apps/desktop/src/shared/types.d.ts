@@ -1,6 +1,7 @@
 import type { LcuEventMap } from '../main/lcu/events';
 
 export type PhaseListener = (phase: GameflowPhase | null) => void;
+export type StatusListener = (status: LcuStatus | null) => void;
 
 export type Lockfile = {
   name: string;

@@ -1,5 +1,6 @@
 import type {
   PhaseListener,
+  StatusListener,
   GameflowPhase,
   LcuState,
   LcuStatus,
@@ -13,11 +14,18 @@ const state: LcuState = {
   recommendations: null,
 };
 const phaseListeners = new Set<PhaseListener>();
+const statusListeners = new Set<StatusListener>();
 
 // phase 구독자 담기
 export function onPhaseChange(listener: PhaseListener) {
   phaseListeners.add(listener);
   return () => phaseListeners.delete(listener);
+}
+
+// status 구독자 담기
+export function onStatusChange(listener: StatusListener) {
+  statusListeners.add(listener);
+  return () => statusListeners.delete(listener);
 }
 
 export function getLcuState(): Readonly<LcuState> {
@@ -47,6 +55,14 @@ export function setLcuStatus(status: LcuStatus) {
   broadcastToAllWindows('lcu:status', status);
 
   if (status === 'disconnected') setLcuPhase(null);
+
+  for (const listener of statusListeners) {
+    try {
+      listener(status);
+    } catch (error) {
+      console.error('status 구독자 실행 실패', error);
+    }
+  }
 }
 
 export function setRecommendations(result: RecommendedItem[] | null) {
