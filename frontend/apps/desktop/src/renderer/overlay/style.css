@@ -113,9 +113,10 @@ input {
   list-style: none;
 }
 
-/* 아이템 줄에만 옅은 판을 깔아, 패널 전체를 어둡게 하지 않고도 글자가 뜨게 한다. */
+/* 아이템 그림은 왼쪽 고정, 나머지(설명 + 챔피언)는 남는 폭을 전부 쓴다. */
 .item {
   display: flex;
+  align-items: center;
   gap: 8px;
   padding: 6px;
   border-radius: 6px;
@@ -129,24 +130,35 @@ input {
 
 .item-image {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 4px;
 }
 
 .item-body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
 }
 
-.item-name {
-  font-size: 13px;
-  font-weight: 600;
+.traits {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.8);
+  /* 한국어는 어절 단위로 끊어야 '광역 피 / 해 방어' 처럼 안 깨진다. */
+  word-break: keep-all;
 }
 
-.traits {
+/* 아군 묶음과 적군 묶음을 한 줄에 놓고, 구분은 테두리 색에 맡긴다. */
+.reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.champions {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -155,11 +167,24 @@ input {
   list-style: none;
 }
 
-.traits li {
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
-  font-size: 11px;
+/* 테두리 색만으로 아군/적군을 구분한다 (롤의 팀 색 관습) */
+.champion-icon {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.champions-ally .champion-icon {
+  border-color: #5aa2ff;
+  box-shadow: 0 0 4px rgba(90, 162, 255, 0.6);
+}
+
+.champions-counter .champion-icon {
+  border-color: #f4705f;
+  box-shadow: 0 0 4px rgba(244, 112, 95, 0.6);
 }
 
 .empty {

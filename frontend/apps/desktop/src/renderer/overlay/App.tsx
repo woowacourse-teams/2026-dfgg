@@ -2,22 +2,51 @@ import './style.css';
 
 import { useEffect, useState } from 'react';
 
-import type { RecommendedItem } from '../../shared/types';
+import type { NamedEntry, RecommendedItem } from '../../shared/types';
+
+/** 이름 없이 초상화만. 아군/적군은 테두리 색으로 구분한다. */
+function ChampionIcons({
+  champions,
+  variant,
+}: {
+  champions: NamedEntry[];
+  variant: 'ally' | 'counter';
+}) {
+  if (champions.length === 0) return null;
+
+  return (
+    <ul className={`champions champions-${variant}`}>
+      {champions.map((champion) => (
+        <li key={champion.id}>
+          {/* 이름을 안 띄우므로 alt·title 로 정보를 남긴다 */}
+          <img
+            className='champion-icon'
+            src={champion.imageUrl}
+            alt={champion.name}
+            title={champion.name}
+          />
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function ItemRow({ item }: { item: RecommendedItem }) {
-  const { traits } = item.description;
+  const { traits, ally, counter } = item.description;
+  const hasChampions = ally.length > 0 || counter.length > 0;
 
   return (
     <li className='item'>
-      <img className='item-image' src={item.imageUrl} alt='' />
+      <img className='item-image' src={item.imageUrl} alt={item.name} title={item.name} />
+
+      {/* 설명과 챔피언은 남는 폭을 전부 쓴다. 빈 것은 렌더하지 않아 빈칸이 안 생긴다. */}
       <div className='item-body'>
-        <span className='item-name'>{item.name}</span>
-        {traits.length > 0 && (
-          <ul className='traits'>
-            {traits.map((trait) => (
-              <li key={trait}>{trait}</li>
-            ))}
-          </ul>
+        {traits.length > 0 && <p className='traits'>{traits.join(' · ')}</p>}
+        {hasChampions && (
+          <div className='reasons'>
+            <ChampionIcons champions={ally} variant='ally' />
+            <ChampionIcons champions={counter} variant='counter' />
+          </div>
         )}
       </div>
     </li>
