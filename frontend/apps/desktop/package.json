@@ -21,6 +21,7 @@
     "package:publish": "pnpm build && electron-builder --win nsis --publish always"
   },
   "dependencies": {
+    "electron-overlay-window": "^4.1.0",
     "ws": "^8.21.3"
   },
   "devDependencies": {
@@ -48,7 +49,22 @@
       {
         "from": "../../node_modules/ws",
         "to": "node_modules/ws"
+      },
+      {
+        "from": "../../node_modules/electron-overlay-window",
+        "to": "node_modules/electron-overlay-window"
+      },
+      {
+        "from": "../../node_modules/node-gyp-build",
+        "to": "node_modules/node-gyp-build"
+      },
+      {
+        "from": "../../node_modules/throttle-debounce",
+        "to": "node_modules/throttle-debounce"
       }
+    ],
+    "asarUnpack": [
+      "**/*.node"
     ],
     "win": {
       "icon": "resources/icons/icon.ico",

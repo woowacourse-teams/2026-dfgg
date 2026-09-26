@@ -83,6 +83,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      electron-overlay-window:
+        specifier: ^4.1.0
+        version: 4.1.0(electron@44.4.1)
       ws:
         specifier: ^8.21.3
         version: 8.21.3
@@ -1985,6 +1988,12 @@ packages:
     engines: {node: '>=14.0.0'}
     hasBin: true
 
+  electron-overlay-window@4.1.0:
+    resolution: {integrity: sha512-HKgnTDLvlXpHEPL3N6Qwb0H2E2JKxa3fDp4ZKZsqHIH4ZWXRccmzcwBS26+RwkblzEBYNXnCnfdbHnJiItmYQQ==}
+    engines: {node: '>= 16'}
+    peerDependencies:
+      electron: '>= 18'
+
   electron-publish@26.15.3:
     resolution: {integrity: sha512-g/2bn8YTavY4cuS5F+jOS7zmZbXXBV8KZ8yHKfJjFPoKtzBqrpCdNPxBd3tqdBwP7BVd0lGzf7Bk2s0KesWZ4Q==}
 
@@ -3076,6 +3085,10 @@ packages:
     resolution: {integrity: sha512-kXs9Go0cah0qHVV2v389IXQLdLCeE1xfFtjOAF+iobu0OIoG1pje8At2vMHyaPMiPMnG/LWP50twML21eMcAag==}
     engines: {node: '>= 0.4'}
 
+  node-gyp-build@4.8.4:
+    resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
+    hasBin: true
+
   node-gyp@12.4.0:
     resolution: {integrity: sha512-OMcPNvqTCFUnNaBlmdgq+lfNqY7gTiSmNRDjY3uAXRyudeKZEZxu3CLtjMQrx4zZxCX2b/mpNqTtwuCJgXhHkw==}
     engines: {node: ^20.17.0 || >=22.9.0}
@@ -3789,6 +3802,10 @@ packages:
     engines: {node: '>=10.18'}
     peerDependencies:
       tslib: ^2
+
+  throttle-debounce@5.0.2:
+    resolution: {integrity: sha512-B71/4oyj61iNH0KeCamLuE2rmKuTO5byTOSVwECM5FA7TiAiAW+UqTKZ9ERueC4qvgSttUhdmq1mXC3kJqGX7A==}
+    engines: {node: '>=12.22'}
 
   thunky@1.1.0:
     resolution: {integrity: sha512-eHY7nBftgThBqOyHGVN+l8gF0BucP09fMo0oO/Lb0w1OF80dJv+lDVpXG60WMQvkcxAkNybKsrEIE3ZtKGmPrA==}
@@ -6355,6 +6372,12 @@ snapshots:
       - electron-builder-squirrel-windows
       - supports-color
 
+  electron-overlay-window@4.1.0(electron@44.4.1):
+    dependencies:
+      electron: 44.4.1
+      node-gyp-build: 4.8.4
+      throttle-debounce: 5.0.2
+
   electron-publish@26.15.3:
     dependencies:
       '@types/fs-extra': 9.0.13
@@ -7542,6 +7565,8 @@ snapshots:
       object.entries: 1.1.9
       semver: 6.3.1
 
+  node-gyp-build@4.8.4: {}
+
   node-gyp@12.4.0:
     dependencies:
       env-paths: 2.2.1
@@ -8338,6 +8363,8 @@ snapshots:
   thingies@2.6.1(tslib@2.8.1):
     dependencies:
       tslib: 2.8.1
+
+  throttle-debounce@5.0.2: {}
 
   thunky@1.1.0: {}
 

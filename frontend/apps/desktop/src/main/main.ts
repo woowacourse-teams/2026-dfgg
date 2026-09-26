@@ -8,6 +8,7 @@ import { onPhaseChange, onStatusChange } from './lcu/state';
 import { ensureBorderlessMode } from './gameConfig/gameConfig';
 import { isStartupLaunch, setAutoLaunch } from './autoLaunch/autoLaunch';
 import { setTray } from './autoLaunch/tray';
+import { attachHomeToClient } from './docking';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
@@ -72,6 +73,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
+
+  // home 창을 롤 클라이언트 옆에 붙인다. 네이티브 모듈이 없으면 조용히 건너뛴다.
+  attachHomeToClient(home);
 
   overlay.hide();
   overlayWithPhase(overlay);
