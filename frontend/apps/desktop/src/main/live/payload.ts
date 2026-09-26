@@ -18,7 +18,7 @@ interface BuildParams {
   players: LivePlayer[];
   myRiotId: string;
   patch: string;
-  componentItemIds: Set<number>;
+  purchasedItemIds: Set<number>;
   championNames?: Record<string, string>;
 }
 
@@ -86,8 +86,8 @@ export function buildRecommendationBody({
   players,
   myRiotId,
   patch,
-  componentItemIds,
   championNames,
+  purchasedItemIds,
 }: BuildParams): RecommendationBody | null {
   const me = players.find((player) => isMe(player, myRiotId));
   if (!me) return null;
@@ -97,7 +97,7 @@ export function buildRecommendationBody({
 
   return {
     myChampion: toEntry(me, championNames),
-    purchasedItemIds: extractItemIds(me, componentItemIds),
+    purchasedItemIds: [...purchasedItemIds],
     allies: allies.map((player) => toEntry(player, championNames)),
     enemies: enemies.map((player) => toEntry(player, championNames)),
     tier: 'PLATINUM',

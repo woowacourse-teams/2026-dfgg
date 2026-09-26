@@ -11,6 +11,7 @@ const POLL_INTERVAL_MS = 2000;
 let timer: NodeJS.Timeout | null = null;
 let polling: boolean = false;
 let lastItemIds: number[] | null = null;
+const purchasedItemIds = new Set<number>();
 let myRiotId: string | null = null;
 let patch: string | null = null;
 
@@ -32,6 +33,15 @@ function sameItems(a: number[], b: number[]) {
   const sortedA = [...a].sort((x, y) => x - y);
   const sortedB = [...b].sort((x, y) => x - y);
   return sortedA.every((id, i) => id === sortedB[i]);
+}
+
+// 구매 순서를 유지하면서 아이템 리스트 업데이트 하기
+function updatePurchaseOrder(itemIds: number[]) {
+  const current = new Set(itemIds);
+  for (const id of purchasedItemIds) {
+    if (!current.has(id)) purchasedItemIds.delete(id);
+  }
+  for (const id of current) purchasedItemIds.add(id);
 }
 
 // 인게임 정보와 소환사 id 정보를 가져와서 필요하면 백엔드에 아이템 요청 보내기
@@ -60,9 +70,11 @@ async function tick() {
       if (lastItemIds === null || !sameItems(itemIds, lastItemIds)) {
         if (!players || !myRiotId || !patch || !championNames || !componentItemIds) return;
 
+        updatePurchaseOrder(itemIds);
+
         console.log('아이템 변경', itemIds);
 
-        const liveInfo = { players, myRiotId, patch, championNames, componentItemIds };
+        const liveInfo = { players, myRiotId, patch, championNames, purchasedItemIds };
 
         // 백엔드에 전달
         const body = buildRecommendationBody(liveInfo);
@@ -99,4 +111,5 @@ export function stopLivePolling() {
   lastItemIds = null;
   myRiotId = null;
   patch = null;
+  purchasedItemIds.clear();
 }
