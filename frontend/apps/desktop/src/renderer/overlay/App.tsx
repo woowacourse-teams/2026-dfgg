@@ -4,7 +4,27 @@ import { useEffect, useState } from 'react';
 
 import type { NamedEntry, RecommendedItem } from '../../shared/types';
 
-/** 이름 없이 초상화만. 아군/적군은 테두리 색으로 구분한다. */
+const VARIANT_LABEL = {
+  ally: '시너지',
+  counter: '카운터',
+} as const;
+
+// 라벨(아군/상대)에 붙는 설명
+const VARIANT_HINT = {
+  ally: '이 아이템과 시너지가 좋은 아군 챔피언',
+  counter: '이 아이템으로 상대하기 좋은 적 챔피언',
+} as const;
+
+// 초상화에 붙는 설명. 챔피언 이름과 관계를 한 줄에 담는다.
+const VARIANT_RELATION = {
+  ally: '아군 — 시너지 좋음',
+  counter: '상대 — 카운터로 좋음',
+} as const;
+
+/**
+ * 챔피언 이름은 안 띄우고 초상화만 보여준다.
+ * 색만으로는 아군/적군 구분이 약해서 짧은 라벨을 함께 붙인다.
+ */
 function ChampionIcons({
   champions,
   variant,
@@ -15,19 +35,25 @@ function ChampionIcons({
   if (champions.length === 0) return null;
 
   return (
-    <ul className={`champions champions-${variant}`}>
-      {champions.map((champion) => (
-        <li key={champion.id}>
-          {/* 이름을 안 띄우므로 alt·title 로 정보를 남긴다 */}
-          <img
-            className='champion-icon'
-            src={champion.imageUrl}
-            alt={champion.name}
-            title={champion.name}
-          />
-        </li>
-      ))}
-    </ul>
+    <div className={`reason reason-${variant}`}>
+      <span className='reason-label' title={VARIANT_HINT[variant]}>
+        {VARIANT_LABEL[variant]}
+      </span>
+      <ul className='champions'>
+        {champions.map((champion) => (
+          <li key={champion.id}>
+            {/* 이름을 안 띄우므로 alt·title 로 정보를 남긴다.
+                title 은 가장 가까운 것만 뜨므로 관계까지 여기에 함께 적는다. */}
+            <img
+              className='champion-icon'
+              src={champion.imageUrl}
+              alt={`${champion.name} — ${VARIANT_RELATION[variant]}`}
+              title={`${champion.name} — ${VARIANT_RELATION[variant]}`}
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -50,7 +76,11 @@ function ItemRow({ item, rank }: { item: RecommendedItem; rank: number }) {
       <img className='item-image' src={item.imageUrl} alt={item.name} title={item.name} />
 
       <div className='item-body'>
-        {traits.length > 0 && <p className='traits'>{traits.join(' · ')}</p>}
+        {traits.length > 0 && (
+          <p className='traits' title={traits.join(' · ')}>
+            {traits.join(' · ')}
+          </p>
+        )}
         {hasChampions && (
           <div className='reasons'>
             <ChampionIcons champions={ally} variant='ally' />
@@ -102,8 +132,13 @@ function App() {
     return (
       <div className='app collapsed'>
         <header className='title-bar'>
-          <button type='button' className='control' aria-label='펼치기' onClick={toggleCollapsed}>
-            {'>'}
+          <button
+            type='button'
+            className='control control-logo'
+            aria-label='오버레이 켜기'
+            onClick={toggleCollapsed}
+          >
+            <img className='logo' src='./icon.png' alt='' />
           </button>
         </header>
       </div>
@@ -118,8 +153,13 @@ function App() {
         </span>
 
         <div className='window-controls'>
-          <button type='button' className='control' aria-label='최소화' onClick={toggleCollapsed}>
-            {'<'}
+          <button
+            type='button'
+            className='control control-off'
+            aria-label='오버레이 끄기'
+            onClick={toggleCollapsed}
+          >
+            ×
           </button>
         </div>
       </header>

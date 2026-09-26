@@ -82,12 +82,17 @@ module.exports = (_env, argv) => {
           }),
       ),
       new CopyPlugin({
-        patterns: windows.map((name) => ({
-          from: `src/renderer/${name}/public`,
-          to: name,
-          globOptions: { ignore: ['**/index.html'] },
-          noErrorOnMissing: true,
-        })),
+        patterns: [
+          ...windows.map((name) => ({
+            from: `src/renderer/${name}/public`,
+            to: name,
+            globOptions: { ignore: ['**/index.html'] },
+            noErrorOnMissing: true,
+          })),
+          // 트레이·설치 파일과 같은 아이콘을 창 폴더에도 넣는다.
+          // 원본을 복사해 쓰므로 두 벌로 갈라질 일이 없다.
+          ...windows.map((name) => ({ from: 'resources/icons/icon.png', to: `${name}/icon.png` })),
+        ],
       }),
     ],
     devServer: {
