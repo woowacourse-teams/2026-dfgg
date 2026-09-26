@@ -80,7 +80,7 @@ async function tick() {
         const body = buildRecommendationBody(liveInfo);
         if (!body) return;
         const result = await fetchItemRecommendations(body);
-        setRecommendations(result.recommendedItems);
+        setRecommendations(result.recommendedItems, purchasedItemIds.size);
 
         lastItemIds = itemIds;
       }

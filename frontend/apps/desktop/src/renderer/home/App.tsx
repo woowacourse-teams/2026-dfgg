@@ -76,7 +76,9 @@ function App() {
 
     const unsubscribeStatus = window.lcu.onStatusChange(setLcuState);
     const unsubscribePhase = window.lcu.onPhaseChange(setLcuPhase);
-    const unsubscribeItems = window.lcu.onItemsRecommendationChange(setItems);
+    const unsubscribeItems = window.lcu.onItemsRecommendationChange(({ items }) => {
+      setItems(items);
+    });
 
     return () => {
       unsubscribeStatus();

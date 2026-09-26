@@ -43,11 +43,17 @@ export type GameflowPhase =
   | 'PreEndOfGame'
   | 'EndOfGame';
 
+export type RecommendationUpdate = {
+  items: RecommendedItem[] | null;
+  purchasedCount: number;
+};
+
 export type LcuStatus = 'disconnected' | 'connecting' | 'connected';
 export type LcuState = {
   status: LcuStatus;
   phase: GameflowPhase | null;
   recommendations: RecommendedItem[] | null;
+  purchasedCount?: number;
 };
 
 // ---------- 백엔드 아이템 추천 응답 ----------

@@ -31,15 +31,24 @@ function ChampionIcons({
   );
 }
 
-function ItemRow({ item }: { item: RecommendedItem }) {
+const TOP_COUNT = 3;
+
+function ItemRow({ item, rank }: { item: RecommendedItem; rank: number }) {
   const { traits, ally, counter } = item.description;
   const hasChampions = ally.length > 0 || counter.length > 0;
+  const isTop = rank <= TOP_COUNT;
 
   return (
-    <li className='item'>
+    <li className={isTop ? `item item-top item-rank-${rank}` : 'item item-rest'}>
+      {/* 상위 3개만 순위를 붙인다. 나머지는 자리로만 순서를 표현. */}
+      {isTop && (
+        <span className='rank' aria-label={`추천 ${rank}순위`}>
+          {rank}
+        </span>
+      )}
+
       <img className='item-image' src={item.imageUrl} alt={item.name} title={item.name} />
 
-      {/* 설명과 챔피언은 남는 폭을 전부 쓴다. 빈 것은 렌더하지 않아 빈칸이 안 생긴다. */}
       <div className='item-body'>
         {traits.length > 0 && <p className='traits'>{traits.join(' · ')}</p>}
         {hasChampions && (
@@ -57,14 +66,22 @@ function App() {
   const [items, setItems] = useState<RecommendedItem[] | null>(null);
   const [isInGame, setIsInGame] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [purchasedCount, setPurchasedCount] = useState<number | null>(null);
+
+  const coreIndex = purchasedCount === null ? null : purchasedCount + 1;
 
   useEffect(() => {
     window.lcu.getState().then((state) => {
       setItems(state.recommendations);
       setIsInGame(state.phase === 'InProgress');
+      setPurchasedCount(state.purchasedCount ?? null);
     });
 
-    const unsubscribeItems = window.lcu.onItemsRecommendationChange(setItems);
+    const unsubscribeItems = window.lcu.onItemsRecommendationChange(({ items, purchasedCount }) => {
+      setItems(items);
+      setPurchasedCount(purchasedCount);
+    });
+
     const unsubscribePhase = window.lcu.onPhaseChange((phase) =>
       setIsInGame(phase === 'InProgress'),
     );
@@ -96,7 +113,9 @@ function App() {
   return (
     <div className='app'>
       <header className='title-bar'>
-        <span className='title'>추천 아이템</span>
+        <span className='title'>
+          {coreIndex === null ? '추천 아이템' : `${coreIndex}코어 추천`}
+        </span>
 
         <div className='window-controls'>
           <button type='button' className='control' aria-label='최소화' onClick={toggleCollapsed}>
@@ -108,8 +127,8 @@ function App() {
       <main className='content'>
         {items && items.length > 0 ? (
           <ul className='items'>
-            {items.map((item) => (
-              <ItemRow key={item.id} item={item} />
+            {items.map((item, index) => (
+              <ItemRow key={item.id} item={item} rank={index + 1} />
             ))}
           </ul>
         ) : (

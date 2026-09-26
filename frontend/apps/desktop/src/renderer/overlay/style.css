@@ -135,6 +135,75 @@ input {
   border-radius: 4px;
 }
 
+/* ---------- 순위 강조 ---------- */
+
+/* 상위 3개: 왼쪽에 순위 색 띠를 둘러 한눈에 묶이게 한다. */
+.item-top {
+  border-left: 3px solid transparent;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.item-rank-1 {
+  border-left-color: #f0c060;
+}
+.item-rank-2 {
+  border-left-color: #c8ced8;
+}
+.item-rank-3 {
+  border-left-color: #d0925a;
+}
+
+/* 메달 색 관습(금·은·동)이라 숫자를 읽기 전에 서열이 보인다. */
+.rank {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  color: #10131a;
+  text-shadow: none;
+}
+
+.item-rank-1 .rank {
+  background: #f0c060;
+}
+.item-rank-2 .rank {
+  background: #c8ced8;
+}
+.item-rank-3 .rank {
+  background: #d0925a;
+}
+
+/* 4위 이하: 후순위라는 게 크기와 밝기로 드러나게 한다. */
+.item-rest {
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.2);
+  opacity: 0.55;
+}
+
+.app:hover .item-rest {
+  opacity: 0.85;
+}
+
+.item-rest .item-image {
+  width: 26px;
+  height: 26px;
+}
+
+.item-rest .traits {
+  font-size: 10px;
+}
+
+.item-rest .champion-icon {
+  width: 20px;
+  height: 20px;
+  border-width: 1px;
+}
+
 .item-body {
   display: flex;
   flex-direction: column;

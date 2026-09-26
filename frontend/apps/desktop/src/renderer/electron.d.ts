@@ -2,7 +2,7 @@ import type {
   GameflowPhase,
   LcuState,
   LcuStatus,
-  RecommendedItem,
+  RecommendationUpdate,
   Summoner,
 } from '../shared/types';
 
@@ -10,7 +10,7 @@ export {};
 
 type StatusListener = (status: LcuStatus) => void;
 type PhaseListener = (phase: GameflowPhase) => void;
-type ItemsListener = (items: RecommendedItem[]) => void;
+type ItemsListener = (items: RecommendationUpdate) => void;
 type Unsubscribe = () => void;
 
 declare global {

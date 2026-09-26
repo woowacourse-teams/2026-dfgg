@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
-import { GameflowPhase, LcuStatus, RecommendedItem } from '../shared/types';
+import { GameflowPhase, LcuStatus, RecommendationUpdate } from '../shared/types';
 
 contextBridge.exposeInMainWorld('lcu', {
   currentSummoner: () => ipcRenderer.invoke('lcu:current-summoner'),
@@ -18,8 +18,8 @@ contextBridge.exposeInMainWorld('lcu', {
     return () => ipcRenderer.removeListener('lcu:phase', listener);
   },
 
-  onItemsRecommendationChange: (callback: (items: RecommendedItem[]) => void) => {
-    const listener = (_: IpcRendererEvent, items: RecommendedItem[]) => callback(items);
+  onItemsRecommendationChange: (callback: (items: RecommendationUpdate[]) => void) => {
+    const listener = (_: IpcRendererEvent, items: RecommendationUpdate[]) => callback(items);
     ipcRenderer.on('lcu:items-recommendation', listener);
     return () => ipcRenderer.removeListener('lcu:items-recommendation', listener);
   },

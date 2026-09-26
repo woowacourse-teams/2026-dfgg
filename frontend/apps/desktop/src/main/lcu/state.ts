@@ -12,6 +12,7 @@ const state: LcuState = {
   status: 'disconnected',
   phase: null,
   recommendations: null,
+  purchasedCount: 0,
 };
 const phaseListeners = new Set<PhaseListener>();
 const statusListeners = new Set<StatusListener>();
@@ -37,7 +38,7 @@ export function setLcuPhase(phase: GameflowPhase | null) {
   state.phase = phase;
   broadcastToAllWindows('lcu:phase', phase);
 
-  if (phase !== 'InProgress') setRecommendations(null);
+  if (phase !== 'InProgress') setRecommendations(null, 0);
 
   for (const listener of phaseListeners) {
     try {
@@ -65,7 +66,8 @@ export function setLcuStatus(status: LcuStatus) {
   }
 }
 
-export function setRecommendations(result: RecommendedItem[] | null) {
+export function setRecommendations(result: RecommendedItem[] | null, count = 0) {
   state.recommendations = result;
-  broadcastToAllWindows('lcu:items-recommendation', result);
+  state.purchasedCount = count;
+  broadcastToAllWindows('lcu:items-recommendation', { items: result, purchasedCount: count });
 }
