@@ -14,24 +14,23 @@ const RIFT_QUEUES = [
   { key: 'RANKED_FLEX_SR', label: '자유 랭크' },
 ] as const;
 
-/** 배치 / 언랭 / 일반 세 가지 상태를 구분해서 보여준다. */
-function RankLine({ entry }: { entry: RankedEntry }) {
+function rankLines(entry: RankedEntry) {
   // 배치 중일 때
   if (entry.isProvisional) {
     const done = entry.provisionalGameThreshold - entry.provisionalGamesRemaining;
-    return (
-      <>
-        <span className='rank-tier'>
+    return {
+      tier: (
+        <>
           배치 {done}/{entry.provisionalGameThreshold}
-        </span>
-        <span className='rank-record'>{entry.provisionalGamesRemaining}판 남음</span>
-      </>
-    );
+        </>
+      ),
+      record: <>{entry.provisionalGamesRemaining}판 남음</>,
+    };
   }
 
   // 언랭일때
   if (!entry.tier) {
-    return <span className='rank-tier rank-unranked'>언랭크</span>;
+    return { tier: <span className='rank-unranked'>언랭크</span>, record: null };
   }
 
   const total = entry.wins + entry.losses;
@@ -39,18 +38,20 @@ function RankLine({ entry }: { entry: RankedEntry }) {
 
   const tierLabel = entry.tier.charAt(0) + entry.tier.slice(1).toLowerCase();
 
-  return (
-    <>
-      <span className='rank-tier'>
+  return {
+    tier: (
+      <>
         {tierLabel} {entry.division}
         <span className='rank-lp'> · {entry.leaguePoints} LP</span>
         {entry.miniSeriesProgress && <em className='rank-series'>승급전</em>}
-      </span>
-      <span className='rank-record'>
+      </>
+    ),
+    record: (
+      <>
         {entry.wins}승 {entry.losses}패 · {winRate}%
-      </span>
-    </>
-  );
+      </>
+    ),
+  };
 }
 
 function RankCard({ label, entry }: { label: string; entry: RankedEntry | undefined }) {
@@ -58,14 +59,18 @@ function RankCard({ label, entry }: { label: string; entry: RankedEntry | undefi
   const played = (entry?.wins ?? 0) + (entry?.losses ?? 0);
   if (!entry || (!entry.tier && played === 0 && !entry.isProvisional)) return null;
 
+  const { tier, record } = rankLines(entry);
+
   return (
     <li className='rank-card'>
       <img className='rank-emblem' src={tierEmblemUrl(entry.tier)} alt='' />
 
       <div className='rank-body'>
         <span className='rank-queue'>{label}</span>
-        <RankLine entry={entry} />
+        <span className='rank-tier'>{tier}</span>
       </div>
+
+      {record && <span className='rank-record'>{record}</span>}
     </li>
   );
 }

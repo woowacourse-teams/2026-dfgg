@@ -1,17 +1,79 @@
 /* ---------- 상단 상태 바 ---------- */
 .status-bar {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  flex-direction: column;
+  padding: 0;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
   position: sticky;
   top: 0;
 }
 
+.title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 32px;
+  flex-shrink: 0;
+  padding-left: 10px;
+  -webkit-app-region: drag;
+}
+
+.title-bar-logo {
+  width: 16px;
+  height: 16px;
+  -webkit-user-drag: none;
+}
+
+.title-bar-controls {
+  display: flex;
+  align-self: stretch;
+}
+
+.title-bar-button {
+  width: 46px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', sans-serif;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  /* 부모의 drag 를 상속하면 클릭이 드래그로 먹혀 버튼이 눌리지 않는다 */
+  -webkit-app-region: no-drag;
+}
+
+.title-bar-button:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text);
+}
+
+.title-bar-button:active {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* 닫기만 붉게 — Windows 관습 */
+.title-bar-close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+.title-bar-close:active {
+  background: #b0271a;
+}
+
 /* ---------- 프로필 (헤더) ---------- */
+.info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 16px 14px;
+}
+
 .avatar {
   position: relative;
   flex-shrink: 0;

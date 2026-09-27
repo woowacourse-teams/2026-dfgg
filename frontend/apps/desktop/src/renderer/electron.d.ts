@@ -26,6 +26,8 @@ declare global {
     };
     windowControls: {
       setCollapsed: (collapsed: boolean) => void;
+      minimize: () => void;
+      close: () => void;
     };
   }
 }

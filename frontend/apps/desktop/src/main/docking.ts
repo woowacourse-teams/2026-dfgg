@@ -3,7 +3,7 @@ import { BrowserWindow, screen } from 'electron';
 const LOL_CLIENT_TITLE = 'League of Legends';
 
 /** 롤 창과 우리 창 사이 간격. 0 이면 딱 붙는다. */
-const GAP = -10;
+const GAP = -8;
 
 /** 라이브러리 내부가 30fps 로 갱신하므로 같은 주기를 쓴다. */
 const THROTTLE_MS = 34;

@@ -29,4 +29,6 @@ contextBridge.exposeInMainWorld('lcu', {
 
 contextBridge.exposeInMainWorld('windowControls', {
   setCollapsed: (collapsed: boolean) => ipcRenderer.send('window:set-collapsed', collapsed),
+  minimize: () => ipcRenderer.send('window:minimize'),
+  close: () => ipcRenderer.send('window:close'),
 });

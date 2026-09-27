@@ -27,7 +27,7 @@
 .rank-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -35,28 +35,31 @@
 
 .rank-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 6px;
+  padding: 12px 10px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
+  text-align: center;
   overflow: hidden;
 }
 
 .rank-emblem {
-  flex-shrink: 0;
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
   /* 어두운 배경에서 엠블럼이 묻히지 않게 살짝 띄운다 */
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
 }
 
+/* width 를 박아야 글자가 길 때 말줄임이 걸린다. align-items: center 만으로는 칸이 늘어난다. */
 .rank-body {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -67,9 +70,12 @@
   letter-spacing: 0.02em;
 }
 
+/* 티어 이름이 길어도(Grandmaster 등) 칸을 밀지 않고 말줄임으로 접는다 */
 .rank-tier {
   white-space: nowrap;
-  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -81,8 +87,11 @@
 }
 
 .rank-record {
+  width: 100%;
   white-space: nowrap;
-  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }

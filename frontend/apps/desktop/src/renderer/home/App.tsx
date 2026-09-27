@@ -6,6 +6,14 @@ import type { GameflowPhase, LcuCurrentRankedStats, LcuStatus, Summoner } from '
 import ProfileHeader from './components/ProfileHeader/ProfileHeader';
 import RankSection from './components/RankSection/RankSection';
 
+// 소환사 정보가 없는 이유를 상태별로 구분해 알린다.
+// 클라이언트가 꺼져 있는데 '불러오는 중' 이라고 하면 오해를 준다.
+const EMPTY_TEXT: Record<LcuStatus, string> = {
+  disconnected: '롤 클라이언트를 실행해 주세요',
+  connecting: '클라이언트에 연결하는 중...',
+  connected: '소환사 정보를 불러오는 중...',
+};
+
 function App() {
   const [currentSummoner, setCurrentSummoner] = useState<Summoner | null>(null);
   const [lcuState, setLcuState] = useState<LcuStatus | null>(null);
@@ -53,20 +61,16 @@ function App() {
     window.lcu.getRankInfo().then(setRankInfo);
   }, [lcuPhase]);
 
-  if (!currentSummoner) {
-    return (
-      <div className='app'>
-        <p className='empty'>소환사 정보를 불러오는 중...</p>
-      </div>
-    );
-  }
-
   return (
     <div className='app'>
       <ProfileHeader summoner={currentSummoner} status={lcuState} phase={lcuPhase} />
 
       <main className='content'>
-        <RankSection rankInfo={rankInfo} />
+        {currentSummoner ? (
+          <RankSection rankInfo={rankInfo} />
+        ) : (
+          <p className='empty'>{EMPTY_TEXT[lcuState ?? 'disconnected']}</p>
+        )}
       </main>
     </div>
   );
