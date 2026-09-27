@@ -1,5 +1,6 @@
 import type {
   GameflowPhase,
+  LcuCurrentRankedStats,
   LcuState,
   LcuStatus,
   RecommendationUpdate,
@@ -17,6 +18,7 @@ declare global {
   interface Window {
     lcu: {
       currentSummoner: () => Promise<Summoner | null>;
+      getRankInfo: () => Promise<LcuCurrentRankedStats | null>;
       getState: () => Promise<LcuState>;
       onStatusChange: (callback: StatusListener) => Unsubscribe;
       onPhaseChange: (callback: PhaseListener) => Unsubscribe;

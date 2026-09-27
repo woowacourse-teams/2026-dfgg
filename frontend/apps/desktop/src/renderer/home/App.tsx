@@ -2,72 +2,17 @@ import './App.css';
 
 import { useEffect, useState } from 'react';
 
-import type { LcuStatus, NamedEntry, RecommendedItem, Summoner } from '../../shared/types';
-
-const STATUS_TEXT: Record<LcuStatus, string> = {
-  disconnected: '롤 클라이언트 대기 중',
-  connecting: '연결 중',
-  connected: '연결됨',
-};
-
-function ChampionChip({ champion }: { champion: NamedEntry }) {
-  return (
-    <li className='chip'>
-      <img className='chip-image' src={champion.imageUrl} alt='' />
-      <span>{champion.name}</span>
-    </li>
-  );
-}
-
-function ItemCard({ item }: { item: RecommendedItem }) {
-  const { counter, ally, traits } = item.description;
-
-  return (
-    <article className='card'>
-      <header className='card-header'>
-        <img className='item-image' src={item.imageUrl} alt='' />
-        <h2 className='item-name'>{item.name}</h2>
-      </header>
-
-      {traits.length > 0 && (
-        <ul className='traits'>
-          {traits.map((trait) => (
-            <li key={trait}>{trait}</li>
-          ))}
-        </ul>
-      )}
-
-      {counter.length > 0 && (
-        <section className='reason'>
-          <h3 className='reason-title'>상대하기 좋은 챔피언</h3>
-          <ul className='chips'>
-            {counter.map((champion) => (
-              <ChampionChip key={champion.id} champion={champion} />
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {ally.length > 0 && (
-        <section className='reason'>
-          <h3 className='reason-title'>시너지 좋은 아군</h3>
-          <ul className='chips'>
-            {ally.map((champion) => (
-              <ChampionChip key={champion.id} champion={champion} />
-            ))}
-          </ul>
-        </section>
-      )}
-    </article>
-  );
-}
+import type { GameflowPhase, LcuCurrentRankedStats, LcuStatus, Summoner } from '../../shared/types';
+import ProfileHeader from './components/ProfileHeader/ProfileHeader';
+import RankSection from './components/RankSection/RankSection';
 
 function App() {
   const [currentSummoner, setCurrentSummoner] = useState<Summoner | null>(null);
   const [lcuState, setLcuState] = useState<LcuStatus | null>(null);
-  const [lcuPhase, setLcuPhase] = useState<string | null>(null);
-  const [items, setItems] = useState<RecommendedItem[] | null>(null);
+  const [lcuPhase, setLcuPhase] = useState<GameflowPhase | null>(null);
+  const [rankInfo, setRankInfo] = useState<LcuCurrentRankedStats | null>(null);
 
+  // 연결 상태와 현재 phase를 가져온다.
   useEffect(() => {
     window.lcu.getState().then((state) => {
       setLcuState(state.status);
@@ -76,17 +21,14 @@ function App() {
 
     const unsubscribeStatus = window.lcu.onStatusChange(setLcuState);
     const unsubscribePhase = window.lcu.onPhaseChange(setLcuPhase);
-    const unsubscribeItems = window.lcu.onItemsRecommendationChange(({ items }) => {
-      setItems(items);
-    });
 
     return () => {
       unsubscribeStatus();
       unsubscribePhase();
-      unsubscribeItems();
     };
   }, []);
 
+  // state 정보가 바뀔 때만 소환사 정보를 가져온다.
   useEffect(() => {
     if (lcuState !== 'connected') return;
 
@@ -104,34 +46,27 @@ function App() {
     };
   }, [lcuState]);
 
-  const isInGame = lcuPhase === 'InProgress';
+  // 랭크는 게임이 끝났을 때만 바뀌므로 그 시점에만 다시 받는다.
+  useEffect(() => {
+    if (lcuPhase !== 'None' && lcuPhase !== 'EndOfGame') return;
+
+    window.lcu.getRankInfo().then(setRankInfo);
+  }, [lcuPhase]);
+
+  if (!currentSummoner) {
+    return (
+      <div className='app'>
+        <p className='empty'>소환사 정보를 불러오는 중...</p>
+      </div>
+    );
+  }
 
   return (
     <div className='app'>
-      <header className='status-bar'>
-        <span className={`badge badge-${lcuState ?? 'unknown'}`}>
-          {lcuState ? STATUS_TEXT[lcuState] : '확인 중'}
-        </span>
-        <span className='status-item'>{lcuPhase ?? '-'}</span>
-        <span className='status-item status-summoner'>
-          {lcuState === 'connected' && currentSummoner
-            ? `${currentSummoner.gameName}#${currentSummoner.tagLine}`
-            : '-'}
-        </span>
-      </header>
+      <ProfileHeader summoner={currentSummoner} status={lcuState} phase={lcuPhase} />
 
       <main className='content'>
-        {items && items.length > 0 ? (
-          <div className='cards'>
-            {items.map((item) => (
-              <ItemCard key={item.id} item={item} />
-            ))}
-          </div>
-        ) : (
-          <p className='empty'>
-            {isInGame ? '추천 아이템을 기다리는 중입니다.' : '게임에 입장하면 아이템을 추천합니다.'}
-          </p>
-        )}
+        <RankSection rankInfo={rankInfo} />
       </main>
     </div>
   );

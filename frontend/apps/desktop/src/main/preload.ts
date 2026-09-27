@@ -4,6 +4,8 @@ import { GameflowPhase, LcuStatus, RecommendationUpdate } from '../shared/types'
 contextBridge.exposeInMainWorld('lcu', {
   currentSummoner: () => ipcRenderer.invoke('lcu:current-summoner'),
 
+  getRankInfo: () => ipcRenderer.invoke('lcu:summoner-rank-info'),
+
   getState: () => ipcRenderer.invoke('lcu:get-state'),
 
   onStatusChange: (callback: (status: LcuStatus) => void) => {

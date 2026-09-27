@@ -1,6 +1,11 @@
 import { getLockfileContent } from './lockfile';
-import { getCurrentSummoner, getGameflowPhase, getGameVersion } from './endpoints';
-import { GameflowPhase, Lockfile, Summoner } from '../../shared/types';
+import {
+  getCurrentSummoner,
+  getGameflowPhase,
+  getGameVersion,
+  getSummonerRankInfo,
+} from './endpoints';
+import { GameflowPhase, LcuCurrentRankedStats, Lockfile, Summoner } from '../../shared/types';
 
 async function withLockfile<T>(
   errorLabel: string,
@@ -37,4 +42,11 @@ export function fetchGameflowPhase() {
 
 export function fetchGameVersion() {
   return withLockfile('패치버전 요청 실패', (lockfile) => getGameVersion(lockfile));
+}
+
+// 현재 소환사 랭크 정보 가져오기
+export function fetchSummonerRankInfo() {
+  return withLockfile<LcuCurrentRankedStats | null>('소환사 정보 요청 실패', (lockfile) => {
+    return getSummonerRankInfo(lockfile);
+  });
 }
