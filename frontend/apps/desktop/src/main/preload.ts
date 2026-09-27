@@ -8,6 +8,10 @@ contextBridge.exposeInMainWorld('lcu', {
 
   getState: () => ipcRenderer.invoke('lcu:get-state'),
 
+  getMatchHistoryInfo: () => ipcRenderer.invoke('lcu:match-history'),
+
+  getMatchDetail: (gameId: number) => ipcRenderer.invoke('lcu:match-detail', gameId),
+
   onStatusChange: (callback: (status: LcuStatus) => void) => {
     const listener = (_: IpcRendererEvent, status: LcuStatus) => callback(status);
     ipcRenderer.on('lcu:status', listener);

@@ -2,7 +2,14 @@ import './App.css';
 
 import { useEffect, useState } from 'react';
 
-import type { GameflowPhase, LcuCurrentRankedStats, LcuStatus, Summoner } from '../../shared/types';
+import type {
+  GameflowPhase,
+  LcuCurrentRankedStats,
+  LcuStatus,
+  MatchSummary,
+  Summoner,
+} from '../../shared/types';
+import MatchSection from './components/MatchSection/MatchSection';
 import ProfileHeader from './components/ProfileHeader/ProfileHeader';
 import RankSection from './components/RankSection/RankSection';
 
@@ -19,6 +26,7 @@ function App() {
   const [lcuState, setLcuState] = useState<LcuStatus | null>(null);
   const [lcuPhase, setLcuPhase] = useState<GameflowPhase | null>(null);
   const [rankInfo, setRankInfo] = useState<LcuCurrentRankedStats | null>(null);
+  const [matches, setMatches] = useState<MatchSummary[] | null>(null);
 
   // 연결 상태와 현재 phase를 가져온다.
   useEffect(() => {
@@ -54,11 +62,15 @@ function App() {
     };
   }, [lcuState]);
 
-  // 랭크는 게임이 끝났을 때만 바뀌므로 그 시점에만 다시 받는다.
+  // 랭크와 전적은 게임이 끝났을 때만 바뀌므로 그 시점에만 다시 받는다.
   useEffect(() => {
     if (lcuPhase !== 'None' && lcuPhase !== 'EndOfGame') return;
 
     window.lcu.getRankInfo().then(setRankInfo);
+    window.lcu
+      .getMatchHistoryInfo()
+      .then(setMatches)
+      .catch(() => console.error('전적을 불러오지 못했습니다.'));
   }, [lcuPhase]);
 
   return (
@@ -67,7 +79,10 @@ function App() {
 
       <main className='content'>
         {currentSummoner ? (
-          <RankSection rankInfo={rankInfo} />
+          <>
+            <RankSection rankInfo={rankInfo} />
+            <MatchSection matches={matches} />
+          </>
         ) : (
           <p className='empty'>{EMPTY_TEXT[lcuState ?? 'disconnected']}</p>
         )}

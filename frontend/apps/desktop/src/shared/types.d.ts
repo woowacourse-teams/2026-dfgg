@@ -161,6 +161,76 @@ export type RankedEntry = {
   ratedRating: number;
 };
 
+// ---------- 전적 (/lol-match-history) ----------
+
+/** 전적 카드 한 장. 원본에서 필요한 것만 추려 IPC 로 보낸다. */
+export type MatchSummary = {
+  gameId: number;
+  queueId: number;
+  /** 클라이언트가 주는 한글 이름. 예: '자유 랭크 게임', '무작위 총력전: 아수라장' */
+  queueName: string;
+  /** 'CLASSIC' | 'ARAM' | 'KIWI' 등. 모드마다 보여줄 지표가 달라 화면을 가를 때 쓴다. */
+  gameMode: string;
+  /** 사용자 설정 게임. 연습 판이라 승률 집계에서 뺄지 화면이 정한다. */
+  isCustom: boolean;
+  /** 초. 화면에서 분:초로 바꾼다. */
+  gameDuration: number;
+  gameCreationDate: string;
+
+  // ---- 내 성적 ----
+  /** 내 인게임 슬롯 번호. 펼쳤을 때 10명 중 나를 집어내는 데 쓴다. */
+  participantId: number;
+  win: boolean;
+  championId: number;
+  spells: [number, number];
+  stats: MatchStats;
+};
+
+/** 요약과 상세가 같은 모양으로 쓰는 개인 성적. 화면이 한 벌로 그릴 수 있게 맞춰 둔다. */
+export type MatchStats = {
+  kills: number;
+  deaths: number;
+  assists: number;
+  /** 게임이 끝났을 때의 챔피언 레벨 */
+  champLevel: number;
+  /** 미니언 + 정글 몬스터 */
+  cs: number;
+  goldEarned: number;
+  /** 챔피언에게 넣은 피해량. 오브젝트 딜은 빠져 있다. */
+  damageDealt: number;
+  damageTaken: number;
+  visionScore: number;
+  wardsPlaced: number;
+  wardsKilled: number;
+  /** item0~6 을 배열로 편 것. 마지막이 장신구. 빈 칸은 0. */
+  items: number[];
+};
+
+// ---------- 참여 챔피언 전적 상세 정보 ---------
+export type MatchDetail = {
+  gameId: number;
+  /** 팀별 승패. 상대 팀을 내 승패의 반대로 추측하지 않아도 된다. */
+  teams: MatchTeam[];
+  participants: MatchParticipant[];
+};
+
+export type MatchTeam = {
+  /** 100 = 블루, 200 = 레드 */
+  teamId: number;
+  win: boolean;
+};
+
+export type MatchParticipant = {
+  participantId: number;
+  championId: number;
+  gameName: string;
+  tagLine: string;
+  /** 100 = 블루, 200 = 레드 */
+  teamId: number;
+  spells: [number, number];
+  stats: MatchStats;
+};
+
 // ---------- 백엔드 아이템 추천 응답 ----------
 export interface NamedEntry {
   id: number;

@@ -51,7 +51,7 @@ function detectClientStatus(home: BrowserWindow) {
 
 function createWindow() {
   const home = new BrowserWindow({
-    width: 400,
+    width: 480,
     height: 600,
     show: false,
     titleBarStyle: 'hidden',

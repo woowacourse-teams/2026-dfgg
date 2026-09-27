@@ -4,8 +4,19 @@ import {
   getGameflowPhase,
   getGameVersion,
   getSummonerRankInfo,
+  getMatchHistory,
+  getMatchDetail,
 } from './endpoints';
-import { GameflowPhase, LcuCurrentRankedStats, Lockfile, Summoner } from '../../shared/types';
+import type {
+  MatchSummary,
+  GameflowPhase,
+  LcuCurrentRankedStats,
+  Lockfile,
+  Summoner,
+  MatchDetail,
+} from '../../shared/types';
+import { toMatchSummaries, toMatchDetail } from './matchHistory';
+import { getQueueNames } from './gameQueues';
 
 async function withLockfile<T>(
   errorLabel: string,
@@ -48,5 +59,29 @@ export function fetchGameVersion() {
 export function fetchSummonerRankInfo() {
   return withLockfile<LcuCurrentRankedStats | null>('소환사 정보 요청 실패', (lockfile) => {
     return getSummonerRankInfo(lockfile);
+  });
+}
+
+// 최근 20경기 전적 가져오기
+export function fetchMatchHistory() {
+  return withLockfile<MatchSummary[] | null>('전적 요청 실패', async (lockfile) => {
+    // 큐 이름표는 캐시돼 있어서 두 번째 호출부터는 요청이 나가지 않는다.
+    const [raw, queueNames] = await Promise.all([
+      getMatchHistory(lockfile),
+      getQueueNames(lockfile),
+    ]);
+    if (!raw) return null;
+
+    return toMatchSummaries(raw, queueNames);
+  });
+}
+
+// 전적 카드를 펼쳤을 때 10명 기록 가져오기
+export function fetchMatchDetail(gameId: number) {
+  return withLockfile<MatchDetail | null>('전적 상세 요청 실패', async (lockfile) => {
+    const raw = await getMatchDetail(lockfile, gameId);
+    if (!raw) return null;
+
+    return toMatchDetail(raw);
   });
 }

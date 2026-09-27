@@ -3,6 +3,8 @@ import type {
   LcuCurrentRankedStats,
   LcuState,
   LcuStatus,
+  MatchDetail,
+  MatchSummary,
   RecommendationUpdate,
   Summoner,
 } from '../shared/types';
@@ -20,6 +22,8 @@ declare global {
       currentSummoner: () => Promise<Summoner | null>;
       getRankInfo: () => Promise<LcuCurrentRankedStats | null>;
       getState: () => Promise<LcuState>;
+      getMatchHistoryInfo: () => Promise<MatchSummary[] | null>;
+      getMatchDetail: (gameId: number) => Promise<MatchDetail | null>;
       onStatusChange: (callback: StatusListener) => Unsubscribe;
       onPhaseChange: (callback: PhaseListener) => Unsubscribe;
       onItemsRecommendationChange: (callback: ItemsListener) => Unsubscribe;

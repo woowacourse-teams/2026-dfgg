@@ -7,6 +7,8 @@
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
+  /* 아래 목록의 position 요소들이 헤더 위로 칠해지지 않게 층을 올린다 */
+  z-index: 10;
 }
 
 .title-bar {
