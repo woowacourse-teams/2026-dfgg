@@ -206,9 +206,16 @@ public class NextItemRecommendationService {
                 request.purchasedItemIds(),
                 championIdsOf(allies),
                 championIdsOf(enemies),
-                request.tier(),
+                tierOf(request),
                 patchOf(request)
         );
+    }
+
+    private String tierOf(NextItemRecommendationRequest request) {
+        if (request.tier() == null || request.tier().isBlank()) {
+            return null;
+        }
+        return request.tier();
     }
 
     private String patchOf(NextItemRecommendationRequest request) {

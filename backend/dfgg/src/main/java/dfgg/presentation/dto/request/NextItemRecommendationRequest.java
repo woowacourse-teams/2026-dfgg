@@ -5,7 +5,6 @@ import dfgg.domain.champion.ChampionPosition;
 import dfgg.presentation.dto.ChampionDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.Arrays;
@@ -29,7 +28,6 @@ public record NextItemRecommendationRequest(
         @Size(min = 5, max = 5, message = "적군은 5명이어야 합니다")
         List<ChampionDto> enemies,
 
-        @NotBlank(message = "티어는 필수입니다")
         String tier,
 
         /** 선택. 비우면 서비스의 현재 버전({@code riot.version})으로 추천한다. */
