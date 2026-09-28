@@ -9,5 +9,6 @@ export interface LcuGameflowSession {
 /** /lol-end-of-game/v1/eog-stats-block 에서 쓰는 필드만 적었다. */
 export interface LcuEndOfGameStats {
   gameId: number;
+  localPlayer: { championId: number };
   teams: { teamId: number; isPlayerTeam: boolean; isWinningTeam: boolean }[];
 }

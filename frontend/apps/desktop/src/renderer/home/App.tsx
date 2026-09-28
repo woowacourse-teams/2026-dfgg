@@ -1,14 +1,16 @@
 import './App.css';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type {
+  EndedGame,
   GameflowPhase,
   LcuCurrentRankedStats,
   LcuStatus,
   MatchSummary,
   Summoner,
 } from '../../shared/types';
+import FeedbackModal from './components/feedback/FeedbackModal';
 import MatchSection from './components/MatchSection/MatchSection';
 import ProfileHeader from './components/ProfileHeader/ProfileHeader';
 import RankSection from './components/RankSection/RankSection';
@@ -27,6 +29,12 @@ function App() {
   const [lcuPhase, setLcuPhase] = useState<GameflowPhase | null>(null);
   const [rankInfo, setRankInfo] = useState<LcuCurrentRankedStats | null>(null);
   const [matches, setMatches] = useState<MatchSummary[] | null>(null);
+  const [endedGame, setEndedGame] = useState<EndedGame | null>(null);
+
+  const playedGame = useRef(false); // 앱을 켠 뒤 한 게임을 한 판이라도 했는지 확인
+  const askedFeedback = useRef(false); // 이번 실행에서 피드백을 이미 했는지 확인
+
+  const closeFeedback = useCallback(() => setEndedGame(null), []);
 
   // 연결 상태와 현재 phase를 가져온다.
   useEffect(() => {
@@ -36,7 +44,21 @@ function App() {
     });
 
     const unsubscribeStatus = window.lcu.onStatusChange(setLcuState);
-    const unsubscribePhase = window.lcu.onPhaseChange(setLcuPhase);
+    const unsubscribePhase = window.lcu.onPhaseChange((phase) => {
+      setLcuPhase(phase);
+
+      if (phase === 'InProgress') {
+        playedGame.current = true;
+        setEndedGame(null);
+      }
+      if (phase === 'EndOfGame' && playedGame.current && !askedFeedback.current) {
+        askedFeedback.current = true;
+        window.lcu
+          .getEndedGame()
+          .then(setEndedGame)
+          .catch(() => console.error('끝난 게임 정보를 불러오지 못했습니다.'));
+      }
+    });
 
     return () => {
       unsubscribeStatus();
@@ -87,6 +109,9 @@ function App() {
           <p className='empty'>{EMPTY_TEXT[lcuState ?? 'disconnected']}</p>
         )}
       </main>
+      {endedGame && (
+        <FeedbackModal key={endedGame.gameId} game={endedGame} onClose={closeFeedback} />
+      )}
     </div>
   );
 }

@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
-import { GameflowPhase, LcuStatus, RecommendationUpdate } from '../shared/types';
+import {
+  EndedGame,
+  FeedbackRating,
+  GameflowPhase,
+  LcuStatus,
+  RecommendationUpdate,
+} from '../shared/types';
 
 contextBridge.exposeInMainWorld('lcu', {
   currentSummoner: () => ipcRenderer.invoke('lcu:current-summoner'),
@@ -29,6 +35,8 @@ contextBridge.exposeInMainWorld('lcu', {
     ipcRenderer.on('lcu:items-recommendation', listener);
     return () => ipcRenderer.removeListener('lcu:items-recommendation', listener);
   },
+
+  getEndedGame: () => ipcRenderer.invoke('lcu:ended-game'),
 });
 
 contextBridge.exposeInMainWorld('windowControls', {
@@ -40,4 +48,9 @@ contextBridge.exposeInMainWorld('windowControls', {
 contextBridge.exposeInMainWorld('analytics', {
   track: (name: string, data?: Record<string, string | number | boolean>) =>
     ipcRenderer.send('analytics:track', name, data),
+});
+
+contextBridge.exposeInMainWorld('feedback', {
+  submit: (rating: FeedbackRating, game: EndedGame) =>
+    ipcRenderer.invoke('feedback:submit', rating, game),
 });

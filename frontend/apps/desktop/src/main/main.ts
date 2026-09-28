@@ -54,7 +54,7 @@ function detectClientStatus(home: BrowserWindow) {
     if (status !== 'connected') return;
     if (shown) return;
 
-    home.show();
+    home.showInactive();
     shown = true;
   });
 }

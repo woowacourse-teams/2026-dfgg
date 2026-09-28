@@ -1,5 +1,17 @@
 import type { LcuEventMap } from '../main/lcu/events';
 
+// 피드백 타입
+export type FeedbackRating = 'good' | 'soso' | 'bad';
+
+// 게임 끝났을 때 메인이 home에 알려주는 정보. 피드백에 같이 담아 보낸다.
+export type EndedGame = {
+  riotId?: string;
+  gameId?: number;
+  championId?: number;
+  queue?: string | null;
+  result: string;
+};
+
 export type PhaseListener = (phase: GameflowPhase | null) => void;
 export type StatusListener = (status: LcuStatus | null) => void;
 

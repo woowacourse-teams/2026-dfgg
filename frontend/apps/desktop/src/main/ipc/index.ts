@@ -4,12 +4,15 @@ import {
   fetchMatchHistory,
   fetchSummonerRankInfo,
   fetchMatchDetail,
+  fetchEndedGame,
 } from '../lcu/service';
 import { getLcuState } from '../lcu/state';
 import { EXPANDED_WIDTH, EXPANDED_HEIGHT, COLLAPSED_HEIGHT, COLLAPSED_WIDTH } from '../constants';
 import { setOverlayCollapsed } from '../analytics/gameTracker';
 import { setQuitSource } from '../analytics/sessionTracker';
 import { trackEvent, type EventData } from '../analytics/umami';
+import type { FeedbackRating, EndedGame } from '../../shared/types';
+import { submitFeedback } from '../api/feedback';
 
 // ipc로 보내기
 export function registerIpcHandlers() {
@@ -41,4 +44,8 @@ export function registerIpcHandlers() {
   ipcMain.on('analytics:track', (_event, name: string, data?: EventData) => {
     trackEvent(`desktop-ui-${name}`, data);
   });
+  ipcMain.handle('lcu:ended-game', fetchEndedGame);
+  ipcMain.handle('feedback:submit', (_event, rating: FeedbackRating, game: EndedGame) =>
+    submitFeedback(rating, game),
+  );
 }

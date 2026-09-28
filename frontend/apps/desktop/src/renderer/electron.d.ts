@@ -1,4 +1,6 @@
 import type {
+  EndedGame,
+  FeedbackRating,
   GameflowPhase,
   LcuCurrentRankedStats,
   LcuState,
@@ -27,6 +29,7 @@ declare global {
       onStatusChange: (callback: StatusListener) => Unsubscribe;
       onPhaseChange: (callback: PhaseListener) => Unsubscribe;
       onItemsRecommendationChange: (callback: ItemsListener) => Unsubscribe;
+      getEndedGame: () => Promise<EndedGame | null>;
     };
     windowControls: {
       setCollapsed: (collapsed: boolean) => void;
@@ -35,6 +38,9 @@ declare global {
     };
     analytics: {
       track: (name: string, data?: Record<string, string | number | boolean>) => void;
+    };
+    feedback: {
+      submit: (rating: FeedbackRating, game: EndedGame) => Promise<Record<string, string>>;
     };
   }
 }

@@ -16,6 +16,7 @@ import type {
   Lockfile,
   Summoner,
   MatchDetail,
+  EndedGame,
 } from '../../shared/types';
 import { toMatchSummaries, toMatchDetail } from './matchHistory';
 import { getQueueNames } from './gameQueues';
@@ -104,4 +105,26 @@ export function fetchQueueName(queueId: number) {
     const queueNames = await getQueueNames(lockfile);
     return queueNames.get(queueId) ?? null;
   });
+}
+
+// 결과 화면에서 방금 끝난 게임 정보 모으기. 피드백에 같이 담는다.
+export async function fetchEndedGame(): Promise<EndedGame | null> {
+  const [stats, session, summoner] = await Promise.all([
+    fetchEndOfGameStats(),
+    fetchGameflowSession(),
+    // 소환사 조회가 실패해도 피드백은 받는다.
+    fetchCurrentSummoner().catch(() => null),
+  ]);
+  if (!stats) return null;
+
+  const myTeam = stats.teams.find((team) => team.isPlayerTeam);
+  const queueId = session?.gameData.queue.id;
+
+  return {
+    riotId: summoner ? `${summoner.gameName}#${summoner.tagLine}` : undefined,
+    gameId: stats.gameId,
+    championId: stats.localPlayer.championId,
+    queue: queueId === undefined ? undefined : await fetchQueueName(queueId),
+    result: myTeam ? (myTeam.isWinningTeam ? 'win' : 'lose') : 'unknown',
+  };
 }
