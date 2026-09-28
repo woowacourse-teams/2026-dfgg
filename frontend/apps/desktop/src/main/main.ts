@@ -8,7 +8,7 @@ import { onPhaseChange, onStatusChange } from './lcu/state';
 import { ensureBorderlessMode } from './gameConfig/gameConfig';
 import { isStartupLaunch, setAutoLaunch } from './autoLaunch/autoLaunch';
 import { setTray } from './autoLaunch/tray';
-import { attachHomeToClient } from './docking';
+import { attachHomeToClient } from './docking/docking';
 
 import { flushOutbox, trackEvent } from './analytics/umami';
 import { readStore, updateStore } from './analytics/store';

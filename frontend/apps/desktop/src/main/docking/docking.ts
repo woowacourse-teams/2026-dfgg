@@ -1,7 +1,9 @@
 import { BrowserWindow, screen } from 'electron';
-import { trackEvent } from './analytics/umami';
+import { trackEvent } from '../analytics/umami';
+import { onPhaseChange, onStatusChange } from '../lcu/state';
+import { findWindowRect } from './clientWindow';
 
-const LOL_CLIENT_TITLE = 'League of Legends';
+export const LOL_CLIENT_TITLE = 'League of Legends';
 
 /** 롤 창과 우리 창 사이 간격. 0 이면 딱 붙는다. */
 const GAP = -4;
@@ -9,7 +11,12 @@ const GAP = -4;
 /** 라이브러리 내부가 30fps 로 갱신하므로 같은 주기를 쓴다. */
 const THROTTLE_MS = 34;
 
-type Rect = { x: number; y: number; width: number; height: number };
+export type Rect = { x: number; y: number; width: number; height: number };
+
+const FIND_INTERVAL_MS = 500;
+const FIND_TIMEOUT_MS = 30_000;
+
+let findTimer: NodeJS.Timeout | null = null;
 
 /**
  * 네이티브 모듈이라 환경(OS·아키텍처·Electron 버전)에 따라 로드가 실패할 수 있다.
@@ -76,6 +83,27 @@ function dockBeside(home: BrowserWindow, clientRect: Rect) {
   });
 }
 
+/** 롤 창이 뜰 때까지 기다렸다가 한 번 붙인다. 새로 부르면 이전 시도는 취소한다. */
+function dockWhenClientAppears(home: BrowserWindow) {
+  if (findTimer) clearInterval(findTimer);
+  const startedAt = Date.now();
+
+  findTimer = setInterval(() => {
+    if (home.isDestroyed() || Date.now() - startedAt > FIND_TIMEOUT_MS) {
+      clearInterval(findTimer!);
+      findTimer = null;
+      return;
+    }
+
+    const rect = findWindowRect(LOL_CLIENT_TITLE);
+    if (!rect) return;
+
+    clearInterval(findTimer!);
+    findTimer = null;
+    dockBeside(home, rect);
+  }, FIND_INTERVAL_MS);
+}
+
 let isAttached = false;
 
 /** 홈 창을 롤 클라이언트 창에 붙여 함께 움직이게 한다. */
@@ -100,8 +128,27 @@ export function attachHomeToClient(home: BrowserWindow) {
 
   controller.events.on('moveresize', reposition);
 
+  const dockSoon = () => dockWhenClientAppears(home);
+
   controller.events.on('detach', () => {
-    console.log('[도킹] 클라이언트가 사라짐 — 현재 위치 유지');
+    console.log('[도킹] 클라이언트가 사라짐 — 다시 뜨면 붙인다');
+    dockSoon();
+  });
+
+  // 롤 클라이언트가 커졌을 때 (앱을 켰을 때 이미 켜져 있던 경우 포함)
+  onStatusChange((status) => {
+    if (status === 'connected') dockSoon();
+  });
+
+  // 게임이 끝나 클라이언트 창이 다시 뜰 때
+  let wasInGame = false;
+  onPhaseChange((phase) => {
+    if (phase === 'InProgress') {
+      wasInGame = true;
+    } else if (wasInGame) {
+      wasInGame = false;
+      dockSoon();
+    }
   });
 
   // 창을 넘기지 않으면(undefined) 라이브러리가 창을 건드리지 않고 좌표만 알려준다.
