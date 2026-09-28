@@ -1,11 +1,14 @@
 // 다운로드 버튼 파일
-import { DOWNLOAD_URL, MS_STORE_URL } from '../lib';
+import { DOWNLOAD_URL, getOs, MS_STORE_URL } from '../lib';
 
 export default function DownloadButtons() {
+  const os = getOs();
+
   return (
     <div className='flex flex-col gap-3 sm:flex-row'>
       <a
         data-umami-event='store-click-top'
+        data-umami-event-os={os}
         href={MS_STORE_URL}
         target='_blank'
         rel='noreferrer'
@@ -15,6 +18,7 @@ export default function DownloadButtons() {
       </a>
       <a
         data-umami-event='download-click'
+        data-umami-event-os={os}
         href={DOWNLOAD_URL}
         className='rounded-md px-6 py-3.5 text-center font-medium text-ink-2 ring-1 ring-line transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent'
       >

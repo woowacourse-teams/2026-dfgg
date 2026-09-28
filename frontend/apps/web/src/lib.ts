@@ -8,3 +8,24 @@ const DDRAGON_VERSION = '16.18';
 
 export const championIcon = (id: string) => `${S3baseUrl}/${DDRAGON_VERSION}/champions/${id}.png`;
 export const itemIcon = (id: number) => `${S3baseUrl}/${DDRAGON_VERSION}/items/${id}.png`;
+
+type TrackData = Record<string, string | number>;
+
+const trackedOnce = new Set<string>();
+
+export const track = (event: string, data?: TrackData) => window.umami?.track(event, data);
+
+export const trackOnce = (event: string, data?: TrackData) => {
+  const key = `${event}:${JSON.stringify(data ?? {})}`;
+  if (trackedOnce.has(key)) return;
+  trackedOnce.add(key);
+  track(event, data);
+};
+
+export const getOs = () => {
+  const ua = navigator.userAgent;
+  if (/Android|iPhone|iPad|iPod/i.test(ua)) return 'mobile';
+  if (/Windows/i.test(ua)) return 'windows';
+  if (/Mac/i.test(ua)) return 'mac';
+  return 'other';
+};

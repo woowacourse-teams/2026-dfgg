@@ -115,6 +115,7 @@ export default function OverlayMock({
         <button
           type='button'
           aria-label='오버레이 켜기'
+          data-umami-event='demo-overlay-expand'
           onClick={onToggle}
           className='size-6 cursor-pointer rounded-md p-0 hover:bg-white/20'
         >
@@ -150,6 +151,7 @@ export default function OverlayMock({
         <button
           type='button'
           aria-label='오버레이 끄기'
+          data-umami-event='demo-overlay-collapse'
           onClick={onToggle}
           className='h-full w-10 cursor-pointer text-base text-white/85 hover:bg-[rgb(244_112_95/0.35)] hover:text-white'
         >

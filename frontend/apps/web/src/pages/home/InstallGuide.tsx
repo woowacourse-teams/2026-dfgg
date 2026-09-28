@@ -1,5 +1,8 @@
 // 설치 안내 파일
-import { MS_STORE_URL } from '../../lib';
+import { useRef } from 'react';
+
+import useTrackInView from '../../hooks/useTrackInView';
+import { MS_STORE_URL, track } from '../../lib';
 import SmartScreenMock from './SmartScreenMock';
 
 const FAQ = [
@@ -22,8 +25,12 @@ const FAQ = [
 ];
 
 export default function InstallGuide() {
+  const sectionRef = useRef<HTMLElement>(null);
+  useTrackInView(sectionRef, 'install-guide-view');
+
   return (
     <section
+      ref={sectionRef}
       id='install'
       aria-labelledby='install-heading'
       className='mx-auto max-w-300 scroll-mt-20 border-t border-line px-4 pt-20 pb-8 sm:px-8 sm:py-28'
@@ -64,7 +71,12 @@ export default function InstallGuide() {
         <ul className='mt-3 border-t border-line'>
           {FAQ.map((item) => (
             <li key={item.q} className='border-b border-line'>
-              <details className='group'>
+              <details
+                className='group'
+                onToggle={(e) => {
+                  if (e.currentTarget.open) track('faq-open', { question: item.q });
+                }}
+              >
                 <summary className='flex cursor-pointer list-none items-center justify-between gap-6 py-5 font-bold transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden'>
                   {item.q}
                   <span

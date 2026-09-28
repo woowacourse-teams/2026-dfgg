@@ -32,6 +32,7 @@ export default function SmartScreenMock() {
             <motion.button
               key='more'
               type='button'
+              data-umami-event='smartscreen-more-info'
               onClick={() => setStep('details')}
               exit={{ opacity: 0 }}
               className='relative mt-4 cursor-pointer text-sm underline underline-offset-2'
@@ -46,6 +47,7 @@ export default function SmartScreenMock() {
           {isExpanded && (
             <button
               type='button'
+              data-umami-event='smartscreen-run'
               onClick={() => setStep('done')}
               className='relative cursor-pointer border border-white bg-white/10 px-6 py-1.5 text-sm'
             >
@@ -64,6 +66,7 @@ export default function SmartScreenMock() {
             <span className='text-win'>설치가 시작됩니다</span>
             <button
               type='button'
+              data-umami-event='smartscreen-replay'
               onClick={() => setStep('blocked')}
               className='cursor-pointer underline-offset-4 hover:text-ink hover:underline'
             >

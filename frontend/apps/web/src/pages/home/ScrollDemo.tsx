@@ -11,6 +11,7 @@ import {
 } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
+import { track, trackOnce } from '../../lib';
 import { INVENTORY_ORDER, recommendationsAfter, stageAt, STAGES } from './demoData';
 import Inventory from './Inventory';
 import OverlayMock from './OverlayMock';
@@ -42,6 +43,8 @@ function RailSegment({ index, progress, isCurrent, onSelect }: RailSegmentProps)
   return (
     <button
       type='button'
+      data-umami-event='demo-stage-click'
+      data-umami-event-stage={STAGES[index].label}
       onClick={() => onSelect(index)}
       aria-current={isCurrent ? 'step' : undefined}
       className='group flex-1 cursor-pointer pt-3 text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent'
@@ -99,7 +102,12 @@ export default function ScrollDemo() {
     const sp = toStageProgress(p);
     const next = stageAt(sp);
     setStage(next);
-    setInventoryCount(countFor(next, sp));
+    const count = countFor(next, sp);
+    setInventoryCount(count);
+
+    if (p > 0.02) trackOnce('demo-enter');
+    if (sp >= 0) trackOnce('demo-stage-view', { stage: STAGES[next].label });
+    if (count === INVENTORY_ORDER.length) trackOnce('demo-full-build');
   });
 
   const prefersReducedMotion = useReducedMotion();
@@ -152,6 +160,7 @@ export default function ScrollDemo() {
             loop
             playsInline
             preload='metadata'
+            onError={() => track('demo-video-error')}
             aria-hidden='true'
             style={{ scale: mediaScale }}
             className='absolute inset-0 size-full object-cover'
@@ -175,7 +184,10 @@ export default function ScrollDemo() {
                   key='overlay'
                   exit={{ opacity: 0, x: -24 }}
                   transition={{ duration: 0.4 }}
-                  onMouseEnter={() => setIsHovered(true)}
+                  onMouseEnter={() => {
+                    setIsHovered(true);
+                    trackOnce('demo-overlay-hover');
+                  }}
                   onMouseLeave={() => setIsHovered(false)}
                   className='absolute top-[14%] left-[4%] origin-top-left scale-[0.72] sm:top-[16%] sm:scale-90 md:scale-100 lg:scale-110'
                 >

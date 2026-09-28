@@ -14,7 +14,11 @@ export default function SiteFooter() {
     <footer className='border-t border-line pt-6 text-left text-xs text-ink-3'>
       <p>
         개인정보처리방침 {/* 같은 사이트 안이지만 절대 주소를 그대로 보여준다. */}
-        <a href={PRIVACY_URL} className='text-ink-2 hover:text-accent'>
+        <a
+          href={PRIVACY_URL}
+          data-umami-event='footer-privacy-click'
+          className='text-ink-2 hover:text-accent'
+        >
           {PRIVACY_URL}
         </a>
       </p>
