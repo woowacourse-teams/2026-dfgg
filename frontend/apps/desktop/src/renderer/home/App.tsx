@@ -41,6 +41,9 @@ function App() {
     window.lcu.getState().then((state) => {
       setLcuState(state.status);
       setLcuPhase(state.phase);
+
+      // 게임 중에 앱을 켜면 InProgress 이벤트가 화면이 뜨기 전에 지나가서 여기서도 표시한다.
+      if (state.phase === 'InProgress') playedGame.current = true;
     });
 
     const unsubscribeStatus = window.lcu.onStatusChange(setLcuState);

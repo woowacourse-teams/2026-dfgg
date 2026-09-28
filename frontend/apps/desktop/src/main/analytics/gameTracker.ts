@@ -133,7 +133,7 @@ async function finishGame(reachedEndOfGame: boolean) {
   if (reachedEndOfGame) {
     try {
       const stats = await fetchEndOfGameStats();
-      const myTeam = stats?.teams.find((team) => team.isPlayerTeam);
+      const myTeam = stats?.teams?.find((team) => team.isPlayerTeam);
       if (myTeam) result = myTeam.isWinningTeam ? 'win' : 'lose';
     } catch {
       // 승패 없이 보낸다.

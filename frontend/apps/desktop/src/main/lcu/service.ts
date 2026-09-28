@@ -111,19 +111,19 @@ export function fetchQueueName(queueId: number) {
 export async function fetchEndedGame(): Promise<EndedGame | null> {
   const [stats, session, summoner] = await Promise.all([
     fetchEndOfGameStats(),
-    fetchGameflowSession(),
+    fetchGameflowSession().catch(() => null),
     // 소환사 조회가 실패해도 피드백은 받는다.
     fetchCurrentSummoner().catch(() => null),
   ]);
   if (!stats) return null;
 
-  const myTeam = stats.teams.find((team) => team.isPlayerTeam);
+  const myTeam = stats.teams?.find((team) => team.isPlayerTeam);
   const queueId = session?.gameData.queue.id;
 
   return {
     riotId: summoner ? `${summoner.gameName}#${summoner.tagLine}` : undefined,
     gameId: stats.gameId,
-    championId: stats.localPlayer.championId,
+    championId: stats.localPlayer?.championId,
     queue: queueId === undefined ? undefined : await fetchQueueName(queueId),
     result: myTeam ? (myTeam.isWinningTeam ? 'win' : 'lose') : 'unknown',
   };
