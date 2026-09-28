@@ -8,6 +8,15 @@ import { fetchGameVersion } from '../lcu/service';
 import { recordChampion, recordLiveError, recordPurchases } from '../analytics/gameTracker';
 
 const POLL_INTERVAL_MS = 2000;
+// 추천 요청이 실패하면 서버 부하를 줄이려고 재시도 간격을 늘린다. (2초 → 4초 → … → 30초)
+const MAX_RETRY_INTERVAL_MS = 30_000;
+
+let recommendFailures = 0;
+
+function nextPollInterval() {
+  if (recommendFailures === 0) return POLL_INTERVAL_MS;
+  return Math.min(POLL_INTERVAL_MS * 2 ** recommendFailures, MAX_RETRY_INTERVAL_MS);
+}
 
 let timer: NodeJS.Timeout | null = null;
 let polling: boolean = false;
@@ -37,10 +46,12 @@ function sameItems(a: number[], b: number[]) {
 }
 
 // 구매 순서를 유지하면서 아이템 리스트 업데이트 하기
-function updatePurchaseOrder(itemIds: number[]) {
+// 원딜은 역할 퀘스트를 깨면 신발이 인벤토리 밖 전용 칸으로 옮겨지고 Live API 에서도 사라진다.
+// 그래서 신발은 한 번 산 것이 보이면 게임이 끝날 때까지 가진 것으로 본다.
+function updatePurchaseOrder(itemIds: number[], bootsItemIds: Set<number>) {
   const current = new Set(itemIds);
   for (const id of purchasedItemIds) {
-    if (!current.has(id)) purchasedItemIds.delete(id);
+    if (!current.has(id) && !bootsItemIds.has(id)) purchasedItemIds.delete(id);
   }
   for (const id of current) purchasedItemIds.add(id);
 }
@@ -58,7 +69,7 @@ async function tick() {
       patch = currentPatch;
     }
 
-    const { championNames, componentItemIds } = await getDDragonData();
+    const { championNames, componentItemIds, bootsItemIds } = await getDDragonData();
 
     const players = await getPlayerList();
     const myPlayers = players?.find(
@@ -75,7 +86,7 @@ async function tick() {
           const newItemIds = itemIds.filter((id) => !purchasedItemIds.has(id));
           recordPurchases(newItemIds, getLcuState().recommendations);
         }
-        updatePurchaseOrder(itemIds);
+        updatePurchaseOrder(itemIds, bootsItemIds);
 
         console.log('아이템 변경', itemIds);
 
@@ -85,7 +96,15 @@ async function tick() {
         const body = buildRecommendationBody(liveInfo);
         if (!body) return;
         recordChampion(body.myChampion);
-        const result = await fetchItemRecommendations(body);
+        let result;
+        try {
+          result = await fetchItemRecommendations(body);
+        } catch (error) {
+          // live API 실패(게임 로딩 중 등)와 구분해서 추천 실패에만 간격을 늘린다.
+          recommendFailures++;
+          throw error;
+        }
+        recommendFailures = 0;
         setRecommendations(result.recommendedItems, purchasedItemIds.size);
 
         lastItemIds = itemIds;
@@ -95,7 +114,7 @@ async function tick() {
     console.debug('live 조회 실패', error);
     recordLiveError();
   } finally {
-    if (polling) timer = setTimeout(tick, POLL_INTERVAL_MS);
+    if (polling) timer = setTimeout(tick, nextPollInterval());
   }
 }
 
@@ -116,6 +135,7 @@ export function stopLivePolling() {
   }
 
   lastItemIds = null;
+  recommendFailures = 0;
   myRiotId = null;
   patch = null;
   purchasedItemIds.clear();

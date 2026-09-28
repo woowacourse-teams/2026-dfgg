@@ -1,10 +1,13 @@
 import type { DDragonChampionList, DDragonItemList, DDragonVersions } from './types';
 
-let cache: Promise<{
+type DDragonData = {
   version: string;
   championNames: Record<string, string>;
   componentItemIds: Set<number>;
-}> | null = null;
+  bootsItemIds: Set<number>;
+};
+
+let cache: Promise<DDragonData> | null = null;
 
 async function fetchVersion(): Promise<DDragonVersions> {
   try {
@@ -68,6 +71,19 @@ function toComponentItemIds(list: DDragonItemList): Set<number> {
   return new Set(ids);
 }
 
+// 신발 전체. 3단계 신발(건메탈 그리브즈 등)은 Boots 태그가 없어서 재료가 신발인지로도 찾는다.
+function toBootsItemIds(list: DDragonItemList): Set<number> {
+  const entries = Object.entries(list.data);
+  const tagged = new Set(
+    entries.filter(([, item]) => item.tags.includes('Boots')).map(([id]) => id),
+  );
+  const ids = entries
+    .filter(([id, item]) => tagged.has(id) || (item.from ?? []).some((from) => tagged.has(from)))
+    .map(([id]) => Number(id));
+
+  return new Set(ids);
+}
+
 function toStartingItemIds(list: DDragonItemList): Set<number> {
   const ids = Object.entries(list.data)
     .filter(([, item]) => {
@@ -82,11 +98,7 @@ function toStartingItemIds(list: DDragonItemList): Set<number> {
 }
 
 // 챔피언, 아이템 정보 가져오기
-async function load(): Promise<{
-  version: string;
-  championNames: Record<string, string>;
-  componentItemIds: Set<number>;
-}> {
+async function load(): Promise<DDragonData> {
   const version = await fetchVersion();
 
   const [championList, itemList] = await Promise.all([
@@ -103,6 +115,7 @@ async function load(): Promise<{
       Object.values(championList.data).map((champion) => [champion.id, champion.name]),
     ),
     componentItemIds: new Set([...componentItemIds, ...startingItemIds]),
+    bootsItemIds: toBootsItemIds(itemList),
   };
 }
 

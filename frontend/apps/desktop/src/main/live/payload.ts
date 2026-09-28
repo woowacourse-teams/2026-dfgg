@@ -33,9 +33,21 @@ const POSITION_MAP: Record<string, string> = {
 
 const TRINKET_SLOT = 6;
 
+// 챔피언마다 원본 이름 형식이 달라서 ddragon 표 확인이 실패했을 때만 쓴다.
 // 'game_character_displayname_Garen' -> 'Garen'
-function toChampionAlias(rawChampionName: string) {
-  return rawChampionName.split('_').pop() ?? rawChampionName;
+// 'Character_Seraphine_Name' -> 'Seraphine'
+const RAW_CHAMPION_NAME_PATTERNS = [/^game_character_displayname_(\w+)$/, /^Character_(\w+)_Name$/];
+
+// 형식에 기대지 않도록 '_' 로 나눈 조각 중 ddragon 챔피언 id 와 같은 것을 먼저 찾는다.
+function toChampionAlias(rawChampionName: string, championNames?: Record<string, string>) {
+  const known = rawChampionName.split('_').find((part) => championNames?.[part]);
+  if (known) return known;
+
+  for (const pattern of RAW_CHAMPION_NAME_PATTERNS) {
+    const match = rawChampionName.match(pattern);
+    if (match) return match[1];
+  }
+  return rawChampionName;
 }
 
 // 'LeeSin' -> 'Lee Sin' (표에 없는 챔피언을 위한 대략적인 폴백)
@@ -45,7 +57,7 @@ function splitPascalCase(alias: string) {
 
 // ddragon에서 영어 이름 찾기
 function toEnglishName(rawChampionName: string, championNames?: Record<string, string>) {
-  const alias = toChampionAlias(rawChampionName);
+  const alias = toChampionAlias(rawChampionName, championNames);
   return championNames?.[alias] ?? splitPascalCase(alias);
 }
 

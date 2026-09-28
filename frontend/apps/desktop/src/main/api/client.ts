@@ -2,7 +2,11 @@ import { getApiBaseUrl } from './config';
 
 const API_TIMEOUT_MS = 5000;
 
-export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+export async function apiPost<T>(
+  path: string,
+  body: unknown,
+  timeoutMs = API_TIMEOUT_MS,
+): Promise<T> {
   const baseUrl = getApiBaseUrl();
 
   try {
@@ -12,7 +16,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) {
       const text = await response.text();
