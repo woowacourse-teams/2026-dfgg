@@ -19,6 +19,7 @@ import {
   startSessionTracking,
 } from './analytics/sessionTracker';
 import { endGameTracking, initGameTracking, recoverLastGame } from './analytics/gameTracker';
+import { initAutoUpdate } from './autoUpdate';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
@@ -120,6 +121,8 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(async () => {
+    initAutoUpdate();
+
     // 지난 실행에서 못 보낸 이벤트부터 정리해서 보낸다.
     recoverLastSession();
     recoverLastGame();
