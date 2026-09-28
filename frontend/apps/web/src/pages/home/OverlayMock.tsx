@@ -3,8 +3,11 @@ import { AnimatePresence, motion } from 'motion/react';
 
 import Logo from '../../assets/icon.png';
 import BorderBeam from '../../components/effects/BorderBeam';
+import { strings } from '../../i18n/i18n';
 import { championIcon, itemIcon } from '../../lib';
 import { CHAMPION_NAMES, type DemoItem } from './demoData';
+
+const text = strings();
 
 const TOP_COUNT = 3;
 const RANK_STYLE = [
@@ -27,7 +30,7 @@ function Champions({ ids, variant }: ChampionsProps) {
       <span
         className={`text-[10px] font-bold tracking-[-0.02em] ${isAlly ? 'text-[#8cc2ff]' : 'text-[#ff9b8d]'}`}
       >
-        {isAlly ? '시너지' : '카운터'}
+        {isAlly ? text.overlay.synergy : text.overlay.counter}
       </span>
       <ul className='flex gap-1'>
         {ids.map((id) => (
@@ -114,7 +117,7 @@ export default function OverlayMock({
       <div className='grid size-10 place-items-center rounded-[10px] bg-black/30'>
         <button
           type='button'
-          aria-label='오버레이 켜기'
+          aria-label={text.overlay.expand}
           data-umami-event='demo-overlay-expand'
           onClick={onToggle}
           className='size-6 cursor-pointer rounded-md p-0 hover:bg-white/20'
@@ -145,12 +148,12 @@ export default function OverlayMock({
             transition={{ duration: 0.2 }}
             className='text-xs font-semibold'
           >
-            {coreIndex}코어 추천
+            {text.overlay.coreTitle(coreIndex)}
           </motion.span>
         </AnimatePresence>
         <button
           type='button'
-          aria-label='오버레이 끄기'
+          aria-label={text.overlay.collapse}
           data-umami-event='demo-overlay-collapse'
           onClick={onToggle}
           className='h-full w-10 cursor-pointer text-base text-white/85 hover:bg-[rgb(244_112_95/0.35)] hover:text-white'

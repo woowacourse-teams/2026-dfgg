@@ -5,7 +5,11 @@ import type { ReactNode } from 'react';
 import DownloadButtons from '../../components/DownloadButtons';
 import BlurText from '../../components/effects/BlurText';
 import LightRays from '../../components/effects/LightRays';
+import { strings } from '../../i18n/i18n';
 import ChatLine from './ChatLine';
+
+const text = strings().hero;
+const sub = text.subtitle;
 
 const fadeUp = (delay: number) => ({
   initial: { opacity: 0, y: 12 },
@@ -40,33 +44,33 @@ export default function Hero() {
     >
       <LightRays />
       <ChatLine
-        history={{
-          time: '12:46',
-          name: '탑블레이드가렌',
-          champion: '레넥톤',
-          text: '원딜 템 뭐갈거?',
-        }}
-        typed={{ time: '12:47', name: '원딜장인', champion: '징크스', text: '템 뭐 가야됨?' }}
+        history={{ time: '12:46', ...text.chatHistory }}
+        typed={{ time: '12:47', ...text.chatTyped }}
       />
       <h1
         id='hero-heading'
         className='relative mt-6 font-impact text-[clamp(2rem,9.4vw,6rem)] leading-[1.1] tracking-[-0.01em] whitespace-nowrap'
       >
-        <span className='sr-only'>“템 뭐 가야됨?” </span>
-        <BlurText lines={['이젠 물어보지 마세요']} delay={120} />
+        <span className='sr-only'>“{text.chatTyped.text}” </span>
+        <BlurText lines={text.headline} delay={120} />
       </h1>
       <motion.p
         {...fadeUp(1.1)}
         className='relative mt-6 text-lg leading-relaxed font-medium tracking-[-0.01em] text-white/80 sm:text-2xl'
       >
-        DFGG가 <Underline delay={1.5}>양 팀 조합</Underline>과{' '}
-        <Underline delay={1.75}>실시간 상황</Underline>에 맞춰
+        {sub.prefix}
+        <Underline delay={1.5}>{sub.teamComp}</Underline>
+        {sub.joiner}
+        <Underline delay={1.75}>{sub.liveState}</Underline>
+        {sub.suffix}
         <br />
-        <strong className='font-bold text-white'>코어템</strong>을 추천해줘요!
+        {sub.secondLinePrefix}
+        <strong className='font-bold text-white'>{sub.coreItem}</strong>
+        {sub.secondLineSuffix}
       </motion.p>
       <motion.div {...fadeUp(1.25)} className='relative mt-9'>
         <DownloadButtons />
-        <p className='mt-3 text-sm text-ink-3'>Windows 10·11</p>
+        <p className='mt-3 text-sm text-ink-3'>{strings().download.requirement}</p>
       </motion.div>
     </section>
   );

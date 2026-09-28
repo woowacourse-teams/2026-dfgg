@@ -2,6 +2,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 
 import BorderBeam from '../../components/effects/BorderBeam';
+import { strings } from '../../i18n/i18n';
 import { itemIcon } from '../../lib';
 import { INVENTORY_ORDER } from './demoData';
 
@@ -36,7 +37,7 @@ export default function Inventory({ count, isCentered }: InventoryProps) {
       </AnimatePresence>
       <motion.ul
         layout
-        aria-label={`인벤토리 ${count}칸 채워짐`}
+        aria-label={strings().overlay.inventoryLabel(count)}
         className='relative grid grid-cols-3 gap-1.5 rounded-lg bg-black/70 p-2 ring-1 ring-white/10'
       >
         {INVENTORY_ORDER.map((item, i) => (

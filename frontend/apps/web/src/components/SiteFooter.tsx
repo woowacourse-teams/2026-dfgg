@@ -4,16 +4,20 @@
  * 링크 문구를 "개인정보처리방침" 대신 주소 그대로 쓴다. Riot API 심사에 제출한
  * 주소와 화면에 보이는 주소가 같아야 확인이 쉽고, 사용자도 복사해 갈 수 있다.
  */
+import { strings } from '../i18n/i18n';
+
 export const PRIVACY_URL = 'https://dfgg.pro/privacy';
 
 /** 서비스를 처음 공개한 해. 해가 바뀌어도 그대로 둔다. */
 const COPYRIGHT_YEAR = 2026;
 
+const text = strings().footer;
+
 export default function SiteFooter() {
   return (
     <footer className='border-t border-line pt-6 text-left text-xs text-ink-3'>
       <p>
-        개인정보처리방침 {/* 같은 사이트 안이지만 절대 주소를 그대로 보여준다. */}
+        {text.privacy}{' '}
         <a
           href={PRIVACY_URL}
           data-umami-event='footer-privacy-click'
@@ -22,9 +26,7 @@ export default function SiteFooter() {
           {PRIVACY_URL}
         </a>
       </p>
-      <p className='mt-3 leading-relaxed'>
-        League of Legends와 Riot Games는 Riot Games, Inc.의 상표입니다.
-      </p>
+      <p className='mt-3 leading-relaxed'>{text.trademark}</p>
       {/* Riot 이 요구하는 고지문 원문. 의역하지 않고 그대로 둔다. */}
       <p className='mt-2 leading-relaxed'>
         DFGG isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or opinions of

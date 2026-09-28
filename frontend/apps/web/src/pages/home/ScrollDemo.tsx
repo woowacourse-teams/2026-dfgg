@@ -11,10 +11,13 @@ import {
 } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
+import { strings } from '../../i18n/i18n';
 import { track, trackOnce } from '../../lib';
 import { INVENTORY_ORDER, recommendationsAfter, stageAt, STAGES } from './demoData';
 import Inventory from './Inventory';
 import OverlayMock from './OverlayMock';
+
+const text = strings();
 
 const VIDEO_SRC = '/media/gameplay.mp4';
 const VIDEO_POSTER = '/media/gameplay-poster.jpg';
@@ -44,7 +47,7 @@ function RailSegment({ index, progress, isCurrent, onSelect }: RailSegmentProps)
     <button
       type='button'
       data-umami-event='demo-stage-click'
-      data-umami-event-stage={STAGES[index].label}
+      data-umami-event-stage={STAGES[index].key}
       onClick={() => onSelect(index)}
       aria-current={isCurrent ? 'step' : undefined}
       className='group flex-1 cursor-pointer pt-3 text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent'
@@ -106,7 +109,7 @@ export default function ScrollDemo() {
     setInventoryCount(count);
 
     if (p > 0.02) trackOnce('demo-enter');
-    if (sp >= 0) trackOnce('demo-stage-view', { stage: STAGES[next].label });
+    if (sp >= 0) trackOnce('demo-stage-view', { stage: STAGES[next].key });
     if (count === INVENTORY_ORDER.length) trackOnce('demo-full-build');
   });
 
@@ -224,10 +227,10 @@ export default function ScrollDemo() {
                   </motion.div>
                 </AnimatePresence>
               </div>
-              <nav aria-label='데모 단계' className='mt-5 flex gap-3'>
+              <nav aria-label={text.demo.stepsLabel} className='mt-5 flex gap-3'>
                 {STAGES.map((s, i) => (
                   <RailSegment
-                    key={s.label}
+                    key={s.key}
                     index={i}
                     progress={scrollYProgress}
                     isCurrent={i === stage}
@@ -245,9 +248,9 @@ export default function ScrollDemo() {
           className='pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-4xl leading-tight font-bold tracking-[-0.03em] text-white [text-shadow:0_2px_24px_rgb(0_0_0/0.6)] sm:text-6xl'
         >
           <span>
-            게임 중엔
+            {text.demo.heading[0]}
             <br />
-            이렇게 뜹니다!
+            {text.demo.heading[1]}
           </span>
         </motion.h2>
       </div>
