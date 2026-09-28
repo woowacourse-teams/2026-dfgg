@@ -23,6 +23,7 @@
   "dependencies": {
     "electron-overlay-window": "^4.1.0",
     "electron-updater": "^6.8.9",
+    "koffi": "^3.3.2",
     "ws": "^8.21.3"
   },
   "devDependencies": {
@@ -62,6 +63,14 @@
       {
         "from": "../../node_modules/throttle-debounce",
         "to": "node_modules/throttle-debounce"
+      },
+      {
+        "from": "../../node_modules/koffi",
+        "to": "node_modules/koffi"
+      },
+      {
+        "from": "../../node_modules/@koromix/koffi-win32-x64",
+        "to": "node_modules/@koromix/koffi-win32-x64"
       },
       {
         "from": "../../node_modules/electron-updater",
