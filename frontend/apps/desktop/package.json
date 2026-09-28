@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "electron-overlay-window": "^4.1.0",
+    "electron-updater": "^6.8.9",
     "ws": "^8.21.3"
   },
   "devDependencies": {
@@ -61,6 +62,70 @@
       {
         "from": "../../node_modules/throttle-debounce",
         "to": "node_modules/throttle-debounce"
+      },
+      {
+        "from": "../../node_modules/electron-updater",
+        "to": "node_modules/electron-updater"
+      },
+      {
+        "from": "../../node_modules/builder-util-runtime",
+        "to": "node_modules/builder-util-runtime"
+      },
+      {
+        "from": "../../node_modules/debug",
+        "to": "node_modules/debug"
+      },
+      {
+        "from": "../../node_modules/ms",
+        "to": "node_modules/ms"
+      },
+      {
+        "from": "../../node_modules/sax",
+        "to": "node_modules/sax"
+      },
+      {
+        "from": "../../node_modules/fs-extra",
+        "to": "node_modules/fs-extra"
+      },
+      {
+        "from": "../../node_modules/graceful-fs",
+        "to": "node_modules/graceful-fs"
+      },
+      {
+        "from": "../../node_modules/jsonfile",
+        "to": "node_modules/jsonfile"
+      },
+      {
+        "from": "../../node_modules/universalify",
+        "to": "node_modules/universalify"
+      },
+      {
+        "from": "../../node_modules/js-yaml",
+        "to": "node_modules/js-yaml"
+      },
+      {
+        "from": "../../node_modules/argparse",
+        "to": "node_modules/argparse"
+      },
+      {
+        "from": "../../node_modules/lazy-val",
+        "to": "node_modules/lazy-val"
+      },
+      {
+        "from": "../../node_modules/lodash.escaperegexp",
+        "to": "node_modules/lodash.escaperegexp"
+      },
+      {
+        "from": "../../node_modules/lodash.isequal",
+        "to": "node_modules/lodash.isequal"
+      },
+      {
+        "from": "../../node_modules/semver",
+        "to": "node_modules/semver"
+      },
+      {
+        "from": "../../node_modules/tiny-typed-emitter",
+        "to": "node_modules/tiny-typed-emitter"
       }
     ],
     "asarUnpack": [
