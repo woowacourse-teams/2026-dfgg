@@ -86,7 +86,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       probes:
@@ -94,6 +94,27 @@ management:
       group:
         readiness:
           include: readinessState,db
+  metrics:
+    distribution:
+      percentiles-histogram:
+        "[http.server.requests]": true
+      minimum-expected-value:
+        "[http.server.requests]": 10ms
+      maximum-expected-value:
+        "[http.server.requests]": 10s
+
+logging:
+  file:
+    name: "${LOGGING_FILE_NAME:}"
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      total-size-cap: 1GB
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [${DFGG_SLOT:local}] [%thread] %logger{36} traceId=%X{traceId:-none} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [${DFGG_SLOT:local}] [%thread] %logger{36} traceId=%X{traceId:-none} - %msg%n"
+  slow-request-threshold-millis: "${LOGGING_SLOW_REQUEST_THRESHOLD_MILLIS:1000}"
 
 assets:
   s3:
