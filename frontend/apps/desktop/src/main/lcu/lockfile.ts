@@ -28,9 +28,6 @@ export function getLockfileContent() {
       lockfile.port = port ?? null;
       lockfile.password = password ?? null;
       lockfile.protocol = protocol ?? null;
-
-      console.log(`port: ${port}`);
-      console.log(`password: ${password}`);
     }
   } catch {
     return null;
