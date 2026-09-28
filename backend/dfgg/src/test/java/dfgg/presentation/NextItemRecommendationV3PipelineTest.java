@@ -4,30 +4,33 @@ import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
-import dfgg.domain.item.trait.ItemTrait;
-import dfgg.presentation.dto.ChampionRefDto;
-import dfgg.presentation.dto.RecommendedItemDto;
-import java.util.Arrays;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
 import dfgg.application.recommend.v3.ranker.LambdaMartRanker;
-import dfgg.presentation.dto.ChampionDto;
-import dfgg.presentation.dto.request.NextItemRecommendationRequest;
-import dfgg.presentation.dto.response.NextItemRecommendationResponse;
-import io.restassured.RestAssured;
-import io.restassured.http.ContentType;
-import java.util.List;
-import java.util.Map;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.item.ItemRepository;
+import dfgg.domain.item.trait.ItemTrait;
 import dfgg.domain.itemstats.ChampionItemRollupRepository;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.domain.itemstats.ItemMetaStatsRepository;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
+import dfgg.presentation.dto.ChampionDto;
+import dfgg.presentation.dto.ChampionRefDto;
+import dfgg.presentation.dto.RecommendedItemDto;
+import dfgg.presentation.dto.request.NextItemRecommendationRequest;
+import dfgg.presentation.dto.response.NextItemRecommendationResponse;
+import io.restassured.RestAssured;
+import io.restassured.http.ContentType;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -82,8 +85,7 @@ class NextItemRecommendationV3PipelineTest {
     }
 
     /**
-     * {@code @SpringBootTest}는 롤백하지 않는다. {@code @Sql}로 넣은 챔피언·아이템과 집계 결과가
-     * 커밋된 채 남으면 전체 아이템 수를 세는 다른 테스트가 깨진다(실제로 깨졌다).
+     * {@code @SpringBootTest}는 롤백하지 않는다. {@code @Sql}로 넣은 챔피언·아이템과 집계 결과가 커밋된 채 남으면 전체 아이템 수를 세는 다른 테스트가 깨진다(실제로 깨졌다).
      */
     @AfterEach
     void cleanUp() {
@@ -94,6 +96,29 @@ class NextItemRecommendationV3PipelineTest {
         participantRepository.deleteAllInBatch();
         championRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
+    }
+
+    @ParameterizedTest(name = "tier=[{0}]")
+    @NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    @DisplayName("티어를 비워도 추천한다 — 모르는 티어는 지어내지 않고 모름으로 남긴다")
+    void recommendV3_WhenTierIsMissing_StillRecommend(String tier) {
+        // given
+        NextItemRecommendationRequest request = new NextItemRecommendationRequest(
+                new ChampionDto("야스오", "MID"),
+                List.of(),
+                List.of(new ChampionDto("징크스", "BOTTOM"), new ChampionDto("쓰레쉬", "SUPPORT"),
+                        new ChampionDto("리신", "JUNGLE"), new ChampionDto("오른", "TOP")),
+                List.of(new ChampionDto("람머스", "TOP"), new ChampionDto("아리", "MID"),
+                        new ChampionDto("케이틀린", "BOTTOM"), new ChampionDto("레오나", "SUPPORT"),
+                        new ChampionDto("엘리스", "JUNGLE")),
+                tier, "16.17"
+        );
+
+        // when & then
+        given().contentType(ContentType.JSON).body(request)
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(200);
     }
 
     private NextItemRecommendationRequest requestWith(List<Long> purchasedItemIds) {
@@ -236,7 +261,8 @@ class NextItemRecommendationV3PipelineTest {
         // then
         assertThat(items).isNotEmpty().allSatisfy(item ->
                 assertThat(item.get("imageUrl"))
-                        .isEqualTo("https://test-bucket.s3.ap-northeast-2.amazonaws.com/dfgg/images/99.1/items/" + item.get("id") + ".png"));
+                        .isEqualTo("https://test-bucket.s3.ap-northeast-2.amazonaws.com/dfgg/images/99.1/items/"
+                                + item.get("id") + ".png"));
     }
 
     @Test
