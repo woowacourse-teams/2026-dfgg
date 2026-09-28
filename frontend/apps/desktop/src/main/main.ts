@@ -10,6 +10,16 @@ import { isStartupLaunch, setAutoLaunch } from './autoLaunch/autoLaunch';
 import { setTray } from './autoLaunch/tray';
 import { attachHomeToClient } from './docking';
 
+import { flushOutbox, trackEvent } from './analytics/umami';
+import { readStore, updateStore } from './analytics/store';
+import { initIdentity } from './analytics/identity';
+import {
+  endSessionTracking,
+  recoverLastSession,
+  startSessionTracking,
+} from './analytics/sessionTracker';
+import { endGameTracking, initGameTracking, recoverLastGame } from './analytics/gameTracker';
+
 const DEV_SERVER_URL = 'http://localhost:3001';
 
 // home 창을 저장하고, 이미 실행되고 있는 같은 프로그램 인스턴스를 확인하는 변수
@@ -77,6 +87,7 @@ function createWindow() {
 
   // home 창을 롤 클라이언트 옆에 붙인다. 네이티브 모듈이 없으면 조용히 건너뛴다.
   attachHomeToClient(home);
+  startSessionTracking(home);
 
   overlay.hide();
   overlayWithPhase(overlay);
@@ -109,11 +120,28 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(async () => {
+    // 지난 실행에서 못 보낸 이벤트부터 정리해서 보낸다.
+    recoverLastSession();
+    recoverLastGame();
+    flushOutbox();
+
+    // LCU 연결 전에 구독해야 첫 connected 를 놓치지 않는다.
+    initIdentity();
+    initGameTracking();
+
     registerIpcHandlers();
     homeWindow = createWindow();
 
+    // 첫 실행이면 설치로 센다. userData 는 삭제해도 남아서 재설치는 세지 않는다.
+    if (!readStore().installed) {
+      trackEvent('desktop-install');
+      updateStore({ installed: true });
+    }
+
     // 앱 시작 시에만 직접 앱 클릭했을 때 화면에 보여주기
-    if (!isStartupLaunch()) homeWindow.show();
+    const startupLaunch = isStartupLaunch();
+    if (!startupLaunch) homeWindow.show();
+    trackEvent('desktop-launch', { startup: startupLaunch });
 
     setTray(homeWindow);
     setAutoLaunch(true);
@@ -130,6 +158,8 @@ if (!gotTheLock) {
 }
 
 app.on('will-quit', () => {
+  endGameTracking();
+  endSessionTracking();
   stopLivePolling();
   stopLcuConnection();
 });

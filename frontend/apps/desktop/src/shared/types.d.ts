@@ -12,6 +12,7 @@ export type Lockfile = {
 };
 
 export interface Summoner {
+  puuid: string;
   summonerId: number;
   displayName: string;
   gameName: string;

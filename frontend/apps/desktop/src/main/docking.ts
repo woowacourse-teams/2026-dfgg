@@ -1,4 +1,5 @@
 import { BrowserWindow, screen } from 'electron';
+import { trackEvent } from './analytics/umami';
 
 const LOL_CLIENT_TITLE = 'League of Legends';
 
@@ -22,6 +23,7 @@ function loadOverlayController() {
     return mod.OverlayController;
   } catch (error) {
     console.warn('[도킹] 네이티브 모듈 로드 실패 — 도킹 없이 계속합니다', error);
+    trackEvent('desktop-error', { type: 'docking-module' });
     return null;
   }
 }

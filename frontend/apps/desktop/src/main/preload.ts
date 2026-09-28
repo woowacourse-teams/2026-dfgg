@@ -36,3 +36,8 @@ contextBridge.exposeInMainWorld('windowControls', {
   minimize: () => ipcRenderer.send('window:minimize'),
   close: () => ipcRenderer.send('window:close'),
 });
+
+contextBridge.exposeInMainWorld('analytics', {
+  track: (name: string, data?: Record<string, string | number | boolean>) =>
+    ipcRenderer.send('analytics:track', name, data),
+});

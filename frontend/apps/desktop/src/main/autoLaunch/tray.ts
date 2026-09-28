@@ -1,5 +1,6 @@
 import { BrowserWindow, Menu, Tray, app, nativeImage } from 'electron';
 import path from 'node:path';
+import { setQuitSource } from '../analytics/sessionTracker';
 
 let tray: Tray | null = null;
 
@@ -28,7 +29,10 @@ export function setTray(home: BrowserWindow) {
     },
     {
       label: '종료',
-      click: () => app.quit(),
+      click: () => {
+        setQuitSource('tray');
+        app.quit();
+      },
     },
   ]);
 

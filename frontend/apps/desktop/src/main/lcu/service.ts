@@ -6,6 +6,8 @@ import {
   getSummonerRankInfo,
   getMatchHistory,
   getMatchDetail,
+  getGameflowSession,
+  getEndOfGameStats,
 } from './endpoints';
 import type {
   MatchSummary,
@@ -83,5 +85,23 @@ export function fetchMatchDetail(gameId: number) {
     if (!raw) return null;
 
     return toMatchDetail(raw);
+  });
+}
+
+// 진행 중인 게임 정보 가져오기
+export function fetchGameflowSession() {
+  return withLockfile('게임 세션 요청 실패', (lockfile) => getGameflowSession(lockfile));
+}
+
+// 게임 결과 화면 정보 가져오기
+export function fetchEndOfGameStats() {
+  return withLockfile('게임 결과 요청 실패', (lockfile) => getEndOfGameStats(lockfile));
+}
+
+// 큐 id로 큐 이름 가져오기
+export function fetchQueueName(queueId: number) {
+  return withLockfile('큐 이름 요청 실패', async (lockfile) => {
+    const queueNames = await getQueueNames(lockfile);
+    return queueNames.get(queueId) ?? null;
   });
 }

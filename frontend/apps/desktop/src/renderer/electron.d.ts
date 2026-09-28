@@ -33,5 +33,8 @@ declare global {
       minimize: () => void;
       close: () => void;
     };
+    analytics: {
+      track: (name: string, data?: Record<string, string | number | boolean>) => void;
+    };
   }
 }

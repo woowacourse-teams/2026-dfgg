@@ -2,6 +2,7 @@ import type { Summoner, Lockfile, GameflowPhase, LcuCurrentRankedStats } from '.
 import { LcuGame, type LcuMatchHistory } from './matchHistory.types';
 import { lcuRequest } from './client';
 import type { LcuGameQueue } from './gameQueues.types';
+import type { LcuEndOfGameStats, LcuGameflowSession } from './gameflow.types';
 
 // 소환사 정보 얻는 api
 export function getCurrentSummoner(lockfile: Lockfile) {
@@ -39,4 +40,14 @@ export function getGameQueues(lockfile: Lockfile) {
 // 게임에 참여한 유저 챔피언이 상세 기록 가져오기
 export function getMatchDetail(lockfile: Lockfile, gameId: number) {
   return lcuRequest<LcuGame>(lockfile, `/lol-match-history/v1/games/${gameId}`);
+}
+
+// 진행 중인 게임 정보(gameId, 큐) 가져오기
+export function getGameflowSession(lockfile: Lockfile) {
+  return lcuRequest<LcuGameflowSession>(lockfile, '/lol-gameflow/v1/session');
+}
+
+// 게임 결과 화면 정보 가져오기
+export function getEndOfGameStats(lockfile: Lockfile) {
+  return lcuRequest<LcuEndOfGameStats>(lockfile, '/lol-end-of-game/v1/eog-stats-block');
 }

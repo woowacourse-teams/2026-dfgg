@@ -287,6 +287,7 @@ function MatchCard({ match, version }: { match: MatchSummary; version: string | 
   const toggle = () => {
     const next = !expanded;
     setExpanded(next);
+    if (next) window.analytics.track('match-expand', { queue: match.queueName });
 
     // 펼칠 때 한 번만 받아 둔다. 다시 접었다 펴면 요청이 나가지 않는다.
     if (!next || detail) return;

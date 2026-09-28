@@ -5,6 +5,7 @@ import { getDDragonData } from './ddragon';
 import { getActivePlayer, getPlayerList } from './endpoints';
 import { buildRecommendationBody, extractItemIds } from './payload';
 import { fetchGameVersion } from '../lcu/service';
+import { recordChampion, recordLiveError, recordPurchases } from '../analytics/gameTracker';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -70,6 +71,10 @@ async function tick() {
       if (lastItemIds === null || !sameItems(itemIds, lastItemIds)) {
         if (!players || !myRiotId || !patch || !championNames || !componentItemIds) return;
 
+        if (lastItemIds !== null) {
+          const newItemIds = itemIds.filter((id) => !purchasedItemIds.has(id));
+          recordPurchases(newItemIds, getLcuState().recommendations);
+        }
         updatePurchaseOrder(itemIds);
 
         console.log('아이템 변경', itemIds);
@@ -79,6 +84,7 @@ async function tick() {
         // 백엔드에 전달
         const body = buildRecommendationBody(liveInfo);
         if (!body) return;
+        recordChampion(body.myChampion);
         const result = await fetchItemRecommendations(body);
         setRecommendations(result.recommendedItems, purchasedItemIds.size);
 
@@ -87,6 +93,7 @@ async function tick() {
     }
   } catch (error) {
     console.debug('live 조회 실패', error);
+    recordLiveError();
   } finally {
     if (polling) timer = setTimeout(tick, POLL_INTERVAL_MS);
   }

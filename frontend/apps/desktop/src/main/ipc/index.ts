@@ -7,6 +7,9 @@ import {
 } from '../lcu/service';
 import { getLcuState } from '../lcu/state';
 import { EXPANDED_WIDTH, EXPANDED_HEIGHT, COLLAPSED_HEIGHT, COLLAPSED_WIDTH } from '../constants';
+import { setOverlayCollapsed } from '../analytics/gameTracker';
+import { setQuitSource } from '../analytics/sessionTracker';
+import { trackEvent, type EventData } from '../analytics/umami';
 
 // ipc로 보내기
 export function registerIpcHandlers() {
@@ -26,11 +29,16 @@ export function registerIpcHandlers() {
     win.setResizable(true);
     win.setSize(width, height);
     win.setResizable(!collapsed);
+    setOverlayCollapsed(collapsed);
   });
   ipcMain.on('window:minimize', (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize();
   });
   ipcMain.on('window:close', (event) => {
+    setQuitSource('close-button');
     BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+  ipcMain.on('analytics:track', (_event, name: string, data?: EventData) => {
+    trackEvent(`desktop-ui-${name}`, data);
   });
 }
