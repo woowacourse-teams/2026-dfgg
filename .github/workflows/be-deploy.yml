@@ -51,6 +51,59 @@ jobs:
           [[ "$blue:$green" == active:inactive || "$blue:$green" == inactive:active ]] \
             || { echo 'Expected exactly one active application'; exit 1; }
 
+      # 저장소가 관리하는 nginx 설정만 설치한다.
+      # dfgg-upstream.conf는 blue/green 단계가 관리하므로 여기서 다루지 않는다.
+      - name: Install nginx configuration
+        working-directory: .
+        run: |
+          set -euo pipefail
+
+          conf_dir=/etc/nginx/conf.d
+          backups="$RUNNER_TEMP/nginx-conf-backup"
+          rm -rf "$backups"
+          mkdir -p "$backups"
+
+          changed=()
+          for name in dfgg-log-format.conf dfgg-metrics.conf; do
+            source="backend/ops/nginx/$name"
+            target="$conf_dir/$name"
+            test -r "$source"
+            if cmp -s "$source" "$target"; then continue; fi
+            if [[ -e "$target" ]]; then cp "$target" "$backups/$name"; fi
+            changed+=("$name")
+          done
+
+          if (( ${#changed[@]} == 0 )); then
+            echo 'nginx 설정 변경 없음'
+            exit 0
+          fi
+          echo "변경: ${changed[*]}"
+
+          install_all() {
+            for name in "${changed[@]}"; do
+              sudo -n install -o root -g root -m 0644 "backend/ops/nginx/$name" "$conf_dir/$name" || return 1
+            done
+          }
+          # 백업이 없던 파일은 새로 생긴 것이므로 지운다.
+          restore() {
+            for name in "${changed[@]}"; do
+              if [[ -e "$backups/$name" ]]; then
+                sudo -n install -o root -g root -m 0644 "$backups/$name" "$conf_dir/$name"
+              else
+                sudo -n rm -f "$conf_dir/$name"
+              fi
+            done
+          }
+
+          # 깨진 설정을 남기면 다음 배포의 nginx -t가 막힌다. 실패하면 되돌리고 멈춘다.
+          if ! install_all || ! sudo -n nginx -t; then
+            echo '::error::nginx configuration failed nginx -t; restoring previous files'
+            restore
+            sudo -n nginx -t
+            exit 1
+          fi
+          sudo -n systemctl reload nginx.service
+
       - name: Copy .env file
         run: cp /home/ubuntu/app-config/.env ./.env
 
