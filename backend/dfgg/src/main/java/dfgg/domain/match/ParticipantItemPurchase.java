@@ -79,6 +79,14 @@ public class ParticipantItemPurchase {
         // 원본 구매 이벤트에는 골드/추가 지불액이 없다. 검증 전에는 NULL을 유지한다.
     }
 
+    /** 패치 카탈로그와 실제 제거 재료로 계산한 양수 비용 가설을 기록한다. */
+    public void recordCostHypothesis(int amount) {
+        if (amount <= 0) {
+            throw new IllegalArgumentException("구매 비용 가설은 양수여야 합니다.");
+        }
+        this.itemCost = amount;
+    }
+
     public Long getId() {
         return id;
     }

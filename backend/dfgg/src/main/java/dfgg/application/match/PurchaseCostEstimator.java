@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import org.springframework.stereotype.Component;
 
 /**
  * 한 번의 ITEM_PURCHASED에서 추가로 지출한 골드를 패치 카탈로그와 관측 재료로 추정한다.
@@ -16,6 +17,7 @@ import java.util.OptionalInt;
  * 이 클래스는 카탈로그 변환, 레시피 대조, 재료 가격 합산을 조율하며 이벤트 연결이나 Gold Range 계산은 맡지 않는다.
  * 결과는 카탈로그 기반 비용 가설이고 게임이 실제로 청구한 금액을 직접 관측한 값은 아니다.
  */
+@Component
 public class PurchaseCostEstimator {
 
     // 할인 규칙이 별도로 검증되지 않은 구매는 카탈로그 정가로 확정하지 않는다.

@@ -5,11 +5,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.stereotype.Component;
 
 /**
  * 구매 바로 앞의 같은 시각·프레임에 기록된 재료 제거 이벤트를 연결한다.
  * 빈 목록은 관측된 제거 재료가 없다는 뜻이고, 빈 Optional은 연결을 보장할 수 없다는 뜻이다.
  */
+@Component
 public class PurchaseMaterialLinker {
 
     public Optional<List<Integer>> link(ParticipantItemEvent purchase, List<ParticipantItemEvent> events) {
