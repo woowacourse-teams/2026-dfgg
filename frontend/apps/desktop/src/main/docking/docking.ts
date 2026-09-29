@@ -1,6 +1,5 @@
 import { BrowserWindow, screen } from 'electron';
 import { trackEvent } from '../analytics/umami';
-import { onPhaseChange, onStatusChange } from '../lcu/state';
 import { findWindowRect } from './clientWindow';
 
 export const LOL_CLIENT_TITLE = 'League of Legends';
@@ -11,12 +10,10 @@ const GAP = -4;
 /** 라이브러리 내부가 30fps 로 갱신하므로 같은 주기를 쓴다. */
 const THROTTLE_MS = 34;
 
+/** 라이브러리가 붙기 전까지 롤 창 위치를 직접 확인하는 주기 */
+const FOLLOW_INTERVAL_MS = 300;
+
 export type Rect = { x: number; y: number; width: number; height: number };
-
-const FIND_INTERVAL_MS = 500;
-const FIND_TIMEOUT_MS = 30_000;
-
-let findTimer: NodeJS.Timeout | null = null;
 
 /**
  * 네이티브 모듈이라 환경(OS·아키텍처·Electron 버전)에 따라 로드가 실패할 수 있다.
@@ -83,25 +80,33 @@ function dockBeside(home: BrowserWindow, clientRect: Rect) {
   });
 }
 
-/** 롤 창이 뜰 때까지 기다렸다가 한 번 붙인다. 새로 부르면 이전 시도는 취소한다. */
-function dockWhenClientAppears(home: BrowserWindow) {
-  if (findTimer) clearInterval(findTimer);
-  const startedAt = Date.now();
+function sameRect(a: Rect, b: Rect | null) {
+  return b !== null && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
 
-  findTimer = setInterval(() => {
-    if (home.isDestroyed() || Date.now() - startedAt > FIND_TIMEOUT_MS) {
-      clearInterval(findTimer!);
-      findTimer = null;
+/**
+ * 라이브러리는 롤 창이 맨 앞(포그라운드)이 돼야 붙어서, 그 전에는 롤 창이 움직여도 모른다.
+ * 그 공백 동안은 직접 롤 창 위치를 확인해서 바뀔 때마다 붙인다.
+ * 롤을 켤 때, 로그인 후 창이 커질 때, 게임이 끝나 창이 다시 뜰 때가 모두 여기에 해당한다.
+ */
+function followClientUntilAttached(home: BrowserWindow, isLibraryAttached: () => boolean) {
+  let lastRect: Rect | null = null;
+
+  const timer = setInterval(() => {
+    if (home.isDestroyed()) return clearInterval(timer);
+
+    // 라이브러리가 붙어 있으면 moveresize 로 부드럽게 따라가니 맡긴다.
+    if (isLibraryAttached()) {
+      lastRect = null;
       return;
     }
 
     const rect = findWindowRect(LOL_CLIENT_TITLE);
-    if (!rect) return;
+    if (!rect || sameRect(rect, lastRect)) return;
 
-    clearInterval(findTimer!);
-    findTimer = null;
+    lastRect = rect;
     dockBeside(home, rect);
-  }, FIND_INTERVAL_MS);
+  }, FOLLOW_INTERVAL_MS);
 }
 
 let isAttached = false;
@@ -116,6 +121,9 @@ export function attachHomeToClient(home: BrowserWindow) {
 
   isAttached = true;
 
+  // 라이브러리가 롤 창을 잡고 있는지. 잡고 있을 때만 라이브러리 이벤트로 따라간다.
+  let libraryAttached = false;
+
   const reposition = throttle(THROTTLE_MS, (rect) => {
     if (home.isDestroyed()) return;
     dockBeside(home, rect);
@@ -123,33 +131,18 @@ export function attachHomeToClient(home: BrowserWindow) {
 
   controller.events.on('attach', (event) => {
     console.log('[도킹] 클라이언트에 붙음');
+    libraryAttached = true;
     reposition(event);
   });
 
   controller.events.on('moveresize', reposition);
 
-  const dockSoon = () => dockWhenClientAppears(home);
-
   controller.events.on('detach', () => {
-    console.log('[도킹] 클라이언트가 사라짐 — 다시 뜨면 붙인다');
-    dockSoon();
+    console.log('[도킹] 클라이언트가 사라짐 — 다시 뜨면 직접 찾아서 붙인다');
+    libraryAttached = false;
   });
 
-  // 롤 클라이언트가 커졌을 때 (앱을 켰을 때 이미 켜져 있던 경우 포함)
-  onStatusChange((status) => {
-    if (status === 'connected') dockSoon();
-  });
-
-  // 게임이 끝나 클라이언트 창이 다시 뜰 때
-  let wasInGame = false;
-  onPhaseChange((phase) => {
-    if (phase === 'InProgress') {
-      wasInGame = true;
-    } else if (wasInGame) {
-      wasInGame = false;
-      dockSoon();
-    }
-  });
+  followClientUntilAttached(home, () => libraryAttached);
 
   // 창을 넘기지 않으면(undefined) 라이브러리가 창을 건드리지 않고 좌표만 알려준다.
   // 창을 넘기면 클릭 통과·항상 위·강제 배치가 걸려서 일반 창에는 쓸 수 없다.
