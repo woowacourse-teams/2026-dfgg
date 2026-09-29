@@ -17,15 +17,17 @@ class ParticipantItemPurchaseExtractorTest {
             new ParticipantItemEventExtractor(new ObjectMapper()));
 
     @Test
-    void Component와_Core만_저장하고_원천_구매_순번을_유지한다() {
+    void 모든_구매를_분류와_원천_구매_순번대로_추출한다() {
         var result = extractor.extract("KR_TEST", timeline(), "16.18", types());
-        assertThat(result).extracting(ParticipantItemPurchase::getItemId).containsExactly(1036, 1036, 3071);
-        assertThat(result).extracting(ParticipantItemPurchase::getPurchaseOrder).containsExactly(1, 2, 5);
+        assertThat(result).extracting(ParticipantItemPurchase::getItemId)
+                .containsExactly(1036, 1036, 2003, 3340, 3071, 1001);
+        assertThat(result).extracting(ParticipantItemPurchase::getPurchaseOrder)
+                .containsExactly(1, 2, 3, 4, 5, 1);
         assertThat(result).extracting(ParticipantItemPurchase::getPurchaseType).containsExactly(
-                ItemPurchaseType.COMPONENT, ItemPurchaseType.COMPONENT, ItemPurchaseType.CORE);
+                ItemPurchaseType.COMPONENT, ItemPurchaseType.COMPONENT, ItemPurchaseType.CONSUMABLE,
+                ItemPurchaseType.OTHER, ItemPurchaseType.CORE, ItemPurchaseType.BOOTS);
         assertThat(result).allSatisfy(purchase -> {
             assertThat(purchase.getPatch()).isEqualTo("16.18");
-            assertThat(purchase.getCurrentGold()).isNull();
             assertThat(purchase.getItemCost()).isNull();
         });
         // 취소된 두 번째 롱소드 구매도 원천 구매 로그에서는 제거하지 않는다.

@@ -26,7 +26,7 @@ public class ParticipantItemPurchaseExtractor {
         return extractFromEvents(eventExtractor.extract(matchId, rawTimeline), patch, purchaseTypes);
     }
 
-    /** 이미 추출한 전체 ITEM 이벤트를 재사용해 저장 대상 구매만 만든다. */
+    /** 이미 추출한 전체 ITEM 이벤트에서 모든 구매를 원천 순서대로 만든다. */
     List<ParticipantItemPurchase> extractFromEvents(
             List<ParticipantItemEvent> events, String patch, Map<Integer, ItemPurchaseType> purchaseTypes
     ) {
@@ -43,10 +43,7 @@ public class ParticipantItemPurchaseExtractor {
             if (type == null) {
                 throw new IllegalArgumentException("구매 아이템의 분류가 없습니다. 아이템 ID: " + event.itemId());
             }
-            if (type.isComponentRecommendationTarget()) {
-                // 제외된 구매도 원천 purchaseOrder를 차지하므로 순번은 다시 매기지 않는다.
-                purchases.add(new ParticipantItemPurchase(event, type, patch));
-            }
+            purchases.add(new ParticipantItemPurchase(event, type, patch));
         }
         return List.copyOf(purchases);
     }
