@@ -1,6 +1,6 @@
 {
   "name": "desktop",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "League of Legends item build recommendations from the ten champions in your match",
   "author": {
     "name": "dfgg"
