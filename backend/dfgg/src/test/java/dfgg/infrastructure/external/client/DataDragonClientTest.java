@@ -33,6 +33,29 @@ public class DataDragonClientTest {
     }
 
     @Test
+    void 구매_분류는_최신_버전_조회_없이_지정한_빌드를_반환한다() {
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/data/en_US/item.json"))
+                .andRespond(withSuccess("""
+                        {"version":"16.18.1","data":{"1036":{"name":"Long Sword"}}}
+                        """, MediaType.APPLICATION_JSON));
+        var response = client.getItems("16.18.1");
+        assertThat(response.version()).isEqualTo("16.18");
+        assertThat(response.dataVersion()).isEqualTo("16.18.1");
+        server.verify();
+    }
+
+    @Test
+    void 지정한_빌드와_다른_응답은_거부한다() {
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/data/en_US/item.json"))
+                .andRespond(withSuccess("""
+                        {"version":"16.19.1","data":{"1036":{"name":"Long Sword"}}}
+                        """, MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> client.getItems("16.18.1"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("응답 버전");
+        server.verify();
+    }
+
+    @Test
     void 최신_버전을_통계_패치_형식으로_반환한다() {
         // given
         server.expect(requestTo(BASE_URL + "/api/versions.json"))
