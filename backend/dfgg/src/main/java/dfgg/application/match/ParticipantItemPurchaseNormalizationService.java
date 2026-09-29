@@ -7,7 +7,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 기존 참가자 정규화와 독립적인 한 경기 구매 적재 경로다. */
+/** 기존 참가자 정규화와 독립적인 한 경기 Component/Core 구매 적재 경로다. */
 @Service
 public class ParticipantItemPurchaseNormalizationService {
 

@@ -2,11 +2,12 @@ package dfgg.application.match;
 
 import dfgg.domain.match.ItemPurchaseType;
 import dfgg.domain.match.ParticipantItemPurchase;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
-/** 전체 행동은 Raw에서 읽고, 저장할 구매만 분리한다. Core 요약에는 영향을 주지 않는다. */
+/** 전체 행동은 Raw에서 읽고, Component 추천 대상 구매만 저장한다. Core 요약에는 영향을 주지 않는다. */
 @Component
 public class ParticipantItemPurchaseExtractor {
 
@@ -26,15 +27,20 @@ public class ParticipantItemPurchaseExtractor {
         if (patch == null || patch.isBlank() || patch.length() > 16) {
             throw new IllegalArgumentException("패치는 비어 있지 않은 16자 이하의 문자열이어야 합니다.");
         }
-        return eventExtractor.extract(matchId, rawTimeline).stream()
-                .filter(event -> "ITEM_PURCHASED".equals(event.eventType()))
-                .map(event -> {
-                    ItemPurchaseType type = purchaseTypes.get(event.itemId());
-                    if (type == null) {
-                        throw new IllegalArgumentException("구매 아이템의 분류가 없습니다. 아이템 ID: " + event.itemId());
-                    }
-                    return new ParticipantItemPurchase(event, type, patch);
-                })
-                .toList();
+        List<ParticipantItemPurchase> purchases = new ArrayList<>();
+        for (var event : eventExtractor.extract(matchId, rawTimeline)) {
+            if (!"ITEM_PURCHASED".equals(event.eventType())) {
+                continue;
+            }
+            ItemPurchaseType type = purchaseTypes.get(event.itemId());
+            if (type == null) {
+                throw new IllegalArgumentException("구매 아이템의 분류가 없습니다. 아이템 ID: " + event.itemId());
+            }
+            if (type.isComponentRecommendationTarget()) {
+                // 제외된 구매도 원천 purchaseOrder를 차지하므로 순번은 다시 매기지 않는다.
+                purchases.add(new ParticipantItemPurchase(event, type, patch));
+            }
+        }
+        return List.copyOf(purchases);
     }
 }

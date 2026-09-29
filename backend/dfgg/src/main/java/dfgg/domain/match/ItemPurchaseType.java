@@ -26,5 +26,10 @@ public enum ItemPurchaseType {
     CONSUMABLE,
 
     /** 위 분류에 해당하지 않는 것으로 확인한 아이템. 예: 장신구. 분류 누락·미확인 아이템의 기본값은 아니다. */
-    OTHER
+    OTHER;
+
+    /** Component LTR의 다음 구매 정답으로 저장할 수 있는 아이템 분류다. */
+    public boolean isComponentRecommendationTarget() {
+        return this == COMPONENT || this == CORE;
+    }
 }

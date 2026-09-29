@@ -34,7 +34,7 @@ class ItemPurchaseTypeMapServiceTest {
         var extractor = new ParticipantItemPurchaseExtractor(new ParticipantItemEventExtractor(new ObjectMapper()));
         var purchases = extractor.extract("KR_TEST", ParticipantItemPurchaseExtractorTest.timeline(), "16.18", types);
         assertThat(purchases).extracting(ParticipantItemPurchase::getPurchaseType).containsExactly(
-                ItemPurchaseType.COMPONENT, ItemPurchaseType.COMPONENT, ItemPurchaseType.CORE, ItemPurchaseType.BOOTS);
+                ItemPurchaseType.COMPONENT, ItemPurchaseType.COMPONENT, ItemPurchaseType.CORE);
         verify(client).getItems("16.18.1");
     }
 
