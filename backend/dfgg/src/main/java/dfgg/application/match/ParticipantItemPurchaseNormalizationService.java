@@ -1,5 +1,7 @@
 package dfgg.application.match;
 
+import dfgg.domain.match.GoldRangeRefinement;
+import dfgg.domain.match.GoldRangeStatus;
 import dfgg.domain.match.ItemPurchaseType;
 import dfgg.domain.match.ParticipantItemEvent;
 import dfgg.domain.match.ParticipantItemPurchase;
@@ -16,7 +18,7 @@ import java.util.OptionalInt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 기존 참가자 정규화와 독립적인 한 경기 Component/Core 구매 적재 경로다. */
+/** 기존 참가자 정규화와 독립적인 한 경기 전체 구매 적재 경로다. */
 @Service
 public class ParticipantItemPurchaseNormalizationService {
 
@@ -26,6 +28,7 @@ public class ParticipantItemPurchaseNormalizationService {
     private final ParticipantItemPurchaseExtractor extractor;
     private final PurchaseMaterialLinker materialLinker;
     private final PurchaseCostEstimator costEstimator;
+    private final PurchaseGoldRangeCalculator goldRangeCalculator;
 
     public ParticipantItemPurchaseNormalizationService(
             RawMatchTimelineRepository timelineRepository,
@@ -33,7 +36,8 @@ public class ParticipantItemPurchaseNormalizationService {
             ParticipantItemEventExtractor eventExtractor,
             ParticipantItemPurchaseExtractor extractor,
             PurchaseMaterialLinker materialLinker,
-            PurchaseCostEstimator costEstimator
+            PurchaseCostEstimator costEstimator,
+            PurchaseGoldRangeCalculator goldRangeCalculator
     ) {
         this.timelineRepository = timelineRepository;
         this.purchaseRepository = purchaseRepository;
@@ -41,10 +45,11 @@ public class ParticipantItemPurchaseNormalizationService {
         this.extractor = extractor;
         this.materialLinker = materialLinker;
         this.costEstimator = costEstimator;
+        this.goldRangeCalculator = goldRangeCalculator;
     }
 
     /**
-     * 한 경기의 Component/Core 구매와 계산 가능한 추가 지출액을 함께 적재한다.
+     * 한 경기의 전체 구매와 계산 가능한 추가 지출액·구매 직전 골드 범위를 함께 적재한다.
      * purchaseTypes는 호출자가 catalog과 동일한 Data Dragon 빌드에서 만든 분류여야 한다.
      */
     @Transactional
@@ -56,7 +61,10 @@ public class ParticipantItemPurchaseNormalizationService {
                 .orElseThrow(() -> new IllegalArgumentException("저장된 Raw Timeline이 없습니다. 경기 ID: " + matchId));
         List<ParticipantItemEvent> events = eventExtractor.extract(matchId, timeline.getRawData());
         List<ParticipantItemPurchase> purchases = extractor.extractFromEvents(events, patch, purchaseTypes);
-        recordCosts(purchases, events, catalog.data());
+        Map<Integer, List<ParticipantItemEvent>> eventsByParticipant = groupByParticipant(events);
+        recordCosts(purchases, eventsByParticipant, catalog.data());
+        recordGoldRanges(purchases, eventsByParticipant,
+                goldRangeCalculator.refineWithTotalGold(matchId, timeline.getRawData(), events, catalog));
         // 검증을 끝낸 뒤 구매만 교체한다. 실패 시 기존 구매도 트랜잭션으로 복구된다.
         purchaseRepository.deletePurchasesByMatchId(matchId);
         purchaseRepository.saveAllAndFlush(purchases);
@@ -74,9 +82,9 @@ public class ParticipantItemPurchaseNormalizationService {
     }
 
     /** 참가자별 원천 이벤트를 모아 각 구매의 제거 재료와 추가 지출액을 연결한다. */
-    private void recordCosts(List<ParticipantItemPurchase> purchases, List<ParticipantItemEvent> events,
+    private void recordCosts(List<ParticipantItemPurchase> purchases,
+                             Map<Integer, List<ParticipantItemEvent>> eventsByParticipant,
                              Map<String, ItemData> catalog) {
-        Map<Integer, List<ParticipantItemEvent>> eventsByParticipant = groupByParticipant(events);
         for (ParticipantItemPurchase purchase : purchases) {
             List<ParticipantItemEvent> participantEvents = eventsByParticipant.get(purchase.getParticipantId());
             ParticipantItemEvent source = sourceEvent(purchase, participantEvents);
@@ -88,6 +96,26 @@ public class ParticipantItemPurchaseNormalizationService {
             if (cost.isPresent()) {
                 purchase.recordCostHypothesis(cost.getAsInt());
             }
+        }
+    }
+
+    /** totalGold와 거래 흐름이 양립하면 보정 범위를, 아니면 기본 범위를 계산 근거와 함께 기록한다. */
+    private void recordGoldRanges(List<ParticipantItemPurchase> purchases,
+                                  Map<Integer, List<ParticipantItemEvent>> eventsByParticipant,
+                                  Map<ParticipantItemEvent, GoldRangeRefinement> refinements) {
+        for (ParticipantItemPurchase purchase : purchases) {
+            ParticipantItemEvent source = sourceEvent(purchase,
+                    eventsByParticipant.get(purchase.getParticipantId()));
+            GoldRangeRefinement refinement = refinements.get(source);
+            if (refinement == null) {
+                continue;
+            }
+            if (refinement.totalGoldRefinement().isPresent()) {
+                purchase.recordGoldRange(refinement.totalGoldRefinement().orElseThrow(),
+                        GoldRangeStatus.TOTAL_GOLD_REFINED);
+                continue;
+            }
+            purchase.recordGoldRange(refinement.base(), GoldRangeStatus.BASE);
         }
     }
 

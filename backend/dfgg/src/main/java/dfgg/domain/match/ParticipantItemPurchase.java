@@ -39,11 +39,18 @@ public class ParticipantItemPurchase {
     @Column(name = "game_time_ms")
     private Integer gameTimeMs;
 
-    @Column(name = "current_gold")
-    private Integer currentGold;
-
     @Column(name = "item_cost")
     private Integer itemCost;
+
+    @Column(name = "gold_lower")
+    private Integer goldLower;
+
+    @Column(name = "gold_upper")
+    private Integer goldUpper;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "gold_range_status", length = 32)
+    private GoldRangeStatus goldRangeStatus;
 
     @Column(nullable = false, length = 16)
     private String patch;
@@ -76,7 +83,7 @@ public class ParticipantItemPurchase {
         this.gameTimeMs = event.gameTimeMs() == null ? null : Math.toIntExact(event.gameTimeMs());
         this.patch = patch;
         this.createdAt = LocalDateTime.now();
-        // 원본 구매 이벤트에는 골드/추가 지불액이 없다. 검증 전에는 NULL을 유지한다.
+        // 구매 순간의 정확한 골드는 관측되지 않는다. 비용과 Gold Range는 정규화 단계에서 계산한다.
     }
 
     /** 패치 카탈로그와 실제 제거 재료로 계산한 양수 비용 가설을 기록한다. */
@@ -85,6 +92,19 @@ public class ParticipantItemPurchase {
             throw new IllegalArgumentException("구매 비용 가설은 양수여야 합니다.");
         }
         this.itemCost = amount;
+    }
+
+    /** 구매 직전 골드 범위를 기록한다. 계산할 수 없으면 이 메서드를 호출하지 않아 NULL을 유지한다. */
+    public void recordGoldRange(GoldRange range, GoldRangeStatus status) {
+        if (range == null || status == null) {
+            throw new IllegalArgumentException("구매 골드 범위와 계산 근거가 필요합니다.");
+        }
+        if (range.upper() > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("구매 골드 범위가 저장 가능한 정수 범위를 초과했습니다.");
+        }
+        this.goldLower = Math.toIntExact(range.lower());
+        this.goldUpper = Math.toIntExact(range.upper());
+        this.goldRangeStatus = status;
     }
 
     public Long getId() {
@@ -115,12 +135,20 @@ public class ParticipantItemPurchase {
         return gameTimeMs;
     }
 
-    public Integer getCurrentGold() {
-        return currentGold;
-    }
-
     public Integer getItemCost() {
         return itemCost;
+    }
+
+    public Integer getGoldLower() {
+        return goldLower;
+    }
+
+    public Integer getGoldUpper() {
+        return goldUpper;
+    }
+
+    public GoldRangeStatus getGoldRangeStatus() {
+        return goldRangeStatus;
     }
 
     public String getPatch() {
