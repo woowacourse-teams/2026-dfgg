@@ -1,0 +1,258 @@
+# Grafana 알림. 규칙·연락처·라우팅을 파일로 둔다(결정 4).
+#
+# 해제(정상 복귀)도 보낸다 — disableResolveMessage: false.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: dfgg
+    folder: dfgg
+    interval: 1m
+    rules:
+      - uid: dfgg-app-down
+        title: 앱 중단 — 살아있는 슬롯 없음
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: dfgg-prometheus
+            model:
+              refId: A
+              expr: sum(up{job=~"dfgg-app.*"}) by (env)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params:
+                      - 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: '{{ $labels.env }} 환경에 살아있는 슬롯이 없습니다. 놀고 있는 슬롯은 원래 0이므로, 합이 0이면 전부 죽은 것입니다.'
+          __dashboardUid__: dfgg-service-health
+        noDataState: Alerting
+        execErrState: Error
+      - uid: dfgg-5xx-rate
+        title: 5xx 비율 1% 초과
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: dfgg-prometheus
+            model:
+              refId: A
+              expr: (sum(rate(http_server_requests_seconds_count{job=~"dfgg-app.*", status=~"5.."}[5m])) by (env) or vector(0)) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~"dfgg-app.*"}[5m]))
+                by (env), 0.001)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: '{{ $labels.env }} 5xx 비율이 1%를 넘었습니다.'
+          __dashboardUid__: dfgg-service-health
+        noDataState: OK
+        execErrState: Error
+      - uid: dfgg-v3-p95
+        title: 추천 v3 p95 1초 초과
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: dfgg-prometheus
+            model:
+              refId: A
+              expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=~"dfgg-app.*", uri="/api/recommendations/v3"}[5m])) by (le, env))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.env }} 추천 p95가 1초를 넘었습니다. 기준값은 T14 조치 후 목표이며 T15에서 실측으로 확정합니다.'
+          __dashboardUid__: dfgg-service-health
+        noDataState: OK
+        execErrState: Error
+      - uid: dfgg-rds-credit
+        title: RDS CPU 크레딧 부족 (prod)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: dfgg-cloudwatch
+            model:
+              refId: A
+              queryMode: Metrics
+              metricQueryType: 0
+              metricEditorMode: 0
+              namespace: AWS/RDS
+              metricName: CPUCreditBalance
+              statistic: Average
+              dimensions:
+                DBInstanceIdentifier: dfgg-db-prod
+              period: '300'
+              region: ap-northeast-2
+              matchExact: true
+          - refId: B
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params:
+                      - 50
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: dfgg-db-prod의 CPU 크레딧이 50 아래입니다. 바닥나면 CPU가 기준선으로 묶여 갑자기 느려집니다.
+          __dashboardUid__: dfgg-service-health
+        noDataState: OK
+        execErrState: Error
+      - uid: dfgg-rds-storage
+        title: RDS 여유 디스크 부족 (prod)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: dfgg-cloudwatch
+            model:
+              refId: A
+              queryMode: Metrics
+              metricQueryType: 0
+              metricEditorMode: 0
+              namespace: AWS/RDS
+              metricName: FreeStorageSpace
+              statistic: Average
+              dimensions:
+                DBInstanceIdentifier: dfgg-db-prod
+              period: '300'
+              region: ap-northeast-2
+              matchExact: true
+          - refId: B
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params:
+                      - 2147483648
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: dfgg-db-prod의 여유 디스크가 2GB 아래입니다.
+          __dashboardUid__: dfgg-service-health
+        noDataState: OK
+        execErrState: Error
+contactPoints:
+  - orgId: 1
+    name: dfgg-slack
+    receivers:
+      - uid: dfgg-slack
+        type: slack
+        disableResolveMessage: false
+        settings:
+          url: $__file{/etc/grafana/secrets/slack-webhook}
+          title: '{{ if eq .Status "firing" }}:rotating_light:{{ else }}:white_check_mark:{{ end }} [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+          text: '{{ range .Alerts }}*{{ .Labels.alertname }}*  env={{ .Labels.env }}  severity={{ .Labels.severity }}
+
+        {{ .Annotations.summary }}
+
+        {{ end }}'
+policies:
+  - orgId: 1
+    receiver: dfgg-slack
+    group_by:
+      - alertname
+      - env
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
