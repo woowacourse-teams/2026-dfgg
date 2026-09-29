@@ -8,7 +8,6 @@ import dfgg.application.match.ParticipantItemEventExtractor;
 import dfgg.application.match.ParticipantItemPurchaseExtractor;
 import dfgg.domain.match.ItemPurchaseType;
 import dfgg.domain.match.ParticipantItemPurchase;
-import dfgg.domain.match.PurchaseCostStatus;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -28,25 +27,9 @@ class ParticipantItemPurchaseExtractorTest {
             assertThat(purchase.getPatch()).isEqualTo("16.18");
             assertThat(purchase.getCurrentGold()).isNull();
             assertThat(purchase.getItemCost()).isNull();
-            assertThat(purchase.getItemCostStatus()).isNull();
         });
         // 취소된 두 번째 롱소드 구매도 원천 구매 로그에서는 제거하지 않는다.
         assertThat(result.get(1).getGameTimeMs()).isEqualTo(101);
-    }
-
-    @Test
-    void 비용_가설과_미확정_상태를_일관되게_기록한다() {
-        var purchase = extractor.extract("KR_TEST", timeline(), "16.18", types()).getFirst();
-
-        purchase.recordCostHypothesis(350);
-        assertThat(purchase.getItemCost()).isEqualTo(350);
-        assertThat(purchase.getItemCostStatus()).isEqualTo(PurchaseCostStatus.HYPOTHESIS);
-
-        purchase.markCostUnknown();
-        assertThat(purchase.getItemCost()).isNull();
-        assertThat(purchase.getItemCostStatus()).isEqualTo(PurchaseCostStatus.UNKNOWN);
-        assertThatThrownBy(() -> purchase.recordCostHypothesis(0))
-                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

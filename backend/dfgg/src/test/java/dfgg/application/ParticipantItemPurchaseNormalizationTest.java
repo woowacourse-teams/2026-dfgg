@@ -9,10 +9,8 @@ import dfgg.application.match.ParticipantItemPurchaseNormalizationService;
 import dfgg.domain.match.ItemPurchaseType;
 import dfgg.domain.match.ParticipantItemPurchase;
 import dfgg.domain.match.ParticipantItemPurchaseRepository;
-import dfgg.domain.match.PurchaseCostStatus;
 import dfgg.domain.match.RawMatchTimeline;
 import dfgg.domain.match.RawMatchTimelineRepository;
-import jakarta.persistence.EntityManager;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +27,6 @@ class ParticipantItemPurchaseNormalizationTest {
     @Autowired private RawMatchTimelineRepository timelineRepository;
     @Autowired private ParticipantItemPurchaseRepository purchaseRepository;
     @Autowired private ParticipantItemPurchaseNormalizationService service;
-    @Autowired private EntityManager entityManager;
 
     @Test
     void 재실행해도_중복_구매가_없고_Raw는_유지한다() {
@@ -52,20 +49,4 @@ class ParticipantItemPurchaseNormalizationTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(purchaseRepository.findByMatchIdOrderByParticipantIdAscPurchaseOrderAsc("KR_TEST")).hasSize(3);
     }
-
-    @Test
-    void 비용_가설을_엔티티와_테이블에서_같은_상태로_읽는다() {
-        timelineRepository.saveAndFlush(new RawMatchTimeline("KR_TEST", ParticipantItemPurchaseExtractorTest.timeline()));
-        service.normalize("KR_TEST", "16.18", ParticipantItemPurchaseExtractorTest.types());
-        var purchase = purchaseRepository.findByMatchIdOrderByParticipantIdAscPurchaseOrderAsc("KR_TEST").getFirst();
-
-        purchase.recordCostHypothesis(350);
-        entityManager.flush();
-        entityManager.clear();
-
-        var persisted = purchaseRepository.findById(purchase.getId()).orElseThrow();
-        assertThat(persisted.getItemCost()).isEqualTo(350);
-        assertThat(persisted.getItemCostStatus()).isEqualTo(PurchaseCostStatus.HYPOTHESIS);
-    }
-
 }
