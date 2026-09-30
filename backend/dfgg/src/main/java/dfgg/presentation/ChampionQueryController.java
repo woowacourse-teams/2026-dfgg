@@ -1,9 +1,12 @@
 package dfgg.presentation;
 
 import dfgg.application.champion.ChampionQueryService;
+import dfgg.domain.language.Language;
 import dfgg.presentation.dto.response.ChampionsResponse;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,8 +24,10 @@ public class ChampionQueryController {
     }
 
     @GetMapping
-    public ResponseEntity<ChampionsResponse> getChampions() {
-        ChampionsResponse response = championQueryService.findAll();
+    public ResponseEntity<ChampionsResponse> getChampions(
+            @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage
+    ) {
+        ChampionsResponse response = championQueryService.findAll(Language.fromAcceptLanguage(acceptLanguage));
 
         return ResponseEntity.ok(response);
     }

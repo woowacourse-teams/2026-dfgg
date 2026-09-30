@@ -3,6 +3,7 @@ package dfgg.evaluation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationResult;
+import dfgg.domain.language.Language;
 import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.recommend.NextItemRecommendationService;
 import dfgg.domain.champion.Champion;
@@ -95,7 +96,7 @@ class DescriptionFillRateEvaluationTest {
             }
             try {
                 tally.record(snapshot.query().position().name(),
-                        recommendationService.recommendNextItem(request));
+                        recommendationService.recommendNextItem(request, Language.KO_KR));
             } catch (RuntimeException exception) {
                 tally.failedQueries++;
             }

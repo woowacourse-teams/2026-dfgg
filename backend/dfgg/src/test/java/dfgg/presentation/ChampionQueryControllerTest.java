@@ -58,11 +58,33 @@ class ChampionQueryControllerTest {
     void getChampions_WhenChampionExists_CarryIdKeyNameAndImageUrl() {
         // when & then
         given().accept(ContentType.JSON)
+                .header("Accept-Language", "ko")
                 .when().get("/api/champions")
                 .then().statusCode(200)
                 .body("champions.find { it.riotKey == 'MonkeyKing' }.id", equalTo(62))
                 .body("champions.find { it.riotKey == 'MonkeyKing' }.name", equalTo("손오공"))
                 .body("champions.find { it.riotKey == 'MonkeyKing' }.imageUrl",
                         equalTo("https://test-bucket.s3.ap-northeast-2.amazonaws.com/dfgg/images/99.1/champions/MonkeyKing.png"));
+    }
+
+    @Test
+    @DisplayName("Accept-Language가 en이면 영어 이름을 싣는다")
+    void getChampions_WhenEnglishRequested_CarryEnglishName() {
+        // when & then
+        given().accept(ContentType.JSON)
+                .header("Accept-Language", "en")
+                .when().get("/api/champions")
+                .then().statusCode(200)
+                .body("champions.find { it.riotKey == 'MonkeyKing' }.name", equalTo("Wukong"));
+    }
+
+    @Test
+    @DisplayName("Accept-Language가 없으면 영어 이름을 싣는다")
+    void getChampions_WhenLanguageAbsent_CarryEnglishName() {
+        // when & then
+        given().accept(ContentType.JSON)
+                .when().get("/api/champions")
+                .then().statusCode(200)
+                .body("champions.find { it.riotKey == 'MonkeyKing' }.name", equalTo("Wukong"));
     }
 }

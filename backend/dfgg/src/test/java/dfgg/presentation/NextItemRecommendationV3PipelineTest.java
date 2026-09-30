@@ -305,6 +305,39 @@ class NextItemRecommendationV3PipelineTest {
     }
 
     @Test
+    @DisplayName("Accept-Language가 없으면 아이템과 지목한 챔피언 이름을 영어로 낸다")
+    void recommendV3_WhenLanguageAbsent_ReturnsEnglishNames() {
+        NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
+
+        assertThat(response.recommendedItems()).isNotEmpty()
+                .extracting(RecommendedItemDto::name)
+                .allSatisfy(name -> assertThat(name).matches("[A-Za-z' ()]+"));
+        assertThat(response.recommendedItems())
+                .flatMap(item -> item.description().counter())
+                .extracting(ChampionRefDto::name)
+                .isSubsetOf("Rammus", "Ahri", "Caitlyn", "Leona", "Elise");
+    }
+
+    @Test
+    @DisplayName("Accept-Language가 ko면 아이템과 지목한 챔피언 이름을 한국어로 낸다")
+    void recommendV3_WhenKoreanRequested_ReturnsKoreanNames() {
+        NextItemRecommendationResponse response = given().contentType(ContentType.JSON)
+                .header("Accept-Language", "ko")
+                .body(requestWith(List.of(KRAKEN, INFINITY_EDGE)))
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(200)
+                .extract().as(NextItemRecommendationResponse.class);
+
+        assertThat(response.recommendedItems()).isNotEmpty()
+                .extracting(RecommendedItemDto::name)
+                .allSatisfy(name -> assertThat(name).matches(".*[가-힣].*"));
+        assertThat(response.recommendedItems())
+                .flatMap(item -> item.description().counter())
+                .extracting(ChampionRefDto::name)
+                .isSubsetOf("람머스", "아리", "케이틀린", "레오나", "엘리스");
+    }
+
+    @Test
     @DisplayName("counter는 두 명을 넘지 않는다")
     void recommendV3_CounterIsCappedAtTwo() {
         NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import dfgg.application.champion.ChampionService;
+import dfgg.domain.language.Language;
 import dfgg.application.item.ItemService;
 import dfgg.application.recommend.v3.CandidateGenerator;
 import dfgg.application.recommend.v3.CandidateSource;
@@ -187,7 +188,7 @@ class NextItemRecommendationServiceTest {
                 .thenReturn(rankedOf(KRAKEN));
 
         // when
-        service.recommendNextItem(requestWithPatch(patch));
+        service.recommendNextItem(requestWithPatch(patch), Language.KO_KR);
 
         // then
         ArgumentCaptor<RecommendationQuery> query = ArgumentCaptor.forClass(RecommendationQuery.class);
@@ -204,7 +205,7 @@ class NextItemRecommendationServiceTest {
                 .thenReturn(rankedOf(KRAKEN));
 
         // when
-        service.recommendNextItem(requestWithPatch("16.17"));
+        service.recommendNextItem(requestWithPatch("16.17"), Language.KO_KR);
 
         // then
         ArgumentCaptor<RecommendationQuery> query = ArgumentCaptor.forClass(RecommendationQuery.class);
@@ -221,7 +222,7 @@ class NextItemRecommendationServiceTest {
                 .thenReturn(rankedOf(LIANDRY, KRAKEN, INFINITY_EDGE));
 
         // when
-        NextItemRecommendationResponse response = service.recommendNextItem(request());
+        NextItemRecommendationResponse response = service.recommendNextItem(request(), Language.KO_KR);
 
         // then
         assertThat(response.recommendedItems()).extracting(item -> item.id())
@@ -238,7 +239,7 @@ class NextItemRecommendationServiceTest {
         when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(List.of());
 
         // when & then
-        assertThatThrownBy(() -> service.recommendNextItem(request()))
+        assertThatThrownBy(() -> service.recommendNextItem(request(), Language.KO_KR))
                 .isInstanceOf(NextItemRecommendationNotFoundException.class);
     }
 
@@ -256,7 +257,7 @@ class NextItemRecommendationServiceTest {
                 "EMERALD", "16.17");
 
         // when & then
-        assertThatThrownBy(() -> service.recommendNextItem(request))
+        assertThatThrownBy(() -> service.recommendNextItem(request, Language.KO_KR))
                 .isInstanceOf(InvalidRecommendationRequestException.class);
     }
 
@@ -274,7 +275,7 @@ class NextItemRecommendationServiceTest {
                 "EMERALD", "16.17");
 
         // when & then
-        assertThatThrownBy(() -> service.recommendNextItem(request))
+        assertThatThrownBy(() -> service.recommendNextItem(request, Language.KO_KR))
                 .isInstanceOf(InvalidRecommendationRequestException.class);
     }
 
@@ -286,7 +287,7 @@ class NextItemRecommendationServiceTest {
         when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(MIKAELS_BLESSING));
 
         // when
-        NextItemRecommendationResponse response = service.recommendNextItem(request());
+        NextItemRecommendationResponse response = service.recommendNextItem(request(), Language.KO_KR);
 
         // then
         assertThat(response.recommendedItems().getFirst().description().traits())
@@ -302,7 +303,7 @@ class NextItemRecommendationServiceTest {
         when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(KRAKEN));
 
         // when
-        service.recommendNextItem(request());
+        service.recommendNextItem(request(), Language.KO_KR);
 
         // then
         assertThat(logAppender.list).extracting(ILoggingEvent::getFormattedMessage)
@@ -320,7 +321,7 @@ class NextItemRecommendationServiceTest {
         when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(KRAKEN));
 
         // when
-        service.recommendNextItem(request());
+        service.recommendNextItem(request(), Language.KO_KR);
 
         // then
         assertThat(logAppender.list).extracting(ILoggingEvent::getFormattedMessage)
@@ -341,7 +342,7 @@ class NextItemRecommendationServiceTest {
                 "EMERALD", "16.17");
 
         // when & then
-        assertThatThrownBy(() -> service.recommendNextItem(request))
+        assertThatThrownBy(() -> service.recommendNextItem(request, Language.KO_KR))
                 .isInstanceOf(InvalidRecommendationRequestException.class)
                 .hasMessageContaining("징크스");
     }
@@ -360,7 +361,7 @@ class NextItemRecommendationServiceTest {
                 "EMERALD", "16.17");
 
         // when & then
-        assertThatThrownBy(() -> service.recommendNextItem(request))
+        assertThatThrownBy(() -> service.recommendNextItem(request, Language.KO_KR))
                 .isInstanceOf(InvalidRecommendationRequestException.class)
                 .hasMessageContaining("징크스");
     }
@@ -373,7 +374,7 @@ class NextItemRecommendationServiceTest {
                 List.of(3031L, 3036L, 3046L, 3072L, 3094L, 6672L));
 
         // when
-        NextItemRecommendationResponse response = service.recommendNextItem(request);
+        NextItemRecommendationResponse response = service.recommendNextItem(request, Language.KO_KR);
 
         // then
         assertThat(response.recommendedItems()).isEmpty();
@@ -389,7 +390,7 @@ class NextItemRecommendationServiceTest {
                 List.of(3031L, 3036L, 3046L, 3072L, 3094L));
 
         // when
-        NextItemRecommendationResponse response = service.recommendNextItem(request);
+        NextItemRecommendationResponse response = service.recommendNextItem(request, Language.KO_KR);
 
         // then
         assertThat(response.recommendedItems()).extracting(item -> item.id()).containsExactly(KRAKEN);
