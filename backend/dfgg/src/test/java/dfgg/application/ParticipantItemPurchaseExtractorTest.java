@@ -18,7 +18,7 @@ class ParticipantItemPurchaseExtractorTest {
 
     @Test
     void 모든_구매를_분류와_원천_구매_순번대로_추출한다() {
-        var result = extractor.extract("KR_TEST", timeline(), "16.18", types());
+        var result = extractor.extract("KR_TEST", timeline(), "16.18", types(), positions());
         assertThat(result).extracting(ParticipantItemPurchase::getItemId)
                 .containsExactly(1036, 1036, 2003, 3340, 3071, 1001);
         assertThat(result).extracting(ParticipantItemPurchase::getPurchaseOrder)
@@ -26,6 +26,8 @@ class ParticipantItemPurchaseExtractorTest {
         assertThat(result).extracting(ParticipantItemPurchase::getPurchaseType).containsExactly(
                 ItemPurchaseType.COMPONENT, ItemPurchaseType.COMPONENT, ItemPurchaseType.CONSUMABLE,
                 ItemPurchaseType.OTHER, ItemPurchaseType.CORE, ItemPurchaseType.BOOTS);
+        assertThat(result).extracting(ParticipantItemPurchase::getPosition)
+                .containsExactly("TOP", "TOP", "TOP", "TOP", "TOP", "JUNGLE");
         assertThat(result).allSatisfy(purchase -> {
             assertThat(purchase.getPatch()).isEqualTo("16.18");
             assertThat(purchase.getItemCost()).isNull();
@@ -36,15 +38,19 @@ class ParticipantItemPurchaseExtractorTest {
 
     @Test
     void 분류가_없는_아이템은_OTHER로_추측하지_않는다() {
-        assertThatThrownBy(() -> extractor.extract("KR_TEST", timeline(), "16.18", Map.of()))
+        assertThatThrownBy(() -> extractor.extract("KR_TEST", timeline(), "16.18", Map.of(), positions()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("분류가 없습니다");
     }
 
     @Test
     void 스키마의_시간_범위를_초과하면_실패한다() {
         assertThatThrownBy(() -> extractor.extract("KR_TEST",
-                timeline().replace("\"timestamp\":100", "\"timestamp\":2147483648"), "16.18", types()))
+                timeline().replace("\"timestamp\":100", "\"timestamp\":2147483648"), "16.18", types(), positions()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("정수 범위");
+    }
+
+    static Map<Integer, String> positions() {
+        return Map.of(1, "TOP", 2, "JUNGLE");
     }
 
     static Map<Integer, ItemPurchaseType> types() {

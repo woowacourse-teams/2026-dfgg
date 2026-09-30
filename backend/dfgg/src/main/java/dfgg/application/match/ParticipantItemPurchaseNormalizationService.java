@@ -54,13 +54,14 @@ public class ParticipantItemPurchaseNormalizationService {
      */
     @Transactional
     public int normalize(String matchId, String patch, Map<Integer, ItemPurchaseType> purchaseTypes,
-                         ItemResponse catalog) {
+                         ItemResponse catalog, Map<Integer, String> positionsByParticipant) {
         validateCatalog(patch, catalog);
         // 같은 경기의 동시 재적재를 Raw 행 잠금으로 직렬화한다. 원본은 수정하지 않는다.
         var timeline = timelineRepository.findForPurchaseNormalization(matchId)
                 .orElseThrow(() -> new IllegalArgumentException("저장된 Raw Timeline이 없습니다. 경기 ID: " + matchId));
         List<ParticipantItemEvent> events = eventExtractor.extract(matchId, timeline.getRawData());
-        List<ParticipantItemPurchase> purchases = extractor.extractFromEvents(events, patch, purchaseTypes);
+        List<ParticipantItemPurchase> purchases = extractor.extractFromEvents(events, patch, purchaseTypes,
+                positionsByParticipant);
         Map<Integer, List<ParticipantItemEvent>> eventsByParticipant = groupByParticipant(events);
         recordCosts(purchases, eventsByParticipant, catalog.data());
         recordGoldRanges(purchases, eventsByParticipant,

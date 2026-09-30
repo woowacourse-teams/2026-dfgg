@@ -26,6 +26,9 @@ public class ParticipantItemPurchase {
     @Column(name = "participant_id", nullable = false)
     private int participantId;
 
+    @Column(name = "position", length = 32)
+    private String position;
+
     @Column(name = "purchase_order", nullable = false)
     private int purchaseOrder;
 
@@ -61,7 +64,8 @@ public class ParticipantItemPurchase {
     protected ParticipantItemPurchase() {
     }
 
-    public ParticipantItemPurchase(ParticipantItemEvent event, ItemPurchaseType purchaseType, String patch) {
+    public ParticipantItemPurchase(ParticipantItemEvent event, ItemPurchaseType purchaseType,
+                                   String patch, String position) {
         if (!"ITEM_PURCHASED".equals(event.eventType()) || event.purchaseOrder() == null
                 || event.itemId() == null || event.itemId() <= 0) {
             throw new IllegalArgumentException("구매 레코드는 유효한 구매 순번과 아이템 ID가 있는 구매 이벤트로 생성해야 합니다.");
@@ -72,11 +76,15 @@ public class ParticipantItemPurchase {
         if (patch == null || patch.isBlank() || patch.length() > 16) {
             throw new IllegalArgumentException("패치는 비어 있지 않은 16자 이하의 문자열이어야 합니다.");
         }
+        if (position != null && position.length() > 32) {
+            throw new IllegalArgumentException("포지션은 32자 이하여야 합니다.");
+        }
         if (event.gameTimeMs() != null && event.gameTimeMs() > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("구매 이벤트 시각이 저장 가능한 정수 범위를 초과했습니다.");
         }
         this.matchId = event.matchId();
         this.participantId = event.participantId();
+        this.position = position;
         this.purchaseOrder = event.purchaseOrder();
         this.itemId = event.itemId();
         this.purchaseType = purchaseType;
@@ -117,6 +125,10 @@ public class ParticipantItemPurchase {
 
     public int getParticipantId() {
         return participantId;
+    }
+
+    public String getPosition() {
+        return position;
     }
 
     public int getPurchaseOrder() {

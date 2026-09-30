@@ -42,14 +42,18 @@ class ParticipantItemPurchaseNormalizationTest {
     void 재실행해도_중복_구매가_없고_Raw는_유지한다() {
         String raw = ParticipantItemPurchaseExtractorTest.timeline();
         timelineRepository.saveAndFlush(new RawMatchTimeline("KR_TEST", raw));
-        assertThat(service.normalize("KR_TEST", "16.18", ParticipantItemPurchaseExtractorTest.types(), catalog())).isEqualTo(6);
-        assertThat(service.normalize("KR_TEST", "16.18", ParticipantItemPurchaseExtractorTest.types(), catalog())).isEqualTo(6);
+        assertThat(service.normalize("KR_TEST", "16.18", ParticipantItemPurchaseExtractorTest.types(),
+                catalog(), ParticipantItemPurchaseExtractorTest.positions())).isEqualTo(6);
+        assertThat(service.normalize("KR_TEST", "16.18", ParticipantItemPurchaseExtractorTest.types(),
+                catalog(), ParticipantItemPurchaseExtractorTest.positions())).isEqualTo(6);
         entityManager.clear();
         var saved = purchaseRepository.findByMatchIdOrderByParticipantIdAscPurchaseOrderAsc("KR_TEST");
         assertThat(saved).extracting(ParticipantItemPurchase::getPurchaseType).containsExactly(
                 ItemPurchaseType.COMPONENT, ItemPurchaseType.COMPONENT, ItemPurchaseType.CONSUMABLE,
                 ItemPurchaseType.OTHER, ItemPurchaseType.CORE, ItemPurchaseType.BOOTS);
         assertThat(saved).extracting(ParticipantItemPurchase::getPurchaseOrder).containsExactly(1, 2, 3, 4, 5, 1);
+        assertThat(saved).extracting(ParticipantItemPurchase::getPosition)
+                .containsExactly("TOP", "TOP", "TOP", "TOP", "TOP", "JUNGLE");
         assertThat(saved).extracting(ParticipantItemPurchase::getItemCost)
                 .containsExactly(350, 350, null, null, 850, null);
         assertThat(saved).allSatisfy(purchase -> {
@@ -64,7 +68,8 @@ class ParticipantItemPurchaseNormalizationTest {
     void totalGold와_거래가_양립하면_보정한_구매_골드_범위를_DB에_저장한다() {
         timelineRepository.saveAndFlush(new RawMatchTimeline("KR_TEST", goldTimeline(true)));
 
-        service.normalize("KR_TEST", "16.18", Map.of(1036, ItemPurchaseType.COMPONENT), catalog());
+        service.normalize("KR_TEST", "16.18", Map.of(1036, ItemPurchaseType.COMPONENT), catalog(),
+                Map.of(1, "TOP"));
 
         entityManager.clear();
         ParticipantItemPurchase saved = purchaseRepository
@@ -78,7 +83,8 @@ class ParticipantItemPurchaseNormalizationTest {
     void totalGold가_없으면_기본_범위를_DB에_저장한다() {
         timelineRepository.saveAndFlush(new RawMatchTimeline("KR_TEST", goldTimeline(false)));
 
-        service.normalize("KR_TEST", "16.18", Map.of(1036, ItemPurchaseType.COMPONENT), catalog());
+        service.normalize("KR_TEST", "16.18", Map.of(1036, ItemPurchaseType.COMPONENT), catalog(),
+                Map.of(1, "TOP"));
 
         entityManager.clear();
         ParticipantItemPurchase saved = purchaseRepository
@@ -91,12 +97,15 @@ class ParticipantItemPurchaseNormalizationTest {
     @Test
     void 검증_실패시_기존_구매를_삭제하지_않는다() {
         timelineRepository.saveAndFlush(new RawMatchTimeline("KR_TEST", ParticipantItemPurchaseExtractorTest.timeline()));
-        service.normalize("KR_TEST", "16.18", ParticipantItemPurchaseExtractorTest.types(), catalog());
-        assertThatThrownBy(() -> service.normalize("KR_TEST", "16.18", Map.of(), catalog()))
+        service.normalize("KR_TEST", "16.18", ParticipantItemPurchaseExtractorTest.types(), catalog(),
+                ParticipantItemPurchaseExtractorTest.positions());
+        assertThatThrownBy(() -> service.normalize("KR_TEST", "16.18", Map.of(), catalog(),
+                ParticipantItemPurchaseExtractorTest.positions()))
                 .isInstanceOf(IllegalArgumentException.class);
         ItemResponse anotherPatch = new ItemResponse("16.19", "16.19.1", catalog().data());
         assertThatThrownBy(() -> service.normalize(
-                "KR_TEST", "16.18", ParticipantItemPurchaseExtractorTest.types(), anotherPatch))
+                "KR_TEST", "16.18", ParticipantItemPurchaseExtractorTest.types(), anotherPatch,
+                ParticipantItemPurchaseExtractorTest.positions()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(purchaseRepository.findByMatchIdOrderByParticipantIdAscPurchaseOrderAsc("KR_TEST")).hasSize(6);
     }
@@ -107,7 +116,8 @@ class ParticipantItemPurchaseNormalizationTest {
         ItemResponse incomplete = new ItemResponse("16.18", "16.18.1",
                 Map.of("3071", item(1200, List.of("1036"))));
 
-        service.normalize("KR_TEST", "16.18", ParticipantItemPurchaseExtractorTest.types(), incomplete);
+        service.normalize("KR_TEST", "16.18", ParticipantItemPurchaseExtractorTest.types(), incomplete,
+                ParticipantItemPurchaseExtractorTest.positions());
 
         entityManager.clear();
         var saved = purchaseRepository.findByMatchIdOrderByParticipantIdAscPurchaseOrderAsc("KR_TEST");

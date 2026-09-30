@@ -32,9 +32,11 @@ class ItemPurchaseTypeMapServiceTest {
         var types = service.classifyItemsForPatch("16.18", "16.18.1");
         assertThat(types).containsEntry(1036, ItemPurchaseType.COMPONENT);
         var extractor = new ParticipantItemPurchaseExtractor(new ParticipantItemEventExtractor(new ObjectMapper()));
-        var purchases = extractor.extract("KR_TEST", ParticipantItemPurchaseExtractorTest.timeline(), "16.18", types);
+        var purchases = extractor.extract("KR_TEST", ParticipantItemPurchaseExtractorTest.timeline(), "16.18",
+                types, ParticipantItemPurchaseExtractorTest.positions());
         assertThat(purchases).extracting(ParticipantItemPurchase::getPurchaseType).containsExactly(
-                ItemPurchaseType.COMPONENT, ItemPurchaseType.COMPONENT, ItemPurchaseType.CORE);
+                ItemPurchaseType.COMPONENT, ItemPurchaseType.COMPONENT, ItemPurchaseType.CONSUMABLE,
+                ItemPurchaseType.OTHER, ItemPurchaseType.CORE, ItemPurchaseType.BOOTS);
         verify(client).getItems("16.18.1");
     }
 
