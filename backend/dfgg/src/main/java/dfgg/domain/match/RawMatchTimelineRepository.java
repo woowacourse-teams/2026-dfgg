@@ -1,14 +1,20 @@
 package dfgg.domain.match;
 
 import java.util.Collection;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 public interface RawMatchTimelineRepository extends JpaRepository<RawMatchTimeline, String> {
+
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT timeline FROM RawMatchTimeline timeline WHERE timeline.matchId = :matchId")
+    Optional<RawMatchTimeline> findForPurchaseNormalization(@Param("matchId") String matchId);
 
     @Query("""
             SELECT timeline.matchId

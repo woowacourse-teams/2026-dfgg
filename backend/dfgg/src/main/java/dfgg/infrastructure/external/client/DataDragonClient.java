@@ -2,6 +2,8 @@ package dfgg.infrastructure.external.client;
 
 import dfgg.infrastructure.external.dto.ChampionResponse;
 import dfgg.infrastructure.external.dto.ItemResponse;
+import java.util.Arrays;
+import java.util.Comparator;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -18,22 +20,6 @@ public class DataDragonClient {
                 .build();
     }
 
-    public String getLatestVersion() {
-        return normalizePatch(getLatestDataVersion());
-    }
-
-    private String getLatestDataVersion() {
-        String[] versions = restClient.get()
-                .uri("api/versions.json")
-                .retrieve()
-                .body(String[].class);
-
-        if (versions == null || versions.length == 0) {
-            throw new IllegalStateException("[Error] Data Dragon version response is empty");
-        }
-        return versions[0];
-    }
-
     private static String normalizePatch(String version) {
         if (version == null || version.isBlank()) {
             throw new IllegalStateException("[Error] Data Dragon version is invalid");
@@ -46,6 +32,40 @@ public class DataDragonClient {
             throw new IllegalStateException("[Error] Data Dragon version is invalid: " + version);
         }
         return components[0] + "." + components[1];
+    }
+
+    public String getLatestVersion() {
+        return normalizePatch(getLatestDataVersion());
+    }
+
+    private String getLatestDataVersion() {
+        return getDataVersions()[0];
+    }
+
+    /** Raw 경기 패치에 대응하는 가장 높은 Data Dragon 아이템 빌드를 찾는다. */
+    public String resolveItemDataVersionForPatch(String patch) {
+        if (patch == null || !patch.matches("[0-9]+\\.[0-9]+")) {
+            throw new IllegalArgumentException("게임 패치는 major.minor 형식이어야 합니다.");
+        }
+        return Arrays.stream(getDataVersions())
+                .filter(version -> version != null && version.matches(java.util.regex.Pattern.quote(patch) + "\\.[0-9]+"))
+                .max(Comparator.comparingInt(this::itemBuildNumber))
+                .orElseThrow(() -> new IllegalStateException("패치 " + patch + "에 해당하는 Data Dragon 빌드가 없습니다."));
+    }
+
+    private int itemBuildNumber(String version) {
+        return Integer.parseInt(version.substring(version.lastIndexOf('.') + 1));
+    }
+
+    private String[] getDataVersions() {
+        String[] versions = restClient.get()
+                .uri("api/versions.json")
+                .retrieve()
+                .body(String[].class);
+        if (versions == null || versions.length == 0) {
+            throw new IllegalStateException("[Error] Data Dragon version response is empty");
+        }
+        return versions;
     }
 
     public ChampionResponse getChampions() {
@@ -115,6 +135,7 @@ public class DataDragonClient {
         return image;
     }
 
+    /** 현재 서비스 아이템 동기화에 사용할 최신 Data Dragon 빌드를 조회한다. */
     public ItemResponse getItems() {
         String version = getLatestDataVersion();
         ItemResponse response = restClient.get()
@@ -140,5 +161,28 @@ public class DataDragonClient {
             }
         });
         return new ItemResponse(normalizePatch(version), version, response.data(), englishNames);
+    }
+
+    /**
+     * 과거 경기의 구매를 경기 당시 카탈로그로 분류하기 위해 지정한 Data Dragon 빌드를 조회한다.
+     * 최신 빌드로 대체하거나 기존 items DB를 동기화하지 않는다.
+     *
+     * @param dataVersion 경기 패치에 해당하는 전체 빌드 버전. 예: 16.18.1
+     */
+    public ItemResponse getItems(String dataVersion) {
+        if (dataVersion == null || !dataVersion.matches("[0-9]+\\.[0-9]+\\.[0-9]+")) {
+            throw new IllegalArgumentException("Data Dragon 빌드는 숫자 세 부분으로 지정해야 합니다. 예: 16.18.1");
+        }
+        ItemResponse response = restClient.get()
+                .uri("/cdn/{version}/data/en_US/item.json", dataVersion)
+                .retrieve()
+                .body(ItemResponse.class);
+        if (response == null || response.data() == null || response.data().isEmpty()) {
+            throw new IllegalStateException("Data Dragon 아이템 카탈로그가 비어 있습니다.");
+        }
+        if (!dataVersion.equals(response.version())) {
+            throw new IllegalStateException("Data Dragon 응답 버전이 요청한 빌드와 다릅니다.");
+        }
+        return new ItemResponse(normalizePatch(dataVersion), dataVersion, response.data());
     }
 }

@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import dfgg.application.RiotCollectionOrchestrator;
 import dfgg.application.match.RiotMatchSyncService;
+import dfgg.application.match.StoredParticipantItemPurchaseNormalizationService;
 import dfgg.application.stats.ChampionBuildStatsRebuildMatchService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,16 +26,19 @@ class RiotMatchControllerTest {
     private RiotCollectionOrchestrator collectionOrchestrator;
     private ChampionBuildStatsRebuildMatchService statsRebuildService;
     private MockMvc mockMvc;
+    private StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService;
 
     @BeforeEach
     void setUp() {
         riotMatchSyncService = mock(RiotMatchSyncService.class);
         collectionOrchestrator = mock(RiotCollectionOrchestrator.class);
         statsRebuildService = mock(ChampionBuildStatsRebuildMatchService.class);
+        purchaseNormalizationService = mock(StoredParticipantItemPurchaseNormalizationService.class);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new RiotMatchController(riotMatchSyncService,
                         collectionOrchestrator,
-                        statsRebuildService, mock(dfgg.application.match.MatchRenormalizationService.class)))
+                        statsRebuildService, mock(dfgg.application.match.MatchRenormalizationService.class),
+                        purchaseNormalizationService))
                 .build();
     }
 
@@ -82,6 +86,14 @@ class RiotMatchControllerTest {
     }
 
     @Test
+    void 관리자_구매_정규화를_매개변수_없이_즉시_실행한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches/purchases/normalize"))
+                .andExpect(status().isOk());
+
+        verify(purchaseNormalizationService).normalizeAll();
+    }
+
+    @Test
     void 지정한_티어로_신규_매치를_즉시_집계하고_미완료_통계를_백필한다() throws Exception {
         mockMvc.perform(post("/admin/riot/matches/stats")
                         .param("tier", "PLATINUM"))
@@ -99,7 +111,8 @@ class RiotMatchControllerTest {
                 .normalizeAndAggregatePendingMatches("PLATINUM");
         RiotMatchController controller = new RiotMatchController(riotMatchSyncService,
                 collectionOrchestrator,
-                statsRebuildService, mock(dfgg.application.match.MatchRenormalizationService.class));
+                statsRebuildService, mock(dfgg.application.match.MatchRenormalizationService.class),
+                purchaseNormalizationService);
 
         assertThatThrownBy(() -> controller.rebuildStats("PLATINUM"))
                 .isInstanceOf(IllegalStateException.class);

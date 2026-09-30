@@ -12,6 +12,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 public interface RawMatchRepository extends JpaRepository<RawMatch, String> {
 
+    /** 구매 적재 대상은 참가자 정규화 여부와 관계없이 Raw Match와 Timeline이 모두 있는 경기다. */
+    @Query("""
+            SELECT rawMatch.matchId
+            FROM RawMatch rawMatch
+            WHERE EXISTS (
+                  SELECT timeline.matchId
+                  FROM RawMatchTimeline timeline
+                  WHERE timeline.matchId = rawMatch.matchId
+              )
+            ORDER BY rawMatch.matchId
+            """)
+    List<String> findMatchIdsWithTimeline();
+
     @Query("""
             SELECT rawMatch.matchId
             FROM RawMatch rawMatch
