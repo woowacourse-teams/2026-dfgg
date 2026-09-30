@@ -7,6 +7,10 @@ on:
         description: "대상 self-hosted 러너 라벨 (dfgg-dev | dfgg-prod)"
         required: true
         type: string
+    outputs:
+      recovery:
+        description: "전환 단계 실패 시 복구 결과 (restored | new-slot-active | uncertain). 전환 전에 멈췄으면 비어 있다"
+        value: ${{ jobs.deploy.outputs.recovery }}
 
 permissions:
   contents: read
@@ -15,6 +19,8 @@ jobs:
   deploy:
     runs-on: [ self-hosted, "${{ inputs.runner-label }}" ]
     timeout-minutes: 45
+    outputs:
+      recovery: ${{ steps.switch.outputs.recovery }}
     defaults:
       run:
         shell: bash
@@ -50,6 +56,59 @@ jobs:
           green=$(systemctl show dfgg@green.service -p ActiveState --value)
           [[ "$blue:$green" == active:inactive || "$blue:$green" == inactive:active ]] \
             || { echo 'Expected exactly one active application'; exit 1; }
+
+      # 저장소가 관리하는 nginx 설정만 설치한다.
+      # dfgg-upstream.conf는 blue/green 단계가 관리하므로 여기서 다루지 않는다.
+      - name: Install nginx configuration
+        working-directory: .
+        run: |
+          set -euo pipefail
+
+          conf_dir=/etc/nginx/conf.d
+          backups="$RUNNER_TEMP/nginx-conf-backup"
+          rm -rf "$backups"
+          mkdir -p "$backups"
+
+          changed=()
+          for name in dfgg-log-format.conf dfgg-metrics.conf; do
+            source="backend/ops/nginx/$name"
+            target="$conf_dir/$name"
+            test -r "$source"
+            if cmp -s "$source" "$target"; then continue; fi
+            if [[ -e "$target" ]]; then cp "$target" "$backups/$name"; fi
+            changed+=("$name")
+          done
+
+          if (( ${#changed[@]} == 0 )); then
+            echo 'nginx 설정 변경 없음'
+            exit 0
+          fi
+          echo "변경: ${changed[*]}"
+
+          install_all() {
+            for name in "${changed[@]}"; do
+              sudo -n install -o root -g root -m 0644 "backend/ops/nginx/$name" "$conf_dir/$name" || return 1
+            done
+          }
+          # 백업이 없던 파일은 새로 생긴 것이므로 지운다.
+          restore() {
+            for name in "${changed[@]}"; do
+              if [[ -e "$backups/$name" ]]; then
+                sudo -n install -o root -g root -m 0644 "$backups/$name" "$conf_dir/$name"
+              else
+                sudo -n rm -f "$conf_dir/$name"
+              fi
+            done
+          }
+
+          # 깨진 설정을 남기면 다음 배포의 nginx -t가 막힌다. 실패하면 되돌리고 멈춘다.
+          if ! install_all || ! sudo -n nginx -t; then
+            echo '::error::nginx configuration failed nginx -t; restoring previous files'
+            restore
+            sudo -n nginx -t
+            exit 1
+          fi
+          sudo -n systemctl reload nginx.service
 
       - name: Copy .env file
         run: cp /home/ubuntu/app-config/.env ./.env
@@ -88,6 +147,7 @@ jobs:
             | grep -Fx 'BOOT-INF/classes/ltr/model.json'
 
       - name: Deploy with Blue-Green switch
+        id: switch
         timeout-minutes: 15
         run: |
           set -euo pipefail
@@ -209,12 +269,17 @@ jobs:
             set +e
             if [[ "$result" != 0 ]]; then
               if [[ "$DFGG_COMMITTED" == true ]]; then
+                recovery=new-slot-active
                 echo "::error::New slot remains active; old-slot cleanup/final check failed. Inspect manually."
               elif rollback; then
+                recovery=restored
                 echo '::error::Deployment failed; previous route preserved/restored.'
               else
+                recovery=uncertain
                 echo "::error::Recovery uncertain. Do not stop either app. Inspect $DFGG_BACKUP"
               fi
+              # 실패 알림이 서비스 영향을 구분하도록 남긴다.
+              echo "recovery=$recovery" >> "$GITHUB_OUTPUT"
             fi
             # 이 실행의 임시 파일만 정리하고 기존 JAR와 서버 측 백업은 남긴다.
             [[ -z "$DFGG_JAR_STAGE" ]] || rm -f "$DFGG_JAR_STAGE"

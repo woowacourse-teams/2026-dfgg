@@ -89,3 +89,41 @@ jobs:
     uses: ./.github/workflows/be-deploy.yml
     with:
       runner-label: dfgg-prod
+
+  notify-dev-failure:
+    needs: [ deploy-dev, verify-dev ]
+    if: ${{ always() && (contains(fromJSON('["failure","cancelled"]'), needs.deploy-dev.result) || contains(fromJSON('["failure","cancelled"]'), needs.verify-dev.result)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Notify Slack
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          DEPLOY_ENV: dev
+          DEPLOY_STAGE: ${{ contains(fromJSON('["failure","cancelled"]'), needs.deploy-dev.result) && 'deploy' || 'verify' }}
+          JOB_RESULT: ${{ contains(fromJSON('["failure","cancelled"]'), needs.deploy-dev.result) && needs.deploy-dev.result || needs.verify-dev.result }}
+          RECOVERY: ${{ needs.deploy-dev.outputs.recovery }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: .github/scripts/notify-deploy-failure.sh
+
+  notify-prod-failure:
+    needs: [ deploy-prod ]
+    if: ${{ always() && contains(fromJSON('["failure","cancelled"]'), needs.deploy-prod.result) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Notify Slack
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          DEPLOY_ENV: prod
+          DEPLOY_STAGE: deploy
+          JOB_RESULT: ${{ needs.deploy-prod.result }}
+          RECOVERY: ${{ needs.deploy-prod.outputs.recovery }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: .github/scripts/notify-deploy-failure.sh
