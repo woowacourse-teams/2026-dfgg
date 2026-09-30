@@ -97,10 +97,24 @@ class ParticipantItemEventExtractorTest {
         assertThat(result).extracting(ParticipantItemEvent::itemId).containsExactly(1036, 1036, null, 1037);
     }
 
+    @Test
+    void 참가자_0번의_구매는_제외하고_실제_참가자의_원천_위치와_구매_순서를_유지한다() {
+        var result = extractor.extract("KR_TEST", timeline("""
+                {"type":"ITEM_PURCHASED","participantId":0,"itemId":3865,"timestamp":0},
+                {"type":"ITEM_PURCHASED","participantId":0,"itemId":3865,"timestamp":0},
+                {"type":"ITEM_PURCHASED","participantId":1,"itemId":1036,"timestamp":100},
+                {"type":"ITEM_DESTROYED","participantId":1,"itemId":1036,"timestamp":200}
+                """));
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(ParticipantItemEvent::participantId).containsOnly(1);
+        assertThat(result).extracting(ParticipantItemEvent::sourceEventIndex).containsExactly(2, 3);
+        assertThat(result).extracting(ParticipantItemEvent::purchaseOrder).containsExactly(1, null);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
             "{\"type\":\"ITEM_PURCHASED\",\"itemId\":1036}",
-            "{\"type\":\"ITEM_PURCHASED\",\"participantId\":0,\"itemId\":1036}",
             "{\"type\":\"ITEM_PURCHASED\",\"participantId\":1}",
             "{\"type\":\"ITEM_PURCHASED\",\"participantId\":1,\"itemId\":0}",
             "{\"type\":\"ITEM_PURCHASED\",\"participantId\":1,\"itemId\":\"1036\"}",

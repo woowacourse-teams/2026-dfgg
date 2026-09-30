@@ -62,12 +62,16 @@ public class ParticipantItemEventExtractor {
                 if (!type.textValue().startsWith("ITEM_")) {
                     continue;
                 }
-                IndexedItemEvent event = readItemEvent(payload, frameIndex, eventIndex);
+                Integer participantId = optionalInteger(payload, "participantId", frameIndex, eventIndex);
+                // Riot Timeline에는 참가자에게 귀속되지 않은 0번 구매가 있다. 플레이어 인벤토리에 반영하지 않는다.
+                if (participantId != null && participantId == 0) {
+                    continue;
+                }
+                IndexedItemEvent event = readItemEvent(payload, participantId, frameIndex, eventIndex);
                 eventsByParticipant.computeIfAbsent(event.participantId(), ignored -> new ArrayList<>())
                         .add(event);
             }
         }
-
         List<ParticipantItemEvent> result = new ArrayList<>();
         for (List<IndexedItemEvent> events : eventsByParticipant.values()) {
             if (events.stream().allMatch(event -> event.gameTimeMs() != null)) {
@@ -106,15 +110,16 @@ public class ParticipantItemEventExtractor {
         }
     }
 
-    private IndexedItemEvent readItemEvent(JsonNode payload, int frameIndex, int eventIndex) {
+    private IndexedItemEvent readItemEvent(JsonNode payload, Integer participantId,
+                                           int frameIndex, int eventIndex) {
         String eventType = payload.get("type").textValue();
-        Integer participantId = optionalInteger(payload, "participantId", frameIndex, eventIndex);
         Integer itemId = optionalInteger(payload, "itemId", frameIndex, eventIndex);
         if (eventType.length() > 32) {
             throw invalidEvent(frameIndex, eventIndex, "이벤트 유형(type)은 32자 이하여야 합니다.");
         }
         if (participantId == null || participantId <= 0) {
-            throw invalidEvent(frameIndex, eventIndex, "참가자 ID(participantId)가 없거나 0 이하입니다.");
+            throw invalidEvent(frameIndex, eventIndex,
+                    "참가자 ID(participantId)가 유효하지 않습니다. participantId=" + participantId);
         }
         if (PURCHASED.equals(eventType) && (itemId == null || itemId <= 0)) {
             throw invalidEvent(frameIndex, eventIndex, "구매 이벤트(ITEM_PURCHASED)의 아이템 ID(itemId)가 없거나 0 이하입니다.");
