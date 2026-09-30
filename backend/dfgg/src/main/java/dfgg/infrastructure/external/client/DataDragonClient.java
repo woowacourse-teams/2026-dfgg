@@ -2,6 +2,8 @@ package dfgg.infrastructure.external.client;
 
 import dfgg.infrastructure.external.dto.ChampionResponse;
 import dfgg.infrastructure.external.dto.ItemResponse;
+import java.util.Arrays;
+import java.util.Comparator;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -37,15 +39,33 @@ public class DataDragonClient {
     }
 
     private String getLatestDataVersion() {
+        return getDataVersions()[0];
+    }
+
+    /** Raw 경기 패치에 대응하는 가장 높은 Data Dragon 아이템 빌드를 찾는다. */
+    public String resolveItemDataVersionForPatch(String patch) {
+        if (patch == null || !patch.matches("[0-9]+\\.[0-9]+")) {
+            throw new IllegalArgumentException("게임 패치는 major.minor 형식이어야 합니다.");
+        }
+        return Arrays.stream(getDataVersions())
+                .filter(version -> version != null && version.matches(java.util.regex.Pattern.quote(patch) + "\\.[0-9]+"))
+                .max(Comparator.comparingInt(this::itemBuildNumber))
+                .orElseThrow(() -> new IllegalStateException("패치 " + patch + "에 해당하는 Data Dragon 빌드가 없습니다."));
+    }
+
+    private int itemBuildNumber(String version) {
+        return Integer.parseInt(version.substring(version.lastIndexOf('.') + 1));
+    }
+
+    private String[] getDataVersions() {
         String[] versions = restClient.get()
                 .uri("api/versions.json")
                 .retrieve()
                 .body(String[].class);
-
         if (versions == null || versions.length == 0) {
             throw new IllegalStateException("[Error] Data Dragon version response is empty");
         }
-        return versions[0];
+        return versions;
     }
 
     public ChampionResponse getChampions() {

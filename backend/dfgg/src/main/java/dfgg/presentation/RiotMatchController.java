@@ -2,6 +2,8 @@ package dfgg.presentation;
 
 import dfgg.application.RiotCollectionOrchestrator;
 import dfgg.application.match.MatchRenormalizationService;
+import dfgg.application.match.StoredParticipantItemPurchaseNormalizationService;
+import dfgg.application.match.PurchaseNormalizationResult;
 import dfgg.application.match.RenormalizationResult;
 import dfgg.application.match.RiotMatchSyncService;
 import dfgg.application.stats.ChampionBuildStatsRebuildMatchService;
@@ -12,6 +14,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,17 +29,29 @@ public class RiotMatchController {
     private final RiotCollectionOrchestrator collectionOrchestrator;
     private final ChampionBuildStatsRebuildMatchService statsRebuildService;
     private final MatchRenormalizationService renormalizationService;
+    private final StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService;
 
     public RiotMatchController(
             RiotMatchSyncService riotMatchSyncService,
             RiotCollectionOrchestrator collectionOrchestrator,
             ChampionBuildStatsRebuildMatchService statsRebuildService,
-            MatchRenormalizationService renormalizationService
+            MatchRenormalizationService renormalizationService,
+            StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService
     ) {
         this.riotMatchSyncService = riotMatchSyncService;
         this.collectionOrchestrator = collectionOrchestrator;
         this.statsRebuildService = statsRebuildService;
         this.renormalizationService = renormalizationService;
+        this.purchaseNormalizationService = purchaseNormalizationService;
+    }
+
+    /**
+     * 저장된 Raw Match와 Timeline을 읽어 모든 경기의 구매를 즉시 정규화한다.
+     * 각 경기의 패치와 카탈로그 빌드는 원천 데이터에서 결정한다.
+     */
+    @PostMapping("/riot/matches/purchases/normalize")
+    public ResponseEntity<PurchaseNormalizationResult> normalizePurchases() {
+        return ResponseEntity.ok(purchaseNormalizationService.normalizeAll());
     }
 
     /**

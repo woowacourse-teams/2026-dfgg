@@ -119,6 +119,19 @@ class RawMatchRepositoryTest {
     }
 
     @Test
+    void 구매_정규화는_참가자_정규화_여부와_관계없이_Raw와_Timeline이_있는_경기를_조회한다() {
+        rawMatchRepository.save(new RawMatch("KR_1", RAW_DATA));
+        rawMatchRepository.save(new RawMatch("KR_2", RAW_DATA));
+        rawMatchRepository.save(new RawMatch("KR_3", RAW_DATA));
+        timelineRepository.save(new RawMatchTimeline("KR_1", "{}"));
+        timelineRepository.save(new RawMatchTimeline("KR_3", "{}"));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(rawMatchRepository.findMatchIdsWithTimeline()).containsExactly("KR_1", "KR_3");
+    }
+
+    @Test
     void Raw와_Timeline은_있지만_아직_정규화하지_않은_매치만_조회한다() {
         rawMatchRepository.save(new RawMatch("KR_1", RAW_DATA));
         rawMatchRepository.save(new RawMatch("KR_2", RAW_DATA));

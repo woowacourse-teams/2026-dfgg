@@ -45,6 +45,26 @@ public class DataDragonClientTest {
     }
 
     @Test
+    void 경기_패치에_해당하는_가장_높은_아이템_빌드를_선택한다() {
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.19.1\",\"16.18.2\",\"16.18.10\",\"16.18.1\"]",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.resolveItemDataVersionForPatch("16.18")).isEqualTo("16.18.10");
+        server.verify();
+    }
+
+    @Test
+    void 해당_패치의_아이템_빌드가_없으면_거부한다() {
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.19.1\"]", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.resolveItemDataVersionForPatch("16.18"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("16.18");
+        server.verify();
+    }
+
+    @Test
     void 지정한_빌드와_다른_응답은_거부한다() {
         server.expect(requestTo(BASE_URL + "/cdn/16.18.1/data/en_US/item.json"))
                 .andRespond(withSuccess("""
