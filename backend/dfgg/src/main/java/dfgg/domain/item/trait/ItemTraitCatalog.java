@@ -17,19 +17,25 @@ import java.util.Set;
 public final class ItemTraitCatalog {
 
     /**
-     * 여섯 파일을 합친 기본 어휘.
+     * 일곱 파일을 합친 기본 어휘.
      */
     private static final Map<Long, Set<ItemTrait>> DEFAULT_TRAITS = merge(
-            FighterTraits.BY_ITEM_ID, MarksmanTraits.BY_ITEM_ID, AssassinTraits.BY_ITEM_ID,
-            MageTraits.BY_ITEM_ID, TankTraits.BY_ITEM_ID,
-            ItemProfile.traitsByItemId(SupportTraits.BY_ITEM_ID)
+            ItemProfile.traitsByItemId(FighterTraits.BY_ITEM_ID),
+            ItemProfile.traitsByItemId(MarksmanTraits.BY_ITEM_ID),
+            ItemProfile.traitsByItemId(AssassinTraits.BY_ITEM_ID),
+            ItemProfile.traitsByItemId(MageTraits.BY_ITEM_ID),
+            ItemProfile.traitsByItemId(TankTraits.BY_ITEM_ID),
+            ItemProfile.traitsByItemId(SupportTraits.BY_ITEM_ID),
+            ItemProfile.traitsByItemId(BootsTraits.BY_ITEM_ID)
     );
 
     /**
      * synergy를 선언한 파일만 모은다. 선언하지 않은 아이템은 {@link Synergy#SELF}다.
      */
-    private static final Map<Long, Synergy> DEFAULT_SYNERGIES =
-            ItemProfile.synergyByItemId(SupportTraits.BY_ITEM_ID);
+    private static final Map<Long, Synergy> DEFAULT_SYNERGIES = mergeSynergies(
+            FighterTraits.BY_ITEM_ID, MarksmanTraits.BY_ITEM_ID, AssassinTraits.BY_ITEM_ID,
+            MageTraits.BY_ITEM_ID, TankTraits.BY_ITEM_ID, SupportTraits.BY_ITEM_ID, BootsTraits.BY_ITEM_ID
+    );
 
     @SafeVarargs
     private static Map<Long, Set<ItemTrait>> merge(Map<Long, Set<ItemTrait>>... sources) {
@@ -40,6 +46,21 @@ public final class ItemTraitCatalog {
                     .addAll(traits));
         }
         merged.replaceAll((itemId, traits) -> Set.copyOf(traits));
+        return Map.copyOf(merged);
+    }
+
+    /** 한 아이템이 두 파일에서 ALLY와 SELF로 갈리면 어느 쪽이 맞는지 알 수 없다. 조용히 덮어쓰지 않고 기동에서 멈춘다. */
+    @SafeVarargs
+    private static Map<Long, Synergy> mergeSynergies(Map<Long, ItemProfile>... sources) {
+        Map<Long, Synergy> merged = new HashMap<>();
+        for (Map<Long, ItemProfile> source : sources) {
+            ItemProfile.synergyByItemId(source).forEach((itemId, synergy) -> {
+                Synergy declared = merged.putIfAbsent(itemId, synergy);
+                if (declared != null && declared != synergy) {
+                    throw new IllegalStateException("아이템 synergy 선언이 충돌합니다: " + itemId);
+                }
+            });
+        }
         return Map.copyOf(merged);
     }
 

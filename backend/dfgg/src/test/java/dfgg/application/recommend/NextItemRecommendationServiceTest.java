@@ -52,6 +52,7 @@ class NextItemRecommendationServiceTest {
     private static final long INFINITY_EDGE = 3031L;
     private static final long LIANDRY = 6653L;
     private static final long MIKAELS_BLESSING = 3222L;
+    private static final long ZEKES_CONVERGENCE = 3050L;
 
     private ChampionService championService;
     private ItemService itemService;
@@ -292,6 +293,21 @@ class NextItemRecommendationServiceTest {
         // then
         assertThat(response.recommendedItems().getFirst().description().traits())
                 .containsExactly("CC 해제 및 회복");
+    }
+
+    @Test
+    @DisplayName("표시명이 없는 판정용 특성은 traits에 싣지 않는다 — 빈 문자열이 화면에 새지 않는다")
+    void recommendNextItem_WhenItemHasTraitWithoutDisplayName_OmitsIt() {
+        // given: 지크의 융합은 표시용 특성과 v2 판정용 ENGAGE(표시명 없음)를 함께 갖는다
+        givenCandidates(ZEKES_CONVERGENCE);
+        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(ZEKES_CONVERGENCE));
+
+        // when
+        NextItemRecommendationResponse response = service.recommendNextItem(request(), Language.KO_KR);
+
+        // then
+        assertThat(response.recommendedItems().getFirst().description().traits())
+                .containsExactly("궁극기 연계 피해 및 둔화");
     }
 
     @Test

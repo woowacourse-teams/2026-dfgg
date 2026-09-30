@@ -191,10 +191,13 @@ public class NextItemRecommendationService {
      * <p>
      * 팀이 정한 표시명을 낸다. enum 이름({@code CC_CLEANSE})은 코드의 식별자라 화면에 쓸 말이 아니다.
      * 정렬은 매 요청 같은 순서를 내기 위한 것이다.
+     * <p>
+     * 표시명이 없는 특성({@code ENGAGE} 등)은 v2 판정용 범주다. 화면에 낼 말이 없어 뺀다.
      */
     private List<String> traitNamesOf(Item item) {
         return itemTraitCatalog.traitsOf(item).stream()
                 .map(ItemTrait::getDisplayName)
+                .filter(displayName -> !displayName.isBlank())
                 .sorted()
                 .toList();
     }
