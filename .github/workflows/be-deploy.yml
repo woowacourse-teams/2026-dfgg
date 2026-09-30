@@ -7,6 +7,10 @@ on:
         description: "대상 self-hosted 러너 라벨 (dfgg-dev | dfgg-prod)"
         required: true
         type: string
+    outputs:
+      recovery:
+        description: "전환 단계 실패 시 복구 결과 (restored | new-slot-active | uncertain). 전환 전에 멈췄으면 비어 있다"
+        value: ${{ jobs.deploy.outputs.recovery }}
 
 permissions:
   contents: read
@@ -15,6 +19,8 @@ jobs:
   deploy:
     runs-on: [ self-hosted, "${{ inputs.runner-label }}" ]
     timeout-minutes: 45
+    outputs:
+      recovery: ${{ steps.switch.outputs.recovery }}
     defaults:
       run:
         shell: bash
@@ -141,6 +147,7 @@ jobs:
             | grep -Fx 'BOOT-INF/classes/ltr/model.json'
 
       - name: Deploy with Blue-Green switch
+        id: switch
         timeout-minutes: 15
         run: |
           set -euo pipefail
@@ -262,12 +269,17 @@ jobs:
             set +e
             if [[ "$result" != 0 ]]; then
               if [[ "$DFGG_COMMITTED" == true ]]; then
+                recovery=new-slot-active
                 echo "::error::New slot remains active; old-slot cleanup/final check failed. Inspect manually."
               elif rollback; then
+                recovery=restored
                 echo '::error::Deployment failed; previous route preserved/restored.'
               else
+                recovery=uncertain
                 echo "::error::Recovery uncertain. Do not stop either app. Inspect $DFGG_BACKUP"
               fi
+              # 실패 알림이 서비스 영향을 구분하도록 남긴다.
+              echo "recovery=$recovery" >> "$GITHUB_OUTPUT"
             fi
             # 이 실행의 임시 파일만 정리하고 기존 JAR와 서버 측 백업은 남긴다.
             [[ -z "$DFGG_JAR_STAGE" ]] || rm -f "$DFGG_JAR_STAGE"
