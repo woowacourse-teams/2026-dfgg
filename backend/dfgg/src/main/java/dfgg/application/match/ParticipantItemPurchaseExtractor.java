@@ -2,7 +2,7 @@ package dfgg.application.match;
 
 import dfgg.domain.match.ItemPurchaseType;
 import dfgg.domain.match.ParticipantItemEvent;
-import dfgg.domain.match.ParticipantItemPurchase;
+import dfgg.domain.match.NormalizedMatchParticipantItemEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +19,7 @@ public class ParticipantItemPurchaseExtractor {
     }
 
     /** purchaseTypes는 해당 패치의 카탈로그에 대해 서비스가 정한 분류다. 미등록을 OTHER로 추측하지 않는다. */
-    public List<ParticipantItemPurchase> extract(
+    public List<NormalizedMatchParticipantItemEvent> extract(
             String matchId, String rawTimeline, String patch, Map<Integer, ItemPurchaseType> purchaseTypes,
             Map<Integer, String> positionsByParticipant
     ) {
@@ -29,7 +29,7 @@ public class ParticipantItemPurchaseExtractor {
     }
 
     /** 이미 추출한 전체 ITEM 이벤트에서 모든 구매를 원천 순서대로 만든다. */
-    List<ParticipantItemPurchase> extractFromEvents(
+    List<NormalizedMatchParticipantItemEvent> extractFromEvents(
             List<ParticipantItemEvent> events, String patch, Map<Integer, ItemPurchaseType> purchaseTypes,
             Map<Integer, String> positionsByParticipant
     ) {
@@ -37,7 +37,7 @@ public class ParticipantItemPurchaseExtractor {
         if (events == null || positionsByParticipant == null) {
             throw new IllegalArgumentException("참가자별 전체 아이템 이벤트와 포지션이 필요합니다.");
         }
-        List<ParticipantItemPurchase> purchases = new ArrayList<>();
+        List<NormalizedMatchParticipantItemEvent> purchases = new ArrayList<>();
         for (ParticipantItemEvent event : events) {
             if (!"ITEM_PURCHASED".equals(event.eventType())) {
                 continue;
@@ -50,7 +50,7 @@ public class ParticipantItemPurchaseExtractor {
                 throw new IllegalArgumentException("구매 참가자의 포지션 정보가 없습니다. 참가자 ID: "
                         + event.participantId());
             }
-            purchases.add(new ParticipantItemPurchase(event, type, patch,
+            purchases.add(new NormalizedMatchParticipantItemEvent(event, type, patch,
                     positionsByParticipant.get(event.participantId())));
         }
         return List.copyOf(purchases);

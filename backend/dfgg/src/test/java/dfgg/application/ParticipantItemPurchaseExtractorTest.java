@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.match.ParticipantItemEventExtractor;
 import dfgg.application.match.ParticipantItemPurchaseExtractor;
 import dfgg.domain.match.ItemPurchaseType;
-import dfgg.domain.match.ParticipantItemPurchase;
+import dfgg.domain.match.NormalizedMatchParticipantItemEvent;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -19,14 +19,14 @@ class ParticipantItemPurchaseExtractorTest {
     @Test
     void 모든_구매를_분류와_원천_구매_순번대로_추출한다() {
         var result = extractor.extract("KR_TEST", timeline(), "16.18", types(), positions());
-        assertThat(result).extracting(ParticipantItemPurchase::getItemId)
+        assertThat(result).extracting(NormalizedMatchParticipantItemEvent::getItemId)
                 .containsExactly(1036, 1036, 2003, 3340, 3071, 1001);
-        assertThat(result).extracting(ParticipantItemPurchase::getPurchaseOrder)
+        assertThat(result).extracting(NormalizedMatchParticipantItemEvent::getPurchaseOrder)
                 .containsExactly(1, 2, 3, 4, 5, 1);
-        assertThat(result).extracting(ParticipantItemPurchase::getPurchaseType).containsExactly(
+        assertThat(result).extracting(NormalizedMatchParticipantItemEvent::getPurchaseType).containsExactly(
                 ItemPurchaseType.COMPONENT, ItemPurchaseType.COMPONENT, ItemPurchaseType.CONSUMABLE,
                 ItemPurchaseType.OTHER, ItemPurchaseType.CORE, ItemPurchaseType.BOOTS);
-        assertThat(result).extracting(ParticipantItemPurchase::getPosition)
+        assertThat(result).extracting(NormalizedMatchParticipantItemEvent::getPosition)
                 .containsExactly("TOP", "TOP", "TOP", "TOP", "TOP", "JUNGLE");
         assertThat(result).allSatisfy(purchase -> {
             assertThat(purchase.getPatch()).isEqualTo("16.18");

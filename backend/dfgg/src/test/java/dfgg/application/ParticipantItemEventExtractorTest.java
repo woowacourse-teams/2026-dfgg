@@ -47,7 +47,7 @@ class ParticipantItemEventExtractorTest {
     }
 
     @Test
-    void 시간순으로_정렬하되_동일_시각은_프레임과_이벤트_위치를_유지한다() {
+    void 시각이_역전되어도_원본_프레임과_이벤트_순서를_유지한다() {
         var result = extractor.extract("KR_TEST", """
                 {"info":{"frames":[
                     {"events":[
@@ -62,9 +62,9 @@ class ParticipantItemEventExtractorTest {
                 ]}}
                 """);
 
-        assertThat(result).extracting(ParticipantItemEvent::itemId).containsExactly(1055, 1036, 1036, 3071, 1037);
-        assertThat(result).extracting(ParticipantItemEvent::purchaseOrder).containsExactly(1, 2, null, 3, 4);
-        assertThat(result).extracting(ParticipantItemEvent::sourceFrameIndex).containsExactly(1, 0, 0, 1, 1);
+        assertThat(result).extracting(ParticipantItemEvent::itemId).containsExactly(1036, 1036, 1055, 3071, 1037);
+        assertThat(result).extracting(ParticipantItemEvent::purchaseOrder).containsExactly(1, null, 2, 3, 4);
+        assertThat(result).extracting(ParticipantItemEvent::sourceFrameIndex).containsExactly(0, 0, 1, 1, 1);
         // 같은 시각의 조합 파괴와 독립 구매를 합치거나 제거하지 않는다.
         assertThat(result).hasSize(5);
     }
@@ -82,7 +82,7 @@ class ParticipantItemEventExtractorTest {
         assertThat(result.stream().filter(event -> event.participantId() == 1))
                 .extracting(ParticipantItemEvent::gameTimeMs).containsExactly(200L, null, 100L);
         assertThat(result.stream().filter(event -> event.participantId() == 2))
-                .extracting(ParticipantItemEvent::gameTimeMs).containsExactly(100L, 200L);
+                .extracting(ParticipantItemEvent::gameTimeMs).containsExactly(200L, 100L);
     }
 
     @Test

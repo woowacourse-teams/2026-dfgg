@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.domain.match.ParticipantItemEvent;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -26,8 +25,8 @@ public class ParticipantItemEventExtractor {
     }
 
     /**
-     * 참가자 ID, eventOrder 순으로 반환한다. 시간 누락이 있는 참가자는 전체 원본 순서를
-     * 보존한다. 이 경우 시간순 복원을 보장하지 않으며 누락된 시각을 추정하지 않는다.
+     * 참가자 ID, 원본 frame/event 순으로 반환한다. 시간 누락과 무관하게 Timeline 순서를 보존하며
+     * 누락된 시각은 추정하지 않는다.
      */
     public List<ParticipantItemEvent> extract(String matchId, String rawTimeline) {
         if (matchId == null || matchId.isBlank() || matchId.length() > 32) {
@@ -74,11 +73,6 @@ public class ParticipantItemEventExtractor {
         }
         List<ParticipantItemEvent> result = new ArrayList<>();
         for (List<IndexedItemEvent> events : eventsByParticipant.values()) {
-            if (events.stream().allMatch(event -> event.gameTimeMs() != null)) {
-                events.sort(Comparator.comparing(IndexedItemEvent::gameTimeMs)
-                        .thenComparingInt(IndexedItemEvent::frameIndex)
-                        .thenComparingInt(IndexedItemEvent::eventIndex));
-            }
             int eventOrder = 0;
             int purchaseOrder = 0;
             for (IndexedItemEvent event : events) {

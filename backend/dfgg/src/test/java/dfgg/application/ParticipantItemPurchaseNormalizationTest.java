@@ -11,8 +11,8 @@ import dfgg.application.match.PurchaseGoldRangeCalculator;
 import dfgg.application.match.PurchaseMaterialLinker;
 import dfgg.domain.match.ItemPurchaseType;
 import dfgg.domain.match.GoldRangeStatus;
-import dfgg.domain.match.ParticipantItemPurchase;
-import dfgg.domain.match.ParticipantItemPurchaseRepository;
+import dfgg.domain.match.NormalizedMatchParticipantItemEvent;
+import dfgg.domain.match.NormalizedMatchParticipantItemEventRepository;
 import dfgg.domain.match.RawMatchTimeline;
 import dfgg.domain.match.RawMatchTimelineRepository;
 import dfgg.infrastructure.external.dto.ItemData;
@@ -34,7 +34,7 @@ import org.springframework.test.context.ActiveProfiles;
 class ParticipantItemPurchaseNormalizationTest {
 
     @Autowired private RawMatchTimelineRepository timelineRepository;
-    @Autowired private ParticipantItemPurchaseRepository purchaseRepository;
+    @Autowired private NormalizedMatchParticipantItemEventRepository purchaseRepository;
     @Autowired private ParticipantItemPurchaseNormalizationService service;
     @Autowired private EntityManager entityManager;
 
@@ -48,18 +48,30 @@ class ParticipantItemPurchaseNormalizationTest {
                 catalog(), ParticipantItemPurchaseExtractorTest.positions())).isEqualTo(6);
         entityManager.clear();
         var saved = purchaseRepository.findByMatchIdOrderByParticipantIdAscPurchaseOrderAsc("KR_TEST");
-        assertThat(saved).extracting(ParticipantItemPurchase::getPurchaseType).containsExactly(
+        assertThat(saved).extracting(NormalizedMatchParticipantItemEvent::getPurchaseType).containsExactly(
                 ItemPurchaseType.COMPONENT, ItemPurchaseType.COMPONENT, ItemPurchaseType.CONSUMABLE,
                 ItemPurchaseType.OTHER, ItemPurchaseType.CORE, ItemPurchaseType.BOOTS);
-        assertThat(saved).extracting(ParticipantItemPurchase::getPurchaseOrder).containsExactly(1, 2, 3, 4, 5, 1);
-        assertThat(saved).extracting(ParticipantItemPurchase::getPosition)
+        assertThat(saved).extracting(NormalizedMatchParticipantItemEvent::getPurchaseOrder).containsExactly(1, 2, 3, 4, 5, 1);
+        assertThat(saved).extracting(NormalizedMatchParticipantItemEvent::getPosition)
                 .containsExactly("TOP", "TOP", "TOP", "TOP", "TOP", "JUNGLE");
-        assertThat(saved).extracting(ParticipantItemPurchase::getItemCost)
+        assertThat(saved).extracting(NormalizedMatchParticipantItemEvent::getItemCost)
                 .containsExactly(350, 350, null, null, 850, null);
         assertThat(saved).allSatisfy(purchase -> {
             assertThat(purchase.getGoldLower()).isNull();
             assertThat(purchase.getGoldUpper()).isNull();
             assertThat(purchase.getGoldRangeStatus()).isNull();
+        });
+        var events = purchaseRepository.findByMatchIdOrderByParticipantIdAscEventOrderAsc("KR_TEST");
+        var source = new ParticipantItemEventExtractor(new com.fasterxml.jackson.databind.ObjectMapper())
+                .extract("KR_TEST", raw);
+        assertThat(events).hasSize(source.size());
+        assertThat(events).extracting(NormalizedMatchParticipantItemEvent::toParticipantItemEvent)
+                .extracting(event -> event.eventType()).containsExactlyElementsOf(
+                        source.stream().map(event -> event.eventType()).toList());
+        assertThat(events.stream().filter(event -> !event.isPurchase())).allSatisfy(event -> {
+            assertThat(event.getPurchaseOrder()).isNull();
+            assertThat(event.getPurchaseType()).isNull();
+            assertThat(event.getGoldLower()).isNull();
         });
         assertThat(timelineRepository.findById("KR_TEST").orElseThrow().getRawData()).isEqualTo(raw);
     }
@@ -72,7 +84,7 @@ class ParticipantItemPurchaseNormalizationTest {
                 Map.of(1, "TOP"));
 
         entityManager.clear();
-        ParticipantItemPurchase saved = purchaseRepository
+        NormalizedMatchParticipantItemEvent saved = purchaseRepository
                 .findByMatchIdOrderByParticipantIdAscPurchaseOrderAsc("KR_TEST").getFirst();
         assertThat(saved.getGoldLower()).isEqualTo(500);
         assertThat(saved.getGoldUpper()).isEqualTo(1_000);
@@ -87,7 +99,7 @@ class ParticipantItemPurchaseNormalizationTest {
                 Map.of(1, "TOP"));
 
         entityManager.clear();
-        ParticipantItemPurchase saved = purchaseRepository
+        NormalizedMatchParticipantItemEvent saved = purchaseRepository
                 .findByMatchIdOrderByParticipantIdAscPurchaseOrderAsc("KR_TEST").getFirst();
         assertThat(saved.getGoldLower()).isEqualTo(500);
         assertThat(saved.getGoldUpper()).isEqualTo(1_250);
@@ -121,7 +133,7 @@ class ParticipantItemPurchaseNormalizationTest {
 
         entityManager.clear();
         var saved = purchaseRepository.findByMatchIdOrderByParticipantIdAscPurchaseOrderAsc("KR_TEST");
-        assertThat(saved).hasSize(6).extracting(ParticipantItemPurchase::getItemCost).containsOnlyNulls();
+        assertThat(saved).hasSize(6).extracting(NormalizedMatchParticipantItemEvent::getItemCost).containsOnlyNulls();
     }
 
     private ItemResponse catalog() {

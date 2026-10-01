@@ -7,8 +7,8 @@ import static org.mockito.Mockito.when;
 
 import dfgg.domain.match.GoldRangeStatus;
 import dfgg.domain.match.ItemPurchaseType;
-import dfgg.domain.match.ParticipantItemPurchase;
-import dfgg.domain.match.ParticipantItemPurchaseRepository;
+import dfgg.domain.match.NormalizedMatchParticipantItemEvent;
+import dfgg.domain.match.NormalizedMatchParticipantItemEventRepository;
 import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.domain.match.RawMatchTimeline;
@@ -44,7 +44,7 @@ class StoredParticipantItemPurchaseNormalizationApiTest {
     private RawMatchTimelineRepository timelineRepository;
 
     @Autowired
-    private ParticipantItemPurchaseRepository purchaseRepository;
+    private NormalizedMatchParticipantItemEventRepository purchaseRepository;
 
     @MockitoBean
     private DataDragonClient dataDragonClient;
@@ -78,10 +78,10 @@ class StoredParticipantItemPurchaseNormalizationApiTest {
             assertThat(response.jsonPath().getInt("savedPurchases")).isEqualTo(1);
         }
 
-        List<ParticipantItemPurchase> purchases =
+        List<NormalizedMatchParticipantItemEvent> purchases =
                 purchaseRepository.findByMatchIdOrderByParticipantIdAscPurchaseOrderAsc(MATCH_ID);
         assertThat(purchases).hasSize(1);
-        ParticipantItemPurchase purchase = purchases.getFirst();
+        NormalizedMatchParticipantItemEvent purchase = purchases.getFirst();
         assertThat(purchase.getItemId()).isEqualTo(1036);
         assertThat(purchase.getPosition()).isEqualTo("MIDDLE");
         assertThat(purchase.getPurchaseType()).isEqualTo(ItemPurchaseType.COMPONENT);

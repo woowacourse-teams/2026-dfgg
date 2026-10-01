@@ -4,8 +4,8 @@ import dfgg.domain.match.GoldRangeRefinement;
 import dfgg.domain.match.GoldRangeStatus;
 import dfgg.domain.match.ItemPurchaseType;
 import dfgg.domain.match.ParticipantItemEvent;
-import dfgg.domain.match.ParticipantItemPurchase;
-import dfgg.domain.match.ParticipantItemPurchaseRepository;
+import dfgg.domain.match.NormalizedMatchParticipantItemEvent;
+import dfgg.domain.match.NormalizedMatchParticipantItemEventRepository;
 import dfgg.domain.match.RawMatchTimelineRepository;
 import dfgg.infrastructure.external.dto.ItemData;
 import dfgg.infrastructure.external.dto.ItemResponse;
@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ParticipantItemPurchaseNormalizationService {
 
     private final RawMatchTimelineRepository timelineRepository;
-    private final ParticipantItemPurchaseRepository purchaseRepository;
+    private final NormalizedMatchParticipantItemEventRepository eventRepository;
     private final ParticipantItemEventExtractor eventExtractor;
     private final ParticipantItemPurchaseExtractor extractor;
     private final PurchaseMaterialLinker materialLinker;
@@ -32,7 +32,7 @@ public class ParticipantItemPurchaseNormalizationService {
 
     public ParticipantItemPurchaseNormalizationService(
             RawMatchTimelineRepository timelineRepository,
-            ParticipantItemPurchaseRepository purchaseRepository,
+            NormalizedMatchParticipantItemEventRepository eventRepository,
             ParticipantItemEventExtractor eventExtractor,
             ParticipantItemPurchaseExtractor extractor,
             PurchaseMaterialLinker materialLinker,
@@ -40,7 +40,7 @@ public class ParticipantItemPurchaseNormalizationService {
             PurchaseGoldRangeCalculator goldRangeCalculator
     ) {
         this.timelineRepository = timelineRepository;
-        this.purchaseRepository = purchaseRepository;
+        this.eventRepository = eventRepository;
         this.eventExtractor = eventExtractor;
         this.extractor = extractor;
         this.materialLinker = materialLinker;
@@ -60,15 +60,29 @@ public class ParticipantItemPurchaseNormalizationService {
         var timeline = timelineRepository.findForPurchaseNormalization(matchId)
                 .orElseThrow(() -> new IllegalArgumentException("저장된 Raw Timeline이 없습니다. 경기 ID: " + matchId));
         List<ParticipantItemEvent> events = eventExtractor.extract(matchId, timeline.getRawData());
-        List<ParticipantItemPurchase> purchases = extractor.extractFromEvents(events, patch, purchaseTypes,
+        List<NormalizedMatchParticipantItemEvent> purchases = extractor.extractFromEvents(events, patch, purchaseTypes,
                 positionsByParticipant);
         Map<Integer, List<ParticipantItemEvent>> eventsByParticipant = groupByParticipant(events);
         recordCosts(purchases, eventsByParticipant, catalog.data());
         recordGoldRanges(purchases, eventsByParticipant,
                 goldRangeCalculator.refineWithTotalGold(matchId, timeline.getRawData(), events, catalog));
-        // 검증을 끝낸 뒤 구매만 교체한다. 실패 시 기존 구매도 트랜잭션으로 복구된다.
-        purchaseRepository.deletePurchasesByMatchId(matchId);
-        purchaseRepository.saveAllAndFlush(purchases);
+        Map<EventSource, NormalizedMatchParticipantItemEvent> purchasesBySource = new HashMap<>();
+        for (NormalizedMatchParticipantItemEvent purchase : purchases) {
+            ParticipantItemEvent source = sourceEvent(purchase, eventsByParticipant.get(purchase.getParticipantId()));
+            purchasesBySource.put(new EventSource(source.participantId(), source.eventOrder()), purchase);
+        }
+        List<NormalizedMatchParticipantItemEvent> normalizedEvents = new ArrayList<>(events.size());
+        for (ParticipantItemEvent event : events) {
+            NormalizedMatchParticipantItemEvent purchase = purchasesBySource.get(
+                    new EventSource(event.participantId(), event.eventOrder()));
+            normalizedEvents.add(purchase == null
+                    ? NormalizedMatchParticipantItemEvent.nonPurchase(event, patch,
+                            positionsByParticipant.get(event.participantId()))
+                    : purchase);
+        }
+        // 구매의 계산 결과와 전체 상태 변경 이벤트를 같은 테이블에 원자적으로 교체한다.
+        eventRepository.deleteEventsByMatchId(matchId);
+        eventRepository.saveAllAndFlush(normalizedEvents);
         return purchases.size();
     }
 
@@ -83,10 +97,10 @@ public class ParticipantItemPurchaseNormalizationService {
     }
 
     /** 참가자별 원천 이벤트를 모아 각 구매의 제거 재료와 추가 지출액을 연결한다. */
-    private void recordCosts(List<ParticipantItemPurchase> purchases,
+    private void recordCosts(List<NormalizedMatchParticipantItemEvent> purchases,
                              Map<Integer, List<ParticipantItemEvent>> eventsByParticipant,
                              Map<String, ItemData> catalog) {
-        for (ParticipantItemPurchase purchase : purchases) {
+        for (NormalizedMatchParticipantItemEvent purchase : purchases) {
             List<ParticipantItemEvent> participantEvents = eventsByParticipant.get(purchase.getParticipantId());
             ParticipantItemEvent source = sourceEvent(purchase, participantEvents);
             Optional<List<Integer>> materials = materialLinker.link(source, participantEvents);
@@ -101,10 +115,10 @@ public class ParticipantItemPurchaseNormalizationService {
     }
 
     /** totalGold와 거래 흐름이 양립하면 보정 범위를, 아니면 기본 범위를 계산 근거와 함께 기록한다. */
-    private void recordGoldRanges(List<ParticipantItemPurchase> purchases,
+    private void recordGoldRanges(List<NormalizedMatchParticipantItemEvent> purchases,
                                   Map<Integer, List<ParticipantItemEvent>> eventsByParticipant,
                                   Map<ParticipantItemEvent, GoldRangeRefinement> refinements) {
-        for (ParticipantItemPurchase purchase : purchases) {
+        for (NormalizedMatchParticipantItemEvent purchase : purchases) {
             ParticipantItemEvent source = sourceEvent(purchase,
                     eventsByParticipant.get(purchase.getParticipantId()));
             GoldRangeRefinement refinement = refinements.get(source);
@@ -130,18 +144,21 @@ public class ParticipantItemPurchaseNormalizationService {
     }
 
     /** 저장 대상 구매의 원천 purchaseOrder를 이용해 같은 이벤트를 다시 찾는다. */
-    private ParticipantItemEvent sourceEvent(ParticipantItemPurchase purchase,
+    private ParticipantItemEvent sourceEvent(NormalizedMatchParticipantItemEvent purchase,
                                              List<ParticipantItemEvent> participantEvents) {
         if (participantEvents == null) {
             throw new IllegalStateException("구매 참가자의 원천 아이템 이벤트가 없습니다.");
         }
         for (ParticipantItemEvent event : participantEvents) {
             if ("ITEM_PURCHASED".equals(event.eventType()) && event.purchaseOrder() != null
-                    && event.purchaseOrder() == purchase.getPurchaseOrder()
-                    && event.itemId() != null && event.itemId() == purchase.getItemId()) {
+                    && event.purchaseOrder().equals(purchase.getPurchaseOrder())
+                    && event.itemId() != null && event.itemId().equals(purchase.getItemId())) {
                 return event;
             }
         }
         throw new IllegalStateException("저장 대상 구매의 원천 아이템 이벤트를 찾을 수 없습니다.");
+    }
+
+    private record EventSource(int participantId, int eventOrder) {
     }
 }
