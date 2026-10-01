@@ -35,3 +35,5 @@ out/
 *.war
 !gradle/wrapper/gradle-wrapper.jar
 release/
+
+umami-to-posthog/

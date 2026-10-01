@@ -24,6 +24,7 @@ export default tseslint.config(
   {
     files: [
       'apps/web/src/**/*.{ts,tsx}',
+      'apps/admin/src/**/*.{ts,tsx}',
       // 렌더러 코드와 웹·앱 공용 코드는 브라우저에서 돈다.
       'apps/desktop/src/renderer/**/*.{ts,tsx}',
       'packages/**/*.{ts,tsx}',
@@ -50,6 +51,12 @@ export default tseslint.config(
   {
     files: ['apps/desktop/src/main/**/*.ts'],
     languageOptions: { globals: globals.node },
+  },
+  {
+    // 관리자 페이지의 로컬 API(dev server 미들웨어)는 Node CommonJS 다.
+    files: ['apps/admin/server/**/*.js'],
+    languageOptions: { globals: globals.node, sourceType: 'commonjs' },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
 
   prettier,
