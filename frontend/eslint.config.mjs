@@ -54,7 +54,7 @@ export default tseslint.config(
   },
   {
     // 관리자 페이지의 로컬 API(dev server 미들웨어)는 Node CommonJS 다.
-    files: ['apps/admin/server/**/*.js'],
+    files: ['apps/admin/server/**/*.js', 'apps/admin/scripts/**/*.js'],
     languageOptions: { globals: globals.node, sourceType: 'commonjs' },
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
