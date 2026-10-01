@@ -1,0 +1,113 @@
+/* ---------- 랭크 ---------- */
+.ranks {
+  margin-bottom: 20px;
+}
+
+.ranks-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ranks-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.ranks-peak {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.rank-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rank-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: center;
+  overflow: hidden;
+}
+
+.rank-emblem {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  /* 어두운 배경에서 엠블럼이 묻히지 않게 살짝 띄운다 */
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
+}
+
+/* width 를 박아야 글자가 길 때 말줄임이 걸린다. align-items: center 만으로는 칸이 늘어난다. */
+.rank-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+}
+
+.rank-queue {
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+}
+
+/* 티어 이름이 길어도(Grandmaster 등) 칸을 밀지 않고 말줄임으로 접는다 */
+.rank-tier {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* LP 는 티어와 붙여 쓰되 무게를 낮춰 구분한다 */
+.rank-lp {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.rank-record {
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-unranked {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.rank-series {
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--warn);
+  color: #0d1017;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+}

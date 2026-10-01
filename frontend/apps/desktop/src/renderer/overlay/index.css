@@ -1,0 +1,9 @@
+body {
+  margin: 0;
+  background: rgba(0, 0, 0, 0.5); /* 창을 반투명하게 설정 (완전 투명은 0) */
+  color: white;
+  font-family: sans-serif;
+  height: 100vh;
+  border-radius: 10px; /* 투명 창에 둥근 모서리 적용 가능 */
+  overflow: hidden;
+}
