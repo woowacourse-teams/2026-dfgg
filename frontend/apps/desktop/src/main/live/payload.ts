@@ -12,6 +12,7 @@ export interface RecommendationBody {
   enemies: ChampionEntry[];
   tier: string;
   patch: string;
+  riotId: string;
 }
 
 interface BuildParams {
@@ -114,5 +115,6 @@ export function buildRecommendationBody({
     enemies: enemies.map((player) => toEntry(player, championNames)),
     tier: 'PLATINUM',
     patch: toPatchVersion(patch),
+    riotId: myRiotId,
   };
 }
