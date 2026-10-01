@@ -16,8 +16,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class PurchaseInventoryReconstructor {
 
-    private static final Set<Integer> ROLE_MARKERS = Set.of(1200, 1201, 1202, 1203, 1204,
-            1205, 1206, 1207, 1208, 2001, 2002);
     private static final Set<Integer> INSTANT_ELIXIRS = Set.of(2138, 2139, 2140);
     private static final Map<Integer, Integer> TRANSFORMS = Map.of(
             3004, 3042, 3003, 3040, 3865, 3866, 3866, 3867, 2420, 2421);
@@ -30,7 +28,7 @@ public class PurchaseInventoryReconstructor {
         if (itemId == null || itemId <= 0) {
             return Optional.empty();
         }
-        if (enabled && ROLE_MARKERS.contains(itemId)) {
+        if (enabled && ItemInventory.isNonInventoryMarker(itemId)) {
             return Optional.of(inventory);
         }
         // 제거 이벤트 자체가 직전 보유의 근거다. 이전 구매 시점으로 소급하지 않는다.
@@ -68,7 +66,7 @@ public class PurchaseInventoryReconstructor {
 
     private boolean isMaterial(ParticipantItemEvent purchase, Integer itemId,
             boolean enabled, boolean midQuestCompleted) {
-        return !enabled || !ROLE_MARKERS.contains(itemId)
+        return !enabled || !ItemInventory.isNonInventoryMarker(itemId)
                 && !(itemId.equals(purchase.itemId()) && (INSTANT_ELIXIRS.contains(itemId)
                 || midQuestCompleted && MID_BOOTS.containsKey(itemId)));
     }

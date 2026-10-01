@@ -15,12 +15,26 @@ public record PurchaseCatalogItem(
         int totalPrice,
         boolean purchasable,
         List<Integer> ingredients,
-        List<Integer> upgrades
+        List<Integer> upgrades,
+        int stackSize,
+        boolean usesInventorySlot
 ) {
+
+    public PurchaseCatalogItem(int id, int totalPrice, boolean purchasable,
+                               List<Integer> ingredients, List<Integer> upgrades) {
+        this(id, totalPrice, purchasable, ingredients, upgrades, 1, true);
+    }
+
+    public int slotsFor(int quantity) {
+        if (quantity < 0) {
+            throw new IllegalArgumentException("보유 수량은 음수일 수 없습니다.");
+        }
+        return usesInventorySlot ? Math.toIntExact((quantity + (long) stackSize - 1) / stackSize) : 0;
+    }
 
     /** 유효한 ID·가격·조합 관계만 보관하고 전달받은 목록을 복사한다. */
     public PurchaseCatalogItem {
-        if (id <= 0 || totalPrice < 0 || ingredients == null || upgrades == null) {
+        if (id <= 0 || totalPrice < 0 || ingredients == null || upgrades == null || stackSize < 1) {
             throw new IllegalArgumentException("아이템 ID, 가격, 조합 관계가 유효해야 합니다.");
         }
         if (ingredients.stream().anyMatch(value -> value == null || value <= 0)

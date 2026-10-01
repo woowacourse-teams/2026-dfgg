@@ -9,6 +9,17 @@ import java.util.Optional;
  */
 public interface PurchaseItemCatalog {
 
+    /** 일반 인벤토리 슬롯 수. 중첩 수량과 별도 장신구 슬롯은 카탈로그 정의에 따른다. */
+    default long occupiedSlots(ItemInventory inventory) {
+        long slots = 0;
+        for (var held : inventory.quantities().entrySet()) {
+            PurchaseCatalogItem item = find(held.getKey())
+                    .orElseThrow(() -> new IllegalStateException("보유 아이템의 슬롯 정보를 알 수 없습니다."));
+            slots += item.slotsFor(held.getValue());
+        }
+        return slots;
+    }
+
     /** 아이템이 없거나 계산에 필요한 카탈로그 필드가 잘못됐으면 빈 결과를 돌려준다. */
     Optional<PurchaseCatalogItem> find(int itemId);
 }

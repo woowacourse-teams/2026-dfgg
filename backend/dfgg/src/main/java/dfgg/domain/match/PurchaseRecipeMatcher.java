@@ -1,6 +1,8 @@
 package dfgg.domain.match;
 
 import java.util.HashSet;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
 
@@ -25,15 +27,31 @@ public class PurchaseRecipeMatcher {
     public boolean matches(PurchaseCatalogItem purchased, PurchaseMaterials materials) {
         RemainingPurchaseMaterials remaining = materials.remaining();
         try {
-            consumeIngredients(purchased, Set.of(purchased.id()), remaining);
+            consumeIngredients(purchased, Set.of(purchased.id()), remaining, null);
         } catch (IllegalStateException exception) {
             return false;
         }
         return remaining.allConsumed();
     }
 
+    /** 현재 보유품에서 구매에 실제 사용할 재료를 한 번씩 선택한다. */
+    public PurchaseMaterials materialsFor(PurchaseCatalogItem purchased, ItemInventory inventory) {
+        RemainingPurchaseMaterials remaining = new RemainingPurchaseMaterials(inventory);
+        consumeIngredients(purchased, Set.of(purchased.id()), remaining, null);
+        return remaining.consumedMaterials();
+    }
+
+    /** 이미 보유한 조합 위치는 닫고, 아직 필요한 상위·하위 아이템을 반환한다. */
+    public List<PurchaseCatalogItem> remainingPath(PurchaseCatalogItem target, ItemInventory inventory) {
+        RemainingPurchaseMaterials remaining = new RemainingPurchaseMaterials(inventory);
+        List<PurchaseCatalogItem> missing = new ArrayList<>();
+        consume(target.id(), 0, Set.of(), remaining, missing);
+        return List.copyOf(missing);
+    }
+
     /** 기대 재료 하나에 직접 ID, 동등한 변형 ID, 하위 레시피 순으로 관측 이벤트를 대응시킨다. */
-    private void consume(int expectedId, int parentId, Set<Integer> path, RemainingPurchaseMaterials remaining) {
+    private void consume(int expectedId, int parentId, Set<Integer> path, RemainingPurchaseMaterials remaining,
+                         List<PurchaseCatalogItem> missing) {
         if (expectedId <= 0 || path.contains(expectedId)) {
             throw new IllegalStateException("조합식의 ID 또는 순환이 잘못되었습니다.");
         }
@@ -47,7 +65,10 @@ public class PurchaseRecipeMatcher {
         }
         PurchaseCatalogItem expected = catalog.find(expectedId)
                 .orElseThrow(() -> new IllegalStateException("조합 재료가 카탈로그에 없습니다."));
-        consumeIngredients(expected, extended(path, expectedId), remaining);
+        if (missing != null) {
+            missing.add(expected);
+        }
+        consumeIngredients(expected, extended(path, expectedId), remaining, missing);
     }
 
     /** 남은 제거 이벤트에서 같은 조합 위치의 동등한 재료가 정확히 하나일 때만 선택한다. */
@@ -71,9 +92,10 @@ public class PurchaseRecipeMatcher {
     }
 
     /** 현재 아이템의 from 목록을 따라 각 조합 위치를 재귀적으로 탐색한다. */
-    private void consumeIngredients(PurchaseCatalogItem parent, Set<Integer> path, RemainingPurchaseMaterials remaining) {
+    private void consumeIngredients(PurchaseCatalogItem parent, Set<Integer> path, RemainingPurchaseMaterials remaining,
+                                    List<PurchaseCatalogItem> missing) {
         for (int childId : parent.ingredients()) {
-            consume(childId, parent.id(), path, remaining);
+            consume(childId, parent.id(), path, remaining, missing);
         }
     }
 

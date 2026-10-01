@@ -16,8 +16,15 @@ public record ItemData(
         Gold gold,
         Image image,
         Boolean inStore,
-        Boolean hideFromAll
+        Boolean hideFromAll,
+        Integer stacks
 ) {
+
+    public ItemData(String name, List<String> from, List<String> into, List<String> tags,
+                    Map<String, Boolean> maps, Boolean consumed, Integer depth, Gold gold,
+                    Image image, Boolean inStore, Boolean hideFromAll) {
+        this(name, from, into, tags, maps, consumed, depth, gold, image, inStore, hideFromAll, null);
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Gold(Integer base, Integer total, Boolean purchasable) {

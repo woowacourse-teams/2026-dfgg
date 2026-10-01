@@ -37,7 +37,11 @@ public class DataDragonPurchaseItemCatalog implements PurchaseItemCatalog {
                     data.gold().total(),
                     Boolean.TRUE.equals(data.gold().purchasable()),
                     parseIds(data.from()),
-                    parseIds(data.into())
+                    parseIds(data.into()),
+                    // 카탈로그의 stacks=0 또는 생략은 일반 단일 아이템으로 처리한다.
+                    data.stacks() == null || data.stacks() == 0 ? 1 : data.stacks(),
+                    !(data.tags() != null && data.tags().contains("Trinket"))
+                            && !dfgg.domain.match.ItemInventory.isNonInventoryMarker(itemId)
             );
             return Optional.of(item);
         } catch (IllegalArgumentException exception) {

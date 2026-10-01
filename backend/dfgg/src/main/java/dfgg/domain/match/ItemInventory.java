@@ -11,6 +11,13 @@ import java.util.Optional;
  */
 public final class ItemInventory {
 
+    private static final java.util.Set<Integer> NON_INVENTORY_MARKERS = java.util.Set.of(
+            1200, 1201, 1202, 1203, 1204, 1205, 1206, 1207, 1208, 2001, 2002);
+
+    public static boolean isNonInventoryMarker(int itemId) {
+        return NON_INVENTORY_MARKERS.contains(itemId);
+    }
+
     private final Map<Integer, Integer> quantities;
 
     private ItemInventory(Map<Integer, Integer> quantities) {
