@@ -1,6 +1,6 @@
 package dfgg.presentation;
 
-import dfgg.application.champion.ChampionService;
+import dfgg.application.ChampionSyncService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -10,15 +10,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/admin")
 public class ChampionController {
 
-    private final ChampionService championService;
+    private final ChampionSyncService championSyncService;
 
-    public ChampionController(ChampionService championService) {
-        this.championService = championService;
+    public ChampionController(ChampionSyncService championSyncService) {
+        this.championSyncService = championSyncService;
     }
 
     @PostMapping("/champions")
     public ResponseEntity<Void> getChampions() {
-        championService.syncChampions();
+        championSyncService.syncChampions();
         return ResponseEntity.noContent().build();
     }
 }

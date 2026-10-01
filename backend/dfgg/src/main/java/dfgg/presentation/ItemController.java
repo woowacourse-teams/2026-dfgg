@@ -1,6 +1,6 @@
 package dfgg.presentation;
 
-import dfgg.application.item.ItemService;
+import dfgg.application.ItemSyncService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -9,15 +9,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/admin")
 public class ItemController {
-    private final ItemService itemService;
+    private final ItemSyncService itemSyncService;
 
-    public ItemController(ItemService itemService) {
-        this.itemService = itemService;
+    public ItemController(ItemSyncService itemSyncService) {
+        this.itemSyncService = itemSyncService;
     }
 
     @PostMapping("/items")
     public ResponseEntity<Void> getItems() {
-        itemService.syncItems();
+        itemSyncService.syncCoreItem();
         return ResponseEntity.noContent().build();
     }
 }

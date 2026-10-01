@@ -7,7 +7,6 @@ import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.champion.ChampionTag;
 import jakarta.persistence.EntityManager;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -31,7 +30,7 @@ class ChampionRepositoryTest {
         Champion champion = new Champion(
                 266L,
                 "Aatrox",
-                Map.of("ko-KR", "아트록스"),
+                "아트록스",
                 List.of(ChampionTag.FIGHTER, ChampionTag.TANK)
         );
 
@@ -43,7 +42,7 @@ class ChampionRepositoryTest {
         // then
         Champion saved = championRepository.findById(266L).orElseThrow();
         assertThat(saved.getRiotKey()).isEqualTo("Aatrox");
-        assertThat(saved.getName()).isEqualTo(Map.of("ko-KR", "아트록스"));
+        assertThat(saved.getName()).isEqualTo("아트록스");
         assertThat(saved.getChampionTags())
                 .containsExactlyInAnyOrder(ChampionTag.FIGHTER, ChampionTag.TANK);
     }
@@ -54,7 +53,7 @@ class ChampionRepositoryTest {
         championRepository.save(new Champion(
                 266L,
                 "Aatrox",
-                Map.of("ko-KR", "이전 이름"),
+                "이전 이름",
                 List.of(ChampionTag.FIGHTER)
         ));
         entityManager.flush();
@@ -64,7 +63,7 @@ class ChampionRepositoryTest {
         championRepository.saveAll(List.of(new Champion(
                 266L,
                 "Aatrox",
-                Map.of("ko-KR", "아트록스"),
+                "아트록스",
                 List.of(ChampionTag.FIGHTER, ChampionTag.TANK)
         )));
         entityManager.flush();
@@ -74,30 +73,8 @@ class ChampionRepositoryTest {
         assertThat(championRepository.count()).isEqualTo(1);
 
         Champion updated = championRepository.findById(266L).orElseThrow();
-        assertThat(updated.getName()).isEqualTo(Map.of("ko-KR", "아트록스"));
+        assertThat(updated.getName()).isEqualTo("아트록스");
         assertThat(updated.getChampionTags())
                 .containsExactlyInAnyOrder(ChampionTag.FIGHTER, ChampionTag.TANK);
     }
-    @Test
-    void 다국어_이름을_JSONB로_저장하고_언어별_이름으로_검색한다() {
-        Map<String, String> names = Map.of("ko-KR", "아리", "en-US", "Ahri");
-        championRepository.save(new Champion(
-                103L, "Ahri", names, List.of(ChampionTag.MAGE)
-        ));
-        entityManager.flush();
-        entityManager.clear();
-
-        Champion saved = championRepository.findById(103L).orElseThrow();
-        assertThat(saved.getName()).isEqualTo(names);
-        assertThat(entityManager.createNativeQuery(
-                "SELECT jsonb_typeof(name) FROM champions WHERE champion_id = 103",
-                String.class
-        ).getSingleResult()).isEqualTo("object");
-        assertThat(championRepository.findByNameIgnoreCase("아리"))
-                .map(Champion::getChampionId).contains(103L);
-        assertThat(championRepository.findByNameIgnoreCase("aHrI"))
-                .map(Champion::getChampionId).contains(103L);
-        assertThat(championRepository.findByNameIgnoreCase("없는 이름")).isEmpty();
-    }
-
 }

@@ -14,9 +14,6 @@ public record MatchParticipant(
         Integer item3,
         Integer item4,
         Integer item5,
-        Boolean win,
-        Integer participantId,
-        Integer roleBoundItem
+        Boolean win
 ) {
-
 }

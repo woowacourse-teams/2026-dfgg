@@ -4,14 +4,12 @@ import dfgg.domain.item.Item;
 
 public record ItemDto(
         Long id,
-        String name,
-        String imageUrl
+        String name
 ) {
-    public static ItemDto of(Item item, String imageUrl) {
+    public static ItemDto from(Item item) {
         return new ItemDto(
                 item.getItemId(),
-                item.getName().get("ko-KR"),
-                imageUrl
+                item.getName()
         );
     }
 }
