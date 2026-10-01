@@ -72,6 +72,19 @@ export default function Hero() {
         <DownloadButtons />
         <p className='mt-3 text-sm text-ink-3'>{strings().download.requirement}</p>
       </motion.div>
+      <motion.dl
+        {...fadeUp(1.4)}
+        className='absolute top-full left-1/2 mt-6 flex -translate-x-1/2 items-center divide-x divide-line whitespace-nowrap'
+      >
+        {strings().download.stats.map((stat) => (
+          <div key={stat.label} className='flex flex-col items-center px-4 sm:px-8'>
+            <dt className='order-2 mt-0.5 text-xs text-ink-3 sm:text-sm'>{stat.label}</dt>
+            <dd className='order-1 font-display text-xl font-bold text-white sm:text-2xl'>
+              {stat.value}
+            </dd>
+          </div>
+        ))}
+      </motion.dl>
     </section>
   );
 }

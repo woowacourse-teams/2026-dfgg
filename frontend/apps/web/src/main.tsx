@@ -3,7 +3,7 @@ import './index.css';
 import { createRoot } from 'react-dom/client';
 
 import App from './App';
-import { LOCALE, localeFromPath, localePath, strings,stripLocale } from './i18n/i18n';
+import { LOCALE, localeFromPath, localePath, strings, stripLocale } from './i18n/i18n';
 
 const { pathname, search, hash } = window.location;
 if (!localeFromPath(pathname) && LOCALE === 'ko') {

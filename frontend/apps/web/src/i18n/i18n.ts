@@ -25,6 +25,11 @@ const KO = {
     store: 'Microsoft Store에서 무료로 받기',
     exe: '설치 파일(.exe) 받기',
     requirement: 'Windows 10·11',
+    stats: [
+      { value: '1K+', label: '누적 다운로드' },
+      { value: '5.0', label: '사용자 평점' },
+      { value: '0원', label: '완전 무료' },
+    ],
   },
   hero: {
     chatHistory: { name: '탑블레이드가렌', champion: '레넥톤', text: '원딜 템 뭐갈거?' },
@@ -172,6 +177,11 @@ const EN: typeof KO = {
     store: 'Get it free on Microsoft Store',
     exe: 'Download installer (.exe)',
     requirement: 'Windows 10·11',
+    stats: [
+      { value: '1K+', label: 'downloads' },
+      { value: '5.0', label: 'user rating' },
+      { value: '$0', label: 'free forever' },
+    ],
   },
   hero: {
     chatHistory: { name: 'TopBladeGaren', champion: 'Renekton', text: 'adc what u building?' },
