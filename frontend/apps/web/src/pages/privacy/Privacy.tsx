@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 
 import { PRIVACY_URL } from '../../components/SiteFooter';
 
@@ -20,9 +19,9 @@ export default function Privacy() {
   return (
     <div className='min-h-screen bg-ground'>
       <div className='mx-auto max-w-180 px-6 pt-11 pb-16'>
-        <Link to='/' className='font-display text-sm tracking-wider text-ink-3 hover:text-accent'>
+        <a href='/' className='font-display text-sm tracking-wider text-ink-3 hover:text-accent'>
           ← DFGG
-        </Link>
+        </a>
 
         <h1 className='mt-6 font-display text-4xl leading-none font-bold'>개인정보처리방침</h1>
         <p className='mt-3 text-sm text-ink-3'>
@@ -87,7 +86,6 @@ export default function Privacy() {
         </Section>
 
         <Section title='6. 고지'>
-          <p>DFGG는 Riot Games와 제휴하거나 승인받은 서비스가 아닙니다.</p>
           {/* Riot 이 요구하는 고지문 원문. 의역하지 않고 그대로 둔다. */}
           <p className='text-ink-3'>
             DFGG isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or opinions of
