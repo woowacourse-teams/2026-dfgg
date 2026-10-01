@@ -33,7 +33,7 @@ public class DataDragonClientTest {
     }
 
     @Test
-    void 버전_목록의_첫_번째_값을_최신_버전으로_반환한다() {
+    void 최신_버전을_통계_패치_형식으로_반환한다() {
         // given
         server.expect(requestTo(BASE_URL + "/api/versions.json"))
                 .andRespond(withSuccess("""
@@ -43,7 +43,20 @@ public class DataDragonClientTest {
         String lastVersion = client.getLatestVersion();
 
         // then
-        assertThat(lastVersion).isEqualTo("16.15.1");
+        assertThat(lastVersion).isEqualTo("16.15");
+        server.verify();
+    }
+
+    @Test
+    void 유효하지_않은_버전이면_예외가_발생한다() {
+        // given
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"invalid\"]", MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertThatThrownBy(client::getLatestVersion)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("[Error] Data Dragon version is invalid: invalid");
         server.verify();
     }
 
@@ -106,16 +119,26 @@ public class DataDragonClientTest {
                             "Aatrox": {
                               "key": "266",
                               "name": "아트록스",
-                              "tags": ["Fighter", "Tank"]
+                              "tags": ["Fighter", "Tank"],
+                              "image": {"full": "Aatrox.png"}
                             }
                           }
                         }
                         """, MediaType.APPLICATION_JSON));
 
         // when
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/data/en_US/champion.json"))
+                .andRespond(withSuccess("""
+                        {"data":{"Aatrox":{"name":"Aatrox"}}}
+                        """, MediaType.APPLICATION_JSON));
         ChampionResponse response = client.getChampions();
+        assertThat(response.localizedName("Aatrox"))
+                .containsEntry("ko-KR", "아트록스").containsEntry("en-US", "Aatrox");
 
         // then
+        assertThat(response.version()).isEqualTo("16.15");
+        assertThat(response.dataVersion()).isEqualTo("16.15.1");
+        assertThat(response.data().get("Aatrox").image().full()).isEqualTo("Aatrox.png");
         assertThat(response.data().get("Aatrox").name()).isEqualTo("아트록스");
         assertThat(response.data().get("Aatrox").key()).isEqualTo("266");
         assertThat(response.data().get("Aatrox").tags())
@@ -179,6 +202,11 @@ public class DataDragonClientTest {
                           "data": {
                             "1036": {
                               "name": "롱소드",
+                              "gold": {"base": 350, "total": 350, "purchasable": true},
+                              "image": {"full": "1036.png"},
+                              "maps": {"11": true},
+                              "inStore": true,
+                              "hideFromAll": false,
                               "into": ["3071"]
                             },
                             "3071": {
@@ -189,9 +217,24 @@ public class DataDragonClientTest {
                         """, MediaType.APPLICATION_JSON));
 
         // when
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/data/en_US/item.json"))
+                .andRespond(withSuccess("""
+                        {"data":{"3071":{"name":"Black Cleaver"},"1036":{"name":"Long Sword"}}}
+                        """, MediaType.APPLICATION_JSON));
         ItemResponse response = client.getItems();
+        assertThat(response.localizedName("1036"))
+                .containsEntry("ko-KR", "롱소드").containsEntry("en-US", "Long Sword");
+        assertThat(response.localizedName("3071")).containsEntry("en-US", "Black Cleaver");
 
         // then
+        assertThat(response.version()).isEqualTo("16.15");
+        assertThat(response.dataVersion()).isEqualTo("16.15.1");
+        assertThat(response.data().get("1036").gold().purchasable()).isTrue();
+        assertThat(response.data().get("1036").gold().base()).isEqualTo(350);
+        assertThat(response.data().get("1036").image().full()).isEqualTo("1036.png");
+        assertThat(response.data().get("1036").inStore()).isTrue();
+        assertThat(response.data().get("1036").hideFromAll()).isFalse();
+        assertThat(response.data().get("1036").maps()).containsEntry("11", true);
         assertThat(response.data().get("1036").into()).containsExactly("3071");
         assertThat(response.data().get("3071").into()).isNull();
 
@@ -232,4 +275,68 @@ public class DataDragonClientTest {
         server.verify();
     }
 
+    @Test
+    void 지정한_버전의_PNG_이미지를_다운로드한다() {
+        byte[] png = {(byte) 137, 80, 78, 71, 13, 10, 26, 10, 0};
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/img/champion/Aatrox.png"))
+                .andRespond(withSuccess(png, MediaType.IMAGE_PNG));
+        assertThat(client.getChampionImage("16.15.1", "Aatrox.png")).isEqualTo(png);
+        server.verify();
+    }
+
+    @Test
+    void 이미지가_비어있거나_PNG가_아니면_실패한다() {
+        server.expect(requestTo(BASE_URL + "/cdn/16.15.1/img/champion/Aatrox.png"))
+                .andRespond(withSuccess("not an image", MediaType.TEXT_PLAIN));
+        assertThatThrownBy(() -> client.getChampionImage("16.15.1", "Aatrox.png"))
+                .isInstanceOf(IllegalStateException.class);
+        server.verify();
+    }
+
+    @Test
+    void 전체_버전으로_아이템_PNG를_다운로드한다() {
+        byte[] png = {(byte) 137, 80, 78, 71, 13, 10, 26, 10, 0};
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/img/item/1036.png"))
+                .andRespond(withSuccess(png, MediaType.IMAGE_PNG));
+        assertThat(client.getItemImage("16.18.1", "1036.png")).isEqualTo(png);
+        server.verify();
+    }
+
+    @Test
+    void 빈_아이템_이미지는_실패한다() {
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/img/item/1036.png"))
+                .andRespond(withNoContent());
+        assertThatThrownBy(() -> client.getItemImage("16.18.1", "1036.png"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("PNG");
+        server.verify();
+    }
+
+
+    @Test
+    void 영문_챔피언_조회_실패를_전파한다() {
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.18.1\"]", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/data/ko_KR/champion.json"))
+                .andRespond(withSuccess("""
+                        {"data":{"Aatrox":{"key":"266","name":"아트록스","tags":["Fighter"]}}}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/data/en_US/champion.json"))
+                .andRespond(withServerError());
+        assertThatThrownBy(client::getChampions).isInstanceOf(HttpServerErrorException.class);
+        server.verify();
+    }
+
+    @Test
+    void 영문_아이템_응답이_비어있으면_실패한다() {
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.18.1\"]", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/data/ko_KR/item.json"))
+                .andRespond(withSuccess("""
+                        {"data":{"1036":{"name":"롱소드"}}}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/cdn/16.18.1/data/en_US/item.json"))
+                .andRespond(withNoContent());
+        assertThatThrownBy(client::getItems).hasMessageContaining("영문 아이템 응답이 비어 있습니다");
+        server.verify();
+    }
 }
