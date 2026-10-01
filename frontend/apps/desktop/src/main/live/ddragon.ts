@@ -18,8 +18,8 @@ async function fetchVersion(): Promise<DDragonVersions> {
 
     const data = (await response.json()) as DDragonVersions;
     return data;
-  } catch {
-    throw new Error('Ddragon version 요청 실패');
+  } catch (error) {
+    throw new Error('Ddragon version 요청 실패', { cause: error });
   }
 }
 
@@ -34,9 +34,9 @@ async function fetchChampionList(version: string): Promise<DDragonChampionList> 
 
     const data = (await response.json()) as DDragonChampionList;
     return data;
-  } catch {
+  } catch (error) {
     cache = null;
-    throw new Error('Ddragon champion 요청 실패');
+    throw new Error('Ddragon champion 요청 실패', { cause: error });
   }
 }
 
@@ -52,9 +52,9 @@ async function fetchItemList(version: string): Promise<DDragonItemList> {
 
     const data = (await response.json()) as DDragonItemList;
     return data;
-  } catch {
+  } catch (error) {
     cache = null;
-    throw new Error('Ddragon item 요청 실패');
+    throw new Error('Ddragon item 요청 실패', { cause: error });
   }
 }
 

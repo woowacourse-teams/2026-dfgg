@@ -6,6 +6,7 @@ import { getActivePlayer, getPlayerList } from './endpoints';
 import { buildRecommendationBody, extractItemIds } from './payload';
 import { fetchGameVersion } from '../lcu/service';
 import { recordChampion, recordLiveError, recordPurchases } from '../analytics/gameTracker';
+import { reportError } from '../sentry';
 
 const POLL_INTERVAL_MS = 2000;
 // 추천 요청이 실패하면 서버 부하를 줄이려고 재시도 간격을 늘린다. (2초 → 4초 → … → 30초)
@@ -113,6 +114,7 @@ async function tick() {
     }
   } catch (error) {
     console.debug('live 조회 실패', error);
+    reportError('live-poll', error);
     recordLiveError();
   } finally {
     if (polling) timer = setTimeout(tick, nextPollInterval());
