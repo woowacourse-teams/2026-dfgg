@@ -6,6 +6,7 @@
   "scripts": {
     "start": "pnpm --filter web run start",
     "build": "pnpm --filter web run build",
+    "admin": "pnpm --filter admin run start",
     "desktop:start": "pnpm --filter desktop run start",
     "desktop:dev": "pnpm --filter desktop run electron:dev",
     "desktop:package": "pnpm --filter desktop run package",

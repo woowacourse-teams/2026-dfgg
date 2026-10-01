@@ -2,6 +2,7 @@ import './index.css';
 
 import { createRoot } from 'react-dom/client';
 
+import { initAnalytics } from './analytics';
 import App from './App';
 import { LOCALE, localeFromPath, localePath, strings, stripLocale } from './i18n/i18n';
 
@@ -14,5 +15,7 @@ const { meta } = strings();
 document.documentElement.lang = LOCALE;
 document.title = meta.title;
 document.querySelector('meta[name="description"]')?.setAttribute('content', meta.description);
+
+initAnalytics();
 
 createRoot(document.getElementById('root')!).render(<App />);
