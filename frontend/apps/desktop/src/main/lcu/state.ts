@@ -7,6 +7,7 @@ import type {
   RecommendedItem,
 } from '../../shared/types';
 import { broadcastToAllWindows } from '../ipc/broadcast';
+import { reportError } from '../sentry';
 
 const state: LcuState = {
   status: 'disconnected',
@@ -45,6 +46,7 @@ export function setLcuPhase(phase: GameflowPhase | null) {
       listener(phase);
     } catch (error) {
       console.error('phase 구독자 실행 실패', error);
+      reportError('lcu-phase-listener', error);
     }
   }
 }
@@ -62,6 +64,7 @@ export function setLcuStatus(status: LcuStatus) {
       listener(status);
     } catch (error) {
       console.error('status 구독자 실행 실패', error);
+      reportError('lcu-status-listener', error);
     }
   }
 }

@@ -1,3 +1,6 @@
+// 다른 모듈이 로드되기 전에 초기화해야 그 안에서 난 에러도 잡힌다.
+import './sentry';
+
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import { registerIpcHandlers } from './ipc';

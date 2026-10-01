@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import { getIdentity } from './identity';
 import { readStore, updateStore, type PendingEvent } from './store';
+import { reportError } from '../sentry';
 
 const UMAMI_ENDPOINT = 'https://cloud.umami.is/api/send';
 // web과 같은 사이트를 쓰고, hostname으로 데스크탑 트래픽을 구분한다.
@@ -53,6 +54,7 @@ export function trackEvent(name: string, data?: EventData, id = getIdentity()?.p
 
   send(event).catch((error) => {
     console.debug('umami 이벤트 전송 실패 — 다음 실행 때 재전송', name, error);
+    reportError('umami-send', error);
     enqueue(event);
   });
 }
@@ -68,7 +70,8 @@ export async function flushOutbox() {
   for (const event of outbox) {
     try {
       await send(event);
-    } catch {
+    } catch (error) {
+      reportError('umami-flush', error);
       enqueue(event);
     }
   }

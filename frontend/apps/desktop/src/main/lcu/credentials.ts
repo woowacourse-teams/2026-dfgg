@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { reportError } from '../sentry';
 
 // 윈도우 시스템 폴더에서 lol yaml 경로
 const PRODUCT_SETTINGS = path.join(
@@ -22,7 +23,8 @@ export function readInstallDirFromMetadata() {
     const yaml = fs.readFileSync(PRODUCT_SETTINGS, 'utf-8');
     const match = yaml.match(/^product_install_full_path:\s*"(.+)"/m);
     return match ? match[1] : null;
-  } catch {
+  } catch (error) {
+    reportError('lcu-install-dir', error);
     return null;
   }
 }

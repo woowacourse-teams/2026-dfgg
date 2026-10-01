@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import type { LcuEvent, Lockfile } from '../../shared/types';
 import { RIOT_ROOT_CERT } from './riotCert';
+import { reportError } from '../sentry';
 
 const SUBSCRIPTIONS = ['OnJsonApiEvent_lol-gameflow_v1_gameflow-phase'];
 const HANDSHAKE_TIMEOUT_MS = 5000;
@@ -27,8 +28,9 @@ export function connectLcuSocket(lockfile: Lockfile, onEvent: (payload: LcuEvent
       const [opcode, , payload] = JSON.parse(text);
 
       if (opcode === 8) onEvent(payload);
-    } catch {
+    } catch (error) {
       console.error('LCU 소켓 메시지 파싱 실패', text.slice(0, 200));
+      reportError('lcu-socket-message', error);
     }
   });
 
