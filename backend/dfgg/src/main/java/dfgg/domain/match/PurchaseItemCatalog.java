@@ -12,10 +12,16 @@ public interface PurchaseItemCatalog {
     /** 일반 인벤토리 슬롯 수. 중첩 수량과 별도 장신구 슬롯은 카탈로그 정의에 따른다. */
     default long occupiedSlots(ItemInventory inventory) {
         long slots = 0;
+        boolean questSlotAvailable = inventory.bootsInQuestSlot();
         for (var held : inventory.quantities().entrySet()) {
             PurchaseCatalogItem item = find(held.getKey())
                     .orElseThrow(() -> new IllegalStateException("보유 아이템의 슬롯 정보를 알 수 없습니다."));
-            slots += item.slotsFor(held.getValue());
+            int quantity = held.getValue();
+            if (questSlotAvailable && item.boots()) {
+                quantity--; // 신발 한 개만 별도 슬롯을 사용한다.
+                questSlotAvailable = false;
+            }
+            slots += item.slotsFor(quantity);
         }
         return slots;
     }

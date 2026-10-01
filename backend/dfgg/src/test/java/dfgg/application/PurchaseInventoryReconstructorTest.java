@@ -197,8 +197,8 @@ class PurchaseInventoryReconstructorTest {
                 {"type":"ITEM_PURCHASED","participantId":1,"itemId":3047,"timestamp":300}
                 """);
         var states = reconstructor.reconstruct(events, "16.18");
-        assertThat(states.get(events.get(3)).inventoryBefore()).isEqualTo(ItemInventory.empty().add(2422));
-        assertThat(states.get(events.getLast()).inventoryBefore()).isEqualTo(ItemInventory.empty().add(2422).add(1029));
+        assertThat(states.get(events.get(3)).inventoryBefore()).isEqualTo(ItemInventory.empty().add(2422).moveBootsToQuestSlot());
+        assertThat(states.get(events.getLast()).inventoryBefore()).isEqualTo(ItemInventory.empty().add(2422).add(1029).moveBootsToQuestSlot());
     }
 
     @Test

@@ -17,8 +17,15 @@ public record PurchaseCatalogItem(
         List<Integer> ingredients,
         List<Integer> upgrades,
         int stackSize,
-        boolean usesInventorySlot
+        boolean usesInventorySlot,
+        boolean boots
 ) {
+
+    public PurchaseCatalogItem(int id, int totalPrice, boolean purchasable,
+                               List<Integer> ingredients, List<Integer> upgrades, int stackSize,
+                               boolean usesInventorySlot) {
+        this(id, totalPrice, purchasable, ingredients, upgrades, stackSize, usesInventorySlot, false);
+    }
 
     public PurchaseCatalogItem(int id, int totalPrice, boolean purchasable,
                                List<Integer> ingredients, List<Integer> upgrades) {

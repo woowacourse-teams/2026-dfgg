@@ -20,12 +20,15 @@ public final class ItemInventory {
 
     private final Map<Integer, Integer> quantities;
 
-    private ItemInventory(Map<Integer, Integer> quantities) {
+    private final boolean bootsInQuestSlot;
+
+    private ItemInventory(Map<Integer, Integer> quantities, boolean bootsInQuestSlot) {
         this.quantities = Map.copyOf(quantities);
+        this.bootsInQuestSlot = bootsInQuestSlot;
     }
 
     public static ItemInventory empty() {
-        return new ItemInventory(Map.of());
+        return new ItemInventory(Map.of(), false);
     }
 
     /** 아이템 한 개를 획득한다. */
@@ -33,7 +36,7 @@ public final class ItemInventory {
         validateItemId(itemId);
         Map<Integer, Integer> changed = new HashMap<>(quantities);
         changed.merge(itemId, 1, Integer::sum);
-        return new ItemInventory(changed);
+        return new ItemInventory(changed, bootsInQuestSlot);
     }
 
     /** 구매 직전에 조합으로 제거된 재료들을 스냅샷에 되돌린다. */
@@ -58,7 +61,16 @@ public final class ItemInventory {
         } else {
             changed.put(itemId, quantity - 1);
         }
-        return Optional.of(new ItemInventory(changed));
+        return Optional.of(new ItemInventory(changed, bootsInQuestSlot));
+    }
+
+    /** Bot 퀘스트 완료 시 신발 한 개를 별도 슬롯에 유지한다. 아이템 수량·능력치는 유지한다. */
+    public ItemInventory moveBootsToQuestSlot() {
+        return bootsInQuestSlot ? this : new ItemInventory(quantities, true);
+    }
+
+    public boolean bootsInQuestSlot() {
+        return bootsInQuestSlot;
     }
 
     public int quantityOf(int itemId) {
@@ -84,11 +96,11 @@ public final class ItemInventory {
         if (!(other instanceof ItemInventory inventory)) {
             return false;
         }
-        return quantities.equals(inventory.quantities);
+        return bootsInQuestSlot == inventory.bootsInQuestSlot && quantities.equals(inventory.quantities);
     }
 
     @Override
     public int hashCode() {
-        return quantities.hashCode();
+        return java.util.Objects.hash(quantities, bootsInQuestSlot);
     }
 }

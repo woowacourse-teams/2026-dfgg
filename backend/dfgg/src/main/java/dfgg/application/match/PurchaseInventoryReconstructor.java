@@ -189,6 +189,9 @@ public class PurchaseInventoryReconstructor {
             }
 
             if ("ITEM_DESTROYED".equals(event.eventType())) {
+                if (patchRulesEnabled && Objects.equals(event.itemId(), 1202)) {
+                    inventory = inventory.moveBootsToQuestSlot();
+                }
                 if (patchRulesEnabled && Objects.equals(event.itemId(), 1201)) {
                     midQuestCompleted = true;
                 }
