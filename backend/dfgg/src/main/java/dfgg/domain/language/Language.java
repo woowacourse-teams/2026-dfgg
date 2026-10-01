@@ -28,10 +28,10 @@ public enum Language {
      * 클라이언트는 {@code ko}와 {@code en}만 보낸다. 우선순위(q)까지 해석할 필요가 없다.
      */
     public static Language fromAcceptLanguage(String acceptLanguage) {
-        if (acceptLanguage != null && acceptLanguage.trim().toLowerCase(Locale.ROOT).startsWith("ko")) {
-            return KO_KR;
+        if (acceptLanguage != null && acceptLanguage.trim().toLowerCase(Locale.ROOT).startsWith("en")) {
+            return EN_US;
         }
-        return EN_US;
+        return KO_KR;
     }
 
     /** 언어별 이름에서 이 언어의 이름을 고른다. 없으면 한글 이름으로 낸다. */
