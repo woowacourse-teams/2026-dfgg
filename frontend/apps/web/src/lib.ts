@@ -1,3 +1,5 @@
+import { capture } from './analytics';
+
 export const MS_STORE_URL = 'https://apps.microsoft.com/detail/9nxl98m7xc82?hl=ko-KR&gl=KR';
 
 export const DOWNLOAD_URL =
@@ -13,7 +15,10 @@ type TrackData = Record<string, string | number>;
 
 const trackedOnce = new Set<string>();
 
-export const track = (event: string, data?: TrackData) => window.umami?.track(event, data);
+export const track = (event: string, data?: TrackData) => {
+  window.umami?.track(event, data); // umami
+  capture(event, data); // posthog
+};
 
 export const trackOnce = (event: string, data?: TrackData) => {
   const key = `${event}:${JSON.stringify(data ?? {})}`;

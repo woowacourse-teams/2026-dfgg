@@ -1,3 +1,4 @@
+import { app } from 'electron';
 import { getApiBaseUrl } from './config';
 import { reportError } from '../sentry';
 
@@ -15,6 +16,7 @@ export async function apiPost<T>(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept-Language': app.getLocale(),
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),

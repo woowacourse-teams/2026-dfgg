@@ -3,6 +3,7 @@ import './index.css';
 import * as Sentry from '@sentry/react';
 import { createRoot } from 'react-dom/client';
 
+import { initAnalytics } from './analytics';
 import App from './App';
 import { LOCALE, localeFromPath, localePath, strings, stripLocale } from './i18n/i18n';
 
@@ -28,6 +29,8 @@ const { meta } = strings();
 document.documentElement.lang = LOCALE;
 document.title = meta.title;
 document.querySelector('meta[name="description"]')?.setAttribute('content', meta.description);
+
+initAnalytics();
 
 // React 19 는 렌더링 중 에러를 window.onerror 로 올리지 않아서 직접 연결해야 Sentry 에 잡힌다.
 createRoot(document.getElementById('root')!, {

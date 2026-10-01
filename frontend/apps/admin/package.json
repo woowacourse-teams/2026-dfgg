@@ -1,16 +1,12 @@
 {
-  "name": "web",
+  "name": "admin",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "start": "webpack server --mode development",
-    "build": "tsc --noEmit && webpack --mode production",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@sentry/react": "^11.1.0",
-    "motion": "^13.4.4",
-    "posthog-js": "^1.435.6",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

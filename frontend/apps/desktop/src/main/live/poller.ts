@@ -96,6 +96,7 @@ async function tick() {
         // 백엔드에 전달
         const body = buildRecommendationBody(liveInfo);
         if (!body) return;
+        console.log(body);
         recordChampion(body.myChampion);
         let result;
         try {

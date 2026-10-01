@@ -4,10 +4,19 @@ import path from 'node:path';
 import type { EventData } from './umami';
 import { reportError } from '../sentry';
 
-export type PendingEvent = { name: string; data?: EventData; id?: string };
+export type AnalyticsTarget = 'umami' | 'posthog';
+
+export type PendingEvent = {
+  name: string;
+  data?: EventData;
+  id?: string;
+  timestamp?: string;
+  targets?: AnalyticsTarget[];
+};
 
 type AnalyticsStore = {
   installed?: boolean;
+  installId?: string; // 소환사를 알기 전에도 같은 기기로 묶기 위한 설치 단위 id
   // 보내지 못한 이벤트. 다음 실행 때 다시 보낸다.
   outbox: PendingEvent[];
   // 진행 중인 세션/게임 스냅샷. 비정상 종료되면 다음 실행 때 outbox로 옮긴다.
