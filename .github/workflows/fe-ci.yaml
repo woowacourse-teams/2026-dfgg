@@ -1,0 +1,52 @@
+name: fe-ci
+
+on:
+  pull_request:
+    branches: [main, dev, FE/dev]
+    paths: ["frontend/**", ".github/workflows/fe-ci.yaml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  fe-check:
+    name: FE-CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: pnpm 바이너리 설치
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - name: 노드 설치
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: 린트 검사
+        run: pnpm lint
+
+      - name: 포맷 검사
+        run: pnpm format:check
+
+      - name: 타입 검사
+        run: pnpm typecheck
+
+      - name: 빌드 검사
+        run: pnpm build

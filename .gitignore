@@ -4,7 +4,9 @@ Thumbs.db
 
 # Editor
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 *.swp
 
 # Env
@@ -20,6 +22,7 @@ yarn-error.log*
 # Node
 node_modules/
 dist/
+dist-desktop/
 build/
 coverage/
 .vite/
@@ -31,3 +34,4 @@ out/
 *.jar
 *.war
 !gradle/wrapper/gradle-wrapper.jar
+release/
