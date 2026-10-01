@@ -9,6 +9,7 @@ import dfgg.application.recommend.v3.ranker.LambdaMartRanker;
 import dfgg.application.recommend.v3.ranker.LightGbmModelLoader;
 import dfgg.application.recommend.v3.ranker.TreeShapCalculator;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -34,7 +35,7 @@ public class LtrModelConfiguration {
      * 트리 깊이만큼의 경로 배열은 계산할 때마다 새로 잡으므로 상태를 공유하지 않는다.
      */
     @Bean
-    public TreeShapCalculator treeShapCalculator(GradientBoostedTrees ltrModel) {
+    public TreeShapCalculator treeShapCalculator(@Qualifier("ltrModel") GradientBoostedTrees ltrModel) {
         return new TreeShapCalculator(ltrModel, FeatureName.values().length);
     }
 
@@ -51,7 +52,7 @@ public class LtrModelConfiguration {
 
     @Bean
     public CandidateRanker candidateRanker(
-            FeatureExtractionPipeline pipeline, GradientBoostedTrees ltrModel) {
+            FeatureExtractionPipeline pipeline, @Qualifier("ltrModel") GradientBoostedTrees ltrModel) {
         return new LambdaMartRanker(pipeline, ltrModel);
     }
 }

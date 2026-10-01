@@ -17,8 +17,15 @@ public record ItemData(
         Image image,
         Boolean inStore,
         Boolean hideFromAll,
-        Integer stacks
+        Integer stacks,
+        Map<String, Double> stats
 ) {
+
+    public ItemData(String name, List<String> from, List<String> into, List<String> tags,
+                    Map<String, Boolean> maps, Boolean consumed, Integer depth, Gold gold,
+                    Image image, Boolean inStore, Boolean hideFromAll, Integer stacks) {
+        this(name, from, into, tags, maps, consumed, depth, gold, image, inStore, hideFromAll, stacks, null);
+    }
 
     public ItemData(String name, List<String> from, List<String> into, List<String> tags,
                     Map<String, Boolean> maps, Boolean consumed, Integer depth, Gold gold,

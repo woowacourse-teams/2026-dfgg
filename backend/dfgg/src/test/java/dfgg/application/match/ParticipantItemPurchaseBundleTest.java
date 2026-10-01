@@ -177,9 +177,9 @@ class ParticipantItemPurchaseBundleTest {
         var mapper = new ObjectMapper();
         var catalog = mapper.readValue("""
                 {"version":"16.18.1","data":{
-                  "1036":{"gold":{"total":350,"purchasable":true},"into":["3071"]},
-                  "1037":{"gold":{"total":875,"purchasable":true},"into":["3071"]},
-                  "3071":{"gold":{"total":1575,"purchasable":true},"from":["1036","1037"]}}}
+                  "1036":{"gold":{"total":350,"purchasable":true},"stats":{"FlatPhysicalDamageMod":10},"into":["3071"]},
+                  "1037":{"gold":{"total":875,"purchasable":true},"stats":{"FlatPhysicalDamageMod":25},"into":["3071"]},
+                  "3071":{"gold":{"total":1575,"purchasable":true},"stats":{"FlatPhysicalDamageMod":40},"from":["1036","1037"]}}}
                 """, dfgg.infrastructure.external.dto.ItemResponse.class);
         var exporter = new ComponentTrainingDataService(service, mapper);
         var examples = exporter.examplesForMatch("KR_TEST", catalog);
@@ -188,15 +188,26 @@ class ParticipantItemPurchaseBundleTest {
         assertThat(first.targetCoreId()).isEqualTo(3071);
         assertThat(first.candidates().stream().filter(c -> c.label() == 1).toList()).hasSize(1);
         var positive = first.candidates().stream().filter(c -> c.label() == 1).findFirst().orElseThrow();
-        assertThat(positive.itemQuantities()).containsEntry(1036, 1).containsEntry(1037, 1);
-        assertThat(positive.features()).containsExactly(1225.0, 2.0, 2.0, 0.0, 2.0);
+        assertThat(positive.candidate().itemQuantities()).containsEntry(1036, 1).containsEntry(1037, 1);
+        assertThat(positive.candidate().features().subList(0, 10)).containsExactly(1225.0, 2.0, 2.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0, 0.0);
+        assertThat(positive.candidate().features().get(10)).isEqualTo(35.0);
+        var completed = examples.getLast().candidates().stream().filter(c -> c.label() == 1).findFirst().orElseThrow();
+        assertThat(completed.candidate().features().subList(5, 8)).containsExactly(1.0, 2.0, 1225.0);
+        assertThat(completed.candidate().features().get(10)).isEqualTo(5.0); // 40 - 기존 재료 35, 완성품 40을 그대로 더하지 않는다.
+        assertThat(positive.candidate().features().subList(22, 29))
+                .containsExactly(1000.0 / 60_000, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         var writer = new java.io.StringWriter();
         exporter.writeJsonl("KR_TEST", catalog, writer);
         assertThat(writer.toString().lines().toList()).hasSize(2);
         var json = mapper.readTree(writer.toString().lines().findFirst().orElseThrow());
         assertThat(json.path("targetSource").asText()).isEqualTo("OBSERVED_FUTURE_CORE");
-        assertThat(json.path("featureNames").size()).isEqualTo(5);
-        assertThat(json.path("schemaVersion").asText()).isEqualTo("component-bundle-validation-v1");
+        assertThat(json.path("featureNames").size()).isEqualTo(41);
+        var exportedCandidate = json.path("candidates").get(0);
+        assertThat(exportedCandidate.path("features").size()).isEqualTo(41);
+        assertThat(exportedCandidate.has("itemQuantities")).isTrue();
+        assertThat(exportedCandidate.has("label")).isTrue();
+        assertThat(exportedCandidate.has("candidate")).isFalse(); // Python이 읽던 평탄 JSONL 형식을 유지한다.
+        assertThat(json.path("schemaVersion").asText()).isEqualTo("component-bundle-validation-v4");
         var wrongPatch = new dfgg.infrastructure.external.dto.ItemResponse("16.19.1", null, catalog.data());
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> exporter.examplesForMatch("KR_TEST", wrongPatch))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -229,7 +240,7 @@ class ParticipantItemPurchaseBundleTest {
         var first = new ComponentTrainingDataService(service, mapper).examplesForMatch("KR_TEST", catalog).getFirst();
         assertThat(first.status()).isEqualTo("OBSERVED_BUNDLE_MISSING");
         assertThat(first.candidates()).hasSize(1).allMatch(c -> c.label() == null);
-        assertThat(first.candidates().getFirst().itemQuantities()).doesNotContainKey(1036);
+        assertThat(first.candidates().getFirst().candidate().itemQuantities()).doesNotContainKey(1036);
     }
 
     @Test

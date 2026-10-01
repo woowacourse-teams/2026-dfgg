@@ -35,12 +35,20 @@ public final class LightGbmModelLoader {
     }
 
     public static GradientBoostedTrees load(InputStream input) {
+        return load(input, FeatureName.exportNames(), FeatureName.schemaFingerprint());
+    }
+
+    /** Core와 Component가 같은 트리 형식을 재사용하되 각 Feature 계약을 따로 검증한다. */
+    public static GradientBoostedTrees load(InputStream input, List<String> expectedNames, String expectedFingerprint) {
+        if (expectedNames == null || expectedNames.isEmpty() || expectedFingerprint == null || expectedFingerprint.isBlank()) {
+            throw new IllegalArgumentException("Feature 이름과 스키마 지문이 필요합니다.");
+        }
         JsonNode root = readJson(input);
-        verifyFingerprint(root);
-        verifyFeatureNames(root);
+        verifyFingerprint(root, expectedFingerprint);
+        verifyFeatureNames(root, expectedNames);
 
         GradientBoostedTrees model = new GradientBoostedTrees(readTrees(root));
-        verifyFeatureIndexRange(model);
+        verifyFeatureIndexRange(model, expectedNames.size());
         return model;
     }
 
@@ -52,17 +60,16 @@ public final class LightGbmModelLoader {
         }
     }
 
-    private static void verifyFingerprint(JsonNode root) {
+    private static void verifyFingerprint(JsonNode root, String expected) {
         String fingerprint = root.path("schema_fingerprint").asText(null);
-        if (!FeatureName.schemaFingerprint().equals(fingerprint)) {
+        if (!expected.equals(fingerprint)) {
             throw new IllegalStateException(
                     "모델의 feature 스키마 지문이 현재 코드와 다릅니다. 모델=%s, 코드=%s. 모델을 다시 학습하세요."
-                            .formatted(fingerprint, FeatureName.schemaFingerprint()));
+                            .formatted(fingerprint, expected));
         }
     }
 
-    private static void verifyFeatureNames(JsonNode root) {
-        List<String> expected = FeatureName.exportNames();
+    private static void verifyFeatureNames(JsonNode root, List<String> expected) {
         JsonNode names = root.path("feature_names");
         if (!names.isArray() || names.size() != expected.size()) {
             throw new IllegalStateException(
@@ -99,8 +106,7 @@ public final class LightGbmModelLoader {
         return parsed;
     }
 
-    private static void verifyFeatureIndexRange(GradientBoostedTrees model) {
-        int featureCount = FeatureName.values().length;
+    private static void verifyFeatureIndexRange(GradientBoostedTrees model, int featureCount) {
         if (model.maxFeatureIndex() >= featureCount) {
             throw new IllegalStateException(
                     "모델이 스키마에 없는 feature 인덱스로 분기합니다: %d (feature 개수=%d)."

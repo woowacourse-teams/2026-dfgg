@@ -67,7 +67,7 @@ class ComponentDatasetExportTest {
                             "OBSERVED_COST_NOT_CONFIRMED", "OBSERVED_COST_OUTSIDE_GOLD_RANGE").contains(example.status());
                     if (comparable) {
                         eligible++;
-                        if (example.candidates().stream().noneMatch(c -> c.itemQuantities().equals(example.observedItems()))) missing++;
+                        if (example.candidates().stream().noneMatch(c -> c.candidate().itemQuantities().equals(example.observedItems()))) missing++;
                     }
                     String json = mapper.writeValueAsString(example) + "\n";
                     all.write(json);
@@ -92,6 +92,42 @@ class ComponentDatasetExportTest {
         report.put("rankingGroups", ready); report.put("statuses", statuses); report.put("exclusionReasonsOverlapping", exclusions);
         mapper.writerWithDefaultPrettyPrinter().writeValue(directory.resolve("report.json").toFile(), report);
         System.out.println("COMPONENT_EXPORT " + mapper.writeValueAsString(report));
+    }
+
+    /** 누락 사례의 현재 복원 상태·후보·전체 이벤트를 기존 계산기로 재현한다. */
+    @Test
+    void inspect_missing_examples() throws Exception {
+        if (System.getProperty("evaluation.component.inspect") == null) return;
+        var mapper = new ObjectMapper();
+        var response = mapper.readValue(Path.of(System.getProperty("evaluation.component.catalog")).toFile(), ItemResponse.class);
+        var catalog = new dfgg.infrastructure.external.catalog.DataDragonPurchaseItemCatalog(response.data());
+        var service = new ComponentTrainingDataService(snapshots, mapper);
+        var reports = new ArrayList<Map<String, Object>>();
+        for (String matchId : System.getProperty("evaluation.component.inspect").split(",")) {
+            var examples = service.examplesForMatch(matchId, response);
+            var states = snapshots.snapshotsForMatch(matchId);
+            var report = new LinkedHashMap<String, Object>();
+            report.put("matchId", matchId);
+            report.put("examples", examples);
+            report.put("missingExamples", examples.stream().filter(e -> e.status().equals("OBSERVED_BUNDLE_MISSING")).toList());
+            report.put("purchaseStates", states.stream().map(state -> {
+                var row = new LinkedHashMap<String, Object>();
+                row.put("participantId", state.purchase().getParticipantId());
+                row.put("purchaseOrder", state.purchase().getPurchaseOrder());
+                row.put("source", state.sourceEvent());
+                row.put("reason", state.reason());
+                row.put("inventory", state.inventoryBefore() == null ? null : state.inventoryBefore().quantities());
+                row.put("bootsInQuestSlot", state.inventoryBefore() != null && state.inventoryBefore().bootsInQuestSlot());
+                row.put("slots", state.inventoryBefore() == null ? null : catalog.occupiedSlots(state.inventoryBefore()));
+                return row;
+            }).toList());
+            report.put("events", jdbc.queryForList("select participant_id,event_order,purchase_order,event_type,item_id,game_time_ms,undo_before_item_id,undo_after_item_id from normalized_match_participant_item_events where match_id=? order by participant_id,event_order", matchId));
+            reports.add(report);
+        }
+        Path output = Path.of(System.getProperty("evaluation.component.output"));
+        Files.createDirectories(output);
+        mapper.writerWithDefaultPrettyPrinter().writeValue(output.resolve("missing-replay.json").toFile(), reports);
+        System.out.println("COMPONENT_MISSING_REPLAY matches=" + reports.size());
     }
 
     private static String hash(String matchId) {

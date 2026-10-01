@@ -1,6 +1,7 @@
 package dfgg.application.match;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dfgg.application.recommend.component.ComponentCandidateFeatures;
 import dfgg.domain.match.BuildPathResolver;
 import dfgg.domain.match.ItemPurchaseType;
 import dfgg.domain.match.PurchaseItemCatalog;
@@ -38,7 +39,7 @@ public class ComponentTrainingDataService {
         var catalog = new DataDragonPurchaseItemCatalog(response.data());
         var resolver = new BuildPathResolver(catalog);
         return prepared.bundles().stream()
-                .map(bundle -> example(bundle, prepared.snapshots(), catalog, resolver, version)).toList();
+                .map(bundle -> example(bundle, prepared.snapshots(), catalog, resolver, version, response)).toList();
     }
 
     /** 호출자가 Writer의 경로·수명·원자적 파일 교체를 관리한다. 제외 행도 보존해 분모를 확인한다. */
@@ -52,7 +53,7 @@ public class ComponentTrainingDataService {
 
     private Example example(ParticipantItemPurchaseBundle bundle,
             List<ParticipantItemPurchaseSnapshot> purchases, PurchaseItemCatalog catalog,
-            BuildPathResolver resolver, String version) {
+            BuildPathResolver resolver, String version, ItemResponse response) {
         // ponytail: 경기 내 선형 탐색. 대량 export에서 병목이 확인되면 참가자별 Core 순번 인덱스로 바꾼다.
         var target = purchases.stream().filter(s -> s.purchase().getParticipantId() == bundle.participantId())
                 .filter(s -> s.purchase().getPurchaseType() == ItemPurchaseType.CORE)
@@ -88,38 +89,30 @@ public class ComponentTrainingDataService {
             status = "OBSERVED_COST_MISMATCH";
         }
         boolean usable = "READY".equals(status);
-        var rows = candidates.stream().map(c -> new Candidate(c.itemQuantities(), c.purchaseOrder(),
-                c.inventoryAfter().quantities(), usable ? (c.itemQuantities().equals(bundle.itemQuantities()) ? 1 : 0) : null,
-                List.of((double) c.additionalCost(),
-                        (double) c.itemQuantities().values().stream().mapToInt(Integer::intValue).sum(),
-                        (double) c.itemQuantities().size(),
-                        (double) catalog.occupiedSlots(bundle.inventoryBefore()),
-                        (double) catalog.occupiedSlots(c.inventoryAfter())))).toList();
+        var rows = candidates.stream().map(c -> new ComponentTrainingCandidate(
+                ComponentCandidateFeatures.calculate(bundle.inventoryBefore(), c, target.purchase().getItemId(), catalog, response, bundle.purchases().getFirst().sourceEvent().gameTimeMs(),
+                        bundle.purchases().getFirst().purchase().getPosition()),
+                usable ? (c.itemQuantities().equals(bundle.itemQuantities()) ? 1 : 0) : null)).toList();
         return result(bundle, target, version, status, rows);
     }
 
     private Example result(ParticipantItemPurchaseBundle bundle, ParticipantItemPurchaseSnapshot target,
-                           String version, String status, List<Candidate> candidates) {
+                           String version, String status, List<ComponentTrainingCandidate> candidates) {
         var first = bundle.purchases().getFirst().purchase();
-        return new Example("component-bundle-validation-v1", "OBSERVED_FUTURE_CORE", version,
+        return new Example(SCHEMA_VERSION, "OBSERVED_FUTURE_CORE", version,
                 bundle.matchId(), bundle.participantId(), bundle.startPurchaseOrder(), bundle.endPurchaseOrder(),
                 first.getPosition(), target == null ? null : target.purchase().getItemId(),
                 target == null ? null : target.purchase().getPurchaseOrder(),
                 bundle.inventoryBefore() == null ? null : bundle.inventoryBefore().quantities(),
                 bundle.goldLower(), bundle.goldUpper(), bundle.itemQuantities(), bundle.totalCost(), status,
-                bundle.exclusionReasons().stream().map(Enum::name).sorted().toList(), FEATURE_NAMES, candidates);
+                bundle.exclusionReasons().stream().map(Enum::name).sorted().toList(), ComponentCandidateFeatures.FEATURE_NAMES, candidates);
     }
 
-    public static final List<String> FEATURE_NAMES = List.of("additional_cost", "purchase_quantity",
-            "distinct_purchase_items", "slots_before", "slots_after");
-
-    public record Candidate(Map<Integer, Integer> itemQuantities, List<Integer> purchaseOrder,
-                            Map<Integer, Integer> inventoryAfter, Integer label, List<Double> features) {}
-
+    public static final String SCHEMA_VERSION = "component-bundle-validation-v4";
     public record Example(String schemaVersion, String targetSource, String dataVersion, String matchId,
                           int participantId, int startPurchaseOrder, int endPurchaseOrder, String position,
                           Integer targetCoreId, Integer targetPurchaseOrder, Map<Integer, Integer> inventoryBefore,
                           Integer goldLower, Integer goldUpper, Map<Integer, Integer> observedItems, Long observedCost,
                           String status, List<String> exclusionReasons, List<String> featureNames,
-                          List<Candidate> candidates) {}
+                          List<ComponentTrainingCandidate> candidates) {}
 }
