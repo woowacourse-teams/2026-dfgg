@@ -145,7 +145,7 @@ public class NextItemRecommendationService {
                             championRefs(CounterEvidence.championIdsFor(evidence), championProfiles, language),
                             championRefs(AllyEvidence.championIdsFor(
                                     evidence, itemTraitCatalog.synergyOf(item)), championProfiles, language),
-                            traitNamesOf(item)),
+                            traitNamesOf(item, language)),
                     language));
         }
         return new NextItemRecommendationResponse(recommendedItems);
@@ -194,9 +194,9 @@ public class NextItemRecommendationService {
      * <p>
      * 표시명이 없는 특성({@code ENGAGE} 등)은 v2 판정용 범주다. 화면에 낼 말이 없어 뺀다.
      */
-    private List<String> traitNamesOf(Item item) {
+    private List<String> traitNamesOf(Item item, Language language) {
         return itemTraitCatalog.traitsOf(item).stream()
-                .map(ItemTrait::getDisplayName)
+                .map(trait -> language.pick(trait.getDisplayName()))
                 .filter(displayName -> !displayName.isBlank())
                 .sorted()
                 .toList();

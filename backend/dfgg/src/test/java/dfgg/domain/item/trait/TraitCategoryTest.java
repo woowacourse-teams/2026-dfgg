@@ -87,7 +87,7 @@ class TraitCategoryTest {
 
         for (RoleFile roleFile : roleFiles()) {
             roleFile.byItemId().forEach((itemId, traits) -> {
-                if (traits.stream().allMatch(trait -> trait.getDisplayName().isBlank())) {
+                if (traits.stream().allMatch(trait -> trait.getDisplayName().values().stream().anyMatch(String::isBlank))) {
                     withoutDisplayableTrait.add("%s의 %d".formatted(roleFile.name(), itemId));
                 }
             });

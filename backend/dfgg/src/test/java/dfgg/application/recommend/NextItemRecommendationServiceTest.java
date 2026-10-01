@@ -296,6 +296,21 @@ class NextItemRecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("영어로 요청하면 traits를 영어 표시명으로 낸다")
+    void recommendNextItem_WhenEnglishRequested_ReturnsEnglishDisplayNames() {
+        // given
+        givenCandidates(MIKAELS_BLESSING);
+        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(MIKAELS_BLESSING));
+
+        // when
+        NextItemRecommendationResponse response = service.recommendNextItem(request(), Language.EN_US);
+
+        // then
+        assertThat(response.recommendedItems().getFirst().description().traits())
+                .containsExactly("CC Cleanse & Heal");
+    }
+
+    @Test
     @DisplayName("표시명이 없는 판정용 특성은 traits에 싣지 않는다 — 빈 문자열이 화면에 새지 않는다")
     void recommendNextItem_WhenItemHasTraitWithoutDisplayName_OmitsIt() {
         // given: 지크의 융합은 표시용 특성과 v2 판정용 ENGAGE(표시명 없음)를 함께 갖는다

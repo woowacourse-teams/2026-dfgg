@@ -319,6 +319,33 @@ class NextItemRecommendationV3PipelineTest {
     }
 
     @Test
+    @DisplayName("Accept-Language가 없으면 traits를 영어로 낸다")
+    void recommendV3_WhenLanguageAbsent_ReturnsEnglishTraits() {
+        NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
+
+        assertThat(response.recommendedItems())
+                .flatMap(item -> item.description().traits())
+                .isNotEmpty()
+                .allSatisfy(trait -> assertThat(trait).doesNotContainPattern("[가-힣]"));
+    }
+
+    @Test
+    @DisplayName("Accept-Language가 ko면 traits를 한국어로 낸다")
+    void recommendV3_WhenKoreanRequested_ReturnsKoreanTraits() {
+        NextItemRecommendationResponse response = given().contentType(ContentType.JSON)
+                .header("Accept-Language", "ko")
+                .body(requestWith(List.of(KRAKEN, INFINITY_EDGE)))
+                .when().post("/api/recommendations/v3")
+                .then().statusCode(200)
+                .extract().as(NextItemRecommendationResponse.class);
+
+        assertThat(response.recommendedItems())
+                .flatMap(item -> item.description().traits())
+                .isNotEmpty()
+                .allSatisfy(trait -> assertThat(trait).containsPattern("[가-힣]"));
+    }
+
+    @Test
     @DisplayName("Accept-Language가 ko면 아이템과 지목한 챔피언 이름을 한국어로 낸다")
     void recommendV3_WhenKoreanRequested_ReturnsKoreanNames() {
         NextItemRecommendationResponse response = given().contentType(ContentType.JSON)
@@ -349,7 +376,9 @@ class NextItemRecommendationV3PipelineTest {
     @Test
     @DisplayName("traits는 팀 어휘의 표시명만 낸다 — Data Dragon 원본 태그도 enum 이름도 새어나가지 않는다")
     void recommendV3_TraitsUseTheTeamVocabularyOnly() {
-        List<String> vocabulary = Arrays.stream(ItemTrait.values()).map(ItemTrait::getDisplayName).toList();
+        List<String> vocabulary = Arrays.stream(ItemTrait.values())
+                .flatMap(trait -> trait.getDisplayName().values().stream())
+                .toList();
 
         NextItemRecommendationResponse response = recommend(List.of(KRAKEN, INFINITY_EDGE));
 
