@@ -38,7 +38,8 @@ public class ParticipantItemPurchaseSnapshotService {
         List<ParticipantItemEvent> events = replaySourceMissing ? List.of() : normalizedEvents.stream()
                 .map(NormalizedMatchParticipantItemEvent::toParticipantItemEvent).toList();
         Map<ParticipantItemEvent, PurchaseInventoryReconstructor.PurchaseState> inventoryStates =
-                inventoryReconstructor.reconstruct(events);
+                inventoryReconstructor.reconstruct(events,
+                        normalizedEvents.isEmpty() ? null : normalizedEvents.getFirst().getPatch());
         List<ParticipantItemPurchaseSnapshot> snapshots = new ArrayList<>();
         for (NormalizedMatchParticipantItemEvent event : normalizedEvents) {
             if (event.isPurchase()) {
@@ -71,7 +72,12 @@ public class ParticipantItemPurchaseSnapshotService {
             return result(purchase, sourceEvent, state.inventoryBefore(), Status.EXCLUDED, Reason.PURCHASE_UNDONE);
         }
         if (state.inventoryBefore() == null || state.inventoryFailure() != null) {
-            return result(purchase, sourceEvent, null, Status.UNRESOLVED, Reason.INVENTORY_UNRESOLVED);
+            Reason reason = state.inventoryFailure() == null ? Reason.INVENTORY_UNRESOLVED
+                    : switch (state.inventoryFailure()) {
+                        case TRANSFORM_OUTPUT_UNOBSERVED -> Reason.TRANSFORM_OUTPUT_UNOBSERVED;
+                        default -> Reason.INVENTORY_UNRESOLVED;
+                    };
+            return result(purchase, sourceEvent, null, Status.UNRESOLVED, reason);
         }
         if (purchase.getGoldLower() == null && purchase.getGoldUpper() == null) {
             return result(purchase, sourceEvent, state.inventoryBefore(), Status.EXCLUDED, Reason.GOLD_RANGE_MISSING);

@@ -9,11 +9,84 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /** 정규화된 전체 아이템 행동을 재생해 각 구매 거래 직전의 보유 수량을 복원한다. */
 @Component
 public class PurchaseInventoryReconstructor {
+
+    private static final Set<Integer> ROLE_MARKERS = Set.of(1200, 1201, 1202, 1203, 1204,
+            1205, 1206, 1207, 1208, 2001, 2002);
+    private static final Set<Integer> INSTANT_ELIXIRS = Set.of(2138, 2139, 2140);
+    private static final Map<Integer, Integer> TRANSFORMS = Map.of(
+            3004, 3042, 3003, 3040, 3865, 3866, 3866, 3867, 2420, 2421);
+    private static final Map<Integer, Integer> MID_BOOTS = Map.of(
+            3009, 3170, 3158, 3171, 3006, 3172, 3111, 3173, 3047, 3174, 3020, 3175, 3008, 3168);
+
+    private Optional<ItemInventory> afterDestroy(ParticipantItemEvent event,
+            List<ParticipantItemEvent> events, ItemInventory inventory, boolean enabled, boolean midQuestCompleted) {
+        Integer itemId = event.itemId();
+        if (itemId == null || itemId <= 0) {
+            return Optional.empty();
+        }
+        if (enabled && ROLE_MARKERS.contains(itemId)) {
+            return Optional.of(inventory);
+        }
+        // 제거 이벤트 자체가 직전 보유의 근거다. 이전 구매 시점으로 소급하지 않는다.
+        ItemInventory before = inventory.quantityOf(itemId) == 0 ? inventory.add(itemId) : inventory;
+        if (enabled && itemId == 2422 && atMoment(event, events, "ITEM_DESTROYED", 1202)) {
+            return Optional.of(before); // Bot 퀘스트 슬롯 이동은 보유 자체의 소멸이 아니다.
+        }
+        if (enabled && (INSTANT_ELIXIRS.contains(itemId) || midQuestCompleted && MID_BOOTS.containsKey(itemId))
+                && atMoment(event, events, "ITEM_PURCHASED", itemId)) {
+            return Optional.of(inventory);
+        }
+        ItemInventory after = before.remove(itemId).orElseThrow();
+        if (enabled && MID_BOOTS.containsKey(itemId) && atMoment(event, events, "ITEM_DESTROYED", 1201)) {
+            return Optional.of(after.add(MID_BOOTS.get(itemId)));
+        }
+        if (enabled && TRANSFORMS.containsKey(itemId) && !hasPurchaseAtMoment(event, events)) {
+            return Optional.of(after.add(TRANSFORMS.get(itemId)));
+        }
+        return Optional.of(after);
+    }
+
+    private ItemInventory afterPurchase(ParticipantItemEvent purchase, List<ParticipantItemEvent> events,
+            ItemInventory inventory, boolean enabled, boolean midQuestCompleted) {
+        int itemId = purchase.itemId();
+        if (enabled && atMoment(purchase, events, "ITEM_DESTROYED", itemId)) {
+            if (INSTANT_ELIXIRS.contains(itemId)) {
+                return inventory;
+            }
+            if (midQuestCompleted && MID_BOOTS.containsKey(itemId)) {
+                return inventory.add(MID_BOOTS.get(itemId));
+            }
+        }
+        return inventory.add(itemId);
+    }
+
+    private boolean isMaterial(ParticipantItemEvent purchase, Integer itemId,
+            boolean enabled, boolean midQuestCompleted) {
+        return !enabled || !ROLE_MARKERS.contains(itemId)
+                && !(itemId.equals(purchase.itemId()) && (INSTANT_ELIXIRS.contains(itemId)
+                || midQuestCompleted && MID_BOOTS.containsKey(itemId)));
+    }
+
+    private boolean hasPurchaseAtMoment(ParticipantItemEvent event, List<ParticipantItemEvent> events) {
+        return events.stream().anyMatch(other -> sameMoment(event, other)
+                && "ITEM_PURCHASED".equals(other.eventType()));
+    }
+
+    private boolean atMoment(ParticipantItemEvent event, List<ParticipantItemEvent> events, String type, int itemId) {
+        return events.stream().anyMatch(other -> sameMoment(event, other)
+                && type.equals(other.eventType()) && Objects.equals(other.itemId(), itemId));
+    }
+
+    private boolean sameMoment(ParticipantItemEvent first, ParticipantItemEvent second) {
+        return first.gameTimeMs() != null && first.sourceFrameIndex() == second.sourceFrameIndex()
+                && first.gameTimeMs().equals(second.gameTimeMs());
+    }
 
     private final PurchaseMaterialLinker materialLinker;
 
@@ -23,13 +96,17 @@ public class PurchaseInventoryReconstructor {
 
     /** 구매마다 복원 결과·실패 이유·구매 취소 여부를 반환한다. */
     public Map<ParticipantItemEvent, PurchaseState> reconstruct(List<ParticipantItemEvent> events) {
+        return reconstruct(events, null);
+    }
+
+    public Map<ParticipantItemEvent, PurchaseState> reconstruct(List<ParticipantItemEvent> events, String patch) {
         if (events == null) {
             throw new IllegalArgumentException("전체 아이템 이벤트가 필요합니다.");
         }
         Map<Integer, List<ParticipantItemEvent>> byParticipant = groupByParticipant(events);
         Map<ParticipantItemEvent, PurchaseState> states = new HashMap<>();
         for (List<ParticipantItemEvent> participantEvents : byParticipant.values()) {
-            replay(participantEvents, states);
+            replay(participantEvents, states, "16.18".equals(patch));
         }
         return Map.copyOf(states);
     }
@@ -56,7 +133,9 @@ public class PurchaseInventoryReconstructor {
         return grouped;
     }
 
-    private void replay(List<ParticipantItemEvent> events, Map<ParticipantItemEvent, PurchaseState> states) {
+    private void replay(List<ParticipantItemEvent> events, Map<ParticipantItemEvent, PurchaseState> states,
+                        boolean patchRulesEnabled) {
+        boolean midQuestCompleted = false;
         ItemInventory inventory = ItemInventory.empty();
         ArrayDeque<Transaction> transactions = new ArrayDeque<>();
         boolean reliable = true;
@@ -74,14 +153,15 @@ public class PurchaseInventoryReconstructor {
             }
 
             if ("ITEM_PURCHASED".equals(event.eventType())) {
-                Optional<ItemInventory> before = beforePurchase(event, events, inventory);
+                Optional<ItemInventory> before = beforePurchase(event, events, inventory, patchRulesEnabled, midQuestCompleted);
                 if (before.isEmpty()) {
                     firstFailure = InventoryFailure.COMBINATION_MATERIAL_UNRESOLVED;
                     states.put(event, PurchaseState.unresolved(firstFailure));
                     reliable = false;
                     continue;
                 }
-                Optional<ItemInventory> after = add(event.itemId(), inventory);
+                Optional<ItemInventory> after = event.itemId() == null || event.itemId() <= 0
+                        ? Optional.empty() : Optional.of(afterPurchase(event, events, inventory, patchRulesEnabled, midQuestCompleted));
                 if (after.isEmpty()) {
                     firstFailure = InventoryFailure.INVALID_ITEM_EVENT;
                     states.put(event, PurchaseState.unresolved(firstFailure));
@@ -111,9 +191,19 @@ public class PurchaseInventoryReconstructor {
             }
 
             if ("ITEM_DESTROYED".equals(event.eventType())) {
-                Optional<ItemInventory> after = remove(event.itemId(), inventory);
+                if (patchRulesEnabled && Objects.equals(event.itemId(), 1201)) {
+                    midQuestCompleted = true;
+                }
+                if (patchRulesEnabled && Objects.equals(event.itemId(), 3867)
+                        && !hasPurchaseAtMoment(event, events)) {
+                    firstFailure = InventoryFailure.TRANSFORM_OUTPUT_UNOBSERVED;
+                    reliable = false;
+                    continue;
+                }
+                Optional<ItemInventory> after = afterDestroy(event, events, inventory,
+                        patchRulesEnabled, midQuestCompleted);
                 if (after.isEmpty()) {
-                    firstFailure = InventoryFailure.ITEM_NOT_IN_INVENTORY;
+                    firstFailure = InventoryFailure.INVALID_ITEM_EVENT;
                     reliable = false;
                     continue;
                 }
@@ -189,12 +279,14 @@ public class PurchaseInventoryReconstructor {
     }
 
     private Optional<ItemInventory> beforePurchase(ParticipantItemEvent purchase,
-                                                   List<ParticipantItemEvent> events, ItemInventory inventory) {
+                                                   List<ParticipantItemEvent> events, ItemInventory inventory,
+                                                   boolean patchRulesEnabled, boolean midQuestCompleted) {
         Optional<List<Integer>> materials = materialLinker.link(purchase, events);
         if (materials.isEmpty()) {
             return hasUnlinkedDestroy(purchase, events) ? Optional.empty() : Optional.of(inventory);
         }
-        return Optional.of(inventory.restore(materials.orElseThrow()));
+        return Optional.of(inventory.restore(materials.orElseThrow().stream()
+                .filter(itemId -> isMaterial(purchase, itemId, patchRulesEnabled, midQuestCompleted)).toList()));
     }
 
     private boolean hasUnlinkedDestroy(ParticipantItemEvent purchase, List<ParticipantItemEvent> events) {
@@ -210,13 +302,6 @@ public class PurchaseInventoryReconstructor {
             }
         }
         return false;
-    }
-
-    private Optional<ItemInventory> add(Integer itemId, ItemInventory inventory) {
-        if (itemId == null || itemId <= 0) {
-            return Optional.empty();
-        }
-        return Optional.of(inventory.add(itemId));
     }
 
     private Optional<ItemInventory> remove(Integer itemId, ItemInventory inventory) {
@@ -251,7 +336,8 @@ public class PurchaseInventoryReconstructor {
         ITEM_NOT_IN_INVENTORY,
         INVALID_ITEM_EVENT,
         UNDO_TRANSACTION_UNRESOLVED,
-        UNSUPPORTED_ITEM_EVENT
+        UNSUPPORTED_ITEM_EVENT,
+        TRANSFORM_OUTPUT_UNOBSERVED
     }
 
     private enum TransactionType {

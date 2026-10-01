@@ -27,6 +27,7 @@ public record ParticipantItemPurchaseSnapshot(
         SOURCE_EVENT_AMBIGUOUS,
         SOURCE_EVENT_MISMATCH,
         INVENTORY_UNRESOLVED,
+        TRANSFORM_OUTPUT_UNOBSERVED,
         GOLD_RANGE_MISSING,
         GOLD_RANGE_INVALID
     }
