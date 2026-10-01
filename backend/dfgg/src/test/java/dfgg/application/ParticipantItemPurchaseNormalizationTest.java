@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dfgg.application.match.ParticipantItemEventExtractor;
 import dfgg.application.match.ParticipantItemPurchaseExtractor;
 import dfgg.application.match.ParticipantItemPurchaseNormalizationService;
+import dfgg.application.match.ParticipantItemPurchaseSnapshotService;
+import dfgg.application.match.ParticipantItemPurchaseSnapshot.Reason;
+import dfgg.application.match.PurchaseInventoryReconstructor;
 import dfgg.application.match.PurchaseCostEstimator;
 import dfgg.application.match.PurchaseGoldRangeCalculator;
 import dfgg.application.match.PurchaseMaterialLinker;
@@ -30,13 +33,15 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 @Import({ParticipantItemEventExtractor.class, ParticipantItemPurchaseExtractor.class,
         PurchaseMaterialLinker.class, PurchaseCostEstimator.class, PurchaseGoldRangeCalculator.class,
-        ParticipantItemPurchaseNormalizationService.class})
+        ParticipantItemPurchaseNormalizationService.class, ParticipantItemPurchaseSnapshotService.class,
+        PurchaseInventoryReconstructor.class})
 class ParticipantItemPurchaseNormalizationTest {
 
     @Autowired private RawMatchTimelineRepository timelineRepository;
     @Autowired private NormalizedMatchParticipantItemEventRepository purchaseRepository;
     @Autowired private ParticipantItemPurchaseNormalizationService service;
     @Autowired private EntityManager entityManager;
+    @Autowired private ParticipantItemPurchaseSnapshotService snapshotService;
 
     @Test
     void 재실행해도_중복_구매가_없고_Raw는_유지한다() {
@@ -134,6 +139,36 @@ class ParticipantItemPurchaseNormalizationTest {
         entityManager.clear();
         var saved = purchaseRepository.findByMatchIdOrderByParticipantIdAscPurchaseOrderAsc("KR_TEST");
         assertThat(saved).hasSize(6).extracting(NormalizedMatchParticipantItemEvent::getItemCost).containsOnlyNulls();
+    }
+
+    @Test
+    void Raw없이_같은_테이블의_판매와_UNDO로_구매_직전_상태를_복원한다() {
+        String raw = """
+                {"metadata":{"matchId":"KR_TEST"},"info":{"frames":[
+                    {"participantFrames":{"1":{"currentGold":2000}},"events":[]},
+                    {"participantFrames":{"1":{"currentGold":1650}},"events":[
+                        {"type":"ITEM_PURCHASED","participantId":1,"itemId":1036,"timestamp":100},
+                        {"type":"ITEM_SOLD","participantId":1,"itemId":1036,"timestamp":150},
+                        {"type":"ITEM_UNDO","participantId":1,"beforeId":0,"afterId":1036,"timestamp":160},
+                        {"type":"ITEM_PURCHASED","participantId":1,"itemId":1036,"timestamp":200},
+                        {"type":"ITEM_UNDO","participantId":1,"beforeId":1036,"afterId":0,"timestamp":210}
+                    ]}
+                ]}}
+                """;
+        timelineRepository.saveAndFlush(new RawMatchTimeline("KR_TEST", raw));
+        service.normalize("KR_TEST", "16.18", Map.of(1036, ItemPurchaseType.COMPONENT), catalog(),
+                Map.of(1, "TOP"));
+        timelineRepository.deleteById("KR_TEST");
+        timelineRepository.flush();
+        entityManager.clear();
+
+        var snapshots = snapshotService.snapshotsForMatch("KR_TEST");
+
+        assertThat(purchaseRepository.findByMatchIdOrderByParticipantIdAscEventOrderAsc("KR_TEST")).hasSize(5);
+        assertThat(snapshots).hasSize(2);
+        assertThat(snapshots.getFirst().inventoryBefore().quantityOf(1036)).isZero();
+        assertThat(snapshots.get(1).inventoryBefore().quantityOf(1036)).isEqualTo(1);
+        assertThat(snapshots.get(1).reason()).isEqualTo(Reason.PURCHASE_UNDONE);
     }
 
     private ItemResponse catalog() {
