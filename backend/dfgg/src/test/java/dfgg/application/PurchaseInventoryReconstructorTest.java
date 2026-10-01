@@ -18,6 +18,23 @@ class PurchaseInventoryReconstructorTest {
             new PurchaseInventoryReconstructor(new PurchaseMaterialLinker());
 
     @Test
+    void 서포터_제어와드_전용슬롯은_첫구매부터_유지하고_다른포지션이나_패치에_적용하지_않는다() {
+        var events = events("""
+                {"type":"ITEM_PURCHASED","participantId":1,"itemId":2055,"timestamp":100},
+                {"type":"ITEM_PURCHASED","participantId":1,"itemId":1036,"timestamp":200}
+                """);
+        var supports = java.util.Set.of(1);
+        var supportState = reconstructor.reconstruct(events, "16.18", supports);
+        assertThat(supportState.get(events.getFirst()).inventoryBefore().controlWardsInQuestSlot()).isTrue();
+        assertThat(supportState.get(events.getLast()).inventoryBefore().quantityOf(2055)).isEqualTo(1);
+        assertThat(supportState.get(events.getLast()).inventoryBefore().controlWardsInQuestSlot()).isTrue();
+        assertThat(reconstructor.reconstruct(events, "16.18").get(events.getLast())
+                .inventoryBefore().controlWardsInQuestSlot()).isFalse();
+        assertThat(reconstructor.reconstruct(events, "16.17", supports).get(events.getLast())
+                .inventoryBefore().controlWardsInQuestSlot()).isFalse();
+    }
+
+    @Test
     void 구매_직전_상태에는_조합으로_제거될_재료가_포함된다() {
         List<ParticipantItemEvent> events = events("""
                 {"type":"ITEM_PURCHASED","participantId":1,"itemId":1036,"timestamp":100},

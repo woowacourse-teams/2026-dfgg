@@ -102,9 +102,15 @@ public class ParticipantItemPurchaseSnapshotService {
         boolean replaySourceMissing = normalizedEvents.stream().anyMatch(event -> !event.hasReplaySource());
         List<ParticipantItemEvent> events = replaySourceMissing ? List.of() : normalizedEvents.stream()
                 .map(NormalizedMatchParticipantItemEvent::toParticipantItemEvent).toList();
+        var positions = new dfgg.application.ChampionPositionNormalizer();
+        var supports = normalizedEvents.stream()
+                .filter(event -> positions.normalize(event.getPosition())
+                        .filter(dfgg.domain.champion.ChampionPosition.SUPPORT::equals).isPresent())
+                .map(NormalizedMatchParticipantItemEvent::getParticipantId)
+                .collect(java.util.stream.Collectors.toSet());
         Map<ParticipantItemEvent, PurchaseInventoryReconstructor.PurchaseState> inventoryStates =
                 inventoryReconstructor.reconstruct(events,
-                        normalizedEvents.isEmpty() ? null : normalizedEvents.getFirst().getPatch());
+                        normalizedEvents.isEmpty() ? null : normalizedEvents.getFirst().getPatch(), supports);
         List<ParticipantItemPurchaseSnapshot> snapshots = new ArrayList<>();
         for (NormalizedMatchParticipantItemEvent event : normalizedEvents) {
             if (event.isPurchase()) {

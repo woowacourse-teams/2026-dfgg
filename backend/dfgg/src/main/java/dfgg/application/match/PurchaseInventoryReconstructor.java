@@ -98,13 +98,19 @@ public class PurchaseInventoryReconstructor {
     }
 
     public Map<ParticipantItemEvent, PurchaseState> reconstruct(List<ParticipantItemEvent> events, String patch) {
+        return reconstruct(events, patch, Set.of());
+    }
+
+    public Map<ParticipantItemEvent, PurchaseState> reconstruct(List<ParticipantItemEvent> events, String patch,
+                                                               Set<Integer> supportParticipants) {
         if (events == null) {
             throw new IllegalArgumentException("전체 아이템 이벤트가 필요합니다.");
         }
         Map<Integer, List<ParticipantItemEvent>> byParticipant = groupByParticipant(events);
         Map<ParticipantItemEvent, PurchaseState> states = new HashMap<>();
         for (List<ParticipantItemEvent> participantEvents : byParticipant.values()) {
-            replay(participantEvents, states, "16.18".equals(patch));
+            replay(participantEvents, states, "16.18".equals(patch),
+                    supportParticipants.contains(participantEvents.getFirst().participantId()));
         }
         return Map.copyOf(states);
     }
@@ -132,9 +138,10 @@ public class PurchaseInventoryReconstructor {
     }
 
     private void replay(List<ParticipantItemEvent> events, Map<ParticipantItemEvent, PurchaseState> states,
-                        boolean patchRulesEnabled) {
+                        boolean patchRulesEnabled, boolean supportParticipant) {
         boolean midQuestCompleted = false;
-        ItemInventory inventory = ItemInventory.empty();
+        ItemInventory inventory = patchRulesEnabled && supportParticipant
+                ? ItemInventory.empty().moveControlWardsToQuestSlot() : ItemInventory.empty();
         ArrayDeque<Transaction> transactions = new ArrayDeque<>();
         boolean reliable = true;
         InventoryFailure firstFailure = null;

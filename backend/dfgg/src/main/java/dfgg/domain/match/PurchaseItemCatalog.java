@@ -21,6 +21,9 @@ public interface PurchaseItemCatalog {
                 quantity--; // 신발 한 개만 별도 슬롯을 사용한다.
                 questSlotAvailable = false;
             }
+            if (inventory.controlWardsInQuestSlot() && item.id() == 2055) {
+                quantity = Math.max(0, quantity - 2);
+            }
             slots += item.slotsFor(quantity);
         }
         return slots;

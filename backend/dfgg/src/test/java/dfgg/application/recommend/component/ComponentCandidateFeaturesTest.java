@@ -64,6 +64,31 @@ class ComponentCandidateFeaturesTest {
         assertThat(questBefore).isNotEqualTo(before);
     }
 
+    @Test
+    void support_control_wards_keep_quantities_but_do_not_block_component_candidates() throws Exception {
+        var response = new ObjectMapper().readValue("""
+                {"data":{
+                  "9":{"gold":{"total":100,"purchasable":true}},
+                  "2055":{"stacks":2,"gold":{"total":75,"purchasable":true}},
+                  "1038":{"gold":{"total":1300,"purchasable":true},"stats":{"FlatPhysicalDamageMod":40}},
+                  "3031":{"from":["1038"],"gold":{"total":3000,"purchasable":true}}}}
+                """, ItemResponse.class);
+        var catalog = new DataDragonPurchaseItemCatalog(response.data());
+        var before = ItemInventory.empty().add(9).add(9).add(9).add(9).add(9).add(2055).add(2055);
+        var resolver = new BuildPathResolver(catalog);
+        assertThat(catalog.occupiedSlots(before)).isEqualTo(6);
+        assertThat(resolver.resolve(3031, before, 1300)).isEmpty();
+        var supportBefore = before.moveControlWardsToQuestSlot();
+        var candidate = resolver.resolve(3031, supportBefore, 1300).getFirst();
+        assertThat(candidate.inventoryAfter().quantityOf(2055)).isEqualTo(2);
+        assertThat(candidate.inventoryAfter().controlWardsInQuestSlot()).isTrue();
+        var vector = ComponentCandidateFeatures.calculate(supportBefore, candidate, 3031,
+                catalog, response, 120_000, "UTILITY").features();
+        assertThat(vector.subList(3, 5)).containsExactly(5.0, 6.0);
+        assertThat(catalog.occupiedSlots(supportBefore.add(2055))).isEqualTo(6); // 전용 슬롯은 2개까지.
+        assertThat(supportBefore.remove(2055).orElseThrow().controlWardsInQuestSlot()).isTrue();
+    }
+
     @ParameterizedTest
     @CsvSource({"MIDDLE,3", "MID,3", "UTILITY,5", "SUPPORT,5", "TOP,1", "JUNGLE,2", "BOTTOM,4", "UNKNOWN,6"})
     void purchase_context_uses_minutes_and_existing_position_normalization(String position, int hotIndex) throws Exception {

@@ -22,13 +22,16 @@ public final class ItemInventory {
 
     private final boolean bootsInQuestSlot;
 
-    private ItemInventory(Map<Integer, Integer> quantities, boolean bootsInQuestSlot) {
+    private final boolean controlWardsInQuestSlot;
+
+    private ItemInventory(Map<Integer, Integer> quantities, boolean bootsInQuestSlot, boolean controlWardsInQuestSlot) {
         this.quantities = Map.copyOf(quantities);
         this.bootsInQuestSlot = bootsInQuestSlot;
+        this.controlWardsInQuestSlot = controlWardsInQuestSlot;
     }
 
     public static ItemInventory empty() {
-        return new ItemInventory(Map.of(), false);
+        return new ItemInventory(Map.of(), false, false);
     }
 
     /** 아이템 한 개를 획득한다. */
@@ -36,7 +39,7 @@ public final class ItemInventory {
         validateItemId(itemId);
         Map<Integer, Integer> changed = new HashMap<>(quantities);
         changed.merge(itemId, 1, Integer::sum);
-        return new ItemInventory(changed, bootsInQuestSlot);
+        return new ItemInventory(changed, bootsInQuestSlot, controlWardsInQuestSlot);
     }
 
     /** 구매 직전에 조합으로 제거된 재료들을 스냅샷에 되돌린다. */
@@ -61,16 +64,25 @@ public final class ItemInventory {
         } else {
             changed.put(itemId, quantity - 1);
         }
-        return Optional.of(new ItemInventory(changed, bootsInQuestSlot));
+        return Optional.of(new ItemInventory(changed, bootsInQuestSlot, controlWardsInQuestSlot));
     }
 
     /** Bot 퀘스트 완료 시 신발 한 개를 별도 슬롯에 유지한다. 아이템 수량·능력치는 유지한다. */
     public ItemInventory moveBootsToQuestSlot() {
-        return bootsInQuestSlot ? this : new ItemInventory(quantities, true);
+        return bootsInQuestSlot ? this : new ItemInventory(quantities, true, controlWardsInQuestSlot);
     }
 
     public boolean bootsInQuestSlot() {
         return bootsInQuestSlot;
+    }
+
+    /** 16.18 서포터의 전용 슬롯은 제어 와드 두 개까지 보관한다. 수량은 함께 유지한다. */
+    public ItemInventory moveControlWardsToQuestSlot() {
+        return controlWardsInQuestSlot ? this : new ItemInventory(quantities, bootsInQuestSlot, true);
+    }
+
+    public boolean controlWardsInQuestSlot() {
+        return controlWardsInQuestSlot;
     }
 
     public int quantityOf(int itemId) {
@@ -96,11 +108,13 @@ public final class ItemInventory {
         if (!(other instanceof ItemInventory inventory)) {
             return false;
         }
-        return bootsInQuestSlot == inventory.bootsInQuestSlot && quantities.equals(inventory.quantities);
+        return bootsInQuestSlot == inventory.bootsInQuestSlot
+                && controlWardsInQuestSlot == inventory.controlWardsInQuestSlot
+                && quantities.equals(inventory.quantities);
     }
 
     @Override
     public int hashCode() {
-        return java.util.Objects.hash(quantities, bootsInQuestSlot);
+        return java.util.Objects.hash(quantities, bootsInQuestSlot, controlWardsInQuestSlot);
     }
 }
