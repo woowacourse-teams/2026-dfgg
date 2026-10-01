@@ -1,0 +1,44 @@
+:root {
+  --bg: #10131a;
+  --surface: #1a1f2b;
+  --surface-hover: #212836;
+  --border: #2b3346;
+  --text: #e6e9f0;
+  --text-dim: #8d97ab;
+  --accent: #4f8cff;
+  --ok: #3ecf8e;
+  --warn: #e8b54a;
+  --off: #6b7488;
+}
+
+/*
+ * min-height 면 내용만큼 .app 이 늘어나 자기 안에서는 넘치지 않는다.
+ * 그러면 스크롤바가 문서에 생겨서 여기 건 overflow 설정이 닿지 않는다.
+ * height 로 못 박아야 .app 이 스크롤 상자가 된다.
+ */
+.app {
+  height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.app::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- 본문 ---------- */
+.content {
+  flex: 1;
+  padding: 16px;
+}
+
+.empty {
+  margin: 48px 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}

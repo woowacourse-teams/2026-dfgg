@@ -1,5 +1,12 @@
 @import 'tailwindcss';
 
+@font-face {
+  font-family: 'Cafe24Ohsquare';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/Cafe24Ohsquare.woff')
+    format('woff');
+  font-display: swap;
+}
+
 @theme {
   /* 배너 계열 */
   --color-cornflower: #5b78dc;
@@ -48,65 +55,44 @@
    */
   --color-mine: #e8b64c;
 
+  --color-rank-1: #f0c060;
+  --color-rank-2: #c8ced8;
+  --color-rank-3: #d0925a;
+  --color-overlay: rgb(10 14 28 / 0.72);
+
   --color-win: #3fc094;
   --color-loss: #ec6d86;
 
   --font-display:
     'Bahnschrift', 'DIN Alternate', 'DIN Condensed', 'Oswald', 'Arial Narrow', system-ui, sans-serif;
+  --font-mono: 'Cascadia Mono', 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, monospace;
+  --font-impact: 'Cafe24Ohsquare', 'Pretendard Variable', sans-serif;
   --font-body:
     'Pretendard Variable', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui,
     -apple-system, sans-serif;
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     background-color: var(--color-ground);
     color: var(--color-ink);
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
+    word-break: keep-all;
   }
-}
 
-.chamfer {
-  clip-path: polygon(
-    12px 0,
-    100% 0,
-    100% calc(100% - 12px),
-    calc(100% - 12px) 100%,
-    0 100%,
-    0 12px
-  );
-}
+  ::selection {
+    background: var(--color-accent-strong);
+    color: #fff;
+  }
 
-.chamfer-sm {
-  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
-}
-
-/* 배너 하단을 검정 바탕으로 녹이는 베일 */
-.banner-veil {
-  background: linear-gradient(
-    180deg,
-    rgb(0 0 0 / 0.12) 0%,
-    rgb(0 0 0 / 0) 42%,
-    rgb(0 0 0 / 0.55) 82%,
-    #000 100%
-  );
-}
-
-/* 상단 헤더 고정 */
-/*
- * 상단 바. fixed 는 문서 흐름에서 빠져 아래 내용이 바 밑으로 파고든다.
- * sticky 는 흐름에 남아 자기 높이만큼 자리를 차지하면서도 스크롤에 따라붙는다.
- * 덕분에 바 높이를 padding-top 으로 따로 맞춰줄 필요가 없다 — 로고 크기를
- * 바꿔도 어긋나지 않는다.
- */
-.fixed-header {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  padding: 16px 40px;
-
-  /* 배경이 없으면 스크롤된 내용이 바를 그대로 통과해 보인다. */
-  background-color: var(--color-ground);
-  border-bottom: 1px solid var(--color-line);
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
 }

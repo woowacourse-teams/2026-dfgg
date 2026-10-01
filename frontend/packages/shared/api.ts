@@ -1,4 +1,9 @@
-import type { RecommendationRequest, RecommendationResponse } from './types';
+import type {
+  RecommendationRequest,
+  RecommendationResponse,
+  RecommendationV3Request,
+  RecommendationV3Response,
+} from './types';
 
 /**
  * 개발 중에는 webpack devServer가 /recommendations 를 :8080 으로 프록시한다.
@@ -11,13 +16,28 @@ export async function requestRecommendation(
   request: RecommendationRequest,
   signal?: AbortSignal,
 ): Promise<RecommendationResponse> {
-  const response = await fetch(`${API_BASE}/recommendations`, {
+  const response = await fetch(`${API_BASE}/api/recommendations/v2`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
     signal,
   });
 
-  if (!response.ok) throw new Error(`recommendations ${response.status}`);
+  if (!response.ok) throw new Error(`/api/recommendations/v2 ${response.status}`);
+  return response.json();
+}
+
+export async function requestRecommendationV3(
+  request: RecommendationV3Request,
+  signal?: AbortSignal,
+): Promise<RecommendationV3Response> {
+  const response = await fetch(`${API_BASE}/api/recommendations/v3`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+    signal,
+  });
+
+  if (!response.ok) throw new Error(`/api/recommendations/v3 ${response.status}`);
   return response.json();
 }

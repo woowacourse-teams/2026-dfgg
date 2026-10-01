@@ -1,0 +1,198 @@
+{
+  "name": "desktop",
+  "version": "2.0.2",
+  "description": "League of Legends item build recommendations from the ten champions in your match",
+  "author": {
+    "name": "dfgg"
+  },
+  "private": true,
+  "main": "out/main/main.js",
+  "scripts": {
+    "start": "webpack server --mode development",
+    "build:main": "tsc -p tsconfig.main.json && pnpm bundle:sentry",
+    "bundle:sentry": "esbuild out/main/sentry.js --bundle --platform=node --format=cjs --external:electron --allow-overwrite --outfile=out/main/sentry.js --log-level=error",
+    "build:renderer": "webpack --mode production",
+    "build": "pnpm build:main && pnpm build:renderer",
+    "typecheck": "tsc --noEmit",
+    "electron:start": "pnpm build:main && electron .",
+    "electron:dev": "concurrently -k \"pnpm start\" \"wait-on http://localhost:3001/home/index.html && pnpm electron:start\"",
+    "package": "pnpm build && electron-builder --win nsis",
+    "package:store": "pnpm build && electron-builder --win appx",
+    "package:all": "pnpm build && electron-builder --win nsis appx",
+    "package:publish": "pnpm build && electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "electron-overlay-window": "^4.1.0",
+    "electron-updater": "^6.8.9",
+    "koffi": "^3.3.2",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@sentry/electron": "^7.20.0",
+    "@types/node": "^22.20.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.1",
+    "concurrently": "^10.0.5",
+    "electron": "44.4.1",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "wait-on": "^9.1.0"
+  },
+  "build": {
+    "appId": "gg.dfgg.desktop",
+    "productName": "dfgg",
+    "directories": {
+      "output": "release",
+      "buildResources": "resources/installer"
+    },
+    "files": [
+      "out/**/*",
+      "package.json",
+      {
+        "from": "../../node_modules/ws",
+        "to": "node_modules/ws"
+      },
+      {
+        "from": "../../node_modules/electron-overlay-window",
+        "to": "node_modules/electron-overlay-window"
+      },
+      {
+        "from": "../../node_modules/node-gyp-build",
+        "to": "node_modules/node-gyp-build"
+      },
+      {
+        "from": "../../node_modules/throttle-debounce",
+        "to": "node_modules/throttle-debounce"
+      },
+      {
+        "from": "../../node_modules/koffi",
+        "to": "node_modules/koffi"
+      },
+      {
+        "from": "../../node_modules/@koromix/koffi-win32-x64",
+        "to": "node_modules/@koromix/koffi-win32-x64"
+      },
+      {
+        "from": "../../node_modules/electron-updater",
+        "to": "node_modules/electron-updater"
+      },
+      {
+        "from": "../../node_modules/builder-util-runtime",
+        "to": "node_modules/builder-util-runtime"
+      },
+      {
+        "from": "../../node_modules/debug",
+        "to": "node_modules/debug"
+      },
+      {
+        "from": "../../node_modules/ms",
+        "to": "node_modules/ms"
+      },
+      {
+        "from": "../../node_modules/sax",
+        "to": "node_modules/sax"
+      },
+      {
+        "from": "../../node_modules/fs-extra",
+        "to": "node_modules/fs-extra"
+      },
+      {
+        "from": "../../node_modules/graceful-fs",
+        "to": "node_modules/graceful-fs"
+      },
+      {
+        "from": "../../node_modules/jsonfile",
+        "to": "node_modules/jsonfile"
+      },
+      {
+        "from": "../../node_modules/universalify",
+        "to": "node_modules/universalify"
+      },
+      {
+        "from": "../../node_modules/js-yaml",
+        "to": "node_modules/js-yaml"
+      },
+      {
+        "from": "../../node_modules/argparse",
+        "to": "node_modules/argparse"
+      },
+      {
+        "from": "../../node_modules/lazy-val",
+        "to": "node_modules/lazy-val"
+      },
+      {
+        "from": "../../node_modules/lodash.escaperegexp",
+        "to": "node_modules/lodash.escaperegexp"
+      },
+      {
+        "from": "../../node_modules/lodash.isequal",
+        "to": "node_modules/lodash.isequal"
+      },
+      {
+        "from": "../../node_modules/semver",
+        "to": "node_modules/semver"
+      },
+      {
+        "from": "../../node_modules/tiny-typed-emitter",
+        "to": "node_modules/tiny-typed-emitter"
+      }
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "win": {
+      "icon": "resources/icons/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "appx",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "forceCodeSigning": false,
+    "artifactName": "dfgg-setup.${ext}",
+    "appx": {
+      "identityName": "DFGG.DFGG",
+      "publisher": "CN=9DD9FAAE-E9F4-42B1-B663-BF31249E9AB8",
+      "publisherDisplayName": "DFGG",
+      "applicationId": "dfgg",
+      "displayName": "dfgg",
+      "backgroundColor": "#0e1428",
+      "languages": [
+        "ko-KR"
+      ],
+      "customExtensionsPath": "resources/installer/appx-extensions.xml"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "woowacourse-teams",
+        "repo": "2026-dfgg"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "resources/icons",
+        "to": "icons"
+      }
+    ]
+  }
+}

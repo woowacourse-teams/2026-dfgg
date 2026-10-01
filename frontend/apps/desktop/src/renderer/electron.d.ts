@@ -1,0 +1,46 @@
+import type {
+  EndedGame,
+  FeedbackRating,
+  GameflowPhase,
+  LcuCurrentRankedStats,
+  LcuState,
+  LcuStatus,
+  MatchDetail,
+  MatchSummary,
+  RecommendationUpdate,
+  Summoner,
+} from '../shared/types';
+
+export {};
+
+type StatusListener = (status: LcuStatus) => void;
+type PhaseListener = (phase: GameflowPhase) => void;
+type ItemsListener = (items: RecommendationUpdate) => void;
+type Unsubscribe = () => void;
+
+declare global {
+  interface Window {
+    lcu: {
+      currentSummoner: () => Promise<Summoner | null>;
+      getRankInfo: () => Promise<LcuCurrentRankedStats | null>;
+      getState: () => Promise<LcuState>;
+      getMatchHistoryInfo: () => Promise<MatchSummary[] | null>;
+      getMatchDetail: (gameId: number) => Promise<MatchDetail | null>;
+      onStatusChange: (callback: StatusListener) => Unsubscribe;
+      onPhaseChange: (callback: PhaseListener) => Unsubscribe;
+      onItemsRecommendationChange: (callback: ItemsListener) => Unsubscribe;
+      getEndedGame: () => Promise<EndedGame | null>;
+    };
+    windowControls: {
+      setCollapsed: (collapsed: boolean) => void;
+      minimize: () => void;
+      close: () => void;
+    };
+    analytics: {
+      track: (name: string, data?: Record<string, string | number | boolean>) => void;
+    };
+    feedback: {
+      submit: (rating: FeedbackRating, game: EndedGame) => Promise<Record<string, string>>;
+    };
+  }
+}

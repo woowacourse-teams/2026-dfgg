@@ -1,0 +1,181 @@
+/* ---------- 상단 상태 바 ---------- */
+.status-bar {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  /* 아래 목록의 position 요소들이 헤더 위로 칠해지지 않게 층을 올린다 */
+  z-index: 10;
+}
+
+.title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 32px;
+  flex-shrink: 0;
+  padding-left: 10px;
+  -webkit-app-region: drag;
+}
+
+.title-bar-logo {
+  width: 16px;
+  height: 16px;
+  -webkit-user-drag: none;
+}
+
+.title-bar-controls {
+  display: flex;
+  align-self: stretch;
+}
+
+.title-bar-button {
+  width: 46px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', sans-serif;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  /* 부모의 drag 를 상속하면 클릭이 드래그로 먹혀 버튼이 눌리지 않는다 */
+  -webkit-app-region: no-drag;
+}
+
+.title-bar-button:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text);
+}
+
+.title-bar-button:active {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* 닫기만 붉게 — Windows 관습 */
+.title-bar-close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+.title-bar-close:active {
+  background: #b0271a;
+}
+
+/* ---------- 프로필 (헤더) ---------- */
+.info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 16px 14px;
+}
+
+.avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+}
+
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface-hover);
+  object-fit: cover;
+}
+
+/* 롤 클라이언트처럼 아이콘 아래쪽에 레벨을 겹친다 */
+.avatar-level {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.identity-name {
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 태그는 이름의 부속이라 약하게 */
+.identity-tag {
+  margin-left: 2px;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.xp-bar {
+  width: 160px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.xp-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* 연결 상태는 보조 정보라 오른쪽 끝으로 민다 */
+/* 연결 상태는 보조 정보라 점 + 짧은 글자로만 알린다 */
+.connection {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  padding: 5px 11px 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+}
+
+.connection-text {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--off);
+}
+
+.status-dot-connected {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.18);
+}
+
+.status-dot-connecting {
+  background: var(--warn);
+}
