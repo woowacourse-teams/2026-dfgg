@@ -1,6 +1,7 @@
 import { fetchCurrentSummoner } from '../lcu/service';
 import { onStatusChange } from '../lcu/state';
 import { trackEvent } from './umami';
+import { reportError } from '../sentry';
 
 const RETRY_MS = 3000;
 const MAX_ATTEMPTS = 10;
@@ -30,8 +31,9 @@ async function resolveIdentity(gen: number, attempt = 1) {
       }
       return;
     }
-  } catch {
+  } catch (error) {
     // 아래에서 재시도
+    reportError('identity', error);
   }
 
   if (gen !== generation) return;

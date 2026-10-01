@@ -1,5 +1,6 @@
 import './MatchSection.css';
 
+import * as Sentry from '@sentry/electron/renderer';
 import { useEffect, useState } from 'react';
 
 import type {
@@ -26,7 +27,10 @@ function useDdragonVersion() {
     fetch('https://ddragon.leagueoflegends.com/api/versions.json')
       .then((response) => response.json())
       .then((versions: string[]) => setVersion(versions[0]))
-      .catch(() => console.error('DDragon 버전을 불러오지 못했습니다.'));
+      .catch((error) => {
+        console.error('DDragon 버전을 불러오지 못했습니다.');
+        Sentry.captureException(error);
+      });
   }, []);
 
   return version;
@@ -295,7 +299,10 @@ function MatchCard({ match, version }: { match: MatchSummary; version: string | 
     window.lcu
       .getMatchDetail(match.gameId)
       .then(setDetail)
-      .catch(() => setFailed(true));
+      .catch((error) => {
+        setFailed(true);
+        Sentry.captureException(error);
+      });
   };
 
   return (

@@ -20,6 +20,7 @@ import type {
 } from '../../shared/types';
 import { toMatchSummaries, toMatchDetail } from './matchHistory';
 import { getQueueNames } from './gameQueues';
+import { reportError } from '../sentry';
 
 async function withLockfile<T>(
   errorLabel: string,
@@ -36,6 +37,7 @@ async function withLockfile<T>(
     return await callback(lockfileContent);
   } catch (error) {
     console.error(errorLabel, error);
+    reportError('lcu-request', error);
     throw error;
   }
 }

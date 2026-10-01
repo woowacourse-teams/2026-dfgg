@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readInstallDirFromMetadata, FALLBACK_DIRS } from './credentials';
+import { reportError } from '../sentry';
 
 // 롤 폴더에서 lock file 경로를 찾는 함수
 function findLockfilePath() {
@@ -29,7 +30,8 @@ export function getLockfileContent() {
       lockfile.password = password ?? null;
       lockfile.protocol = protocol ?? null;
     }
-  } catch {
+  } catch (error) {
+    reportError('lcu-lockfile', error);
     return null;
   }
 

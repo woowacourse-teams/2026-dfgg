@@ -4,6 +4,7 @@ import { getLcuState, setLcuPhase, setLcuStatus } from './state';
 import { fetchGameflowPhase } from './service';
 import { LCU_URI } from './events';
 import type WebSocket from 'ws';
+import { reportError } from '../sentry';
 
 const WAIT_FOR_CLIENT_MS = 3000; // 롤이 꺼져 있을 때
 const MIN_RETRY_MS = 1000; // 연결 실패 백오프 시작
@@ -41,7 +42,10 @@ async function syncInitialPhase(ws: WebSocket, attemptsLeft = 3) {
       const state = getLcuState();
       if (phase && state.status === 'connected' && state.phase === null) setLcuPhase(phase);
     } catch (error) {
-      if (attemptsLeft <= 1) return console.debug('초기 phase 조회 포기', error);
+      if (attemptsLeft <= 1) {
+        reportError('lcu-initial-phase', error);
+        return console.debug('초기 phase 조회 포기', error);
+      }
       setTimeout(() => syncInitialPhase(ws, attemptsLeft - 1), 1000);
     }
   });

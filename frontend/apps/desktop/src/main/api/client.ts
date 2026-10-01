@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from './config';
+import { reportError } from '../sentry';
 
 const API_TIMEOUT_MS = 5000;
 
@@ -26,6 +27,7 @@ export async function apiPost<T>(
     return result;
   } catch (error) {
     console.error(`POST ${path} 실패`, error);
+    reportError(`api-post ${path}`, error);
     throw error;
   }
 }
