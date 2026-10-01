@@ -6,9 +6,16 @@ import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
+export default tseslint(
   {
-    ignores: ['**/dist/**', '**/build/**', '**/out/**', '**/release/**', 'node_modules/**', '**/*.config.js'],
+    ignores: [
+      '**/dist/**',
+      '**/build/**',
+      '**/out/**',
+      '**/release/**',
+      'node_modules/**',
+      '**/*.config.js',
+    ],
   },
 
   js.configs.recommended,
