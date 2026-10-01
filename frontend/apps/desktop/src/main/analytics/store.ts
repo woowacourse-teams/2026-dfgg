@@ -2,6 +2,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { EventData } from './umami';
+import { reportError } from '../sentry';
 
 export type AnalyticsTarget = 'umami' | 'posthog';
 
@@ -34,7 +35,8 @@ export function readStore(): AnalyticsStore {
 
   try {
     cache = { outbox: [], ...JSON.parse(fs.readFileSync(storePath(), 'utf8')) };
-  } catch {
+  } catch (error) {
+    reportError('analytics-store-read', error);
     cache = { outbox: [] };
   }
   return cache as AnalyticsStore;
@@ -49,5 +51,6 @@ export function updateStore(patch: Partial<AnalyticsStore>) {
     fs.writeFileSync(storePath(), JSON.stringify(next));
   } catch (error) {
     console.debug('analytics 저장 실패', error);
+    reportError('analytics-store-write', error);
   }
 }

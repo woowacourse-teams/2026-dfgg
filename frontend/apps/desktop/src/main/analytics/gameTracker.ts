@@ -5,6 +5,7 @@ import { getIdentity, type Identity } from './identity';
 import { Stopwatch } from './stopwatch';
 import { readStore, updateStore, type PendingEvent } from './store';
 import { enqueue, trackEvent } from './umami';
+import { reportError } from '../sentry';
 
 const SNAPSHOT_INTERVAL_MS = 60_000;
 // 게임은 끝났지만 결과 화면 전인 phase. 이때는 게임을 끝내지 않는다.
@@ -104,8 +105,9 @@ async function startGame() {
     const queueId = session.gameData.queue.id;
     current.gameId = session.gameData.gameId;
     current.queue = (await fetchQueueName(queueId)) ?? String(queueId);
-  } catch {
+  } catch (error) {
     // 큐 정보 없이 계속한다.
+    reportError('game-tracker-queue', error);
   }
 }
 
@@ -135,8 +137,9 @@ async function finishGame(reachedEndOfGame: boolean) {
       const stats = await fetchEndOfGameStats();
       const myTeam = stats?.teams?.find((team) => team.isPlayerTeam);
       if (myTeam) result = myTeam.isWinningTeam ? 'win' : 'lose';
-    } catch {
+    } catch (error) {
       // 승패 없이 보낸다.
+      reportError('game-tracker-result', error);
     }
   }
 

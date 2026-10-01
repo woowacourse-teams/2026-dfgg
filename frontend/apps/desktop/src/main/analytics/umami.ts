@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { app } from 'electron';
 import { getIdentity } from './identity';
 import { AnalyticsTarget, readStore, updateStore, type PendingEvent } from './store';
+import { reportError } from '../sentry';
 
 const TIMEOUT_MS = 5000;
 const ALL_TARGETS: AnalyticsTarget[] = ['umami', 'posthog'];
@@ -106,6 +107,7 @@ export function trackEvent(name: string, data?: EventData, id = getIdentity()?.p
   send(event).then((failed) => {
     if (failed.length > 0) {
       console.debug('analytics 전송 실패 — 다음 실행 때 재전송', name, failed);
+      reportError('send', error);
       enqueue({ ...event, targets: failed });
     }
   });
@@ -121,6 +123,9 @@ export async function flushOutbox() {
 
   for (const event of outbox) {
     const failed = await send(event);
-    if (failed.length > 0) enqueue({ ...event, targets: failed });
+    if (failed.length > 0) {
+      reportError('flush', error);
+      enqueue({ ...event, targets: failed });
+    }
   }
 }

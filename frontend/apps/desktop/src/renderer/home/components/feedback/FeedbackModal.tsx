@@ -1,5 +1,6 @@
 import './FeedbackModal.css';
 
+import * as Sentry from '@sentry/electron/renderer';
 import { useEffect, useState } from 'react';
 
 import type { EndedGame, FeedbackRating } from '../../../../shared/types';
@@ -34,8 +35,9 @@ export default function FeedbackModal({ game, onClose }: FeedbackModalProps) {
     try {
       await window.feedback.submit(rating, game);
       setStatus('done');
-    } catch {
+    } catch (error) {
       setStatus('error');
+      Sentry.captureException(error);
     }
   };
 

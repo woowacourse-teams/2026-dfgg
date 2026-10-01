@@ -5,6 +5,7 @@ import { FALLBACK_DIRS, readInstallDirFromMetadata } from '../lcu/credentials';
 import { getLcuState } from '../lcu/state';
 import type { GameflowPhase } from '../../shared/types';
 import { trackEvent } from '../analytics/umami';
+import { reportError } from '../sentry';
 
 let borderlessErrorReported = false;
 
@@ -80,6 +81,7 @@ export function ensureBorderlessMode() {
     fs.writeFileSync(configPath, withWindowMode(text, BORDERLESS), 'utf-8');
   } catch (error) {
     console.debug('화면 모드 변경 실패', error);
+    reportError('borderless', error);
 
     // phase 가 바뀔 때마다 불리므로 한 번만 보낸다.
     if (!borderlessErrorReported) {

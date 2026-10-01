@@ -1,5 +1,6 @@
 import './App.css';
 
+import * as Sentry from '@sentry/electron/renderer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type {
@@ -59,7 +60,10 @@ function App() {
         window.lcu
           .getEndedGame()
           .then(setEndedGame)
-          .catch(() => console.error('끝난 게임 정보를 불러오지 못했습니다.'));
+          .catch((error) => {
+            console.error('끝난 게임 정보를 불러오지 못했습니다.');
+            Sentry.captureException(error);
+          });
       }
     });
 
@@ -80,7 +84,10 @@ function App() {
       .then((summoner) => {
         if (!cancelled) setCurrentSummoner(summoner);
       })
-      .catch(() => console.error('소환사 정보를 불러오지 못했습니다.'));
+      .catch((error) => {
+        console.error('소환사 정보를 불러오지 못했습니다.');
+        Sentry.captureException(error);
+      });
 
     return () => {
       cancelled = true;
@@ -95,7 +102,10 @@ function App() {
     window.lcu
       .getMatchHistoryInfo()
       .then(setMatches)
-      .catch(() => console.error('전적을 불러오지 못했습니다.'));
+      .catch((error) => {
+        console.error('전적을 불러오지 못했습니다.');
+        Sentry.captureException(error);
+      });
   }, [lcuPhase]);
 
   return (

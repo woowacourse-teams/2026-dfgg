@@ -1,4 +1,5 @@
 import { type Rect } from './docking';
+import { reportError } from '../sentry';
 
 /** 롤 창을 직접 찾기 위한 user32 함수들. 실패하면 null 이고, 라이브러리 도킹만으로 동작한다. */
 export function loadWin32() {
@@ -22,6 +23,7 @@ export function loadWin32() {
     };
   } catch (error) {
     console.warn('[창 찾기] koffi 로드 실패 — 롤 창을 직접 찾지 않습니다', error);
+    reportError('docking-koffi', error);
     return null;
   }
 }
