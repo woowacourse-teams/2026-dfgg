@@ -40,12 +40,17 @@ public class ParticipantItemPurchaseSnapshotService {
     /** 초기 정책: 아이템 이벤트 간 10초 공백으로 묶고 30초 초과 묶음은 사용하지 않는다. */
     @Transactional(readOnly = true)
     public List<ParticipantItemPurchaseBundle> bundlesForMatch(String matchId) {
+        return prepareForMatch(matchId).bundles();
+    }
+
+    PreparedPurchases prepareForMatch(String matchId) {
         var normalizedEvents = loadEvents(matchId);
+        var purchaseSnapshots = snapshots(normalizedEvents);
         if (normalizedEvents.stream().anyMatch(event -> !event.hasReplaySource())) {
             throw new IllegalStateException("구매 묶음 추출 전에 전체 아이템 이벤트 재정규화가 필요합니다.");
         }
         Map<ParticipantItemEvent, ParticipantItemPurchaseSnapshot> snapshotsBySource = new HashMap<>();
-        for (var snapshot : snapshots(normalizedEvents)) {
+        for (var snapshot : purchaseSnapshots) {
             snapshotsBySource.put(snapshot.sourceEvent(), snapshot);
         }
         Map<Integer, List<ParticipantItemEvent>> byParticipant = new LinkedHashMap<>();
@@ -65,8 +70,11 @@ public class ParticipantItemPurchaseSnapshotService {
             }
             appendBundle(segment, events, snapshotsBySource, bundles);
         }
-        return List.copyOf(bundles);
+        return new PreparedPurchases(purchaseSnapshots, List.copyOf(bundles));
     }
+
+    record PreparedPurchases(List<ParticipantItemPurchaseSnapshot> snapshots,
+                             List<ParticipantItemPurchaseBundle> bundles) {}
 
     private boolean separatedByGap(ParticipantItemEvent previous, ParticipantItemEvent current) {
         return previous.gameTimeMs() != null && current.gameTimeMs() != null

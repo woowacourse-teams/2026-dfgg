@@ -165,6 +165,86 @@ class ParticipantItemPurchaseBundleTest {
                 .contains(ParticipantItemPurchaseBundle.Reason.EVENT_TIME_INVALID);
     }
 
+    @Test
+    void 실제_Core_목표로_수량_정답과_Feature를_JSONL까지_연결한다() throws Exception {
+        load("""
+                {"type":"ITEM_PURCHASED","participantId":1,"itemId":1036,"timestamp":1000},
+                {"type":"ITEM_PURCHASED","participantId":1,"itemId":1037,"timestamp":2000},
+                {"type":"ITEM_DESTROYED","participantId":1,"itemId":1036,"timestamp":20000},
+                {"type":"ITEM_DESTROYED","participantId":1,"itemId":1037,"timestamp":20000},
+                {"type":"ITEM_PURCHASED","participantId":1,"itemId":3071,"timestamp":20000}
+                """);
+        var mapper = new ObjectMapper();
+        var catalog = mapper.readValue("""
+                {"version":"16.18.1","data":{
+                  "1036":{"gold":{"total":350,"purchasable":true},"into":["3071"]},
+                  "1037":{"gold":{"total":875,"purchasable":true},"into":["3071"]},
+                  "3071":{"gold":{"total":1575,"purchasable":true},"from":["1036","1037"]}}}
+                """, dfgg.infrastructure.external.dto.ItemResponse.class);
+        var exporter = new ComponentTrainingDataService(service, mapper);
+        var examples = exporter.examplesForMatch("KR_TEST", catalog);
+        assertThat(examples).hasSize(2).allMatch(e -> e.status().equals("READY"));
+        var first = examples.getFirst();
+        assertThat(first.targetCoreId()).isEqualTo(3071);
+        assertThat(first.candidates().stream().filter(c -> c.label() == 1).toList()).hasSize(1);
+        var positive = first.candidates().stream().filter(c -> c.label() == 1).findFirst().orElseThrow();
+        assertThat(positive.itemQuantities()).containsEntry(1036, 1).containsEntry(1037, 1);
+        assertThat(positive.features()).containsExactly(1225.0, 2.0, 2.0, 0.0, 2.0);
+        var writer = new java.io.StringWriter();
+        exporter.writeJsonl("KR_TEST", catalog, writer);
+        assertThat(writer.toString().lines().toList()).hasSize(2);
+        var json = mapper.readTree(writer.toString().lines().findFirst().orElseThrow());
+        assertThat(json.path("targetSource").asText()).isEqualTo("OBSERVED_FUTURE_CORE");
+        assertThat(json.path("featureNames").size()).isEqualTo(5);
+        assertThat(json.path("schemaVersion").asText()).isEqualTo("component-bundle-validation-v1");
+        var wrongPatch = new dfgg.infrastructure.external.dto.ItemResponse("16.19.1", null, catalog.data());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> exporter.examplesForMatch("KR_TEST", wrongPatch))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void 목표_Core가_없는_구매는_후보와_라벨을_억지로_만들지_않는다() throws Exception {
+        load("""
+                {"type":"ITEM_PURCHASED","participantId":1,"itemId":1036,"timestamp":1000}
+                """);
+        var mapper = new ObjectMapper();
+        var catalog = new dfgg.infrastructure.external.dto.ItemResponse("16.18.1", null, java.util.Map.of());
+        var example = new ComponentTrainingDataService(service, mapper).examplesForMatch("KR_TEST", catalog).getFirst();
+        assertThat(example.status()).isEqualTo("NO_OBSERVED_CORE");
+        assertThat(example.candidates()).isEmpty();
+    }
+
+    @Test
+    void 정답이_목표_경로에_없으면_후보를_추가하거나_전부_부정으로_만들지_않는다() throws Exception {
+        load("""
+                {"type":"ITEM_PURCHASED","participantId":1,"itemId":1036,"timestamp":1000},
+                {"type":"ITEM_PURCHASED","participantId":1,"itemId":3071,"timestamp":20000}
+                """);
+        var mapper = new ObjectMapper();
+        var catalog = mapper.readValue("""
+                {"version":"16.18.1","data":{
+                  "1036":{"gold":{"total":350,"purchasable":true}},
+                  "3071":{"gold":{"total":350,"purchasable":true}}}}
+                """, dfgg.infrastructure.external.dto.ItemResponse.class);
+        var first = new ComponentTrainingDataService(service, mapper).examplesForMatch("KR_TEST", catalog).getFirst();
+        assertThat(first.status()).isEqualTo("OBSERVED_BUNDLE_MISSING");
+        assertThat(first.candidates()).hasSize(1).allMatch(c -> c.label() == null);
+        assertThat(first.candidates().getFirst().itemQuantities()).doesNotContainKey(1036);
+    }
+
+    @Test
+    void 취소된_Core를_사후_목표로_사용하지_않는다() {
+        load("""
+                {"type":"ITEM_PURCHASED","participantId":1,"itemId":1036,"timestamp":1000},
+                {"type":"ITEM_PURCHASED","participantId":1,"itemId":3071,"timestamp":20000},
+                {"type":"ITEM_UNDO","participantId":1,"beforeId":3071,"afterId":0,"timestamp":21000}
+                """);
+        var catalog = new dfgg.infrastructure.external.dto.ItemResponse("16.18.1", null, java.util.Map.of());
+        var first = new ComponentTrainingDataService(service, new ObjectMapper())
+                .examplesForMatch("KR_TEST", catalog).getFirst();
+        assertThat(first.status()).isEqualTo("NO_OBSERVED_CORE");
+    }
+
     private List<NormalizedMatchParticipantItemEvent> load(String payload) {
         return load(payload, Integer.MAX_VALUE);
     }
