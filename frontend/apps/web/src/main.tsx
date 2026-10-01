@@ -7,7 +7,7 @@ import App from './App';
 import { LOCALE, localeFromPath, localePath, strings, stripLocale } from './i18n/i18n';
 
 const SENTRY_DSN =
-  'https://5b9e49678c0d1aff8c28470c780701a5@o4512044427968512.ingest.us.sentry.io/4512179816562688';
+  'https://fec5aaea14d81822eef4a934ae94c521@o4512044427968512.ingest.us.sentry.io/4512179818921984';
 
 const PROD_HOSTNAMES = ['dfgg.pro', 'www.dfgg.pro'];
 const { hostname } = window.location;
