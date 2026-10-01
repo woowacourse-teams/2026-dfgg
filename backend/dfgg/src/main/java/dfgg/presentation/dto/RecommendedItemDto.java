@@ -1,6 +1,7 @@
 package dfgg.presentation.dto;
 
 import dfgg.domain.item.Item;
+import dfgg.domain.language.Language;
 
 /**
  * v3 추천 응답의 아이템 하나. description에는 상대하기 좋은 적군 챔피언 목록, 시너지가 좋은 아군 챔피언 목록, 아이템 특성을 담는다.
@@ -13,7 +14,8 @@ public record RecommendedItemDto(
         String imageUrl,
         RecommendationDescription description
 ) {
-    public static RecommendedItemDto of(Item item, String imageUrl, RecommendationDescription description) {
-        return new RecommendedItemDto(item.getItemId(), item.getName().get("ko-KR"), imageUrl, description);
+    public static RecommendedItemDto of(
+            Item item, String imageUrl, RecommendationDescription description, Language language) {
+        return new RecommendedItemDto(item.getItemId(), language.pick(item.getName()), imageUrl, description);
     }
 }

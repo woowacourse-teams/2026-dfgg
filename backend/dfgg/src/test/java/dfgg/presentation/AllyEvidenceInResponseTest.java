@@ -3,6 +3,7 @@ package dfgg.presentation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
+import dfgg.domain.language.Language;
 import dfgg.application.recommend.NextItemRecommendationService;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.item.Item;
@@ -95,7 +96,7 @@ class AllyEvidenceInResponseTest {
                 List.of(),
                 List.of(new ChampionDto("징크스", "BOTTOM"), new ChampionDto("코그모", "MID")),
                 List.of(new ChampionDto("람머스", "TOP")),
-                "EMERALD", "16.17"));
+                "EMERALD", "16.17"), Language.KO_KR);
     }
 
     @Test

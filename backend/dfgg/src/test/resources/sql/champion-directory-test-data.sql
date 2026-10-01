@@ -2,9 +2,9 @@ DELETE FROM champion_tags;
 DELETE FROM champions;
 
 INSERT INTO champions (champion_id, riot_key, name) VALUES
-    (122, 'Darius', jsonb_build_object('ko-KR', '다리우스')),
-    (222, 'Jinx', jsonb_build_object('ko-KR', '징크스')),
-    (112, 'Viktor', jsonb_build_object('ko-KR', '빅토르')),
+    (122, 'Darius', jsonb_build_object('ko-KR', '다리우스', 'en-US', 'Darius')),
+    (222, 'Jinx', jsonb_build_object('ko-KR', '징크스', 'en-US', 'Jinx')),
+    (112, 'Viktor', jsonb_build_object('ko-KR', '빅토르', 'en-US', 'Viktor')),
     (777, 'NoTagChampion', jsonb_build_object('ko-KR', '태그없는챔피언'));
 
 -- 태그는 의미상 집합이지만 @ElementCollection은 List로 매핑돼 있어 중복 행이 그대로 올라온다.

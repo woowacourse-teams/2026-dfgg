@@ -2,24 +2,24 @@ package dfgg.domain.item.trait;
 
 import static dfgg.domain.item.trait.ItemProfile.ally;
 import static dfgg.domain.item.trait.ItemProfile.self;
-import static dfgg.domain.item.trait.ItemTrait.MANA_REGEN_BASED_HEAL_SHIELD_AMPLIFY;
-import static dfgg.domain.item.trait.ItemTrait.ALLY_OFFENSE_DEFENSE_BUFF;
-import static dfgg.domain.item.trait.ItemTrait.AP_AND_ABILITY_HASTE_BUFF;
-import static dfgg.domain.item.trait.ItemTrait.CC_ABILITY_HASTE_AND_ENEMY_VULNERABILITY;
-import static dfgg.domain.item.trait.ItemTrait.DAMAGE_TO_HEAL;
-import static dfgg.domain.item.trait.ItemTrait.DAMAGE_REDUCTION_AND_SLOW;
-import static dfgg.domain.item.trait.ItemTrait.ALLY_SUSTAIN;
-import static dfgg.domain.item.trait.ItemTrait.AOE_DAMAGE_DEFENSE;
-import static dfgg.domain.item.trait.ItemTrait.AOE_HEAL;
-import static dfgg.domain.item.trait.ItemTrait.ATTACK_SPEED_BUFF;
-import static dfgg.domain.item.trait.ItemTrait.ATTACK_SPEED_AND_DAMAGE_BUFF;
-import static dfgg.domain.item.trait.ItemTrait.CARRY_PROTECTION;
-import static dfgg.domain.item.trait.ItemTrait.CC_CLEANSE;
-import static dfgg.domain.item.trait.ItemTrait.ATTACK_BUFF_AND_ENEMY_VULNERABILITY;
-import static dfgg.domain.item.trait.ItemTrait.HEAL_SHIELD_AMPLIFY;
-import static dfgg.domain.item.trait.ItemTrait.SELF_HEAL_AND_MOBILITY_BUFF;
-import static dfgg.domain.item.trait.ItemTrait.MOBILITY_BUFF;
-import static dfgg.domain.item.trait.ItemTrait.SKILL_POKE;
+import static dfgg.domain.item.trait.ItemTrait.DAWNCORE;
+import static dfgg.domain.item.trait.ItemTrait.DREAM_MAKER;
+import static dfgg.domain.item.trait.ItemTrait.STAFF_OF_FLOWING_WATER;
+import static dfgg.domain.item.trait.ItemTrait.IMPERIAL_MANDATE;
+import static dfgg.domain.item.trait.ItemTrait.ECHOES_OF_HELIA;
+import static dfgg.domain.item.trait.ItemTrait.CELESTIAL_OPPOSITION;
+import static dfgg.domain.item.trait.ItemTrait.WHISPERING_CIRCLET;
+import static dfgg.domain.item.trait.ItemTrait.LOCKET_OF_THE_IRON_SOLARI;
+import static dfgg.domain.item.trait.ItemTrait.REDEMPTION;
+import static dfgg.domain.item.trait.ItemTrait.BANDLEPIPES;
+import static dfgg.domain.item.trait.ItemTrait.ARDENT_CENSER;
+import static dfgg.domain.item.trait.ItemTrait.KNIGHT_VOW;
+import static dfgg.domain.item.trait.ItemTrait.MIKAEL_BLESSING;
+import static dfgg.domain.item.trait.ItemTrait.BLOODSONG;
+import static dfgg.domain.item.trait.ItemTrait.MOONSTONE_RENEWER;
+import static dfgg.domain.item.trait.ItemTrait.SOLSTICE_SLEIGH;
+import static dfgg.domain.item.trait.ItemTrait.SHURELYA_BATTLESONG;
+import static dfgg.domain.item.trait.ItemTrait.ZAZZAK_REALMSPIKE;
 
 import java.util.EnumSet;
 import java.util.Map;
@@ -39,24 +39,24 @@ final class SupportTraits {
     static final Set<ItemTrait> CATEGORY = EnumSet.noneOf(ItemTrait.class);
 
     static final Map<Long, ItemProfile> BY_ITEM_ID = Map.ofEntries(
-            Map.entry(2065L, ally(MOBILITY_BUFF)), // 슈렐리아의 군가
-            Map.entry(2524L, ally(ATTACK_SPEED_BUFF)),  // 밴들파이프
-            Map.entry(2526L, ally(ALLY_SUSTAIN)),  // 속삭이는 머리띠
-            Map.entry(3107L, ally(AOE_HEAL)), // 구원
-            Map.entry(3109L, ally(CARRY_PROTECTION)), // 기사의 맹세
-            Map.entry(3190L, ally(AOE_DAMAGE_DEFENSE)), // 강철의 솔라리 펜던트
-            Map.entry(3222L, ally(CC_CLEANSE)), // 미카엘의 축복
-            Map.entry(3504L, ally(ATTACK_SPEED_AND_DAMAGE_BUFF)), // 불타는 향로
-            Map.entry(3869L, self(DAMAGE_REDUCTION_AND_SLOW)), // 천상의 이의
-            Map.entry(3870L, ally(ALLY_OFFENSE_DEFENSE_BUFF)), // 꿈 생성기
-            Map.entry(3871L, self(SKILL_POKE)),  // 자자크의 세계가시
-            Map.entry(3876L, ally(SELF_HEAL_AND_MOBILITY_BUFF)), // 태양의 썰매
-            Map.entry(3877L, ally(ATTACK_BUFF_AND_ENEMY_VULNERABILITY)),  // 피의 노래
-            Map.entry(4005L, ally(CC_ABILITY_HASTE_AND_ENEMY_VULNERABILITY)), // 제국의 명령
-            Map.entry(6616L, ally(AP_AND_ABILITY_HASTE_BUFF)), // 흐르는 물의 지팡이
-            Map.entry(6617L, ally(HEAL_SHIELD_AMPLIFY)), // 월석 재생기
-            Map.entry(6620L, ally(DAMAGE_TO_HEAL)), // 헬리아의 메아리
-            Map.entry(6621L, self(MANA_REGEN_BASED_HEAL_SHIELD_AMPLIFY)) // 새벽심장
+            Map.entry(2065L, ally(SHURELYA_BATTLESONG)), // 슈렐리아의 군가
+            Map.entry(2524L, ally(BANDLEPIPES)),  // 밴들파이프
+            Map.entry(2526L, ally(WHISPERING_CIRCLET)),  // 속삭이는 머리띠
+            Map.entry(3107L, ally(REDEMPTION)), // 구원
+            Map.entry(3109L, ally(KNIGHT_VOW)), // 기사의 맹세
+            Map.entry(3190L, ally(LOCKET_OF_THE_IRON_SOLARI)), // 강철의 솔라리 펜던트
+            Map.entry(3222L, ally(MIKAEL_BLESSING)), // 미카엘의 축복
+            Map.entry(3504L, ally(ARDENT_CENSER)), // 불타는 향로
+            Map.entry(3869L, self(CELESTIAL_OPPOSITION)), // 천상의 이의
+            Map.entry(3870L, ally(DREAM_MAKER)), // 꿈 생성기
+            Map.entry(3871L, self(ZAZZAK_REALMSPIKE)),  // 자자크의 세계가시
+            Map.entry(3876L, ally(SOLSTICE_SLEIGH)), // 태양의 썰매
+            Map.entry(3877L, ally(BLOODSONG)),  // 피의 노래
+            Map.entry(4005L, ally(IMPERIAL_MANDATE)), // 제국의 명령
+            Map.entry(6616L, ally(STAFF_OF_FLOWING_WATER)), // 흐르는 물의 지팡이
+            Map.entry(6617L, ally(MOONSTONE_RENEWER)), // 월석 재생기
+            Map.entry(6620L, ally(ECHOES_OF_HELIA)), // 헬리아의 메아리
+            Map.entry(6621L, self(DAWNCORE)) // 새벽심장
     );
 
     private SupportTraits() {

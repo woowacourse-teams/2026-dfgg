@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.image.ImageUrls;
+import dfgg.domain.language.Language;
 import dfgg.presentation.dto.ChampionSummaryDto;
 import dfgg.presentation.dto.response.ChampionsResponse;
 import java.util.List;
@@ -35,11 +36,32 @@ class ChampionQueryServiceTest {
                 championRepository, new ImageUrls("test-bucket", "ap-northeast-2", "99.1"));
 
         // when
-        ChampionsResponse response = service.findAll();
+        ChampionsResponse response = service.findAll(Language.KO_KR);
 
         // then
         assertThat(response.champions())
                 .extracting(ChampionSummaryDto::name)
                 .containsExactly("가렌", "손오공", "아트록스");
+    }
+
+    @Test
+    @DisplayName("영어로 요청하면 영어 이름으로 내고 영어 이름 알파벳순으로 정렬한다")
+    void findAll_WhenEnglishRequested_ReturnEnglishNamesSortedAlphabetically() {
+        // given
+        when(championRepository.findAll()).thenReturn(List.of(
+                new Champion(62L, "MonkeyKing", Map.of("ko-KR", "손오공", "en-US", "Wukong"), List.of()),
+                new Champion(86L, "Garen", Map.of("ko-KR", "가렌", "en-US", "Garen"), List.of()),
+                new Champion(266L, "Aatrox", Map.of("ko-KR", "아트록스", "en-US", "Aatrox"), List.of())
+        ));
+        ChampionQueryService service = new ChampionQueryService(
+                championRepository, new ImageUrls("test-bucket", "ap-northeast-2", "99.1"));
+
+        // when
+        ChampionsResponse response = service.findAll(Language.EN_US);
+
+        // then
+        assertThat(response.champions())
+                .extracting(ChampionSummaryDto::name)
+                .containsExactly("Aatrox", "Garen", "Wukong");
     }
 }

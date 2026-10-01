@@ -3,6 +3,7 @@ package dfgg.presentation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
+import dfgg.domain.language.Language;
 import dfgg.application.recommend.NextItemRecommendationService;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.item.ItemRepository;
@@ -86,7 +87,7 @@ class CounterEvidenceInResponseTest {
                 List.of(),
                 List.of(new ChampionDto("아리", "BOTTOM"), new ChampionDto("징크스", "SUPPORT")),
                 List.of(new ChampionDto("람머스", "TOP")),
-                "EMERALD", "16.17"));
+                "EMERALD", "16.17"), Language.KO_KR);
     }
 
     @Test

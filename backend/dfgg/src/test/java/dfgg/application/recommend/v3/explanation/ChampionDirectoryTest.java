@@ -39,12 +39,12 @@ class ChampionDirectoryTest {
     }
 
     @Test
-    @DisplayName("ID를 한글 이름으로 바꾼다")
-    void resolve_TranslatesIdToKoreanName() {
+    @DisplayName("ID를 언어별 이름으로 바꾼다 — 어느 언어로 낼지는 응답을 만들 때 고른다")
+    void resolve_TranslatesIdToLocalizedNames() {
         Map<Long, ChampionProfile> profiles = directory.resolve(List.of(DARIUS, JINX));
 
-        assertThat(profiles.get(DARIUS).name()).isEqualTo("다리우스");
-        assertThat(profiles.get(JINX).name()).isEqualTo("징크스");
+        assertThat(profiles.get(DARIUS).name()).containsEntry("ko-KR", "다리우스").containsEntry("en-US", "Darius");
+        assertThat(profiles.get(JINX).name()).containsEntry("ko-KR", "징크스").containsEntry("en-US", "Jinx");
     }
 
     @Test

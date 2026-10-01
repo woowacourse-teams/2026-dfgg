@@ -23,6 +23,7 @@ import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.image.ImageUrls;
 import dfgg.domain.item.Item;
+import dfgg.domain.language.Language;
 import dfgg.infrastructure.config.LeagueOfLegendsVersionProperties;
 import dfgg.domain.item.trait.ItemTrait;
 import dfgg.domain.item.trait.ItemTraitCatalog;
@@ -103,7 +104,8 @@ public class NextItemRecommendationService {
         this.leagueOfLegendsVersion = leagueOfLegendsVersion;
     }
 
-    public NextItemRecommendationResponse recommendNextItem(NextItemRecommendationRequest request) {
+    public NextItemRecommendationResponse recommendNextItem(
+            NextItemRecommendationRequest request, Language language) {
         Champion myChampion = championService.findChampionByName(request.myChampion().name());
         RecommendationQuery query = toQuery(request, myChampion);
         if (query.position().isFullBuild(query.purchasedItemCount())) {
@@ -140,10 +142,11 @@ public class NextItemRecommendationService {
 
             recommendedItems.add(RecommendedItemDto.of(item, imageUrls.itemOf(item.getItemId()),
                     new RecommendationDescription(
-                            championRefs(CounterEvidence.championIdsFor(evidence), championProfiles),
+                            championRefs(CounterEvidence.championIdsFor(evidence), championProfiles, language),
                             championRefs(AllyEvidence.championIdsFor(
-                                    evidence, itemTraitCatalog.synergyOf(item)), championProfiles),
-                            traitNamesOf(item))));
+                                    evidence, itemTraitCatalog.synergyOf(item)), championProfiles, language),
+                            traitNamesOf(item, language)),
+                    language));
         }
         return new NextItemRecommendationResponse(recommendedItems);
     }
@@ -174,11 +177,11 @@ public class NextItemRecommendationService {
 
     /** 이름을 못 찾은 챔피언은 뺀다. id만으로는 화면에 쓸 수 없다. */
     private List<ChampionRefDto> championRefs(
-            List<Long> championIds, Map<Long, ChampionProfile> championProfiles) {
+            List<Long> championIds, Map<Long, ChampionProfile> championProfiles, Language language) {
         return championIds.stream()
                 .map(championProfiles::get)
                 .filter(Objects::nonNull)
-                .map(profile -> new ChampionRefDto(profile.championId(), profile.name(),
+                .map(profile -> new ChampionRefDto(profile.championId(), language.pick(profile.name()),
                         imageUrls.championOf(profile.riotKey())))
                 .toList();
     }
@@ -188,10 +191,13 @@ public class NextItemRecommendationService {
      * <p>
      * 팀이 정한 표시명을 낸다. enum 이름({@code CC_CLEANSE})은 코드의 식별자라 화면에 쓸 말이 아니다.
      * 정렬은 매 요청 같은 순서를 내기 위한 것이다.
+     * <p>
+     * 표시명이 없는 특성({@code ENGAGE} 등)은 v2 판정용 범주다. 화면에 낼 말이 없어 뺀다.
      */
-    private List<String> traitNamesOf(Item item) {
+    private List<String> traitNamesOf(Item item, Language language) {
         return itemTraitCatalog.traitsOf(item).stream()
-                .map(ItemTrait::getDisplayName)
+                .map(trait -> language.pick(trait.getDisplayName()))
+                .filter(displayName -> !displayName.isBlank())
                 .sorted()
                 .toList();
     }

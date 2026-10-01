@@ -77,7 +77,7 @@ class ItemSynergyTest {
     @DisplayName("ally 팩토리는 ALLY synergy와 주어진 특성을 한 항목에 담는다")
     void ally_WhenTraitsGiven_CarriesAllySynergyAndThoseTraits() {
         // given
-        ItemTrait cleanse = ItemTrait.CC_CLEANSE;
+        ItemTrait cleanse = ItemTrait.MIKAEL_BLESSING;
 
         // when
         ItemProfile profile = ItemProfile.ally(cleanse);
@@ -103,7 +103,7 @@ class ItemSynergyTest {
     void synergyOf_WhenCatalogIsCustom_UsesOnlyTheGivenMapping() {
         // given
         ItemTraitCatalog custom = new ItemTraitCatalog(
-                Map.of(3871L, Set.of(ItemTrait.SKILL_POKE)),
+                Map.of(3871L, Set.of(ItemTrait.ZAZZAK_REALMSPIKE)),
                 Map.of(3871L, Synergy.ALLY));
 
         // when

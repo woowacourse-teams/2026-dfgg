@@ -28,11 +28,12 @@ class TraitCategoryTest {
     /** 카탈로그의 {@code merge(...)} 인자와 같아야 한다. 한쪽만 늘리면 이 클래스의 테스트가 잡는다. */
     private static List<RoleFile> roleFiles() {
         return List.of(
-                new RoleFile("전사", FighterTraits.BY_ITEM_ID),
-                new RoleFile("원거리 딜러", MarksmanTraits.BY_ITEM_ID),
-                new RoleFile("암살자", AssassinTraits.BY_ITEM_ID),
-                new RoleFile("마법사", MageTraits.BY_ITEM_ID),
-                new RoleFile("탱커", TankTraits.BY_ITEM_ID),
+                new RoleFile("전사", ItemProfile.traitsByItemId(FighterTraits.BY_ITEM_ID)),
+                new RoleFile("원거리 딜러", ItemProfile.traitsByItemId(MarksmanTraits.BY_ITEM_ID)),
+                new RoleFile("암살자", ItemProfile.traitsByItemId(AssassinTraits.BY_ITEM_ID)),
+                new RoleFile("마법사", ItemProfile.traitsByItemId(MageTraits.BY_ITEM_ID)),
+                new RoleFile("탱커", ItemProfile.traitsByItemId(TankTraits.BY_ITEM_ID)),
+                new RoleFile("신발", ItemProfile.traitsByItemId(BootsTraits.BY_ITEM_ID)),
                 new RoleFile("서포터", ItemProfile.traitsByItemId(SupportTraits.BY_ITEM_ID)));
     }
 
@@ -77,6 +78,22 @@ class TraitCategoryTest {
         }
 
         assertThat(arenaVariants).isEmpty();
+    }
+
+    @Test
+    @DisplayName("등록한 아이템은 모두 화면에 낼 특성을 갖는다 — 빈 항목이나 표시명 없는 특성만 가진 항목은 실수다")
+    void everyRegisteredItem_HasADisplayableTrait() {
+        List<String> withoutDisplayableTrait = new ArrayList<>();
+
+        for (RoleFile roleFile : roleFiles()) {
+            roleFile.byItemId().forEach((itemId, traits) -> {
+                if (traits.stream().allMatch(trait -> trait.getDisplayName().values().stream().anyMatch(String::isBlank))) {
+                    withoutDisplayableTrait.add("%s의 %d".formatted(roleFile.name(), itemId));
+                }
+            });
+        }
+
+        assertThat(withoutDisplayableTrait).isEmpty();
     }
 
     @Test
