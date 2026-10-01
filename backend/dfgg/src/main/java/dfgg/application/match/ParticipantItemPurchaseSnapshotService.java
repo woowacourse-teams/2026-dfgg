@@ -6,6 +6,8 @@ import dfgg.domain.match.ParticipantItemEvent;
 import dfgg.domain.match.NormalizedMatchParticipantItemEvent;
 import dfgg.domain.match.NormalizedMatchParticipantItemEventRepository;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -17,23 +19,78 @@ public class ParticipantItemPurchaseSnapshotService {
 
     private final NormalizedMatchParticipantItemEventRepository eventRepository;
     private final PurchaseInventoryReconstructor inventoryReconstructor;
+    private final PurchaseMaterialLinker materialLinker;
 
     public ParticipantItemPurchaseSnapshotService(
             NormalizedMatchParticipantItemEventRepository eventRepository,
-            PurchaseInventoryReconstructor inventoryReconstructor
+            PurchaseInventoryReconstructor inventoryReconstructor,
+            PurchaseMaterialLinker materialLinker
     ) {
         this.eventRepository = eventRepository;
         this.inventoryReconstructor = inventoryReconstructor;
+        this.materialLinker = materialLinker;
     }
 
     /** 저장된 한 경기의 구매와 아이템 Fact를 연결해 원천 순번대로 반환한다. Raw JSON을 다시 읽지 않는다. */
     @Transactional(readOnly = true)
     public List<ParticipantItemPurchaseSnapshot> snapshotsForMatch(String matchId) {
+        return snapshots(loadEvents(matchId));
+    }
+
+    /** 초기 정책: 아이템 이벤트 간 10초 공백으로 묶고 30초 초과 묶음은 사용하지 않는다. */
+    @Transactional(readOnly = true)
+    public List<ParticipantItemPurchaseBundle> bundlesForMatch(String matchId) {
+        var normalizedEvents = loadEvents(matchId);
+        if (normalizedEvents.stream().anyMatch(event -> !event.hasReplaySource())) {
+            throw new IllegalStateException("구매 묶음 추출 전에 전체 아이템 이벤트 재정규화가 필요합니다.");
+        }
+        Map<ParticipantItemEvent, ParticipantItemPurchaseSnapshot> snapshotsBySource = new HashMap<>();
+        for (var snapshot : snapshots(normalizedEvents)) {
+            snapshotsBySource.put(snapshot.sourceEvent(), snapshot);
+        }
+        Map<Integer, List<ParticipantItemEvent>> byParticipant = new LinkedHashMap<>();
+        for (var event : normalizedEvents) {
+            byParticipant.computeIfAbsent(event.getParticipantId(), ignored -> new ArrayList<>())
+                    .add(event.toParticipantItemEvent());
+        }
+        List<ParticipantItemPurchaseBundle> bundles = new ArrayList<>();
+        for (var events : byParticipant.values()) {
+            List<ParticipantItemEvent> segment = new ArrayList<>();
+            for (var event : events) {
+                if (!segment.isEmpty() && separatedByGap(segment.getLast(), event)) {
+                    appendBundle(segment, events, snapshotsBySource, bundles);
+                    segment.clear();
+                }
+                segment.add(event);
+            }
+            appendBundle(segment, events, snapshotsBySource, bundles);
+        }
+        return List.copyOf(bundles);
+    }
+
+    private boolean separatedByGap(ParticipantItemEvent previous, ParticipantItemEvent current) {
+        return previous.gameTimeMs() != null && current.gameTimeMs() != null
+                && current.gameTimeMs() - previous.gameTimeMs() >= ParticipantItemPurchaseBundle.EVENT_GAP_MS;
+    }
+
+    private void appendBundle(List<ParticipantItemEvent> segment, List<ParticipantItemEvent> participantEvents,
+            Map<ParticipantItemEvent, ParticipantItemPurchaseSnapshot> snapshotsBySource,
+            List<ParticipantItemPurchaseBundle> bundles) {
+        var purchases = segment.stream().filter(event -> "ITEM_PURCHASED".equals(event.eventType()))
+                .map(snapshotsBySource::get).toList();
+        if (!purchases.isEmpty()) {
+            bundles.add(ParticipantItemPurchaseBundle.from(segment, purchases, participantEvents, materialLinker));
+        }
+    }
+
+    private List<NormalizedMatchParticipantItemEvent> loadEvents(String matchId) {
         if (matchId == null || matchId.isBlank()) {
             throw new IllegalArgumentException("경기 ID(matchId)가 필요합니다.");
         }
-        List<NormalizedMatchParticipantItemEvent> normalizedEvents = eventRepository
-                .findByMatchIdOrderByParticipantIdAscEventOrderAsc(matchId);
+        return eventRepository.findByMatchIdOrderByParticipantIdAscEventOrderAsc(matchId);
+    }
+
+    private List<ParticipantItemPurchaseSnapshot> snapshots(List<NormalizedMatchParticipantItemEvent> normalizedEvents) {
         boolean replaySourceMissing = normalizedEvents.stream().anyMatch(event -> !event.hasReplaySource());
         List<ParticipantItemEvent> events = replaySourceMissing ? List.of() : normalizedEvents.stream()
                 .map(NormalizedMatchParticipantItemEvent::toParticipantItemEvent).toList();
