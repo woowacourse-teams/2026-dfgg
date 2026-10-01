@@ -132,6 +132,51 @@ const KO = {
     privacy: '개인정보처리방침',
     trademark: 'League of Legends와 Riot Games는 Riot Games, Inc.의 상표입니다.',
   },
+  privacy: {
+    title: '개인정보처리방침',
+    lastUpdatedLabel: '최종 수정일',
+    lastUpdated: '2026년 10월 2일',
+    intro: '본 방침은 DFGG 웹사이트(https://dfgg.pro)와 DFGG 데스크톱 앱에 모두 적용됩니다.',
+    contactLabel: '개인정보 관련 문의',
+    sections: [
+      {
+        title: '1. 수집하지 않는 정보',
+        body: [
+          'DFGG는 회원가입과 로그인이 없습니다. 이름, 이메일, 결제 정보를 수집하지 않으며 광고 식별자를 사용하지 않습니다.',
+        ],
+      },
+      {
+        title: '2. 처리하는 정보',
+        body: [
+          '아이템 추천을 위해 한 경기에 등장하는 챔피언 10개의 이름과 포지션을 서버로 전송합니다. 이 정보만으로는 개인을 식별할 수 없습니다.',
+          '데스크톱 앱은 사용자의 PC에서 실행 중인 League of Legends 클라이언트로부터 로컬 주소(127.0.0.1)를 통해 경기 정보를 읽습니다. 이 과정에서 사용자 본인의 Riot ID와 경기 정보를 확인하며, 아래 3항의 사용 기록에 포함되어 전송됩니다.',
+        ],
+      },
+      {
+        title: '3. 자동으로 기록되는 정보',
+        body: [
+          '서버 운영과 장애 대응을 위해 웹 서버 접속 기록(IP 주소, 접속 시각, 요청 경로)이 남습니다. 이 기록은 통계나 마케팅에 사용하지 않습니다.',
+          '또한 서비스 개선을 위해 웹사이트와 데스크톱 앱의 사용 기록을 수집합니다.',
+        ],
+        list: [
+          '웹사이트: 방문한 페이지, 버튼 클릭 등 기능 사용 기록',
+          '데스크톱 앱: Riot ID와 이를 기반으로 한 사용자 식별값, 앱 버전, 플레이한 경기 정보(챔피언, 포지션, 게임 모드, 승패, 경기 ID, 아이템 구매 및 추천 이용 횟수)',
+          '공통: 접속 IP로 추정한 국가·도시, 브라우저·운영체제 종류',
+        ],
+        after: [
+          '웹사이트는 재방문 여부를 구분하기 위해 쿠키와 브라우저 저장소를 사용합니다. 브라우저 설정에서 쿠키를 차단하거나 삭제할 수 있으며, 차단해도 서비스 이용에는 지장이 없습니다. 수집한 기록은 서비스 개선 외의 목적이나 마케팅·광고에 사용하지 않습니다.',
+          '수집한 사용 기록은 수집일로부터 1년간 보관한 뒤 삭제합니다. 삭제를 원하면 Riot ID를 적어 아래 메일로 요청해 주세요.',
+        ],
+      },
+      {
+        title: '4. 제3자 서비스',
+        body: [
+          '데스크톱 앱의 챔피언 및 아이템 이미지는 Riot Games가 운영하는 Data Dragon(ddragon.leagueoflegends.com)에서 불러옵니다.',
+          '사용 기록 집계를 위해 PostHog Inc.의 PostHog Cloud(미국)와 Umami Software, Inc.의 Umami Cloud를 사용합니다. 기록은 국외 서버에서 처리되며, 각 서비스의 개인정보처리방침(https://posthog.com/privacy, https://umami.is/privacy)을 따릅니다.',
+        ],
+      },
+    ],
+  },
   items: {
     2510: { name: '황혼과 새벽', traits: ['주문검', '공격 속도'] },
     3158: { name: '명석함의 아이오니아 장화', traits: ['스킬 가속'] },
@@ -283,6 +328,52 @@ const EN: typeof KO = {
   footer: {
     privacy: 'Privacy Policy',
     trademark: 'League of Legends and Riot Games are trademarks of Riot Games, Inc.',
+  },
+  privacy: {
+    title: 'Privacy Policy',
+    lastUpdatedLabel: 'Last updated',
+    lastUpdated: 'October 2, 2026',
+    intro:
+      'This policy applies to both the DFGG website (https://dfgg.pro) and the DFGG desktop app.',
+    contactLabel: 'Privacy inquiries',
+    sections: [
+      {
+        title: '1. Information we do not collect',
+        body: [
+          'DFGG has no sign-up or login. We do not collect your name, email, or payment information, and we do not use advertising identifiers.',
+        ],
+      },
+      {
+        title: '2. Information we process',
+        body: [
+          'To recommend items, we send the names and positions of the 10 champions in a match to our server. This alone cannot identify you.',
+          'The desktop app reads match information from the League of Legends client running on your PC through a local address (127.0.0.1). In doing so it reads your Riot ID and match information, which are sent as part of the usage records described in section 3.',
+        ],
+      },
+      {
+        title: '3. Automatically recorded information',
+        body: [
+          'For server operation and troubleshooting, our web server keeps access logs (IP address, access time, request path). These logs are not used for statistics or marketing.',
+          'To improve the service, we also collect usage records from the website and the desktop app.',
+        ],
+        list: [
+          'Website: pages visited and feature usage such as button clicks',
+          'Desktop app: your Riot ID and an identifier derived from it, app version, and information about matches you play (champion, position, game mode, result, match ID, item purchases and recommendation usage counts)',
+          'Both: country and city estimated from your IP address, browser and operating system type',
+        ],
+        after: [
+          'The website uses cookies and browser storage to recognize returning visitors. You can block or delete cookies in your browser settings; this does not affect your use of the service. Usage records are used only to improve the service and never for marketing or advertising.',
+          'Usage records are kept for one year from collection and then deleted. To request deletion, email us at the address below with your Riot ID.',
+        ],
+      },
+      {
+        title: '4. Third-party services',
+        body: [
+          'Champion and item images in the desktop app are loaded from Data Dragon (ddragon.leagueoflegends.com), operated by Riot Games.',
+          'We use PostHog Cloud (United States) by PostHog Inc. and Umami Cloud by Umami Software, Inc. to aggregate usage records. Records are processed on servers outside Korea under each service’s privacy policy (https://posthog.com/privacy, https://umami.is/privacy).',
+        ],
+      },
+    ],
   },
   items: {
     2510: { name: 'Dusk and Dawn', traits: ['Spellblade', 'Attack speed'] },
