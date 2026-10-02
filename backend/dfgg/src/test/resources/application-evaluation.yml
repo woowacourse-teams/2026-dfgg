@@ -1,0 +1,37 @@
+# 오프라인 평가 전용 프로파일. 실 매치 데이터가 있는 dfgg_backtest를 가리킨다.
+#
+# ⚠️ ddl-auto를 절대 create-drop으로 두지 않는다. 이 DB에는 86,108매치 / 861,080참가자가 있고
+#    한 번 날리면 Riot API rate limit 때문에 재수집에 수개월이 걸린다.
+#    update로 두어 신규 통계 테이블만 생성되게 한다(기존 테이블은 건드리지 않음).
+spring:
+  datasource:
+    url: "${EVALUATION_DB_URL:jdbc:postgresql://127.0.0.1:5432/dfgg_backtest}"
+    username: "${EVALUATION_DB_USERNAME:postgres}"
+    password: "${EVALUATION_DB_PASSWORD:postgres}"
+    hikari:
+      maximum-pool-size: 4
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 500
+
+  test:
+    database:
+      replace: none
+
+riot:
+  api:
+    key: "evaluation-not-used"
+    platform-base-url: "https://kr.api.riotgames.com"
+    regional-base-url: "https://asia.api.riotgames.com"
+mining:
+  batch:
+    match-page-size: 500
+collection:
+  scheduler:
+    enabled: false
