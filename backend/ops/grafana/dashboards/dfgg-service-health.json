@@ -1326,7 +1326,7 @@
               "name": "/dfgg/$env"
             }
           ],
-          "expression": "fields @timestamp, @logStream, @message\n| filter @logStream like \"app-\"\n  and @message =~ /^\\d{4}-\\d{2}-\\d{2} \\S+ (WARN|ERROR) /\n| sort @timestamp desc\n| limit 100"
+          "expression": "fields @timestamp, @message\n| filter @logStream like \"app-\"\n  and @message =~ /^\\d{4}-\\d{2}-\\d{2} \\S+ (WARN|ERROR) /\n| parse @message /^\\S+ \\S+ (?<level>WARN|ERROR)\\s+\\[(?<slot>[^\\]]*)\\] \\[[^\\]]*\\] (?<logger>\\S+) traceId=(?<traceId>\\S+) - (?<msg>.*)/\n| fields concat(level, \" [\", slot, \"] \", logger, \" - \", msg) as line\n| display @timestamp, line, level, traceId\n| sort @timestamp desc\n| limit 100"
         }
       ]
     }
