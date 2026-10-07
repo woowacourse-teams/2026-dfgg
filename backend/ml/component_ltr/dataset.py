@@ -25,11 +25,13 @@ def validate_row(row, seen):
         raise ValueError("SCHEMA_VERSION")
     if row["featureNames"] != FEATURE_NAMES:
         raise ValueError("FEATURE_ORDER")
-    if row["targetSource"] != "OBSERVED_FUTURE_CORE":
+    if row["targetSource"] != "OBSERVED_FUTURE_TARGET_ITEM":
         raise ValueError("TARGET_SOURCE")
     if row["status"] != "READY":
         raise ValueError("NOT_READY")
-    qid = f"{row['matchId']}:{row['participantId']}:{row['startPurchaseOrder']}:{row['endPurchaseOrder']}"
+    if type(row["targetItemId"]) is not int or row["targetItemId"] <= 0:
+        raise ValueError("TARGET_ITEM")
+    qid = f"{row['matchId']}:{row['participantId']}:{row['startPurchaseOrder']}:{row['endPurchaseOrder']}:{row['targetItemId']}"
     if qid in seen:
         raise ValueError("DUPLICATE_QUERY")
     seen.add(qid)

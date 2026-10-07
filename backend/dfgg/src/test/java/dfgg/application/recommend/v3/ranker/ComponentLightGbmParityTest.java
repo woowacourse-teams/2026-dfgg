@@ -26,8 +26,8 @@ class ComponentLightGbmParityTest {
         var mapper = new ObjectMapper();
         var fixture = mapper.readTree(fixturePath.toFile());
         var modelJson = mapper.readTree(modelPath.toFile());
-        assertThat(modelJson.path("model_version").asText()).isEqualTo("component-ltr-v4");
-        assertThat(modelJson.path("target_source").asText()).isEqualTo("OBSERVED_FUTURE_CORE");
+        assertThat(modelJson.path("model_version").asText()).isEqualTo("component-ltr-v5");
+        assertThat(modelJson.path("target_source").asText()).isEqualTo("OBSERVED_FUTURE_TARGET_ITEM");
         assertThat(fixture.path("schema_fingerprint").asText()).isEqualTo(FINGERPRINT);
         assertThat(mapper.convertValue(fixture.path("feature_names"),
                 new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {}))

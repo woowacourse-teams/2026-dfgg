@@ -2,7 +2,7 @@
 import hashlib
 import json
 
-SCHEMA_VERSION = "component-bundle-validation-v4"
+SCHEMA_VERSION = "component-bundle-validation-v5"
 FEATURE_NAMES = [
     "additional_cost",
     "purchase_quantity",
@@ -45,6 +45,11 @@ FEATURE_NAMES = [
     "flat_move_speed_before",
     "percent_move_speed_before",
     "health_regen_before",
+    "target_remaining_gold_after_purchase",
+    "target_remaining_recipe_depth",
+    "contains_direct_target_material",
+    "target_material_coverage_after_purchase",
+    "target_progress_gain",
 ]
 
 # 열 순서가 바뀌면 지문도 바뀌므로 다른 계약의 모델을 잘못 읽지 못하게 한다.

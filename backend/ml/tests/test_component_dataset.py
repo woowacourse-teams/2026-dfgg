@@ -7,19 +7,19 @@ from component_ltr.feature_schema import FEATURE_NAMES, SCHEMA_VERSION, SCHEMA_F
 
 def test_bundle_dataset_contract(tmp_path):
     row = {"schemaVersion": SCHEMA_VERSION, "featureNames": FEATURE_NAMES, "status": "READY",
-           "targetSource": "OBSERVED_FUTURE_CORE", "matchId": "KR_1", "participantId": 1,
+           "targetSource": "OBSERVED_FUTURE_TARGET_ITEM", "matchId": "KR_1", "participantId": 1, "targetItemId": 3071,
            "startPurchaseOrder": 1, "endPurchaseOrder": 2, "observedItems": {"1036": 2},
-           "candidates": [{"itemQuantities": {"1036": 2}, "label": 1, "features": [700, 2, 1, 0, 2] + [0] * 36},
-                          {"itemQuantities": {"1036": 1}, "label": 0, "features": [350, 1, 1, 0, 1] + [0] * 36}]}
+           "candidates": [{"itemQuantities": {"1036": 2}, "label": 1, "features": [700, 2, 1, 0, 2] + [0] * 41},
+                          {"itemQuantities": {"1036": 1}, "label": 0, "features": [350, 1, 1, 0, 1] + [0] * 41}]}
     path = tmp_path / "train.jsonl"
     path.write_text(json.dumps(row) + '\n')
     dataset = load_dataset(path)
     assert dataset.group.tolist() == [2]
     assert dataset.labels.tolist() == [1, 0]
-    assert dataset.features.shape == (2, 41)
+    assert dataset.features.shape == (2, 46)
     # Java 모델 로더의 계약 지문과 동일해야 한다.
     assert dataset.schema_fingerprint == SCHEMA_FINGERPRINT == (
-        '9d8228aac189ef9ed2238458e922010d74fcda150865f938cbf57730cddc63ec'
+        '54d9de4694c4f106003206c2489c3ba8cdd0346aad3c8c375fed32a4682e9188'
     )
     row['candidates'][0]['label'] = 0
     path.write_text(json.dumps(row) + '\n')
@@ -33,9 +33,9 @@ def test_validation_diagnostics_identifies_indistinguishable_candidates(tmp_path
     from dfgg_ltr.dataset import Dataset
     from component_ltr.analyze import diagnostics
     from component_ltr.evaluate import evaluate
-    dataset = Dataset(np.zeros((2, 41)), np.asarray([0, 1]), np.asarray([2]),
+    dataset = Dataset(np.zeros((2, 46)), np.asarray([0, 1]), np.asarray([2]),
                       ['KR_1:1:1:1'], FEATURE_NAMES, 'test-fingerprint')
-    row = {'position': 'TOP', 'targetCoreId': 3071, 'observedItems': {'1036': 2},
+    row = {'position': 'TOP', 'targetItemId': 3071, 'observedItems': {'1036': 2},
            'candidates': [{'itemQuantities': {'1037': 1}}, {'itemQuantities': {'1036': 2}}]}
     path = tmp_path / 'validation.jsonl'
     path.write_text(json.dumps(row) + '\n')
@@ -53,10 +53,10 @@ def test_validation_diagnostics_identifies_indistinguishable_candidates(tmp_path
 @pytest.fixture
 def ranking_row():
     return {"schemaVersion": SCHEMA_VERSION, "featureNames": FEATURE_NAMES.copy(), "status": "READY",
-            "targetSource": "OBSERVED_FUTURE_CORE", "matchId": "KR_1", "participantId": 1,
+            "targetSource": "OBSERVED_FUTURE_TARGET_ITEM", "matchId": "KR_1", "participantId": 1, "targetItemId": 3071,
             "startPurchaseOrder": 1, "endPurchaseOrder": 2, "observedItems": {"1036": 2},
-            "candidates": [{"itemQuantities": {"1036": 2}, "label": 1, "features": [700] + [0] * 40},
-                           {"itemQuantities": {"1036": 1}, "label": 0, "features": [350] + [0] * 40}]}
+            "candidates": [{"itemQuantities": {"1036": 2}, "label": 1, "features": [700] + [0] * 45},
+                           {"itemQuantities": {"1036": 1}, "label": 0, "features": [350] + [0] * 45}]}
 
 
 @pytest.mark.parametrize("fault,reason", [
@@ -112,7 +112,7 @@ def test_baselines_and_ndcg1_use_same_groups_and_tie_policy():
     import numpy as np
     from dfgg_ltr.dataset import Dataset
     from component_ltr.evaluate import evaluate_baselines
-    features = np.zeros((3, 41))
+    features = np.zeros((3, 46))
     features[:, 0] = [100, 200, 300]
     features[:, FEATURE_NAMES.index("consumed_owned_quantity")] = [0, 2, 2]
     dataset = Dataset(features, np.asarray([0, 1, 0]), np.asarray([3]),
@@ -122,3 +122,41 @@ def test_baselines_and_ndcg1_use_same_groups_and_tie_policy():
     assert results["MOST_MATERIAL_CONSUMED"]["ndcg@1"] == 1
     assert results["CHEAPEST"]["mrr"] == 0.5
     assert results["COST_DESC"]["mrr"] == 0.5
+
+
+def test_target_is_part_of_query_identity_and_feature_order_matches_java(tmp_path, ranking_row):
+    import copy
+    import re
+    from pathlib import Path
+    other = copy.deepcopy(ranking_row)
+    other['targetItemId'] = 6333
+    path = tmp_path / 'train.jsonl'
+    path.write_text(json.dumps(ranking_row) + '\n' + json.dumps(other) + '\n')
+    dataset = load_dataset(path)
+    assert len(dataset.qids) == 2
+    assert dataset.qids[0] != dataset.qids[1]
+    java = (Path(__file__).parents[2] / 'dfgg/src/main/java/dfgg/application/recommend/component/ComponentCandidateFeatures.java').read_text()
+    declaration = java.split('FEATURE_NAMES = List.of(', 1)[1].split(');', 1)[0]
+    assert re.findall(r'"([a-z_]+)"', declaration) == FEATURE_NAMES
+
+
+def test_v4_data_is_rejected_even_if_feature_count_was_padded(tmp_path, ranking_row):
+    ranking_row['schemaVersion'] = 'component-bundle-validation-v4'
+    path = tmp_path / 'train.jsonl'
+    path.write_text(json.dumps(ranking_row) + '\n')
+    with pytest.raises(ValueError, match='SCHEMA_VERSION'):
+        load_dataset(path)
+
+
+def test_stratification_uses_metadata_without_adding_features(tmp_path, ranking_row):
+    import numpy as np
+    from component_ltr.evaluate import stratified_evaluation
+    ranking_row.update(targetKind='TIER_TWO_BOOTS', completedCoreCount=2, goldLower=700, position='TOP')
+    path = tmp_path / 'test.jsonl'
+    path.write_text(json.dumps(ranking_row) + '\n')
+    dataset = load_dataset(path)
+    result = stratified_evaluation(dataset, np.asarray([1.0, 0.0]), path)
+    assert result['target_kind']['TIER_TWO_BOOTS']['groups'] == 1
+    assert result['completed_core_count']['2']['hit@1'] == 1
+    assert result['gold_lower_range']['500-999']['hit@1'] == 1
+    assert dataset.features.shape[1] == 46

@@ -34,3 +34,37 @@ def evaluate_baselines(dataset) -> dict:
     return {"COST_DESC": evaluate(dataset, dataset.features[:, column["additional_cost"]]),
             "CHEAPEST": evaluate(dataset, -dataset.features[:, column["additional_cost"]]),
             "MOST_MATERIAL_CONSUMED": evaluate(dataset, dataset.features[:, column["consumed_owned_quantity"]])}
+
+
+def stratified_evaluation(dataset, scores, path):
+    """같은 모델의 지표만 유형/단계/역할/예산별 집계한다. 분리 학습하지 않는다."""
+    import json
+    from dfgg_ltr.dataset import Dataset
+    buckets = {}
+    offset = 0
+    with path.open(encoding='utf-8') as source:
+        for size, line in zip(dataset.group, source, strict=True):
+            row = json.loads(line)
+            end = offset + int(size)
+            group = Dataset(dataset.features[offset:end], dataset.labels[offset:end],
+                            np.asarray([size]), [], dataset.feature_names, dataset.schema_fingerprint)
+            metrics = evaluate(group, scores[offset:end])
+            gold = row.get('goldLower', 0)
+            categories = {
+                'target_kind': row.get('targetKind', 'UNKNOWN'),
+                'completed_core_count': str(min(row.get('completedCoreCount', 0), 3)),
+                'position': row.get('position') or 'UNKNOWN',
+                'gold_lower_range': '0-499' if gold < 500 else '500-999' if gold < 1000 else '1000-1999' if gold < 2000 else '2000+',
+            }
+            for category, value in categories.items():
+                bucket = buckets.setdefault(category, {}).setdefault(value, {'groups': 0, **{k: 0.0 for k in metrics}})
+                bucket['groups'] += 1
+                for key, metric in metrics.items():
+                    bucket[key] += metric
+            offset = end
+    for category in buckets.values():
+        for bucket in category.values():
+            for key in bucket:
+                if key != 'groups':
+                    bucket[key] /= bucket['groups']
+    return buckets

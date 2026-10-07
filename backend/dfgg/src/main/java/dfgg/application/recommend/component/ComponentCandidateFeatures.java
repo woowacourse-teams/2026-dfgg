@@ -4,6 +4,7 @@ import dfgg.domain.match.BuildPathResolver;
 import dfgg.application.ChampionPositionNormalizer;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.match.PurchaseItemCatalog;
+import dfgg.domain.match.TargetItemProgress;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import java.util.List;
 import java.util.Map;
@@ -34,11 +35,13 @@ public record ComponentCandidateFeatures(Map<Integer, Integer> itemQuantities, L
             "magic_resist_delta", "attack_speed_delta", "crit_chance_delta", "life_steal_delta",
             "flat_move_speed_delta", "percent_move_speed_delta", "health_regen_delta",
             "game_time_minutes", "position_top", "position_jungle", "position_mid", "position_bottom", "position_support", "position_unknown",
-            "attack_damage_before", "ability_power_before", "health_before", "mana_before", "armor_before", "magic_resist_before", "attack_speed_before", "crit_chance_before", "life_steal_before", "flat_move_speed_before", "percent_move_speed_before", "health_regen_before");
+            "attack_damage_before", "ability_power_before", "health_before", "mana_before", "armor_before", "magic_resist_before", "attack_speed_before", "crit_chance_before", "life_steal_before", "flat_move_speed_before", "percent_move_speed_before", "health_regen_before",
+            "target_remaining_gold_after_purchase", "target_remaining_recipe_depth", "contains_direct_target_material",
+            "target_material_coverage_after_purchase", "target_progress_gain");
 
     /** 학습과 추론에 같은 계산을 사용한다. Gold 추정치·미래 구매 정보는 입력받지 않는다. */
     public static ComponentCandidateFeatures calculate(dfgg.domain.match.ItemInventory before,
-            BuildPathResolver.PurchaseBundle candidate, int targetCoreId, PurchaseItemCatalog catalog, ItemResponse response, long gameTimeMs, String position) {
+            BuildPathResolver.PurchaseBundle candidate, int targetItemId, PurchaseItemCatalog catalog, ItemResponse response, long gameTimeMs, String position) {
         if (gameTimeMs < 0) throw new IllegalArgumentException("게임 시간은 음수일 수 없습니다.");
         var after = candidate.inventoryAfter();
         int consumedQuantity = 0;
@@ -55,14 +58,14 @@ public record ComponentCandidateFeatures(Map<Integer, Integer> itemQuantities, L
         int basic = 0;
         int intermediate = 0;
         for (var purchased : candidate.itemQuantities().entrySet()) {
-            if (purchased.getKey() == targetCoreId) continue;
+            if (purchased.getKey() == targetItemId) continue;
             if (catalog.find(purchased.getKey()).orElseThrow().ingredients().isEmpty()) basic += purchased.getValue();
             else intermediate += purchased.getValue();
         }
         List<Double> vector = new java.util.ArrayList<>(List.of((double) candidate.additionalCost(),
                 (double) candidate.itemQuantities().values().stream().mapToInt(Integer::intValue).sum(),
                 (double) candidate.itemQuantities().size(), (double) catalog.occupiedSlots(before),
-                (double) catalog.occupiedSlots(after), after.quantityOf(targetCoreId) > before.quantityOf(targetCoreId) ? 1.0 : 0.0,
+                (double) catalog.occupiedSlots(after), after.quantityOf(targetItemId) > before.quantityOf(targetItemId) ? 1.0 : 0.0,
                 (double) consumedQuantity, (double) consumedValue, (double) basic, (double) intermediate));
         for (String stat : STAT_KEYS) vector.add(statDelta(before, after, response, stat));
         // 첫 구매 직전의 공통 맥락. 후보마다 복사되어 능력치·비용과 함께 트리에서 비교된다.
@@ -74,6 +77,15 @@ public record ComponentCandidateFeatures(Map<Integer, Integer> itemQuantities, L
         vector.add(normalizedPosition.isEmpty() ? 1.0 : 0.0);
         // 현재 보유 아이템의 기본 능력치 합. 챔피언 기본 능력치·패시브는 포함하지 않는다.
         for (String stat : STAT_KEYS) vector.add(statDelta(dfgg.domain.match.ItemInventory.empty(), before, response, stat));
+        var progress = new TargetItemProgress(catalog);
+        var previous = progress.measure(targetItemId, before);
+        var current = progress.measure(targetItemId, after);
+        var target = catalog.find(targetItemId).orElseThrow();
+        vector.add((double) current.remainingGold());
+        vector.add((double) current.remainingRecipeDepth());
+        vector.add(candidate.itemQuantities().keySet().stream().anyMatch(target.ingredients()::contains) ? 1.0 : 0.0);
+        vector.add(current.materialCoverage());
+        vector.add(current.fraction() - previous.fraction());
         return new ComponentCandidateFeatures(candidate.itemQuantities(), candidate.purchaseOrder(),
                 after.quantities(), vector);
     }

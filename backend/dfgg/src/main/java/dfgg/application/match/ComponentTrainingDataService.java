@@ -3,6 +3,7 @@ package dfgg.application.match;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.recommend.component.ComponentCandidateFeatures;
 import dfgg.domain.match.BuildPathResolver;
+import dfgg.domain.match.ComponentTargetPolicy;
 import dfgg.domain.match.ItemPurchaseType;
 import dfgg.domain.match.PurchaseItemCatalog;
 import dfgg.infrastructure.external.catalog.DataDragonPurchaseItemCatalog;
@@ -14,7 +15,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 실제 미래 Core를 조건으로 한 데이터 생성 검증. 운영 Core 추천 성능을 평가하는 데이터가 아니다. */
+/** 실제 미래 목표의 관측 구매를 조건으로 한 데이터 생성. 운영 Core 추천 성능 평가는 아니다. */
 @Service
 public class ComponentTrainingDataService {
     private final ParticipantItemPurchaseSnapshotService snapshots;
@@ -55,28 +56,30 @@ public class ComponentTrainingDataService {
             List<ParticipantItemPurchaseSnapshot> purchases, PurchaseItemCatalog catalog,
             BuildPathResolver resolver, String version, ItemResponse response) {
         // ponytail: 경기 내 선형 탐색. 대량 export에서 병목이 확인되면 참가자별 Core 순번 인덱스로 바꾼다.
+        var targets = new ComponentTargetPolicy(catalog);
         var target = purchases.stream().filter(s -> s.purchase().getParticipantId() == bundle.participantId())
-                .filter(s -> s.purchase().getPurchaseType() == ItemPurchaseType.CORE)
+                .filter(s -> targets.isObservedTarget(s.purchase().getItemId(), s.purchase().getPurchaseType()))
                 .filter(s -> s.purchase().getPurchaseOrder() >= bundle.startPurchaseOrder())
                 .filter(s -> s.reason() != ParticipantItemPurchaseSnapshot.Reason.PURCHASE_UNDONE)
                 .findFirst().orElse(null);
         if (!bundle.ready()) {
-            return result(bundle, target, version, "BUNDLE_EXCLUDED", List.of());
+            return result(bundle, target, catalog, purchases, version, "BUNDLE_EXCLUDED", List.of());
         }
         if (target == null) {
-            return result(bundle, null, version, "NO_OBSERVED_CORE", List.of());
+            return result(bundle, null, catalog, purchases, version, "NO_OBSERVED_TARGET", List.of());
         }
         if (target.reason() == ParticipantItemPurchaseSnapshot.Reason.CANCELLATION_UNRESOLVED) {
-            return result(bundle, target, version, "TARGET_CANCELLATION_UNRESOLVED", List.of());
+            return result(bundle, target, catalog, purchases, version, "TARGET_CANCELLATION_UNRESOLVED", List.of());
         }
         if (target.purchase().getPurchaseOrder() < bundle.endPurchaseOrder()) {
-            return result(bundle, target, version, "CORE_BOUNDARY_CROSSED", List.of());
+            return result(bundle, target, catalog, purchases, version, "TARGET_BOUNDARY_CROSSED", List.of());
         }
         final List<BuildPathResolver.PurchaseBundle> candidates;
         try {
+            targets.validate(target.purchase().getItemId(), bundle.inventoryBefore());
             candidates = resolver.resolve(target.purchase().getItemId(), bundle.inventoryBefore(), bundle.goldLower());
         } catch (IllegalArgumentException | IllegalStateException exception) {
-            return result(bundle, target, version, "CANDIDATE_RESOLUTION_FAILED: " + exception.getMessage(), List.of());
+            return result(bundle, target, catalog, purchases, version, "CANDIDATE_RESOLUTION_FAILED: " + exception.getMessage(), List.of());
         }
         var matched = candidates.stream().filter(c -> c.itemQuantities().equals(bundle.itemQuantities()))
                 .findFirst().orElse(null);
@@ -89,30 +92,59 @@ public class ComponentTrainingDataService {
             status = "OBSERVED_COST_MISMATCH";
         }
         boolean usable = "READY".equals(status);
-        var rows = candidates.stream().map(c -> new ComponentTrainingCandidate(
-                ComponentCandidateFeatures.calculate(bundle.inventoryBefore(), c, target.purchase().getItemId(), catalog, response, bundle.purchases().getFirst().sourceEvent().gameTimeMs(),
-                        bundle.purchases().getFirst().purchase().getPosition()),
-                usable ? (c.itemQuantities().equals(bundle.itemQuantities()) ? 1 : 0) : null)).toList();
-        return result(bundle, target, version, status, rows);
+        final List<ComponentTrainingCandidate> rows;
+        try {
+            rows = candidates.stream().map(c -> new ComponentTrainingCandidate(
+                    ComponentCandidateFeatures.calculate(bundle.inventoryBefore(), c, target.purchase().getItemId(), catalog, response,
+                            bundle.purchases().getFirst().sourceEvent().gameTimeMs(), bundle.purchases().getFirst().purchase().getPosition()),
+                    usable ? (c.itemQuantities().equals(bundle.itemQuantities()) ? 1 : 0) : null)).toList();
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            return result(bundle, target, catalog, purchases, version, "FEATURE_CALCULATION_FAILED: " + exception.getMessage(), List.of());
+        }
+        return result(bundle, target, catalog, purchases, version, status, rows);
     }
 
     private Example result(ParticipantItemPurchaseBundle bundle, ParticipantItemPurchaseSnapshot target,
+                           PurchaseItemCatalog catalog, List<ParticipantItemPurchaseSnapshot> purchases,
                            String version, String status, List<ComponentTrainingCandidate> candidates) {
         var first = bundle.purchases().getFirst().purchase();
-        return new Example(SCHEMA_VERSION, "OBSERVED_FUTURE_CORE", version,
+        return new Example(SCHEMA_VERSION, "OBSERVED_FUTURE_TARGET_ITEM", version,
                 bundle.matchId(), bundle.participantId(), bundle.startPurchaseOrder(), bundle.endPurchaseOrder(),
                 first.getPosition(), target == null ? null : target.purchase().getItemId(),
                 target == null ? null : target.purchase().getPurchaseOrder(),
                 bundle.inventoryBefore() == null ? null : bundle.inventoryBefore().quantities(),
                 bundle.goldLower(), bundle.goldUpper(), bundle.itemQuantities(), bundle.totalCost(), status,
-                bundle.exclusionReasons().stream().map(Enum::name).sorted().toList(), ComponentCandidateFeatures.FEATURE_NAMES, candidates);
+                bundle.exclusionReasons().stream().map(Enum::name).sorted().toList(), ComponentCandidateFeatures.FEATURE_NAMES, candidates,
+                targetKind(target, catalog), completedCoreCount(bundle, purchases));
     }
 
-    public static final String SCHEMA_VERSION = "component-bundle-validation-v4";
+    private String targetKind(ParticipantItemPurchaseSnapshot target, PurchaseItemCatalog catalog) {
+        if (target == null) return null;
+        try {
+            return new ComponentTargetPolicy(catalog).kind(target.purchase().getItemId()).name();
+        } catch (IllegalStateException exception) {
+            return "UNSUPPORTED";
+        }
+    }
+
+    /** 평가 메타데이터만 기록한다. Feature/학습 분할/모델 선택에는 사용하지 않는다. */
+    private long completedCoreCount(ParticipantItemPurchaseBundle bundle, List<ParticipantItemPurchaseSnapshot> purchases) {
+        if (bundle.inventoryBefore() == null) return 0;
+        return purchases.stream().filter(s -> s.purchase().getParticipantId() == bundle.participantId())
+                .filter(s -> s.purchase().getPurchaseOrder() < bundle.startPurchaseOrder())
+                .filter(s -> s.purchase().getPurchaseType() == ItemPurchaseType.CORE)
+                .filter(s -> s.reason() != ParticipantItemPurchaseSnapshot.Reason.PURCHASE_UNDONE)
+                .map(s -> s.purchase().getItemId()).distinct()
+                .filter(id -> bundle.inventoryBefore().quantityOf(id) > 0).count();
+    }
+
+    public static final String SCHEMA_VERSION = "component-bundle-validation-v5";
     public record Example(String schemaVersion, String targetSource, String dataVersion, String matchId,
                           int participantId, int startPurchaseOrder, int endPurchaseOrder, String position,
-                          Integer targetCoreId, Integer targetPurchaseOrder, Map<Integer, Integer> inventoryBefore,
+                          Integer targetItemId, Integer targetPurchaseOrder, Map<Integer, Integer> inventoryBefore,
                           Integer goldLower, Integer goldUpper, Map<Integer, Integer> observedItems, Long observedCost,
                           String status, List<String> exclusionReasons, List<String> featureNames,
-                          List<ComponentTrainingCandidate> candidates) {}
+                          List<ComponentTrainingCandidate> candidates, String targetKind, long completedCoreCount) {
+        public Integer targetCoreId() { return targetItemId; }
+    }
 }

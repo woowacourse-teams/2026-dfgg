@@ -32,7 +32,7 @@ def diagnostics(dataset, scores, path: Path) -> dict:
             bucket["groups"] += 1
             bucket["correct"] += int(selected == positive)
             if selected != positive and len(wrong_examples) < 10:
-                wrong_examples.append({"qid": qid, "targetCoreId": row["targetCoreId"],
+                wrong_examples.append({"qid": qid, "targetItemId": row["targetItemId"],
                                        "observedItems": row["observedItems"],
                                        "selectedItems": row["candidates"][selected]["itemQuantities"],
                                        "positiveFeatureCollision": bool(np.count_nonzero(same) > 1)})
@@ -55,3 +55,40 @@ def validation_report(booster, dataset, data_path: Path, history: dict) -> dict:
     report["feature_gain"] = dict(zip(dataset.feature_names,
                                     booster.feature_importance(importance_type="gain").tolist()))
     return report
+
+
+def coverage_report(path: Path) -> dict:
+    """제외 행까지 보존한 all.jsonl로 목표별 후보 생성/학습 제외 분모를 기록한다."""
+    from collections import Counter
+    targets = {}
+    with path.open(encoding='utf-8') as source:
+        for line in source:
+            row = json.loads(line)
+            kind = row.get('targetKind') or 'NO_OBSERVED_TARGET'
+            bucket = targets.setdefault(kind, {'bundles': 0, 'candidatesAtLeastOne': 0,
+                                               'candidatesAtLeastTwo': 0, 'rankingGroups': 0,
+                                               'statuses': Counter(), 'exclusionReasonsOverlapping': Counter()})
+            count = len(row['candidates'])
+            bucket['bundles'] += 1
+            bucket['candidatesAtLeastOne'] += int(count >= 1)
+            bucket['candidatesAtLeastTwo'] += int(count >= 2)
+            bucket['rankingGroups'] += int(row['status'] == 'READY' and count >= 2)
+            bucket['statuses'][row['status']] += 1
+            bucket['exclusionReasonsOverlapping'].update(row['exclusionReasons'])
+    for bucket in targets.values():
+        bucket['rankingExcludedRate'] = 1 - bucket['rankingGroups'] / bucket['bundles']
+        bucket['candidateCoverageRate'] = bucket['candidatesAtLeastOne'] / bucket['bundles']
+    return {'purpose': 'EXPORT_COVERAGE_INCLUDING_EXCLUDED_BUNDLES_NOT_MODEL_ACCURACY', 'targetKinds': targets}
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--all-data', type=Path, required=True)
+    parser.add_argument('--out', type=Path, required=True)
+    args = parser.parse_args()
+    result = coverage_report(args.all_data)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps(result, ensure_ascii=False, indent=2))
+    print(json.dumps({kind: {key: bucket[key] for key in ('bundles', 'rankingGroups', 'candidateCoverageRate', 'rankingExcludedRate')}
+                      for kind, bucket in result['targetKinds'].items()}, indent=2))

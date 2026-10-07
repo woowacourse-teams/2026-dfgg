@@ -22,6 +22,7 @@ class ComponentCandidateFeaturesTest {
                   "1":{"gold":{"total":10,"purchasable":true},"stats":{"PercentAttackSpeedMod":0.1}},
                   "2":{"gold":{"total":10,"purchasable":true},"stats":{"PercentAttackSpeedMod":0.2}},
                   "3":{"gold":{"total":10,"purchasable":true},"stats":{"PercentAttackSpeedMod":0.3}},
+                  "3071":{"from":["1036"],"gold":{"total":3000,"purchasable":true}},
                   "1036":{"gold":{"total":350,"purchasable":true},"stats":{"FlatPhysicalDamageMod":10}}}}
                 """, ItemResponse.class);
         var before = ItemInventory.empty().add(1).add(1).add(2).add(3);
@@ -30,7 +31,7 @@ class ComponentCandidateFeaturesTest {
                 new DataDragonPurchaseItemCatalog(response.data()), response, 120_000, "TOP").features();
         assertThat(features.get(16)).isEqualTo(0.0); // 공격력 구매가 공격속도를 바꿨다고 학습시키지 않는다.
         assertThat(features.get(10)).isEqualTo(10.0);
-        assertThat(features).hasSize(41);
+        assertThat(features).hasSize(46);
         assertThat(features.get(29)).isEqualTo(0.0); // 구매할 롱소드의 공격력은 이전 보유량에 포함하지 않는다.
         assertThat(features.get(35)).isCloseTo(0.7, org.assertj.core.data.Offset.offset(1e-12));
     }
@@ -93,7 +94,8 @@ class ComponentCandidateFeaturesTest {
     @CsvSource({"MIDDLE,3", "MID,3", "UTILITY,5", "SUPPORT,5", "TOP,1", "JUNGLE,2", "BOTTOM,4", "UNKNOWN,6"})
     void purchase_context_uses_minutes_and_existing_position_normalization(String position, int hotIndex) throws Exception {
         var response = new ObjectMapper().readValue("""
-                {"version":"16.18.1","data":{"1036":{"gold":{"total":350,"purchasable":true}}}}
+                {"version":"16.18.1","data":{"3071":{"from":["1036"],"gold":{"total":3000,"purchasable":true}},
+                  "1036":{"gold":{"total":350,"purchasable":true}}}}
                 """, ItemResponse.class);
         var candidate = new BuildPathResolver.PurchaseBundle(Map.of(1036, 1), 350,
                 ItemInventory.empty().add(1036), List.of(1036));

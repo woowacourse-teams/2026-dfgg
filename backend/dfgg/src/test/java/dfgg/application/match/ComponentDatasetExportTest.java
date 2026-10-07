@@ -47,6 +47,8 @@ class ComponentDatasetExportTest {
         matches.sort(java.util.Comparator.comparing(ComponentDatasetExportTest::hash).thenComparing(id -> id));
         Map<String, Long> statuses = new TreeMap<>();
         Map<String, Long> exclusions = new TreeMap<>();
+        Map<String, Long> targetKinds = new TreeMap<>();
+        var policy = new dfgg.domain.match.ComponentTargetPolicy(new dfgg.infrastructure.external.catalog.DataDragonPurchaseItemCatalog(catalog.data()));
         Map<String, Object> manifest = new LinkedHashMap<>();
         long rows = 0, eligible = 0, missing = 0, ready = 0;
         int trainEnd = matches.size() * 8 / 10;
@@ -73,6 +75,7 @@ class ComponentDatasetExportTest {
                     all.write(json);
                     if (example.status().equals("READY") && example.candidates().size() > 1) {
                         writer.write(json);
+                        targetKinds.merge(policy.kind(example.targetItemId()).name(), 1L, Long::sum);
                         ready++;
                         splitReady++;
                     }
@@ -82,10 +85,12 @@ class ComponentDatasetExportTest {
             }
         }
         mapper.writerWithDefaultPrettyPrinter().writeValue(directory.resolve("manifest.json").toFile(),
-                Map.of("targetSource", "OBSERVED_FUTURE_CORE", "splitPolicy", "sha256(component-v1:matchId), sorted 80/10/10",
+                Map.of("targetSource", "OBSERVED_FUTURE_TARGET_ITEM", "splitPolicy", "sha256(component-v1:matchId), sorted 80/10/10",
                         "catalogSha256", HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(catalogPath))),
                         "matches", manifest));
         var report = new LinkedHashMap<String, Object>();
+        report.put("schemaVersion", ComponentTrainingDataService.SCHEMA_VERSION);
+        report.put("rankingGroupsByTargetKind", targetKinds);
         report.put("matches", matches.size()); report.put("bundles", rows);
         report.put("candidateComparableBundles", eligible); report.put("missingObservedBundles", missing);
         report.put("missingRate", eligible == 0 ? null : (double) missing / eligible);
