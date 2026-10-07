@@ -8,10 +8,13 @@ import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
 import dfgg.application.recommend.v3.ranker.LambdaMartRanker;
 import dfgg.application.recommend.v3.ranker.LightGbmModelLoader;
 import dfgg.application.recommend.v3.ranker.TreeShapCalculator;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ResourceLoader;
 
 /**
  * 학습된 LTR 모델을 기동 시점에 읽는다.
@@ -26,8 +29,15 @@ public class LtrModelConfiguration {
 
     @Bean
     public GradientBoostedTrees ltrModel(
-            @Value("${recommendation.ltr.model-path:ltr/model.json}") String modelPath) {
-        return LightGbmModelLoader.loadFromClasspath(modelPath);
+            @Value("${recommendation.ltr.model-path:ltr/model.json}") String modelPath,
+            ResourceLoader resources) {
+        // 기존 접두사 없는 경로는 classpath로 유지하고 EC2의 file:/...도 허용한다.
+        var resource = resources.getResource(modelPath.contains(":") ? modelPath : "classpath:" + modelPath);
+        try (var input = resource.getInputStream()) {
+            return LightGbmModelLoader.load(input);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Core LTR 모델을 읽지 못했습니다: " + modelPath, exception);
+        }
     }
 
     /**

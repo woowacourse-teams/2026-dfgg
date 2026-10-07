@@ -92,6 +92,14 @@ public class PurchaseInventoryReconstructor {
         this.materialLinker = materialLinker;
     }
 
+    /** 과거 구매가 현재 보유 상태에 남아 있는지 확인한다. Replay와 같은 패치별 변형 규칙을 쓴다. */
+    public boolean isStillOwned(int purchasedItemId, ItemInventory inventory, String patch) {
+        if (inventory.quantityOf(purchasedItemId) > 0) return true;
+        if (!"16.18".equals(patch)) return false;
+        Integer transformed = TRANSFORMS.getOrDefault(purchasedItemId, MID_BOOTS.get(purchasedItemId));
+        return transformed != null && inventory.quantityOf(transformed) > 0;
+    }
+
     /** 구매마다 복원 결과·실패 이유·구매 취소 여부를 반환한다. */
     public Map<ParticipantItemEvent, PurchaseState> reconstruct(List<ParticipantItemEvent> events) {
         return reconstruct(events, null);

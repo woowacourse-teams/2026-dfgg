@@ -18,6 +18,15 @@ class PurchaseInventoryReconstructorTest {
             new PurchaseInventoryReconstructor(new PurchaseMaterialLinker());
 
     @Test
+    void 과거_구매의_현재_보유_판정은_Replay의_변형_규칙을_재사용한다() {
+        assertThat(reconstructor.isStillOwned(3004, ItemInventory.empty().add(3042), "16.18")).isTrue();
+        assertThat(reconstructor.isStillOwned(3158, ItemInventory.empty().add(3171), "16.18")).isTrue();
+        assertThat(reconstructor.isStillOwned(3158, ItemInventory.empty().add(3158), "16.17")).isTrue();
+        assertThat(reconstructor.isStillOwned(3004, ItemInventory.empty().add(3042), "16.17")).isFalse();
+        assertThat(reconstructor.isStillOwned(3004, ItemInventory.empty(), "16.18")).isFalse();
+    }
+
+    @Test
     void 서포터_제어와드_전용슬롯은_첫구매부터_유지하고_다른포지션이나_패치에_적용하지_않는다() {
         var events = events("""
                 {"type":"ITEM_PURCHASED","participantId":1,"itemId":2055,"timestamp":100},
