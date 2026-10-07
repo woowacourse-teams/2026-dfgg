@@ -1,181 +1,207 @@
-/* ---------- 상단 상태 바 ---------- */
-.status-bar {
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+/* ---------- 타이틀 바 ---------- */
+.title-bar {
   position: sticky;
   top: 0;
-  /* 아래 목록의 position 요소들이 헤더 위로 칠해지지 않게 층을 올린다 */
-  z-index: 10;
-}
-
-.title-bar {
+  z-index: 2;
+  flex: none;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  height: 32px;
-  flex-shrink: 0;
-  padding-left: 10px;
+  gap: 7px;
+  height: 36px;
+  padding-left: 14px;
+  /* 배너 위에 떠 있다가, 본문이 밑으로 지나가면 흐린 유리로 가린다 */
+  background: linear-gradient(180deg, rgb(10 11 13 / 80%), rgb(10 11 13 / 35%));
+  backdrop-filter: blur(12px);
+  /* 프레임 없는 창이라 여기를 잡고 창을 옮긴다 */
   -webkit-app-region: drag;
 }
 
 .title-bar-logo {
-  width: 16px;
-  height: 16px;
-  -webkit-user-drag: none;
+  width: 15px;
+  height: 15px;
+}
+
+.title-bar-name {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .title-bar-controls {
   display: flex;
-  align-self: stretch;
-}
-
-.title-bar-button {
-  width: 46px;
   height: 100%;
-  display: grid;
-  place-items: center;
-  border: 0;
-  background: transparent;
-  color: var(--text-dim);
-  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', sans-serif;
-  font-size: 10px;
-  line-height: 1;
-  cursor: pointer;
-  transition: background 0.1s ease;
+  margin-left: auto;
   /* 부모의 drag 를 상속하면 클릭이 드래그로 먹혀 버튼이 눌리지 않는다 */
   -webkit-app-region: no-drag;
 }
 
+.title-bar-button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
 .title-bar-button:hover {
-  background: rgba(255, 255, 255, 0.09);
-  color: var(--text);
+  background: rgb(255 255 255 / 10%);
+  color: var(--ink);
 }
 
-.title-bar-button:active {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-/* 닫기만 붉게 — Windows 관습 */
 .title-bar-close:hover {
-  background: #c42b1c;
+  background: var(--accent-strong);
   color: #fff;
 }
 
-.title-bar-close:active {
-  background: #b0271a;
+/* ---------- 프로필 ---------- */
+.hero {
+  position: relative;
+  flex: none;
+  /* 타이틀 바 밑으로 배너가 이어져 보이도록 끌어올린다 */
+  margin-top: -36px;
 }
 
-/* ---------- 프로필 (헤더) ---------- */
-.info {
+/* 가장 많이 한 챔피언을 창 가득 건다. 화면에서 유일하게 색이 풍부한 곳이다. */
+.hero-banner {
+  height: 168px;
+  overflow: hidden;
+  background: radial-gradient(90% 120% at 80% 0%, rgb(230 57 80 / 22%), transparent 70%);
+  /* 아래쪽을 바탕색으로 녹여 본문과 이어 붙인다 */
+  mask-image: linear-gradient(180deg, #000 42%, transparent 100%);
+}
+
+.hero-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 18%;
+  opacity: 0;
+  transform: scale(1.06);
+  transition:
+    opacity 700ms ease,
+    transform 1400ms var(--ease-out);
+}
+
+/* 그림이 살짝 다가오며 선명해진다 */
+.hero-banner .hero-banner-loaded {
+  opacity: 0.9;
+  transform: scale(1);
+}
+
+.hero-body {
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 16px 14px;
+  align-items: flex-end;
+  gap: 14px;
+  /* 프로필이 배너 아래쪽에 걸쳐 앉는다 */
+  margin-top: -62px;
+  padding: 0 16px 6px;
 }
 
 .avatar {
   position: relative;
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
+  flex: none;
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  /* 배너 그림 위에서 프로필이 떠 보이게 바탕색 테를 두른다 */
+  background: var(--ground);
+  animation: avatar-in 520ms var(--ease-out) backwards;
+}
+
+@keyframes avatar-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.avatar-ring {
+  position: absolute;
+  inset: 0;
+  /* 12시에서 시작해 시계 방향으로 찬다 */
+  transform: rotate(-90deg);
+  fill: none;
+  stroke-width: 3;
+}
+
+.avatar-ring-track {
+  stroke: var(--line-strong);
+}
+
+.avatar-ring-fill {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgb(230 57 80 / 70%));
+  animation: ring-draw 1100ms var(--ease-out) 250ms backwards;
+}
+
+@keyframes ring-draw {
+  from {
+    stroke-dashoffset: 229;
+  }
 }
 
 .avatar-image {
-  width: 100%;
-  height: 100%;
+  width: 62px;
+  height: 62px;
   border-radius: 50%;
-  border: 2px solid var(--border);
-  background: var(--surface-hover);
   object-fit: cover;
 }
 
-/* 롤 클라이언트처럼 아이콘 아래쪽에 레벨을 겹친다 */
 .avatar-level {
   position: absolute;
-  left: 50%;
-  bottom: -4px;
-  transform: translateX(-50%);
-  padding: 1px 6px;
+  bottom: -6px;
+  padding: 1px 8px;
+  border: 2px solid var(--ground);
   border-radius: 999px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  font-size: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .identity {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
   min-width: 0;
-}
-
-.identity-name {
-  font-size: 15px;
-  font-weight: 700;
-  white-space: nowrap;
+  margin: 0 0 10px;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* 태그는 이름의 부속이라 약하게 */
-.identity-tag {
-  margin-left: 2px;
-  color: var(--text-dim);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.xp-bar {
-  width: 160px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--border);
-  overflow: hidden;
-}
-
-.xp-fill {
-  display: block;
-  height: 100%;
-  border-radius: 2px;
-  background: var(--accent);
-}
-
-/* 연결 상태는 보조 정보라 오른쪽 끝으로 민다 */
-/* 연결 상태는 보조 정보라 점 + 짧은 글자로만 알린다 */
-.connection {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-left: auto;
-  padding: 5px 11px 5px 9px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg);
-}
-
-.connection-text {
-  font-size: 12px;
-  color: var(--text-dim);
   white-space: nowrap;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 14px rgb(0 0 0 / 70%);
+  animation: rise 420ms var(--ease-out) 120ms backwards;
 }
 
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--off);
+.identity-tag {
+  margin-left: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ink-2);
 }
 
-.status-dot-connected {
-  background: var(--ok);
-  box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.18);
-}
+@media (prefers-reduced-motion: reduce) {
+  .hero-banner img {
+    transform: none;
+    transition: none;
+  }
 
-.status-dot-connecting {
-  background: var(--warn);
+  .avatar,
+  .avatar-ring-fill,
+  .identity {
+    animation: none;
+  }
 }
