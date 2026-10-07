@@ -1,0 +1,546 @@
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px 14px 18px;
+}
+
+/* ---------- 점수판 ---------- */
+.score-board {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+.score-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.score-right {
+  align-items: flex-end;
+}
+
+.score-side b {
+  padding: 3px 9px;
+  border-radius: 7px;
+  background: rgb(255 255 255 / 8%);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.score-win b {
+  background: rgb(230 57 80 / 18%);
+  color: var(--accent);
+}
+
+.score-kills {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0;
+}
+
+.score-kills strong {
+  min-width: 44px;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-align: center;
+  color: var(--ink-2);
+}
+
+.score-kills .score-mine {
+  color: var(--ink);
+}
+
+.score-kills i {
+  font-size: 12px;
+  font-style: normal;
+  color: var(--ink-2);
+}
+
+.score-gold {
+  display: grid;
+  /* 숫자 칸은 내용만큼. 여섯 자리 골드도 잘리지 않는다. */
+  grid-template-columns: auto 1fr auto;
+  align-items: end;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.score-gold > span:last-child {
+  text-align: right;
+}
+
+.score-gold-track {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  /* 숫자의 글자 밑선과 막대가 나란히 보이도록 살짝 올린다 */
+  padding-bottom: 4px;
+}
+
+.score-gold-track i {
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 400;
+  text-align: center;
+  color: var(--ink-2);
+}
+
+/* 골드 막대: 바탕이 상대 팀 몫, 그 위에 우리 팀 몫을 왼쪽부터 덮는다 */
+.score-gold-bar {
+  display: flex;
+  --hatch-rest: var(--ink-3);
+}
+
+/* ---------- 내 플레이 ---------- */
+.my-play {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px;
+  border: 1px solid var(--line);
+  border-top-color: var(--line-strong);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--surface-3), var(--surface));
+}
+
+.my-ring {
+  position: relative;
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.my-ring svg {
+  transform: rotate(-90deg);
+  fill: none;
+  stroke-width: 5;
+}
+
+.my-ring-track {
+  stroke: var(--line-strong);
+}
+
+.my-ring-fill {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  animation: my-ring-draw 900ms var(--ease-out) 120ms backwards;
+}
+
+@keyframes my-ring-draw {
+  from {
+    stroke-dashoffset: var(--ring-length);
+  }
+}
+
+/* 고리 한가운데에 얹는다. 고리 지름이 60 이라 그 높이만큼 줄 높이를 준다. */
+.my-ring-value {
+  position: absolute;
+  top: 0;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 60px;
+  letter-spacing: -0.02em;
+}
+
+.my-ring-value small {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.my-ring-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.my-stats {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+}
+
+.my-stats > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding-left: 12px;
+}
+
+.my-stats > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.my-stats dt {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+/* 숫자가 주인공이다. 가장 크고 가장 밝게. */
+.my-stats dd {
+  margin: 4px 0 0;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+/* 숫자를 풀어 주는 한마디. 흐린 글씨로 두면 안 읽혀서 알약에 담아 따로 세운다. */
+.my-stats .my-pill {
+  margin-top: 7px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 9%);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* 팀에서 1등이면 금색으로 알린다 */
+.my-stats .my-pill-top {
+  background: color-mix(in srgb, var(--gold) 18%, transparent);
+  color: var(--gold);
+}
+
+/* ---------- 맞대결 판 ---------- */
+.board-head {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.board-views {
+  display: flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 6%);
+}
+
+.board-views button {
+  height: 28px;
+  padding: 0 13px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+.board-views button[aria-selected='true'] {
+  background: var(--surface-3);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.board-rows {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 두 팀 사이를 가르는 가운데 선 */
+.board-rows::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 50%;
+  width: 1px;
+  background: var(--line);
+}
+
+.board-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* ---------- 선수 ---------- */
+.fighter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 10px 9px 6px;
+  border-radius: 10px;
+}
+
+/* 오른쪽 팀은 통째로 뒤집어 가운데를 보고 선다 */
+.fighter-right {
+  flex-direction: row-reverse;
+  padding: 9px 6px 9px 10px;
+}
+
+/* 10명 사이에서 내 자리를 바로 찾게 한다 */
+.fighter-me {
+  background: rgb(255 255 255 / 7%);
+}
+
+.fighter-portrait {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 36px;
+}
+
+.fighter-portrait img {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  outline: 1px solid rgb(255 255 255 / 10%);
+  outline-offset: -1px;
+}
+
+/* 그림 아래쪽에 걸치는 금색 띠 */
+.fighter-portrait em {
+  position: absolute;
+  right: -3px;
+  bottom: -5px;
+  left: -3px;
+  border-radius: 5px;
+  background: var(--gold);
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+  color: #1a1305;
+  white-space: nowrap;
+}
+
+.fighter-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fighter-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.fighter-right .fighter-line {
+  flex-direction: row-reverse;
+}
+
+.fighter-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.fighter-me .fighter-name {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.fighter .kda-line {
+  flex: none;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.fighter .kda-line b {
+  font-weight: 700;
+}
+
+/*
+ * 피해량 줄과 아이템 줄은 높이가 같아야 한다. 다르면 보기를 바꿀 때 판 전체가 출렁인다.
+ * 막대는 가운데에서 바깥으로 자란다. 왼쪽 팀은 오른쪽 끝에서, 오른쪽 팀은 왼쪽 끝에서 시작한다.
+ */
+.fighter-damage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-direction: row-reverse;
+  height: 18px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.fighter-right .fighter-damage {
+  flex-direction: row;
+}
+
+/*
+ * 숫자 칸 너비를 못 박아야 막대가 모두 같은 자리에서 시작해 길이를 서로 견줄 수 있다.
+ * 여섯 자리(100,000 이상)까지 들어가는 너비다.
+ */
+.fighter-damage b {
+  flex: none;
+  width: 52px;
+  font-weight: 600;
+}
+
+.fighter-right .fighter-damage b {
+  text-align: right;
+}
+
+/* 가장 많이 넣은 선수는 숫자를 밝히고 작은 이름표를 단다 */
+.fighter-damage-top b {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* ---------- 빗금 막대 ---------- */
+/*
+ * 세로 줄무늬(4px 채움 + 3px 틈)를 그린 뒤 통째로 기울인다. 전적 카드의 그림을 자른 기울기와 같다.
+ * 무늬를 비스듬히 그리는 대신 상자를 기울이므로 막대의 양 끝도 빗금과 같은 각도가 된다.
+ */
+.hatch {
+  --hatch-step: 7px;
+  --hatch-gap: 3px;
+
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  height: 8px;
+  /* 기울이면 양옆으로 조금 삐져나온다. 그만큼 안으로 들인다. */
+  padding: 0 2px;
+}
+
+.hatch-from-right {
+  justify-content: flex-end;
+}
+
+/*
+ * 길의 너비를 줄무늬 한 칸의 배수로 내리고 마지막 틈을 뺀다.
+ * 그래야 오른쪽 끝이 반쯤 잘린 조각이 아니라 온전한 빗금 한 개로 끝난다.
+ */
+.hatch-track {
+  position: relative;
+  width: calc(round(down, 100%, var(--hatch-step)) - var(--hatch-gap));
+  height: 100%;
+  color: var(--hatch-rest, rgb(255 255 255 / 10%));
+  transform: skewX(-25deg);
+}
+
+.hatch-track,
+.hatch-fill {
+  background: repeating-linear-gradient(
+    90deg,
+    currentColor 0 calc(var(--hatch-step) - var(--hatch-gap)),
+    transparent 0 var(--hatch-step)
+  );
+}
+
+/* 채운 쪽도 길 전체에 같은 무늬를 깔고 필요한 만큼만 잘라 보여 준다. 그래야 칸이 어긋나지 않는다. */
+.hatch-fill {
+  position: absolute;
+  inset: 0;
+  color: var(--hatch-color, var(--accent));
+  /* 바탕 빗금이 비치지 않게 가린다 */
+  background-color: var(--surface-2);
+  /* 자르는 자리도 한 칸 단위로 맞춰 빗금이 반쪽으로 잘리지 않게 한다 */
+  --cut: round(nearest, calc(100% - var(--fill)), var(--hatch-step));
+  clip-path: inset(0 var(--cut) 0 0);
+  transition: clip-path 700ms var(--ease-out);
+
+  @starting-style {
+    clip-path: inset(0 100% 0 0);
+  }
+}
+
+.hatch-from-right .hatch-fill {
+  clip-path: inset(0 0 0 var(--cut));
+
+  @starting-style {
+    clip-path: inset(0 0 0 100%);
+  }
+}
+
+.fighter-right {
+  --hatch-color: #b4b9c4;
+}
+
+/* 내 줄은 바탕색이 달라서 가림막 색도 맞춘다 */
+.fighter-me .hatch-fill {
+  background-color: #26282e;
+}
+
+/* 위에서부터 차례로 빗금이 채워진다 */
+.board-row:nth-child(2) .hatch-fill {
+  transition-delay: 50ms;
+}
+.board-row:nth-child(3) .hatch-fill {
+  transition-delay: 100ms;
+}
+.board-row:nth-child(4) .hatch-fill {
+  transition-delay: 150ms;
+}
+.board-row:nth-child(5) .hatch-fill {
+  transition-delay: 200ms;
+}
+
+/* 맞대결 판에서는 아이템을 한 줄로 놓고, 오른쪽 팀은 오른쪽 끝에 붙인다 */
+.fighter .items {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+}
+
+.fighter-right .items {
+  justify-content: flex-end;
+}
+
+.fighter .item-slot {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+
+.fighter .item-slot-empty {
+  display: none;
+}
+
+.fighter .item-slot:last-child {
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .my-ring-fill {
+    animation: none;
+  }
+
+  .hatch-fill {
+    transition: none;
+  }
+
+  .board-views button {
+    transition: none;
+  }
+}
