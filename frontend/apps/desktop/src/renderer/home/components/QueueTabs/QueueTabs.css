@@ -1,0 +1,84 @@
+/* 상자 없이 글자와 밑줄만으로 된 가로 메뉴. 밑에 가는 선 하나가 메뉴 전체를 받친다. */
+.queue-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--tab-count), 1fr);
+  border-bottom: 1px solid var(--line);
+}
+
+/*
+ * 고른 칸을 따라 미끄러지는 표시. 칸 너비가 같아 순번만큼 옮기면 된다.
+ * 배경 판을 깔지 않고, 밑줄과 그 위로 번지는 빛만 둔다.
+ */
+.queue-tabs-thumb {
+  position: absolute;
+  top: 0;
+  bottom: -1px;
+  left: 0;
+  width: calc(100% / var(--tab-count));
+  transform: translateX(calc(var(--tab-active) * 100%));
+  transition: transform 360ms var(--ease-out);
+  pointer-events: none;
+}
+
+/* 밑줄에서 위로 옅게 올라오는 붉은 빛. 고른 칸이 아래에서 비친 것처럼 보인다. */
+.queue-tabs-thumb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 90% at 50% 100%, rgb(230 57 80 / 22%), transparent 72%);
+}
+
+.queue-tabs-thumb::after {
+  content: '';
+  position: absolute;
+  right: 22%;
+  bottom: 0;
+  left: 22%;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgb(230 57 80 / 90%);
+}
+
+.queue-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--duration-normal) ease;
+}
+
+@media (hover: hover) {
+  .queue-tab:hover {
+    color: var(--ink-2);
+  }
+}
+
+.queue-tab[aria-selected='true'] {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.queue-tab-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-tabs-thumb,
+  .queue-tab {
+    transition: none;
+  }
+}
