@@ -1,0 +1,54 @@
+/*
+ * 데스크톱 앱 공통 디자인 토큰. 창마다(home, overlay) index.css 에서 불러온다.
+ *
+ * 원칙: 바탕과 글자는 무채색, 색은 챔피언 그림과 브랜드 레드 둘뿐이다.
+ * 레드는 '이겼다'와 '지금 고른 것'을 가리킨다.
+ */
+
+/* 0 → 값으로 세어 올라가는 숫자에 쓴다. 정수로 등록해야 중간값이 정수로 보간된다. */
+@property --count {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 0;
+}
+:root {
+  --ground: #0a0b0d;
+  --surface: #111317;
+  --surface-2: #17191e;
+  --surface-3: #1f2228;
+  /* 선은 색을 정하지 않고 흰색을 옅게 얹는다. 어느 면 위에서도 같은 세기로 보인다. */
+  --line: rgb(255 255 255 / 7%);
+  --line-strong: rgb(255 255 255 / 12%);
+
+  --ink: #eef0f3;
+  --ink-2: #a2a7b1;
+  --ink-3: #6a707b;
+
+  --accent: #e63950;
+  --accent-strong: #c1243d;
+
+  /*
+   * 이긴 판은 브랜드 레드로 빛나고, 진 판은 색을 뺀다.
+   * 승패를 파랑·빨강 두 색으로 나누지 않고 '색이 있다 / 없다'로 가른다.
+   */
+  --win: var(--accent);
+  --loss: var(--ink-3);
+  /* 퍼펙트·고평점처럼 드물게 눈에 띄어야 하는 값 */
+  --gold: #e6b450;
+  /* 잘한 수치. 레드(승리)·골드(최고)와 겹치지 않는 차가운 색으로 둔다. */
+  --good: #5fd4a8;
+
+  --font-body:
+    'Pretendard Variable', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui,
+    -apple-system, sans-serif;
+
+  --radius-s: 5px;
+  --radius-m: 8px;
+  --radius-l: 14px;
+
+  /* 기본 ease-out 은 힘이 약해 움직임이 흐릿하다. 처음에 확 나가고 길게 멈추는 곡선을 쓴다. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --duration-press: 140ms;
+  --duration-fast: 160ms;
+  --duration-normal: 240ms;
+}

@@ -1,12 +1,30 @@
+@import '../tokens.css';
+
 body {
   margin: 0;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
-    'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.4;
+  /* 숫자가 많은 화면이라 자릿수가 바뀌어도 줄이 흔들리지 않게 폭을 맞춘다 */
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* 데스크톱 앱이라 글자가 드래그로 선택되면 웹페이지처럼 보인다 */
+  user-select: none;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+button {
+  font: inherit;
+  color: inherit;
+}
+
+img {
+  -webkit-user-drag: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
