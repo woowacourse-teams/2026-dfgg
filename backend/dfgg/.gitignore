@@ -40,3 +40,9 @@ out/
 .env
 .env.*
 !.env.example
+
+# Component Target Item implementation records and reproducible experiment runner
+!implementation_investigation.md
+!component_target_item_implementation_report.md
+!scripts/run-component-target-experiments.py
+!scripts/component-core-bridge-analyze.py
