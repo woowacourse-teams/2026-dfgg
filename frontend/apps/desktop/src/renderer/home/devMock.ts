@@ -6,6 +6,7 @@
  *   /home/index.html                      연결됨 · 로비 (기본)
  *   /home/index.html?status=disconnected  롤 클라이언트 꺼짐
  *   /home/index.html?phase=ChampSelect    챔피언 선택 중
+ *   /home/index.html?stress=1             이름·숫자를 가장 길게 (칸이 넘치는지 볼 때)
  */
 import type {
   GameflowPhase,
@@ -23,6 +24,39 @@ import type {
 const params = new URLSearchParams(window.location.search);
 const status = (params.get('status') ?? 'connected') as LcuStatus;
 const phase = (params.get('phase') ?? 'None') as GameflowPhase;
+const isStress = params.has('stress');
+
+/**
+ * 라이엇 ID 규칙: 이름 3~16자, 태그 3~5자.
+ * stress 모드에서는 열 명 모두 16자 이름과 5자 태그를 쓴다. 한글과 폭이 넓은 영문(W, M)을 섞었다.
+ */
+const NAMES = isStress
+  ? [
+      '우리팀정글은어디갔나요제발와주세',
+      'WWWWWWWWWWWWWWWW',
+      '탑은내가간다고했잖아요진짜로간다',
+      'Hide on bush KR1',
+      '미드오픈하면바로신고합니다여러분',
+      '원딜장인이되고싶은브론즈입니다요',
+      'MMMMMMMMMMMMMMMM',
+      '서폿차이로이긴판입니다감사합니다',
+      '가나다라마바사아자차카타파하가나',
+      '정글차이가너무심해서못이깁니다요',
+    ]
+  : [
+      'Hide on bush',
+      'T1 Gumayusi',
+      '탑은내가간다',
+      'Faker',
+      '정글차이',
+      'Deft',
+      '미드오픈',
+      'ShowMaker',
+      '원딜장인',
+      '서폿유저',
+    ];
+const TAG = isStress ? 'KR123' : 'KR1';
+const MY_NAME = NAMES[0];
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -34,10 +68,10 @@ const PHASE_DELAY_MS = 300;
 const summoner: Summoner = {
   puuid: 'mock-puuid',
   summonerId: 1,
-  displayName: 'Hide on bush',
-  gameName: 'Hide on bush',
-  tagLine: 'KR1',
-  summonerLevel: 742,
+  displayName: MY_NAME,
+  gameName: MY_NAME,
+  tagLine: TAG,
+  summonerLevel: isStress ? 2468 : 742,
   profileIconId: 6,
   xpSinceLastLevel: 1840,
   xpUntilNextLevel: 3360,
@@ -72,13 +106,12 @@ function rankedEntry(queueType: RankedQueueType, patch: Partial<RankedEntry> = {
   };
 }
 
-const solo = rankedEntry('RANKED_SOLO_5x5', {
-  tier: 'EMERALD',
-  division: 'II',
-  leaguePoints: 47,
-  wins: 128,
-  losses: 109,
-});
+const solo = rankedEntry(
+  'RANKED_SOLO_5x5',
+  isStress
+    ? { tier: 'GRANDMASTER', division: 'I', leaguePoints: 1234, wins: 1234, losses: 1111 }
+    : { tier: 'EMERALD', division: 'II', leaguePoints: 47, wins: 128, losses: 109 },
+);
 const flex = rankedEntry('RANKED_FLEX_SR', {
   tier: 'PLATINUM',
   division: 'I',
@@ -126,7 +159,26 @@ const BUILDS: Build[] = [
   { championId: 89, spells: [4, 3], items: [3190, 3047, 3109, 2055, 0, 0, 3364] },
 ];
 
+const FULL_BUILD = [6672, 3006, 3031, 3094, 3036, 3072, 3363];
+
 function stats(seed: number, items: number[]): MatchStats {
+  if (isStress) {
+    return {
+      kills: 20 + (seed % 9),
+      deaths: 10 + (seed % 9),
+      assists: 30 + (seed % 9),
+      champLevel: 18,
+      cs: 400 + ((seed * 37) % 99),
+      goldEarned: 24_000 + ((seed * 913) % 9000),
+      damageDealt: 100_000 + ((seed * 2131) % 60_000),
+      damageTaken: 90_000 + ((seed * 1777) % 30_000),
+      visionScore: 120,
+      wardsPlaced: 60,
+      wardsKilled: 30,
+      items: FULL_BUILD,
+    };
+  }
+
   return {
     kills: (seed * 7) % 14,
     deaths: (seed * 3) % 9,
@@ -180,8 +232,8 @@ function matchDetail(gameId: number): MatchDetail | null {
     return {
       participantId,
       championId: isMe ? match.championId : build.championId,
-      gameName: isMe ? summoner.gameName : `소환사${participantId}`,
-      tagLine: isMe ? summoner.tagLine : 'KR1',
+      gameName: isMe ? summoner.gameName : NAMES[index % NAMES.length],
+      tagLine: TAG,
       teamId: index < TEAM_SIZE ? BLUE_TEAM : RED_TEAM,
       spells: isMe ? match.spells : build.spells,
       stats: isMe ? match.stats : stats((gameId % 97) + index, build.items),
