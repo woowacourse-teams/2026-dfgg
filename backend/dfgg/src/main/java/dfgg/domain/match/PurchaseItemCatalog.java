@@ -15,7 +15,7 @@ public interface PurchaseItemCatalog {
         boolean questSlotAvailable = inventory.bootsInQuestSlot();
         for (var held : inventory.quantities().entrySet()) {
             PurchaseCatalogItem item = find(held.getKey())
-                    .orElseThrow(() -> new IllegalStateException("보유 아이템의 슬롯 정보를 알 수 없습니다."));
+                    .orElseThrow(() -> new IllegalStateException("UNSUPPORTED_CATALOG_ITEM: 보유 아이템 " + held.getKey()));
             int quantity = held.getValue();
             if (questSlotAvailable && item.boots()) {
                 quantity--; // 신발 한 개만 별도 슬롯을 사용한다.

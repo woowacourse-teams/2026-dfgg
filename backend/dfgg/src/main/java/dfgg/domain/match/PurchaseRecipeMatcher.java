@@ -64,7 +64,7 @@ public class PurchaseRecipeMatcher {
             return;
         }
         PurchaseCatalogItem expected = catalog.find(expectedId)
-                .orElseThrow(() -> new IllegalStateException("조합 재료가 카탈로그에 없습니다."));
+                .orElseThrow(() -> new IllegalStateException("UNSUPPORTED_CATALOG_ITEM: 조합 재료 " + expectedId));
         if (missing != null) {
             missing.add(expected);
         }

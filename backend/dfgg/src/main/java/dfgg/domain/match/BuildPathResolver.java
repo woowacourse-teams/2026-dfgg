@@ -8,7 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 목표 Core의 남은 경로에서 예산·일반 6슬롯을 만족하는 구매 묶음을 만든다. */
+/** 목표 아이템의 남은 경로에서 예산·일반 6슬롯을 만족하는 구매 묶음을 만든다. */
 public final class BuildPathResolver {
     private static final int INVENTORY_SLOTS = 6;
     private final PurchaseItemCatalog catalog;
@@ -23,14 +23,14 @@ public final class BuildPathResolver {
     }
 
     /** Gold Range를 사용할 때는 호출자가 하한을 budget으로 전달한다. */
-    public List<PurchaseBundle> resolve(int targetCoreId, ItemInventory inventory, long budget) {
+    public List<PurchaseBundle> resolve(int targetItemId, ItemInventory inventory, long budget) {
         if (inventory == null || budget < 0) {
             throw new IllegalArgumentException("현재 Inventory와 음수가 아닌 예산이 필요합니다.");
         }
-        PurchaseCatalogItem target = catalog.find(targetCoreId)
-                .orElseThrow(() -> new IllegalArgumentException("목표 Core가 카탈로그에 없습니다."));
+        PurchaseCatalogItem target = catalog.find(targetItemId)
+                .orElseThrow(() -> new IllegalArgumentException("목표 아이템이 카탈로그에 없습니다."));
         if (!target.purchasable()) {
-            throw new IllegalArgumentException("구매 가능한 목표 Core가 필요합니다.");
+            throw new IllegalArgumentException("구매 가능한 목표 아이템이 필요합니다.");
         }
         if (catalog.occupiedSlots(inventory) > INVENTORY_SLOTS) {
             throw new IllegalArgumentException("일반 인벤토리가 6슬롯을 초과합니다.");
