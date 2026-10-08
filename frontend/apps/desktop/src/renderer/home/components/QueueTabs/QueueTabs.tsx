@@ -33,6 +33,8 @@ function QueueTabs({ tabs, active, onChange }: Props) {
           role='tab'
           className='queue-tab'
           aria-selected={tab.key === active}
+          // 판이 없는 종류는 눌러도 보여 줄 게 없다
+          disabled={tab.count === 0}
           onClick={() => onChange(tab.key)}
         >
           {tab.label}

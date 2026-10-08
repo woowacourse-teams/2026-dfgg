@@ -60,9 +60,15 @@
 }
 
 @media (hover: hover) {
-  .queue-tab:hover {
+  .queue-tab:hover:not(:disabled) {
     color: var(--ink-2);
   }
+}
+
+/* 판이 없는 종류. 칸은 남겨 메뉴 모양을 지키되 눌리지 않는다는 걸 흐리게 알린다. */
+.queue-tab:disabled {
+  opacity: 0.38;
+  cursor: default;
 }
 
 .queue-tab[aria-selected='true'] {
