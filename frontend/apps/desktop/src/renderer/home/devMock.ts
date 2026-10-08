@@ -289,6 +289,7 @@ if (!window.lcu) {
   };
   window.windowControls = {
     setCollapsed: log('windowControls.setCollapsed'),
+    setOverlayHeight: log('windowControls.setOverlayHeight'),
     minimize: log('windowControls.minimize'),
     close: log('windowControls.close'),
   };

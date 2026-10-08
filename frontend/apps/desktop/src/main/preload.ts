@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('lcu', {
 
 contextBridge.exposeInMainWorld('windowControls', {
   setCollapsed: (collapsed: boolean) => ipcRenderer.send('window:set-collapsed', collapsed),
+  setOverlayHeight: (height: number) => ipcRenderer.send('window:set-overlay-height', height),
   minimize: () => ipcRenderer.send('window:minimize'),
   close: () => ipcRenderer.send('window:close'),
 });

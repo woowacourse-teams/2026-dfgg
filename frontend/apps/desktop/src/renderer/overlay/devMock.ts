@@ -97,7 +97,7 @@ const log =
 const unsubscribe = () => {};
 
 // 실제 창은 투명해서 게임 화면이 비친다. 그 위에서 읽히는지 보려고 게임 같은 배경을 깔고,
-// 브라우저 창이 더 커도 실제 오버레이 크기(260x242)로 보이게 틀을 잡는다.
+// 브라우저 창이 더 커도 실제 오버레이 크기(폭 260, 높이는 내용만큼)로 보이게 틀을 잡는다.
 const OVERLAY_WIDTH = 260;
 const OVERLAY_HEIGHT = 242;
 const PREVIEW_MARGIN = 24;
@@ -106,18 +106,21 @@ document.documentElement.style.background =
   'url(https://cdn.communitydragon.org/latest/champion/103/splash-art) center / cover #1b2a1f';
 const COLLAPSED_SIZE = 40;
 
+let expandedHeight = OVERLAY_HEIGHT;
+let collapsed = false;
+
 /** 실제 앱에서는 메인 프로세스가 창 크기를 바꾼다. 여기서는 틀 크기를 바꿔 흉내 낸다. */
-function resizePreview(collapsed: boolean) {
+function resizePreview() {
   const root = document.getElementById('root');
   if (!root) return;
 
   const [width, height] = collapsed
     ? [COLLAPSED_SIZE, COLLAPSED_SIZE]
-    : [OVERLAY_WIDTH, OVERLAY_HEIGHT];
+    : [OVERLAY_WIDTH, expandedHeight];
   root.style.cssText = `width:${width}px;height:${height}px;margin:${PREVIEW_MARGIN}px`;
 }
 
-window.addEventListener('DOMContentLoaded', () => resizePreview(false));
+window.addEventListener('DOMContentLoaded', resizePreview);
 
 // Electron 안에서는 진짜 preload 가 이미 있으므로 건드리지 않는다.
 if (!window.lcu) {
@@ -142,7 +145,14 @@ if (!window.lcu) {
     getEndedGame: async () => null,
   };
   window.windowControls = {
-    setCollapsed: resizePreview,
+    setCollapsed: (next) => {
+      collapsed = next;
+      resizePreview();
+    },
+    setOverlayHeight: (height) => {
+      expandedHeight = height;
+      resizePreview();
+    },
     minimize: log('windowControls.minimize'),
     close: log('windowControls.close'),
   };

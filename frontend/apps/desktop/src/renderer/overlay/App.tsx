@@ -1,6 +1,6 @@
 import './style.css';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import type { NamedEntry, RecommendedItem } from '../../shared/types';
 import { ChevronIcon } from '../icons';
@@ -113,6 +113,33 @@ function BuildProgress({ purchased }: { purchased: number }) {
   );
 }
 
+/**
+ * 창 높이를 내용 높이에 맞춘다. 추천이 다섯 개면 다섯 개가 다 보이게 창이 늘어난다.
+ * 목록은 창이 최대 높이에 걸렸을 때만 스크롤되므로, 잘린 높이가 아니라 다 펼친 높이를 재서 알린다.
+ */
+function useFitWindowToContent(dependency: unknown) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+
+    const report = () => {
+      const list = overlay.querySelector('.picks');
+      const hidden = list ? list.scrollHeight - list.clientHeight : 0;
+      window.windowControls.setOverlayHeight(overlay.offsetHeight + hidden);
+    };
+
+    report();
+    // 글꼴이나 그림이 늦게 와서 높이가 달라지면 다시 알린다.
+    const observer = new ResizeObserver(report);
+    observer.observe(overlay);
+    return () => observer.disconnect();
+  }, [dependency]);
+
+  return overlayRef;
+}
+
 function App() {
   const [items, setItems] = useState<RecommendedItem[] | null>(null);
   const [isInGame, setIsInGame] = useState(false);
@@ -141,6 +168,9 @@ function App() {
     };
   }, []);
 
+  // 추천 목록이나 상태가 바뀌면 내용 높이도 바뀐다.
+  const overlayRef = useFitWindowToContent(`${items?.length ?? 0}-${isInGame}-${isCollapsed}`);
+
   const toggleCollapsed = () => {
     const next = !isCollapsed;
     setIsCollapsed(next);
@@ -163,7 +193,7 @@ function App() {
   const hasItems = items !== null && items.length > 0;
 
   return (
-    <div className='overlay'>
+    <div className='overlay' ref={overlayRef}>
       <header className='bar'>
         <span className='bar-title'>
           {purchasedCount === null ? '추천 아이템' : `${purchasedCount + 1}코어 추천`}

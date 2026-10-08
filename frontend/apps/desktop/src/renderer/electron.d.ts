@@ -41,6 +41,8 @@ declare global {
     };
     windowControls: {
       setCollapsed: (collapsed: boolean) => void;
+      /** 오버레이 내용 높이(px)를 알려 창 높이를 맞춘다. */
+      setOverlayHeight: (height: number) => void;
       minimize: () => void;
       close: () => void;
     };
