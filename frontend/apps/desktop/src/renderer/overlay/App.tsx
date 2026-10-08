@@ -3,92 +3,113 @@ import './style.css';
 import { useEffect, useState } from 'react';
 
 import type { NamedEntry, RecommendedItem } from '../../shared/types';
+import { ChevronIcon } from '../icons';
 
-const VARIANT_LABEL = {
+type Variant = 'ally' | 'counter';
+
+const VARIANT_LABEL: Record<Variant, string> = {
   ally: '시너지',
   counter: '카운터',
-} as const;
-
-// 라벨(아군/상대)에 붙는 설명
-const VARIANT_HINT = {
-  ally: '이 아이템과 시너지가 좋은 아군 챔피언',
-  counter: '이 아이템으로 상대하기 좋은 적 챔피언',
-} as const;
+};
 
 // 초상화에 붙는 설명. 챔피언 이름과 관계를 한 줄에 담는다.
-const VARIANT_RELATION = {
+const VARIANT_RELATION: Record<Variant, string> = {
   ally: '아군 — 시너지 좋음',
   counter: '상대 — 카운터로 좋음',
-} as const;
+};
+
+/** 순위 숫자를 붙이는 개수. 그 아래는 자리로만 순서를 알린다. */
+const TOP_COUNT = 3;
+/** 한 판에 채우는 아이템 칸 수 */
+const BUILD_SLOTS = 6;
 
 /**
  * 챔피언 이름은 안 띄우고 초상화만 보여준다.
- * 색만으로는 아군/적군 구분이 약해서 짧은 라벨을 함께 붙인다.
+ * 아군은 초록, 상대는 빨강 테로 가르고 withLabel 이면 짧은 이름표도 붙인다.
  */
-function ChampionIcons({
+function Faces({
   champions,
   variant,
+  withLabel = false,
 }: {
   champions: NamedEntry[];
-  variant: 'ally' | 'counter';
+  variant: Variant;
+  withLabel?: boolean;
 }) {
   if (champions.length === 0) return null;
 
   return (
-    <div className={`reason reason-${variant}`}>
-      <span className='reason-label' title={VARIANT_HINT[variant]}>
-        {VARIANT_LABEL[variant]}
-      </span>
-      <ul className='champions'>
-        {champions.map((champion) => (
-          <li key={champion.id}>
-            {/* 이름을 안 띄우므로 alt·title 로 정보를 남긴다.
-                title 은 가장 가까운 것만 뜨므로 관계까지 여기에 함께 적는다. */}
-            <img
-              className='champion-icon'
-              src={champion.imageUrl}
-              alt={`${champion.name} — ${VARIANT_RELATION[variant]}`}
-              title={`${champion.name} — ${VARIANT_RELATION[variant]}`}
-            />
-          </li>
-        ))}
-      </ul>
-    </div>
+    <span className={`faces faces-${variant}`}>
+      {withLabel && <span className='faces-label'>{VARIANT_LABEL[variant]}</span>}
+      {champions.map((champion) => (
+        // 이름을 안 띄우므로 alt·title 로 정보를 남긴다.
+        <img
+          key={champion.id}
+          src={champion.imageUrl}
+          alt={`${champion.name} — ${VARIANT_RELATION[variant]}`}
+          title={`${champion.name} — ${VARIANT_RELATION[variant]}`}
+        />
+      ))}
+    </span>
   );
 }
 
-const TOP_COUNT = 3;
-
-function ItemRow({ item, rank }: { item: RecommendedItem; rank: number }) {
+function Pick({ item, rank }: { item: RecommendedItem; rank: number }) {
   const { traits, ally, counter } = item.description;
-  const hasChampions = ally.length > 0 || counter.length > 0;
-  const isTop = rank <= TOP_COUNT;
+  const isBest = rank === 1;
 
   return (
-    <li className={isTop ? `item item-top item-rank-${rank}` : 'item item-rest'}>
-      {/* 상위 3개만 순위를 붙인다. 나머지는 자리로만 순서를 표현. */}
-      {isTop && (
-        <span className='rank' aria-label={`추천 ${rank}순위`}>
-          {rank}
+    <li
+      className={`pick ${isBest ? 'pick-best' : ''} ${rank > TOP_COUNT ? 'pick-rest' : ''}`}
+      style={{ '--order': rank - 1 } as React.CSSProperties}
+    >
+      <span className='pick-art'>
+        <img src={item.imageUrl} alt='' />
+        {rank <= TOP_COUNT && (
+          <b className='pick-rank' aria-label={`추천 ${rank}순위`}>
+            {rank}
+          </b>
+        )}
+      </span>
+
+      <span className='pick-body'>
+        <span className='pick-name'>{item.name}</span>
+        {traits.length > 0 && (
+          <span className='pick-traits' title={traits.join(' · ')}>
+            {traits.join(' · ')}
+          </span>
+        )}
+        {/* 1순위는 왜 추천하는지까지 이름표와 함께 보여 준다 */}
+        {isBest && (ally.length > 0 || counter.length > 0) && (
+          <span className='pick-reasons'>
+            <Faces champions={ally} variant='ally' withLabel />
+            <Faces champions={counter} variant='counter' withLabel />
+          </span>
+        )}
+      </span>
+
+      {/* 나머지는 자리가 좁아 초상화만 오른쪽에 붙인다. 테 색으로 아군·상대를 가른다. */}
+      {!isBest && (
+        <span className='pick-faces'>
+          <Faces champions={ally} variant='ally' />
+          <Faces champions={counter} variant='counter' />
         </span>
       )}
-
-      <img className='item-image' src={item.imageUrl} alt={item.name} title={item.name} />
-
-      <div className='item-body'>
-        {traits.length > 0 && (
-          <p className='traits' title={traits.join(' · ')}>
-            {traits.join(' · ')}
-          </p>
-        )}
-        {hasChampions && (
-          <div className='reasons'>
-            <ChampionIcons champions={ally} variant='ally' />
-            <ChampionIcons champions={counter} variant='counter' />
-          </div>
-        )}
-      </div>
     </li>
+  );
+}
+
+/** 지금 몇 번째 아이템을 살 차례인지 빗금 여섯 칸으로 보여 준다. */
+function BuildProgress({ purchased }: { purchased: number }) {
+  return (
+    <ol className='progress' aria-label={`아이템 ${BUILD_SLOTS}칸 중 ${purchased}칸 구매`}>
+      {Array.from({ length: BUILD_SLOTS }, (_, slot) => (
+        <li
+          key={slot}
+          className={slot < purchased ? 'progress-done' : slot === purchased ? 'progress-next' : ''}
+        />
+      ))}
+    </ol>
   );
 }
 
@@ -97,8 +118,6 @@ function App() {
   const [isInGame, setIsInGame] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [purchasedCount, setPurchasedCount] = useState<number | null>(null);
-
-  const coreIndex = purchasedCount === null ? null : purchasedCount + 1;
 
   useEffect(() => {
     window.lcu.getState().then((state) => {
@@ -130,53 +149,50 @@ function App() {
 
   if (isCollapsed) {
     return (
-      <div className='app collapsed'>
-        <header className='title-bar'>
-          <button
-            type='button'
-            className='control control-logo'
-            aria-label='오버레이 켜기'
-            onClick={toggleCollapsed}
-          >
-            <img className='logo' src='./icon.png' alt='' />
-          </button>
-        </header>
-      </div>
+      <button
+        type='button'
+        className='overlay-collapsed'
+        aria-label='오버레이 펼치기'
+        onClick={toggleCollapsed}
+      >
+        <img src='./icon.png' alt='' />
+      </button>
     );
   }
 
-  return (
-    <div className='app'>
-      <header className='title-bar'>
-        <span className='title'>
-          {coreIndex === null ? '추천 아이템' : `${coreIndex}코어 추천`}
-        </span>
+  const hasItems = items !== null && items.length > 0;
 
-        <div className='window-controls'>
-          <button
-            type='button'
-            className='control control-off'
-            aria-label='오버레이 끄기'
-            onClick={toggleCollapsed}
-          >
-            ×
-          </button>
-        </div>
+  return (
+    <div className='overlay'>
+      <header className='bar'>
+        <span className='bar-title'>
+          {purchasedCount === null ? '추천 아이템' : `${purchasedCount + 1}코어 추천`}
+        </span>
+        {purchasedCount !== null && <BuildProgress purchased={purchasedCount} />}
+
+        <button
+          type='button'
+          className='bar-button'
+          aria-label='오버레이 접기'
+          onClick={toggleCollapsed}
+        >
+          <ChevronIcon />
+        </button>
       </header>
 
-      <main className='content'>
-        {items && items.length > 0 ? (
-          <ul className='items'>
-            {items.map((item, index) => (
-              <ItemRow key={item.id} item={item} rank={index + 1} />
-            ))}
-          </ul>
-        ) : (
-          <p className='empty'>
-            {isInGame ? '추천 아이템을 기다리는 중입니다.' : '게임에 입장하면 아이템을 추천합니다.'}
-          </p>
-        )}
-      </main>
+      {hasItems ? (
+        // 추천이 바뀌면 목록을 새로 그려 위에서부터 다시 차례로 나타나게 한다.
+        <ol className='picks' key={items.map((item) => item.id).join()}>
+          {items.map((item, index) => (
+            <Pick key={item.id} item={item} rank={index + 1} />
+          ))}
+        </ol>
+      ) : (
+        <div className='overlay-empty'>
+          {isInGame && <span className='overlay-loader' aria-hidden='true' />}
+          <p>{isInGame ? '추천을 계산하는 중이에요' : '게임에 들어가면 추천이 시작돼요'}</p>
+        </div>
+      )}
     </div>
   );
 }

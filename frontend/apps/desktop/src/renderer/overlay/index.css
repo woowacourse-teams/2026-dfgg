@@ -1,9 +1,42 @@
+@import '../tokens.css';
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/*
+ * transparent:true 창이라 캔버스는 투명하게 두고, 반투명 배경은 .overlay 가 그린다.
+ * body 에 배경을 주면 캔버스 전체로 전파돼서 border-radius 가 먹지 않는다.
+ */
+html,
 body {
   margin: 0;
-  background: rgba(0, 0, 0, 0.5); /* 창을 반투명하게 설정 (완전 투명은 0) */
-  color: white;
-  font-family: sans-serif;
-  height: 100vh;
-  border-radius: 10px; /* 투명 창에 둥근 모서리 적용 가능 */
+  background: transparent;
+}
+
+body {
   overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+img {
+  -webkit-user-drag: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
