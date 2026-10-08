@@ -96,15 +96,10 @@ const log =
     console.debug(`[mock] ${name}`, ...args);
 const unsubscribe = () => {};
 
-// 브라우저 창이 더 커도 실제 오버레이 크기(폭 260, 높이는 내용만큼)로 보이게 틀을 잡는다.
-// 실제 창은 투명해서 게임 화면이 비친다. 여기서는 그림 없이 어두운 단색만 깔아 흰 글자가 보이게 한다.
 const OVERLAY_WIDTH = 260;
 const OVERLAY_HEIGHT = 242;
-const PREVIEW_MARGIN = 24;
-
-document.documentElement.style.background = '#1c1e22';
-
 const COLLAPSED_SIZE = 40;
+const PREVIEW_MARGIN = 24;
 
 let expandedHeight = OVERLAY_HEIGHT;
 let collapsed = false;
@@ -120,10 +115,20 @@ function resizePreview() {
   root.style.cssText = `width:${width}px;height:${height}px;margin:${PREVIEW_MARGIN}px`;
 }
 
-window.addEventListener('DOMContentLoaded', resizePreview);
+/**
+ * 브라우저 미리보기 전용 꾸밈: 어두운 바탕을 깔고, 실제 오버레이 크기로 틀을 잡는다.
+ * Electron 창은 투명하고 창 크기가 곧 오버레이 크기라서, 여기 손대면 배경이 생기고 창을 끌 수 없게 된다.
+ * 반드시 아래 `if (!window.lcu)` 안에서만 부른다.
+ */
+function setUpBrowserPreview() {
+  document.documentElement.style.background = '#1c1e22';
+  window.addEventListener('DOMContentLoaded', resizePreview);
+}
 
-// Electron 안에서는 진짜 preload 가 이미 있으므로 건드리지 않는다.
+// Electron 안에서는 진짜 preload 가 이미 있으므로 아무것도 건드리지 않는다. 미리보기 꾸밈도 마찬가지다.
 if (!window.lcu) {
+  setUpBrowserPreview();
+
   window.lcu = {
     currentSummoner: async () => null,
     getRankInfo: async () => null,
