@@ -6,11 +6,11 @@ import type {
   RankedEntry,
   Tier,
 } from '../../../../shared/types';
+import { StarIcon } from '../../../icons';
 import { championIconUrl, championTileUrl } from '../../lib/ddragon';
 import { formatWhen, queueLabel } from '../../lib/format';
 import { formatRatio, kdaGrade, kdaValue } from '../../lib/kda';
 import type { RecentSummary } from '../../lib/recentSummary';
-import { StarIcon } from '../icons';
 
 // 500x500 정사각으로 잘린 에셋. ranked-emblem 쪽은 1280x720 와이드라 크게 쓰면 쪼그라든다.
 const tierEmblemUrl = (tier: string) =>

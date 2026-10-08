@@ -4,9 +4,9 @@ import * as Sentry from '@sentry/electron/renderer';
 import { useState } from 'react';
 
 import type { MatchDetail as Detail, MatchSummary } from '../../../../shared/types';
+import { ChevronIcon, ClockIcon } from '../../../icons';
 import { championTileUrl } from '../../lib/ddragon';
 import { formatMinutes, formatWhen, queueLabel } from '../../lib/format';
-import { ChevronIcon, ClockIcon } from '../icons';
 import MatchDetail from './MatchDetail';
 import { ItemRow, KdaLine, RatioChip } from './parts';
 
