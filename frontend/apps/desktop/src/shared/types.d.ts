@@ -37,6 +37,12 @@ export interface Summoner {
   percentCompleteForNextLevel: number;
 }
 
+/** 소환사 프로필 꾸밈 정보 (/lol-summoner/v1/current-summoner/summoner-profile). 프로필 배경만 쓴다. */
+export type LcuSummonerProfile = {
+  /** 챔피언 id * 1000 + 스킨 번호. 예: 103015 = 아리(103)의 15번 스킨 */
+  backgroundSkinId?: number;
+};
+
 export type LcuEvent = {
   [K in keyof LcuEventMap]: {
     data: LcuEventMap[K];

@@ -1,7 +1,6 @@
 import './ProfileHeader.css';
 
 import type { Summoner } from '../../../../shared/types';
-import { championSplashUrl } from '../../lib/ddragon';
 import { CloseIcon, MinimizeIcon } from '../icons';
 
 const profileIconUrl = (id: number) =>
@@ -15,11 +14,11 @@ const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 
 type Props = {
   summoner: Summoner | null;
-  /** 배너에 깔 챔피언. 최근에 가장 많이 한 챔피언을 넘긴다. */
-  backdropChampionId?: number;
+  /** 배너에 걸 그림 주소. 없으면 그림 없이 그린다. */
+  backdropUrl?: string;
 };
 
-function ProfileHeader({ summoner, backdropChampionId }: Props) {
+function ProfileHeader({ summoner, backdropUrl }: Props) {
   return (
     <>
       <header className='title-bar'>
@@ -49,11 +48,11 @@ function ProfileHeader({ summoner, backdropChampionId }: Props) {
       {summoner && (
         <section className='hero'>
           <div className='hero-banner'>
-            {backdropChampionId !== undefined && (
+            {backdropUrl && (
               <img
-                // 챔피언이 바뀌면 새 그림이 다시 서서히 나타나야 한다
-                key={backdropChampionId}
-                src={championSplashUrl(backdropChampionId)}
+                // 그림이 바뀌면 새 그림이 다시 서서히 나타나야 한다
+                key={backdropUrl}
+                src={backdropUrl}
                 alt=''
                 onLoad={(event) => event.currentTarget.classList.add('hero-banner-loaded')}
               />

@@ -17,6 +17,12 @@ export const championTileUrl = (championId: number): string =>
 export const championSplashUrl = (championId: number): string =>
   `https://cdn.communitydragon.org/latest/champion/${championId}/splash-art/centered`;
 
+const SKIN_ID_BASE = 1000;
+
+/** 스킨 id(챔피언 id * 1000 + 스킨 번호)로 그 스킨의 가로 일러스트를 받는다. */
+export const skinSplashUrl = (skinId: number): string =>
+  `https://cdn.communitydragon.org/latest/champion/${Math.floor(skinId / SKIN_ID_BASE)}/splash-art/centered/skin/${skinId % SKIN_ID_BASE}`;
+
 /** DDragon 은 경로에 패치 버전이 들어간다. 목록의 첫 항목이 최신이다. */
 export function useDdragonVersion(): string | null {
   const [version, setVersion] = useState<string | null>(null);

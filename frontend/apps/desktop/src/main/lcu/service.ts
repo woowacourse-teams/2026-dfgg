@@ -8,6 +8,7 @@ import {
   getMatchDetail,
   getGameflowSession,
   getEndOfGameStats,
+  getSummonerProfile,
 } from './endpoints';
 import type {
   MatchSummary,
@@ -47,6 +48,14 @@ export function fetchCurrentSummoner() {
   return withLockfile<Summoner | null>('소환사 정보 요청 실패', (lockfileContent) => {
     return getCurrentSummoner(lockfileContent);
   });
+}
+
+// 소환사가 클라이언트에서 고른 프로필 배경 스킨 id 가져오기. 설정한 적이 없으면 null.
+export async function fetchProfileBackground(): Promise<number | null> {
+  const profile = await withLockfile('프로필 배경 요청 실패', (lockfile) =>
+    getSummonerProfile(lockfile),
+  );
+  return profile?.backgroundSkinId ?? null;
 }
 
 // 앱 최초 실행 시 현재 phase 가져오기

@@ -5,7 +5,9 @@ import {
   fetchSummonerRankInfo,
   fetchMatchDetail,
   fetchEndedGame,
+  fetchProfileBackground,
 } from '../lcu/service';
+import { launchLeagueClient } from '../lcu/launch';
 import { getLcuState } from '../lcu/state';
 import { EXPANDED_WIDTH, EXPANDED_HEIGHT, COLLAPSED_HEIGHT, COLLAPSED_WIDTH } from '../constants';
 import { setOverlayCollapsed } from '../analytics/gameTracker';
@@ -19,6 +21,8 @@ export function registerIpcHandlers() {
   ipcMain.handle('lcu:current-summoner', fetchCurrentSummoner);
   ipcMain.handle('lcu:get-state', getLcuState);
   ipcMain.handle('lcu:summoner-rank-info', fetchSummonerRankInfo);
+  ipcMain.handle('lcu:profile-background', fetchProfileBackground);
+  ipcMain.handle('lcu:launch-client', launchLeagueClient);
   ipcMain.handle('lcu:match-history', fetchMatchHistory);
   ipcMain.handle('lcu:match-detail', (_event, gameId: number) => fetchMatchDetail(gameId));
 

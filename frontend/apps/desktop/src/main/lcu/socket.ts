@@ -3,7 +3,11 @@ import type { LcuEvent, Lockfile } from '../../shared/types';
 import { RIOT_ROOT_CERT } from './riotCert';
 import { reportError } from '../sentry';
 
-const SUBSCRIPTIONS = ['OnJsonApiEvent_lol-gameflow_v1_gameflow-phase'];
+// 이벤트 이름은 주소의 앞부분과 맞춰진다. current-summoner 하나로 그 아래 summoner-profile 까지 받는다.
+const SUBSCRIPTIONS = [
+  'OnJsonApiEvent_lol-gameflow_v1_gameflow-phase',
+  'OnJsonApiEvent_lol-summoner_v1_current-summoner',
+];
 const HANDSHAKE_TIMEOUT_MS = 5000;
 
 // lcu socket 연결 함수

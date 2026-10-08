@@ -7,6 +7,7 @@
  *   /home/index.html?status=disconnected  롤 클라이언트 꺼짐
  *   /home/index.html?phase=ChampSelect    챔피언 선택 중
  *   /home/index.html?stress=1             이름·숫자를 가장 길게 (칸이 넘치는지 볼 때)
+ *   /home/index.html?status=disconnected&nolaunch=1   클라이언트 실행 실패
  */
 import type {
   GameflowPhase,
@@ -58,6 +59,7 @@ const NAMES = isStress
 const TAG = isStress ? 'KR123' : 'KR1';
 const MY_NAME = NAMES[0];
 
+const MOCK_BACKGROUND_SKIN_ID = 103015;
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const BLUE_TEAM = 100;
@@ -262,10 +264,18 @@ if (!window.lcu) {
   window.lcu = {
     currentSummoner: async () => (connected ? summoner : null),
     getRankInfo: async () => (connected ? rankInfo : null),
+    // 아리(103)의 15번 스킨. 모스트 챔피언의 기본 그림과 다른 게 떠야 프로필 배경을 쓴 것이다.
+    getProfileBackground: async () => (connected ? MOCK_BACKGROUND_SKIN_ID : null),
+    launchClient: async () => {
+      console.debug('[mock] lcu.launchClient');
+      return !params.has('nolaunch');
+    },
     getState: async () => ({ status, phase: connected ? 'None' : null, recommendations: null }),
     getMatchHistoryInfo: async () => (connected ? matches : null),
     getMatchDetail: async (gameId) => matchDetail(gameId),
     onStatusChange: () => unsubscribe,
+    onSummonerChange: () => unsubscribe,
+    onProfileBackgroundChange: () => unsubscribe,
     // 실제 앱처럼 로비에서 시작해 전적을 받은 뒤 phase 가 바뀌게 한다. 처음부터 다른 phase 면 전적을 받지 않는다.
     onPhaseChange: (callback) => {
       const timer =

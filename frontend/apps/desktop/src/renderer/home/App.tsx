@@ -12,30 +12,21 @@ import type {
   Summoner,
 } from '../../shared/types';
 import Bento from './components/Bento/Bento';
+import EmptyState from './components/EmptyState/EmptyState';
 import FeedbackModal from './components/feedback/FeedbackModal';
 import MatchSection from './components/MatchSection/MatchSection';
 import ProfileHeader from './components/ProfileHeader/ProfileHeader';
 import QueueTabs from './components/QueueTabs/QueueTabs';
-import { useDdragonVersion } from './lib/ddragon';
+import { championSplashUrl, skinSplashUrl, useDdragonVersion } from './lib/ddragon';
 import { filterMatches, QUEUE_FILTERS, type QueueFilter } from './lib/queues';
 import { summarizeMatches } from './lib/recentSummary';
-
-// 소환사 정보가 없는 이유를 상태별로 구분해 알린다.
-// 클라이언트가 꺼져 있는데 '불러오는 중' 이라고 하면 오해를 준다.
-const EMPTY_TEXT: Record<LcuStatus, { title: string; hint: string }> = {
-  disconnected: {
-    title: '롤 클라이언트를 실행해 주세요',
-    hint: '클라이언트가 켜지면 알아서 연결돼요',
-  },
-  connecting: { title: '클라이언트에 연결하는 중', hint: '잠시만 기다려 주세요' },
-  connected: { title: '소환사 정보를 불러오는 중', hint: '잠시만 기다려 주세요' },
-};
 
 function App() {
   const [currentSummoner, setCurrentSummoner] = useState<Summoner | null>(null);
   const [lcuState, setLcuState] = useState<LcuStatus | null>(null);
   const [lcuPhase, setLcuPhase] = useState<GameflowPhase | null>(null);
   const [rankInfo, setRankInfo] = useState<LcuCurrentRankedStats | null>(null);
+  const [backgroundSkinId, setBackgroundSkinId] = useState<number | null>(null);
   const [matches, setMatches] = useState<MatchSummary[] | null>(null);
   const [endedGame, setEndedGame] = useState<EndedGame | null>(null);
   const [queue, setQueue] = useState<QueueFilter>('all');
@@ -46,18 +37,19 @@ function App() {
 
   const closeFeedback = useCallback(() => setEndedGame(null), []);
 
-  // 탭은 실제로 한 판이라도 있는 종류만 보여 준다.
+  // 메뉴는 늘 같은 자리에 같은 칸이 있어야 한다. 판수가 0인 종류도 칸은 남기고 못 누르게만 한다.
+  // '기타'만은 해당 판이 있을 때만 보인다.
   const tabs = useMemo(
     () =>
       QUEUE_FILTERS.map(({ key, label }) => ({
         key,
         label,
         count: filterMatches(matches ?? [], key).length,
-      })).filter((tab) => tab.count > 0),
+      })).filter((tab) => tab.key !== 'etc' || tab.count > 0),
     [matches],
   );
-  // 전적이 새로 오면서 고른 종류가 사라졌으면 전체로 돌아간다.
-  const activeQueue = tabs.some((tab) => tab.key === queue) ? queue : 'all';
+  // 전적이 새로 오면서 고른 종류의 판이 사라졌으면 전체로 돌아간다.
+  const activeQueue = tabs.some((tab) => tab.key === queue && tab.count > 0) ? queue : 'all';
 
   const shownMatches = useMemo(
     () => (matches ? filterMatches(matches, activeQueue) : null),
@@ -67,12 +59,14 @@ function App() {
     () => (shownMatches ? summarizeMatches(shownMatches) : null),
     [shownMatches],
   );
-  // 배경 그림은 탭을 바꿔도 그대로 둔다. 누를 때마다 프로필 그림이 바뀌면 어지럽다.
-  const favoriteChampionId = useMemo(
-    () => (matches ? summarizeMatches(matches)?.champions[0]?.championId : undefined),
-    [matches],
-  );
-  const emptyText = EMPTY_TEXT[lcuState ?? 'disconnected'];
+  // 배너는 클라이언트에서 고른 프로필 배경을 그대로 쓴다. 고른 적이 없으면 가장 많이 한 챔피언으로 대신한다.
+  // 탭을 바꿔도 그대로 둔다. 누를 때마다 프로필 그림이 바뀌면 어지럽다.
+  const backdropUrl = useMemo(() => {
+    if (backgroundSkinId) return skinSplashUrl(backgroundSkinId);
+
+    const favorite = matches ? summarizeMatches(matches)?.champions[0]?.championId : undefined;
+    return favorite === undefined ? undefined : championSplashUrl(favorite);
+  }, [backgroundSkinId, matches]);
 
   // 연결 상태와 현재 phase를 가져온다.
   useEffect(() => {
@@ -85,6 +79,9 @@ function App() {
     });
 
     const unsubscribeStatus = window.lcu.onStatusChange(setLcuState);
+    // 클라이언트에서 프로필 아이콘이나 배경을 바꾸면 바로 따라 바뀐다.
+    const unsubscribeSummoner = window.lcu.onSummonerChange(setCurrentSummoner);
+    const unsubscribeBackground = window.lcu.onProfileBackgroundChange(setBackgroundSkinId);
     const unsubscribePhase = window.lcu.onPhaseChange((phase) => {
       setLcuPhase(phase);
 
@@ -106,6 +103,8 @@ function App() {
 
     return () => {
       unsubscribeStatus();
+      unsubscribeSummoner();
+      unsubscribeBackground();
       unsubscribePhase();
     };
   }, []);
@@ -125,6 +124,14 @@ function App() {
         console.error('소환사 정보를 불러오지 못했습니다.');
         Sentry.captureException(error);
       });
+
+    // 프로필 배경은 못 받아도 화면은 그려야 하므로 실패하면 조용히 대체 그림을 쓴다.
+    window.lcu
+      .getProfileBackground()
+      .then((skinId) => {
+        if (!cancelled) setBackgroundSkinId(skinId);
+      })
+      .catch((error) => Sentry.captureException(error));
 
     return () => {
       cancelled = true;
@@ -147,12 +154,11 @@ function App() {
 
   return (
     <div className='app'>
-      <ProfileHeader summoner={currentSummoner} backdropChampionId={favoriteChampionId} />
+      <ProfileHeader summoner={currentSummoner} backdropUrl={backdropUrl} />
 
       {currentSummoner ? (
         <main className='content'>
-          {/* 탭이 '전체' 하나뿐이면 고를 게 없다 */}
-          {tabs.length > 2 && <QueueTabs tabs={tabs} active={activeQueue} onChange={setQueue} />}
+          <QueueTabs tabs={tabs} active={activeQueue} onChange={setQueue} />
           {/* 탭을 바꾸면 통계 판을 새로 그려 숫자가 다시 세어 올라가게 한다 */}
           <section className='bento-section'>
             {summary && (
@@ -165,13 +171,7 @@ function App() {
           <MatchSection matches={shownMatches} version={version} />
         </main>
       ) : (
-        <main className='empty'>
-          <div className='empty-mark'>
-            <img src='./icon.png' alt='' />
-          </div>
-          <p className='empty-title'>{emptyText.title}</p>
-          <p className='empty-hint'>{emptyText.hint}</p>
-        </main>
+        <EmptyState status={lcuState} />
       )}
       {endedGame && (
         <FeedbackModal key={endedGame.gameId} game={endedGame} onClose={closeFeedback} />
