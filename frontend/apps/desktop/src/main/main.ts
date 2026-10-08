@@ -23,7 +23,7 @@ import {
 } from './analytics/sessionTracker';
 import { endGameTracking, initGameTracking, recoverLastGame } from './analytics/gameTracker';
 import { initAutoUpdate } from './autoUpdate';
-import { detectEncoder } from './highlight/encoder';
+import { startRecording, stopRecording } from './highlight/recoder';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
@@ -127,8 +127,11 @@ if (!gotTheLock) {
   app.whenReady().then(async () => {
     initAutoUpdate();
 
-    const t = Date.now();
-    detectEncoder().then((e) => console.log('[encoder]', e, `${Date.now() - t}ms`));
+    setTimeout(async () => {
+      const s = await startRecording();
+      console.log('[rec] start', s);
+      setTimeout(async () => console.log('[rec] stop', await stopRecording()), 20_000);
+    }, 3_000);
 
     // 지난 실행에서 못 보낸 이벤트부터 정리해서 보낸다.
     recoverLastSession();
