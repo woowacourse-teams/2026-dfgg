@@ -96,14 +96,14 @@ const log =
     console.debug(`[mock] ${name}`, ...args);
 const unsubscribe = () => {};
 
-// 실제 창은 투명해서 게임 화면이 비친다. 그 위에서 읽히는지 보려고 게임 같은 배경을 깔고,
 // 브라우저 창이 더 커도 실제 오버레이 크기(폭 260, 높이는 내용만큼)로 보이게 틀을 잡는다.
+// 실제 창은 투명해서 게임 화면이 비친다. 여기서는 그림 없이 어두운 단색만 깔아 흰 글자가 보이게 한다.
 const OVERLAY_WIDTH = 260;
 const OVERLAY_HEIGHT = 242;
 const PREVIEW_MARGIN = 24;
 
-document.documentElement.style.background =
-  'url(https://cdn.communitydragon.org/latest/champion/103/splash-art) center / cover #1b2a1f';
+document.documentElement.style.background = '#1c1e22';
+
 const COLLAPSED_SIZE = 40;
 
 let expandedHeight = OVERLAY_HEIGHT;
