@@ -179,14 +179,12 @@ function App() {
 
   if (isCollapsed) {
     return (
-      <button
-        type='button'
-        className='overlay-collapsed'
-        aria-label='오버레이 펼치기'
-        onClick={toggleCollapsed}
-      >
-        <img src='./icon.png' alt='' />
-      </button>
+      // 바깥 테두리는 잡고 끄는 자리, 가운데 로고는 누르는 자리다. 접힌 채로도 창을 옮길 수 있어야 한다.
+      <div className='overlay-collapsed'>
+        <button type='button' aria-label='오버레이 펼치기' onClick={toggleCollapsed}>
+          <img src='./icon.png' alt='' />
+        </button>
+      </div>
     );
   }
 

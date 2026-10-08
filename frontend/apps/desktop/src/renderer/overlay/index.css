@@ -30,6 +30,8 @@ body {
 button {
   font: inherit;
   color: inherit;
+  /* 끄는 영역 안에 있는 버튼은 눌려야 한다. 부모의 drag 를 물려받으면 클릭이 드래그로 먹힌다. */
+  -webkit-app-region: no-drag;
 }
 
 img {

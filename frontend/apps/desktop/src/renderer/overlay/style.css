@@ -337,29 +337,42 @@
 }
 
 /* ---------- 접힌 모습 ---------- */
+/*
+ * 40x40 창 전체가 손잡이다. 가운데 로고 버튼만 눌리고, 그 둘레는 잡고 끌어 창을 옮긴다.
+ * 버튼이 창을 가득 채우면 끌 자리가 없어져 접힌 채로는 옮길 수 없게 된다.
+ */
 .overlay-collapsed {
   display: grid;
   place-items: center;
   width: 100%;
   height: 100%;
-  padding: 0;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 50%;
   background: rgb(10 11 13 / 78%);
-  cursor: pointer;
   box-sizing: border-box;
-  /* 접힌 동안에도 이 버튼을 잡고 창을 옮길 수 있어야 하지만, 누르는 게 먼저라 drag 는 주지 않는다 */
-  transition:
-    background-color var(--duration-fast) ease,
-    transform var(--duration-press) var(--ease-out);
+  -webkit-app-region: drag;
+  transition: background-color var(--duration-fast) ease;
 }
 
 .overlay-collapsed:hover {
   background: rgb(10 11 13 / 95%);
 }
 
-.overlay-collapsed:active {
-  transform: scale(0.92);
+.overlay-collapsed button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: transform var(--duration-press) var(--ease-out);
+}
+
+.overlay-collapsed button:active {
+  transform: scale(0.88);
 }
 
 .overlay-collapsed img {
@@ -376,7 +389,8 @@
   }
 
   .overlay,
-  .overlay-collapsed {
+  .overlay-collapsed,
+  .overlay-collapsed button {
     transition: none;
   }
 }
