@@ -2,6 +2,7 @@ import { desktopCapturer } from 'electron';
 import type { GameflowPhase } from '../../shared/types';
 import { getLcuState, onPhaseChange } from '../lcu/state';
 import { startRecording, stopRecording } from './recoder';
+import { startEventCollector, stopEventCollector } from './eventCollector';
 
 const GAME_WINDOW_TITLE = 'League of Legends (TM) Client'; // 롤 게임 창 제목
 const WINDOW_POLL_MS = 2_000; // 게임 창 2초마다 확인
@@ -42,11 +43,13 @@ async function start() {
     return;
   }
   console.log('[highlight] 녹화 시작', session?.dir ?? '인코더 없음');
+  if (session) startEventCollector(session.dir);
 }
 
 // 게임 종료 시 녹화 종료
 async function stop() {
   gameToken++; // 기다리던 start()가 있으면 취소됨
+  stopEventCollector();
   const session = await stopRecording();
   if (session) console.log('[highlight] 녹화 종료', session.videoPath);
 }
