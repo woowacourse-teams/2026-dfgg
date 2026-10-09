@@ -23,7 +23,7 @@ import {
 } from './analytics/sessionTracker';
 import { endGameTracking, initGameTracking, recoverLastGame } from './analytics/gameTracker';
 import { initAutoUpdate } from './autoUpdate';
-import { startRecording, stopRecording } from './highlight/recoder';
+import { endHighlight, initHighlight } from './highlight/highlight';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
@@ -127,12 +127,6 @@ if (!gotTheLock) {
   app.whenReady().then(async () => {
     initAutoUpdate();
 
-    setTimeout(async () => {
-      const s = await startRecording();
-      console.log('[rec] start', s);
-      setTimeout(async () => console.log('[rec] stop', await stopRecording()), 20_000);
-    }, 3_000);
-
     // 지난 실행에서 못 보낸 이벤트부터 정리해서 보낸다.
     recoverLastSession();
     recoverLastGame();
@@ -141,6 +135,8 @@ if (!gotTheLock) {
     // LCU 연결 전에 구독해야 첫 connected 를 놓치지 않는다.
     initIdentity();
     initGameTracking();
+
+    initHighlight();
 
     registerIpcHandlers();
     homeWindow = createWindow();
@@ -171,6 +167,7 @@ if (!gotTheLock) {
 }
 
 app.on('will-quit', () => {
+  endHighlight();
   endGameTracking();
   endSessionTracking();
   stopLivePolling();

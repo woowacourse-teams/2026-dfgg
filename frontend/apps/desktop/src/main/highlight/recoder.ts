@@ -20,6 +20,7 @@ export interface RecordingSession {
 
 let proc: ChildProcess | null = null; // 실행 중인 ffmpeg 프로세스
 let current: RecordingSession | null = null; // 진행 중인 세션 정보
+let stopping = false; // 정지 요청을 이미 보냈는지
 
 // 녹화 시작, 사용처: 다음 단계에서 게임이 InProgress가 되면 호출
 // 반환: 세션 정보
@@ -67,6 +68,7 @@ export async function startRecording(): Promise<RecordingSession | null> {
     console.log('[recorder] exit', code);
     proc = null;
     current = null;
+    stopping = false;
   });
 
   // 현재 상태 저장하고 반환
@@ -79,7 +81,9 @@ export async function startRecording(): Promise<RecordingSession | null> {
 export function stopRecording(): Promise<RecordingSession | null> {
   const p = proc;
   const c = current;
-  if (!p || !c) return Promise.resolve(null);
+  if (!p || !c || stopping) return Promise.resolve(null);
+
+  stopping = true;
 
   return new Promise((resolve) => {
     // 종료를 누르고 10초 안에 안 끝나면 강제 종료
