@@ -1,0 +1,56 @@
+{
+  "sources": [
+    {
+      "path": "/Users/tuise/Desktop/woowa/2026-dfgg/backend/dfgg/build/component-data/observed-target-v5-16.18/train.jsonl",
+      "sha256": "a557030a894e812d0281edcbc835da2a0575949e59bf256c0fe9519ef5d4230b"
+    },
+    {
+      "path": "/Users/tuise/Desktop/woowa/2026-dfgg/backend/dfgg/build/component-data/observed-target-v5-16.18/validation.jsonl",
+      "sha256": "b7deba164a4b72aa3810cde5a06a5b6c4769c3efbe664072210a41df43564b2d"
+    },
+    {
+      "path": "/Users/tuise/Desktop/woowa/2026-dfgg/backend/dfgg/build/component-data/observed-target-v5-16.18/test.jsonl",
+      "sha256": "13ed48381605db1c596223b1fcce3a1314ec31c3cfe258c6741d9d59c25cf11b"
+    }
+  ],
+  "catalog": "/Users/tuise/Desktop/woowa/2026-dfgg/backend/dfgg/build/component-data/observed-core-v4-role-slots-16.18/catalog.json",
+  "catalogSha256": "0b8ddc4531607aefa4322b18a04be8569b0fc1379211c4e2bf06676d911cea6d",
+  "tierSource": "/Users/tuise/Desktop/woowa/2026-dfgg/backend/dfgg/build/component-tier-weight-input/cohort-tiers.csv",
+  "tierSha256": "75c58633e1a4ec9a8da168611a3de1245ec6f7ce3eed7782f5616ba54252afb7",
+  "selection": "READY AND candidateCount >= 2; train + validation + test; no retraining",
+  "timeBucketsMinutes": "[0,5),[5,10),[10,15),[15,20),[20,25),[25,30),[30,infinity)",
+  "goldBuckets": "[0,500),[500,1000),[1000,1500),[1500,2000),[2000,infinity)",
+  "thresholds": [
+    3,
+    5,
+    10,
+    20,
+    50
+  ],
+  "strategies": [
+    "Strict",
+    "Recipe-aware",
+    "Context-light"
+  ],
+  "coreStageInPrimaryKey": false,
+  "coreStageReason": "Preserve the three specified strategies; stage is separate diagnostic",
+  "recipeProjection": "PurchaseRecipeMatcher.remainingPath(target, empty) IDs plus materialsFor(target, inventory) replacement IDs; retain all held quantities",
+  "entropy": "natural-log Shannon entropy / ln(observed unique choice count); zero when choice count is one",
+  "descriptivePatterns": {
+    "dominant": "top1 >= 0.8",
+    "twoCompeting": "top1 < 0.8 AND top2 >= 0.8",
+    "dispersed": "top1 < 0.8 AND top2 < 0.8"
+  },
+  "patternCaution": "Descriptive bins, not acceptance criteria",
+  "tierCounts": {
+    "DIAMOND": 17099,
+    "MASTER": 27312,
+    "GRANDMASTER": 9470,
+    "CHALLENGER": 4221,
+    "EMERALD": 15640
+  },
+  "queryCount": 73742,
+  "uniqueInventories": 54267,
+  "querySha256": "ab4a9984e4ae6a0ac2525b62b27d245736a243405317313d841ac9041a233615",
+  "inventoryInputSha256": "ebfb714c9470467fa1f63f9010228053d95ad763a9f2e6ae01da9353178b5a43"
+}

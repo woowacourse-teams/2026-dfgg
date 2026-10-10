@@ -1,0 +1,7 @@
+{
+  "cases" : 1632,
+  "missingCases" : 631,
+  "maximumAbsoluteError" : 0.0,
+  "modelSha256" : "d1f6059aed6f38103c7fb90d44965d39e24931c8d39a0ce3d2d1112ef20dc0bf",
+  "tolerance" : 1.0E-9
+}
