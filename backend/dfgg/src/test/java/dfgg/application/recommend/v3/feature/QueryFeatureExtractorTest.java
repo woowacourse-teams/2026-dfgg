@@ -50,7 +50,7 @@ class QueryFeatureExtractorTest {
                     })
                     .toList();
         });
-        extractor = new QueryFeatureExtractor(championRepository);
+        extractor = new QueryFeatureExtractor(new dfgg.application.recommend.context.CompositionFeatureCalculator(championRepository));
     }
 
     private FeatureVector extract(RecommendationQuery query) {
