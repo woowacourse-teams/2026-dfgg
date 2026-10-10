@@ -57,10 +57,20 @@ public final class BuildPathResolver {
         return List.copyOf(bundles.values());
     }
 
+    /** 조회표의 아이템 자체 한 개만 구매한다. 하위 재료 후보로 확장하지 않는다. */
+    public PurchaseBundle singlePurchase(int itemId, ItemInventory inventory, long budget) {
+        if (inventory == null || budget < 0 || catalog.occupiedSlots(inventory) > INVENTORY_SLOTS) {
+            throw new IllegalArgumentException("현재 Inventory와 예산이 유효해야 합니다.");
+        }
+        new TargetItemProgress(catalog).measure(itemId, inventory);
+        var item = catalog.find(itemId).orElseThrow();
+        return purchase(new PurchaseBundle(Map.of(), 0, inventory, List.of()), item, budget);
+    }
+
     private PurchaseBundle purchase(PurchaseBundle current, PurchaseCatalogItem item, long budget) {
         PurchaseMaterials materials = recipes.materialsFor(item, current.inventoryAfter());
         if (materials.ids().stream().anyMatch(current.itemQuantities()::containsKey)) {
-            // 관측 정답과 동일하게, 묶음 안에서 방금 구매한 재료의 재조합은 첫 버전에서 제외한다.
+            // 관측 구매 묶음과 동일하게, 묶음 안에서 방금 구매한 재료의 재조합은 첫 버전에서 제외한다.
             return null;
         }
         int materialPrice = materials.totalPrice(catalog)
