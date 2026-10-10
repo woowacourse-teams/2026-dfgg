@@ -14,6 +14,7 @@
     "build:renderer": "webpack --mode production",
     "build": "pnpm build:main && pnpm build:renderer",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "electron:start": "pnpm build:main && electron .",
     "electron:dev": "concurrently -k \"pnpm start\" \"wait-on http://localhost:3001/home/index.html && pnpm electron:start\"",
     "package": "pnpm build && electron-builder --win nsis",
@@ -39,6 +40,7 @@
     "esbuild": "^0.28.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "vitest": "^5.0.3",
     "wait-on": "^9.1.0"
   },
   "build": {
