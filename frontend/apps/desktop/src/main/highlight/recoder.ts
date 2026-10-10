@@ -60,6 +60,13 @@ export async function startRecording(): Promise<RecordingSession | null> {
     windowsHide: true,
   });
 
+  const startedAt = Date.now();
+  // 게임 후 게임 시간 -> 영상 시간 계산에 필요한 값 저장
+  fs.writeFileSync(
+    path.join(dir, 'session.json'),
+    JSON.stringify({ startedAt, encoder: encoder.name }),
+  );
+
   // 로그를 ffmpeg.log 파일로 저장. 녹화 이상하면 원인 분석 가능.
   p.stderr?.pipe(fs.createWriteStream(path.join(dir, 'ffmpeg.log')));
 
@@ -73,7 +80,7 @@ export async function startRecording(): Promise<RecordingSession | null> {
 
   // 현재 상태 저장하고 반환
   proc = p; // stopRecording()에서 정지할 때
-  current = { dir, videoPath, startedAt: Date.now() }; // 정지 후 자르기 단계에 어느 폴더의 어느 영상인지 넘길 때
+  current = { dir, videoPath, startedAt }; // 정지 후 자르기 단계에 어느 폴더의 어느 영상인지 넘길 때
   return current; // 나중에 킬이 난 시각 -> 영상 몇 초 지점을 계산할 때 기준 시각
 }
 
