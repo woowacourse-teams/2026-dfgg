@@ -54,6 +54,7 @@ class ComponentConnectionEvaluationTest {
     @Autowired PurchaseInventoryReconstructor inventoryReconstructor;
     @Autowired NormalizedMatchParticipantRepository participants;
     @Autowired ItemRepository items;
+    @Autowired dfgg.application.recommend.context.CompositionFeatureCalculator compositions;
     @Autowired List<CandidateGenerator> generators;
     @Autowired CandidateTopK retrievalLimits;
     @Autowired HardValidityFilter validity;
@@ -121,7 +122,7 @@ class ComponentConnectionEvaluationTest {
         var componentRecommendations = new dfgg.application.recommend.component.ComponentRecommendationService(componentModel);
         var targetIds = topCores.stream().map(c -> Math.toIntExact(c.itemId())).toList();
         var branches = componentRecommendations.recommend(targetIds, bundle.inventoryBefore(), bundle.goldLower(),
-                bundle.purchases().getFirst().sourceEvent().gameTimeMs(), query.position().name(), patch, response);
+                bundle.purchases().getFirst().sourceEvent().gameTimeMs(), query.position().name(), patch, response, compositions.calculate(query.allyChampionIds(), query.enemyChampionIds()));
         var coreRows = new ArrayList<Map<String, Object>>();
         for (int i = 0; i < topCores.size(); i++) {
             var core = topCores.get(i);

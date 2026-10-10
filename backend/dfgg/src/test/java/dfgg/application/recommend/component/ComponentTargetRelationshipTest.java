@@ -1,5 +1,7 @@
 package dfgg.application.recommend.component;
 
+import static dfgg.application.recommend.context.TestCompositions.NO_TAGS;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -42,7 +44,7 @@ class ComponentTargetRelationshipTest {
         var candidate = find(4, before, 350, Map.of(1, 1));
         var a = vector(before, candidate, 4);
         var b = vector(before, candidate, 5);
-        assertThat(a).hasSize(46);
+        assertThat(a).hasSize(59);
         assertThat(a.subList(0, 41)).isEqualTo(b.subList(0, 41));
         assertThat(a.subList(41, 46)).isNotEqualTo(b.subList(41, 46));
         assertThat(a.get(41)).isEqualTo(2650);
@@ -67,7 +69,7 @@ class ComponentTargetRelationshipTest {
         var vectors = new java.util.ArrayList<List<Double>>();
         for (int target : List.of(3071, 6333)) {
             var sword = paths.resolve(target, before, 350).stream().filter(c -> c.itemQuantities().equals(Map.of(1036, 1))).findFirst().orElseThrow();
-            vectors.add(ComponentCandidateFeatures.calculate(before, sword, target, patchCatalog, patch, 600_000, "TOP").features());
+            vectors.add(ComponentCandidateFeatures.calculate(before, sword, target, patchCatalog, patch, 600_000, "TOP", NO_TAGS).features());
         }
         assertThat(vectors.get(0).subList(0, 41)).isEqualTo(vectors.get(1).subList(0, 41));
         assertThat(vectors.get(0).subList(41, 46)).isNotEqualTo(vectors.get(1).subList(41, 46));
@@ -130,7 +132,7 @@ class ComponentTargetRelationshipTest {
         var tree = new dfgg.application.recommend.v3.ranker.DecisionTree(new int[0], new double[0], new boolean[0],
                 new int[0], new int[0], new double[]{1.0}, new double[0], new double[]{1.0});
         var service = new ComponentRecommendationService(new dfgg.application.recommend.v3.ranker.GradientBoostedTrees(List.of(tree)));
-        var results = service.recommend(List.of(4, 5, 3047, 3869, 3097), ItemInventory.empty(), 350, 600_000, "TOP", "16.18", response);
+        var results = service.recommend(List.of(4, 5, 3047, 3869, 3097), ItemInventory.empty(), 350, 600_000, "TOP", "16.18", response, NO_TAGS);
         assertThat(results).extracting(ComponentRecommendationService.TargetRecommendation::targetItemId).containsExactly(4, 5, 3047, 3869, 3097);
         assertThat(results.get(0).rankedPurchases().getFirst().candidate().itemQuantities()).isEqualTo(Map.of(1, 1));
         assertThat(results.get(1).rankedPurchases().getFirst().candidate().itemQuantities()).isEqualTo(Map.of(1, 1));
@@ -139,7 +141,7 @@ class ComponentTargetRelationshipTest {
         assertThat(results.get(4).status()).isEqualTo(ComponentRecommendationService.Status.UNSUPPORTED_CATALOG_ITEM);
         assertThat(results.get(0).rankedPurchases().getFirst().rankWithinTarget()).isEqualTo(1);
         assertThat(results.get(1).rankedPurchases().getFirst().rankWithinTarget()).isEqualTo(1);
-        assertThatThrownBy(() -> service.recommend(List.of(4), ItemInventory.empty(), 350, 0, "TOP", "16.19", response))
+        assertThatThrownBy(() -> service.recommend(List.of(4), ItemInventory.empty(), 350, 0, "TOP", "16.19", response, NO_TAGS))
                 .hasMessageContaining("패치");
     }
 
@@ -148,6 +150,6 @@ class ComponentTargetRelationshipTest {
     }
 
     private List<Double> vector(ItemInventory before, BuildPathResolver.PurchaseBundle candidate, int target) {
-        return ComponentCandidateFeatures.calculate(before, candidate, target, catalog, response, 600_000, "TOP").features();
+        return ComponentCandidateFeatures.calculate(before, candidate, target, catalog, response, 600_000, "TOP", NO_TAGS).features();
     }
 }

@@ -7,6 +7,7 @@ import dfgg.presentation.dto.RecommendedItemDto;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import java.util.ArrayList;
 import java.util.List;
+import dfgg.application.recommend.context.CompositionFeatureCalculator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -14,11 +15,15 @@ import org.springframework.stereotype.Service;
 @Service
 @ConditionalOnProperty(name = "recommendation.component-ltr.model-path")
 public class CoreComponentRecommendationService {
+    private final dfgg.application.champion.ChampionService champions;
     private final NextItemRecommendationService coreRecommendations;
     private final ComponentRecommendationService componentRecommendations;
+    private final CompositionFeatureCalculator compositions;
 
     public CoreComponentRecommendationService(NextItemRecommendationService coreRecommendations,
-            ComponentRecommendationService componentRecommendations) {
+            ComponentRecommendationService componentRecommendations, dfgg.application.champion.ChampionService champions, CompositionFeatureCalculator compositions) {
+        this.compositions = compositions;
+        this.champions = champions;
         this.coreRecommendations = coreRecommendations;
         this.componentRecommendations = componentRecommendations;
     }
@@ -32,8 +37,11 @@ public class CoreComponentRecommendationService {
         }
         var cores = coreRecommendations.recommendNextItem(request).recommendedItems();
         var targets = cores.stream().map(core -> Math.toIntExact(core.id())).toList();
-        var components = componentRecommendations.recommend(targets, inventory, availableGold, gameTimeMs,
-                request.myChampion().position(), request.patch(), catalog);
+        var allyIds = request.allies().stream().map(ally -> champions.findChampionByName(ally.name()).getChampionId()).toList();
+        var enemyIds = request.enemies().stream().map(enemy -> champions.findChampionByName(enemy.name()).getChampionId()).toList();
+        var composition = compositions.calculate(allyIds, enemyIds);
+        var components = componentRecommendations.recommend(Math.toIntExact(champions.findChampionByName(request.myChampion().name()).getChampionId()), targets, inventory, availableGold, gameTimeMs,
+                request.myChampion().position(), request.patch(), catalog, composition);
         var results = new ArrayList<TargetRecommendation>();
         for (int i = 0; i < cores.size(); i++) {
             results.add(new TargetRecommendation(cores.get(i), i + 1, components.get(i)));

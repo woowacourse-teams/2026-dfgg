@@ -46,6 +46,7 @@ class ComponentCoreBridgeReplayTest {
     @Autowired PurchaseInventoryReconstructor inventoryReconstructor;
     @Autowired NormalizedMatchParticipantRepository participants;
     @Autowired ItemRepository items;
+    @Autowired dfgg.application.recommend.context.CompositionFeatureCalculator compositions;
     @Autowired List<CandidateGenerator> generators;
     @Autowired CandidateTopK retrievalLimits;
     @Autowired HardValidityFilter validity;
@@ -245,7 +246,7 @@ class ComponentCoreBridgeReplayTest {
         branch.put("componentPredictions", List.of());
         var result = new dfgg.application.recommend.component.ComponentRecommendationService(componentModel)
                 .recommend(List.of(target), bundle.inventoryBefore(), bundle.goldLower(),
-                        bundle.purchases().getFirst().sourceEvent().gameTimeMs(), query.position().name(), query.patch(), response).getFirst();
+                        bundle.purchases().getFirst().sourceEvent().gameTimeMs(), query.position().name(), query.patch(), response, compositions.calculate(query.allyChampionIds(), query.enemyChampionIds())).getFirst();
         var predictions = new ArrayList<Map<String, Object>>();
         for (var candidate : result.rankedPurchases()) {
             var prediction = new LinkedHashMap<String, Object>();

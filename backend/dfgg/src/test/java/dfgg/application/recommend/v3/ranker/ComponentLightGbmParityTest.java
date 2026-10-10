@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 /** 실제 학습 모델을 명시적으로 지정해 실행한다. Core 모델을 교체하지 않는다. */
 @Tag("evaluation")
 class ComponentLightGbmParityTest {
-    // Python component_ltr.feature_schema의 v4 스키마 계약. 모델 파일에서 기대 계약을 읽으면 검증이 무의미하다.
+    // Python component_ltr.feature_schema의 v7 스키마 계약. 모델 파일에서 기대 계약을 읽으면 검증이 무의미하다.
     private static final String FINGERPRINT = ComponentLtrConfiguration.SCHEMA_FINGERPRINT;
 
     @Test
@@ -26,7 +26,7 @@ class ComponentLightGbmParityTest {
         var mapper = new ObjectMapper();
         var fixture = mapper.readTree(fixturePath.toFile());
         var modelJson = mapper.readTree(modelPath.toFile());
-        assertThat(modelJson.path("model_version").asText()).isEqualTo("component-ltr-v5");
+        assertThat(modelJson.path("model_version").asText()).isEqualTo("component-ltr-v7");
         assertThat(modelJson.path("target_source").asText()).isEqualTo("OBSERVED_FUTURE_TARGET_ITEM");
         assertThat(fixture.path("schema_fingerprint").asText()).isEqualTo(FINGERPRINT);
         assertThat(mapper.convertValue(fixture.path("feature_names"),
@@ -37,9 +37,14 @@ class ComponentLightGbmParityTest {
         GradientBoostedTrees model;
         // 운영과 같은 Configuration 경로로 모델을 등록하고 Bean을 조회한다.
         try (var context = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
+            var properties = new java.util.HashMap<String, Object>();
+            properties.put("recommendation.component-ltr.model-path", modelPath.toUri().toString());
+            if (modelJson.hasNonNull("preparation_lookup_sha256")) {
+                properties.put("recommendation.component-ltr.preparation-lookup-path",
+                        modelPath.resolveSibling("preparation-lookup.json").toUri().toString());
+            }
             context.getEnvironment().getPropertySources().addFirst(
-                    new org.springframework.core.env.MapPropertySource("component-test", java.util.Map.of(
-                            "recommendation.component-ltr.model-path", modelPath.toUri().toString())));
+                    new org.springframework.core.env.MapPropertySource("component-test", properties));
             context.register(ComponentLtrConfiguration.class);
             context.refresh();
             model = context.getBean("componentLtrModel", GradientBoostedTrees.class);

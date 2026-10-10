@@ -1,6 +1,7 @@
-"""순위 평가: 각 구매 시점의 정답 순위를 지표로 계산한다.
+"""순위 평가: 각 구매 시점의 관측 구매 순위를 지표로 계산한다.
 
-모델 학습이나 파일 저장을 하지 않는다. Core와 달리 Component 정답은 label=1이다.
+모델 학습이나 파일 저장을 하지 않는다. Component 관측 구매는 label=1이다.
+Hit/MRR/NDCG는 관측 선택 재현 지표이며 구매의 최적성이나 승률을 측정하지 않는다.
 """
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ from dfgg_ltr.metrics import ndcg_at_k
 
 
 def evaluate(dataset, scores) -> dict:
-    """구매 시점마다 평가한 뒤 평균한다. Core의 정답 등급 3 대신 Component 등급 1을 찾는다."""
+    """구매 시점마다 평가한 뒤 평균한다. Component의 관측 구매 등급 1을 찾는다."""
     results = {"hit@1": [], "hit@3": [], "mrr": [], "ndcg@1": [], "ndcg@3": []}
     offset = 0
     for size in dataset.group:
@@ -21,7 +22,7 @@ def evaluate(dataset, scores) -> dict:
         results["hit@1"].append(float(rank == 1))
         results["hit@3"].append(float(rank <= 3))
         results["mrr"].append(1.0 / rank)
-        results["ndcg@1"].append(float(rank == 1))  # 정답 하나인 이진 relevance에서는 Hit@1과 같다.
+        results["ndcg@1"].append(float(rank == 1))  # 관측 구매 하나인 이진 relevance에서는 Hit@1과 같다.
         results["ndcg@3"].append(ndcg_at_k(labels, group_scores, 3))
         offset += size
     return {name: float(np.mean(values)) for name, values in results.items()}
@@ -50,7 +51,10 @@ def stratified_evaluation(dataset, scores, path):
                             np.asarray([size]), [], dataset.feature_names, dataset.schema_fingerprint)
             metrics = evaluate(group, scores[offset:end])
             gold = row.get('goldLower', 0)
+            observed = next(c for c in row['candidates'] if c.get('label') == 1)
             categories = {
+                'target_item': str(row.get('targetItemId', 'UNKNOWN')),
+                'observed_candidate_source': observed.get('candidateSource', 'TARGET_PATH'),
                 'target_kind': row.get('targetKind', 'UNKNOWN'),
                 'completed_core_count': str(min(row.get('completedCoreCount', 0), 3)),
                 'position': row.get('position') or 'UNKNOWN',

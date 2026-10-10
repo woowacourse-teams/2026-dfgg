@@ -1,5 +1,7 @@
 package dfgg.evaluation;
 
+import static dfgg.application.recommend.context.TestCompositions.NO_TAGS;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,7 +46,7 @@ class ComponentCoreBridgeContractTest {
                 var sword = candidates.stream().filter(c -> c.itemQuantities().equals(Map.of(1036, 1)))
                         .findFirst().orElseThrow();
                 var features = ComponentCandidateFeatures.calculate(before, sword, target, catalog,
-                        response, 600_000, "TOP");
+                        response, 600_000, "TOP", NO_TAGS);
                 vectors.add(features.features());
                 double score = model.predict(features.features().stream().mapToDouble(Double::doubleValue).toArray());
                 assertThat(score).isFinite();
@@ -53,7 +55,7 @@ class ComponentCoreBridgeContractTest {
                         "features", features.features(), "componentScore", score));
             }
         }
-        assertThat(vectors.get(0)).hasSize(46);
+        assertThat(vectors.get(0)).hasSize(59);
         assertThat(vectors.get(0).subList(0, 41)).isEqualTo(vectors.get(1).subList(0, 41));
         assertThat(vectors.get(0).subList(41, 46)).isNotEqualTo(vectors.get(1).subList(41, 46));
 

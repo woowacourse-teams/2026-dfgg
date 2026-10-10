@@ -2,7 +2,7 @@
 import hashlib
 import json
 
-SCHEMA_VERSION = "component-bundle-validation-v5"
+SCHEMA_VERSION = "component-bundle-validation-v7"
 FEATURE_NAMES = [
     "additional_cost",
     "purchase_quantity",
@@ -50,6 +50,19 @@ FEATURE_NAMES = [
     "contains_direct_target_material",
     "target_material_coverage_after_purchase",
     "target_progress_gain",
+    "enemy_tank_count",
+    "enemy_mage_count",
+    "enemy_marksman_count",
+    "enemy_assassin_count",
+    "enemy_fighter_count",
+    "ally_tank_count",
+    "ally_mage_count",
+    "ally_marksman_count",
+    "ally_support_count",
+    "is_preparation_candidate",
+    "preparation_observation_rate",
+    "preparation_support_log",
+    "preparation_future_recipe_link_rate",
 ]
 
 # 열 순서가 바뀌면 지문도 바뀌므로 다른 계약의 모델을 잘못 읽지 못하게 한다.
@@ -61,3 +74,8 @@ SCHEMA_FINGERPRINT = hashlib.sha256(
 CONTEXT_FEATURE_START = FEATURE_NAMES.index("game_time_minutes")
 
 CONTEXT_FEATURE_END = FEATURE_NAMES.index("attack_damage_before")
+
+COMPOSITION_FEATURE_START = FEATURE_NAMES.index("enemy_tank_count")
+
+PREPARATION_FEATURE_START = FEATURE_NAMES.index("is_preparation_candidate")
+COMPOSITION_FEATURE_END = PREPARATION_FEATURE_START

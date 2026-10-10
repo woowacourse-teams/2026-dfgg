@@ -7,9 +7,10 @@ import dfgg.domain.match.PurchaseItemCatalog;
 import dfgg.domain.match.TargetItemProgress;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import java.util.List;
+import dfgg.application.recommend.context.CompositionFeatures;
 import java.util.Map;
 
-/** 구매 후보와 Feature. 관측 정답·학습 라벨 없이 학습과 추론에서 공통으로 사용한다. */
+/** 구매 후보와 Feature. 관측 구매·학습 라벨 없이 학습과 추론에서 공통으로 사용한다. */
 public record ComponentCandidateFeatures(Map<Integer, Integer> itemQuantities, List<Integer> purchaseOrder,
                                          Map<Integer, Integer> inventoryAfter, List<Double> features) {
     public ComponentCandidateFeatures {
@@ -28,7 +29,7 @@ public record ComponentCandidateFeatures(Map<Integer, Integer> itemQuantities, L
             "FlatHPPoolMod", "FlatMPPoolMod", "FlatArmorMod", "FlatSpellBlockMod", "PercentAttackSpeedMod",
             "FlatCritChanceMod", "PercentLifeStealMod", "FlatMovementSpeedMod", "PercentMovementSpeedMod",
             "FlatHPRegenMod");
-    public static final List<String> FEATURE_NAMES = List.of("additional_cost", "purchase_quantity",
+    private static final List<String> PURCHASE_FEATURE_NAMES = List.of("additional_cost", "purchase_quantity",
             "distinct_purchase_items", "slots_before", "slots_after", "completes_target_core",
             "consumed_owned_quantity", "consumed_owned_value", "basic_purchase_quantity", "intermediate_purchase_quantity",
             "attack_damage_delta", "ability_power_delta", "health_delta", "mana_delta", "armor_delta",
@@ -39,9 +40,24 @@ public record ComponentCandidateFeatures(Map<Integer, Integer> itemQuantities, L
             "target_remaining_gold_after_purchase", "target_remaining_recipe_depth", "contains_direct_target_material",
             "target_material_coverage_after_purchase", "target_progress_gain");
 
+    public static final List<String> PREPARATION_FEATURE_NAMES = List.of("is_preparation_candidate",
+            "preparation_observation_rate", "preparation_support_log", "preparation_future_recipe_link_rate");
+    public static final List<String> FEATURE_NAMES = java.util.stream.Stream.of(
+            PURCHASE_FEATURE_NAMES, CompositionFeatures.FEATURE_NAMES, PREPARATION_FEATURE_NAMES)
+            .flatMap(List::stream).toList();
+
+    public static ComponentCandidateFeatures calculate(dfgg.domain.match.ItemInventory before,
+            dfgg.domain.match.ComponentCandidateGenerator.Candidate candidate, int targetItemId,
+            PurchaseItemCatalog catalog, ItemResponse response, long gameTimeMs, String position, CompositionFeatures composition) {
+        var base = calculate(before, candidate.bundle(), targetItemId, catalog, response, gameTimeMs, position, composition);
+        var vector = new java.util.ArrayList<>(base.features().subList(0, 55));
+        vector.addAll(candidate.preparationFeatures());
+        return new ComponentCandidateFeatures(base.itemQuantities(), base.purchaseOrder(), base.inventoryAfter(), vector);
+    }
+
     /** 학습과 추론에 같은 계산을 사용한다. Gold 추정치·미래 구매 정보는 입력받지 않는다. */
     public static ComponentCandidateFeatures calculate(dfgg.domain.match.ItemInventory before,
-            BuildPathResolver.PurchaseBundle candidate, int targetItemId, PurchaseItemCatalog catalog, ItemResponse response, long gameTimeMs, String position) {
+            BuildPathResolver.PurchaseBundle candidate, int targetItemId, PurchaseItemCatalog catalog, ItemResponse response, long gameTimeMs, String position, CompositionFeatures composition) {
         if (gameTimeMs < 0) throw new IllegalArgumentException("게임 시간은 음수일 수 없습니다.");
         var after = candidate.inventoryAfter();
         int consumedQuantity = 0;
@@ -86,6 +102,8 @@ public record ComponentCandidateFeatures(Map<Integer, Integer> itemQuantities, L
         vector.add(candidate.itemQuantities().keySet().stream().anyMatch(target.ingredients()::contains) ? 1.0 : 0.0);
         vector.add(current.materialCoverage());
         vector.add(current.fraction() - previous.fraction());
+        vector.addAll(java.util.Objects.requireNonNull(composition, "경기 조합은 필수입니다.").values());
+        vector.addAll(List.of(0.0, 0.0, 0.0, 0.0));
         return new ComponentCandidateFeatures(candidate.itemQuantities(), candidate.purchaseOrder(),
                 after.quantities(), vector);
     }

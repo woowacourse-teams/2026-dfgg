@@ -1,5 +1,7 @@
 package dfgg.application.match;
 
+import static dfgg.application.recommend.context.TestCompositions.NO_TAGS;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -13,7 +15,13 @@ import org.junit.jupiter.api.Test;
 
 class ComponentTrainingTargetTest {
     private final ParticipantItemPurchaseSnapshotService snapshots = mock(ParticipantItemPurchaseSnapshotService.class);
-    private final ComponentTrainingDataService exporter = new ComponentTrainingDataService(snapshots, new ObjectMapper());
+    private final dfgg.application.recommend.component.ComponentCompositionReader compositions = mock(dfgg.application.recommend.component.ComponentCompositionReader.class);
+    private final ComponentTrainingDataService exporter = new ComponentTrainingDataService(snapshots, new ObjectMapper(), PreparationLookup.disabled(), compositions);
+
+    @org.junit.jupiter.api.BeforeEach
+    void composition() {
+        when(compositions.forMatch("KR_TEST")).thenReturn(java.util.Map.of(1, NO_TAGS, 2, NO_TAGS));
+    }
 
     @Test
     void basic_boot_purchase_uses_only_observed_future_tier_two_boot_target() throws Exception {
@@ -69,13 +77,169 @@ class ComponentTrainingTargetTest {
         assertThat(rows).hasSize(2).allMatch(row -> row.status().equals("READY"));
         assertThat(rows).extracting(ComponentTrainingDataService.Example::completedCoreCount).containsExactly(0L, 1L);
         assertThat(rows.getFirst().featureNames()).isEqualTo(rows.getLast().featureNames());
-        assertThat(rows.getFirst().featureNames()).hasSize(46).doesNotContain("completedCoreCount", "completed_core_count", "target_item_id");
+        assertThat(rows.getFirst().featureNames()).hasSize(59).doesNotContain("completedCoreCount", "completed_core_count", "target_item_id");
         assertThat(rows).allMatch(row -> row.candidates().stream().filter(c -> c.label() == 1).count() == 1);
     }
 
     private void prepare(List<ParticipantItemPurchaseSnapshot> purchases) {
         when(snapshots.prepareForMatch("KR_TEST")).thenReturn(new ParticipantItemPurchaseSnapshotService.PreparedPurchases(
                 purchases, purchases.stream().map(s -> new ParticipantItemPurchaseBundle(List.of(s), s.purchase().getItemCost() == null ? Set.of(ParticipantItemPurchaseBundle.Reason.COST_UNKNOWN) : Set.of())).toList()));
+    }
+
+    @Test
+    void scope_diagnostic_keeps_training_examples_identical_and_records_future_recipe_connection() throws Exception {
+        var preparation = snapshot(2, ItemPurchaseType.COMPONENT, 1, 200, ItemInventory.empty());
+        var target = snapshot(500, ItemPurchaseType.CORE, 2, 1000, ItemInventory.empty().add(2));
+        var future = snapshot(501, ItemPurchaseType.CORE, 3, 800, ItemInventory.empty().add(2).add(500));
+        prepare(List.of(preparation, target, future));
+        var response = preparationCatalog();
+        var original = exporter.examplesForMatch("KR_TEST", response);
+        var dataset = exporter.datasetForMatch("KR_TEST", response, java.util.Map.of(1, 81));
+        assertThat(dataset.examples()).isEqualTo(original);
+        var row = dataset.diagnostics().getFirst();
+        assertThat(row.status()).isEqualTo("OUT_OF_TARGET_PATH_PURCHASE");
+        assertThat(row.championId()).isEqualTo(81);
+        assertThat(row.outsideTargetPathItems()).containsExactlyEntriesOf(java.util.Map.of(2, 1));
+        assertThat(row.targetRecipePath()).containsExactly(1, 500);
+        assertThat(row.candidateSet()).noneMatch(candidate -> candidate.containsKey(2));
+        assertThat(dataset.examples().getFirst().candidates()).allMatch(candidate -> candidate.label() == null);
+        assertThat(row.nextCompletedItem().itemId()).isEqualTo(500);
+        assertThat(row.subsequentCompletedItems()).hasSize(2);
+        assertThat(row.subsequentCompletedItems().getLast().relatedOutsideItemIds()).containsExactly(2);
+        assertThat(row.subsequentCompletedItems().getLast().elapsedSincePurchaseMs()).isEqualTo(40_000);
+        assertThat(row.subsequentCompletedItems().getLast().evidence()).isEqualTo("RECIPE_MEMBERSHIP_ONLY");
+    }
+
+    @Test
+    void in_path_purchase_missing_due_to_budget_is_not_a_preparation_purchase() throws Exception {
+        var material = snapshot(1, ItemPurchaseType.COMPONENT, 1, 300, ItemInventory.empty());
+        material.purchase().recordGoldRange(new GoldRange(0, 100), GoldRangeStatus.BASE);
+        prepare(List.of(material, snapshot(500, ItemPurchaseType.CORE, 2, 1000, ItemInventory.empty().add(1))));
+        var dataset = exporter.datasetForMatch("KR_TEST", preparationCatalog(), java.util.Map.of());
+        assertThat(dataset.examples().getFirst().candidates()).isEmpty();
+        assertThat(dataset.diagnostics().getFirst().status()).isEqualTo("WITHIN_TARGET_PATH");
+        assertThat(dataset.diagnostics().getFirst().candidateSetStatus()).isEqualTo("EXPORTED_EMPTY_CANDIDATE_SET");
+    }
+
+    @Test
+    void unknown_observed_catalog_item_is_unresolved_not_preparation() throws Exception {
+        prepare(List.of(snapshot(999, ItemPurchaseType.COMPONENT, 1, 200, ItemInventory.empty()),
+                snapshot(500, ItemPurchaseType.CORE, 2, 1000, ItemInventory.empty())));
+        var row = exporter.datasetForMatch("KR_TEST", preparationCatalog(), java.util.Map.of()).diagnostics().getFirst();
+        assertThat(row.status()).isEqualTo("UNRESOLVED_RECIPE_PATH");
+        assertThat(row.unresolvedReason()).contains("999");
+        assertThat(row.championId()).isNull();
+    }
+
+    @Test
+    void cancelled_future_completion_is_not_evidence_for_preparation() throws Exception {
+        var future = snapshot(501, ItemPurchaseType.CORE, 3, 800, ItemInventory.empty().add(2));
+        var cancelled = new ParticipantItemPurchaseSnapshot(future.purchase(), future.sourceEvent(), future.inventoryBefore(),
+                ParticipantItemPurchaseSnapshot.Status.EXCLUDED, ParticipantItemPurchaseSnapshot.Reason.PURCHASE_UNDONE);
+        prepare(List.of(snapshot(2, ItemPurchaseType.COMPONENT, 1, 200, ItemInventory.empty()),
+                snapshot(500, ItemPurchaseType.CORE, 2, 1000, ItemInventory.empty().add(2)), cancelled));
+        var row = exporter.datasetForMatch("KR_TEST", preparationCatalog(), java.util.Map.of()).diagnostics().getFirst();
+        assertThat(row.subsequentCompletedItems()).extracting(ComponentCandidateScopeDiagnostics.Completion::itemId)
+                .containsExactly(500);
+    }
+
+    @Test
+    void excluded_mixed_bundle_is_diagnosed_without_changing_training_status() throws Exception {
+        var material = snapshot(1, ItemPurchaseType.COMPONENT, 1, 300, ItemInventory.empty());
+        var outside = snapshot(2, ItemPurchaseType.COMPONENT, 2, 200, ItemInventory.empty().add(1));
+        var target = snapshot(500, ItemPurchaseType.CORE, 3, 1000, ItemInventory.empty());
+        var bundle = new ParticipantItemPurchaseBundle(List.of(material, outside), Set.of(ParticipantItemPurchaseBundle.Reason.COST_UNKNOWN));
+        when(snapshots.prepareForMatch("KR_TEST")).thenReturn(new ParticipantItemPurchaseSnapshotService.PreparedPurchases(
+                List.of(material, outside, target), List.of(bundle)));
+        var dataset = exporter.datasetForMatch("KR_TEST", preparationCatalog(), java.util.Map.of());
+        assertThat(dataset.examples().getFirst().status()).isEqualTo("BUNDLE_EXCLUDED");
+        var row = dataset.diagnostics().getFirst();
+        assertThat(row.status()).isEqualTo("OUT_OF_TARGET_PATH_PURCHASE");
+        assertThat(row.outsideTargetPathItems()).containsExactlyEntriesOf(java.util.Map.of(2, 1));
+        assertThat(row.candidateSetStatus()).isEqualTo("NOT_GENERATED_OR_UNAVAILABLE");
+    }
+
+    @Test
+    void undo_bundle_is_not_counted_as_preparation() throws Exception {
+        var outside = snapshot(2, ItemPurchaseType.COMPONENT, 1, 200, ItemInventory.empty());
+        var target = snapshot(500, ItemPurchaseType.CORE, 2, 1000, ItemInventory.empty());
+        when(snapshots.prepareForMatch("KR_TEST")).thenReturn(new ParticipantItemPurchaseSnapshotService.PreparedPurchases(
+                List.of(outside, target), List.of(new ParticipantItemPurchaseBundle(List.of(outside),
+                Set.of(ParticipantItemPurchaseBundle.Reason.UNDO_INCLUDED)))));
+        var row = exporter.datasetForMatch("KR_TEST", preparationCatalog(), java.util.Map.of()).diagnostics().getFirst();
+        assertThat(row.status()).isEqualTo("UNRESOLVED_OR_CANCELLED_OBSERVATION");
+    }
+
+    @Test
+    void cancelled_target_is_reported_even_when_bundle_was_excluded_first() throws Exception {
+        var outside = snapshot(2, ItemPurchaseType.COMPONENT, 1, 200, ItemInventory.empty());
+        var target = snapshot(500, ItemPurchaseType.CORE, 2, 1000, ItemInventory.empty());
+        var unresolved = new ParticipantItemPurchaseSnapshot(target.purchase(), target.sourceEvent(), target.inventoryBefore(),
+                ParticipantItemPurchaseSnapshot.Status.UNRESOLVED, ParticipantItemPurchaseSnapshot.Reason.CANCELLATION_UNRESOLVED);
+        when(snapshots.prepareForMatch("KR_TEST")).thenReturn(new ParticipantItemPurchaseSnapshotService.PreparedPurchases(
+                List.of(outside, unresolved), List.of(new ParticipantItemPurchaseBundle(List.of(outside),
+                Set.of(ParticipantItemPurchaseBundle.Reason.COST_UNKNOWN)))));
+        var dataset = exporter.datasetForMatch("KR_TEST", preparationCatalog(), java.util.Map.of());
+        assertThat(dataset.examples().getFirst().status()).isEqualTo("BUNDLE_EXCLUDED");
+        assertThat(dataset.diagnostics().getFirst().status()).isEqualTo("TARGET_CANCELLATION_UNRESOLVED");
+    }
+
+    @Test
+    void another_participants_completion_is_not_linked() throws Exception {
+        var otherEvent = new ParticipantItemEvent("KR_TEST", 2, 3, 3, 0, 3, "ITEM_PURCHASED", 501,
+                null, null, 60_000L, "{}", "test");
+        var otherPurchase = new NormalizedMatchParticipantItemEvent(otherEvent, ItemPurchaseType.CORE, "16.18", "MID");
+        var other = new ParticipantItemPurchaseSnapshot(otherPurchase, otherEvent, ItemInventory.empty(),
+                ParticipantItemPurchaseSnapshot.Status.READY, null);
+        var outside = snapshot(2, ItemPurchaseType.COMPONENT, 1, 200, ItemInventory.empty());
+        var target = snapshot(500, ItemPurchaseType.CORE, 2, 1000, ItemInventory.empty());
+        when(snapshots.prepareForMatch("KR_TEST")).thenReturn(new ParticipantItemPurchaseSnapshotService.PreparedPurchases(
+                List.of(outside, target, other), List.of(new ParticipantItemPurchaseBundle(List.of(outside), Set.of()))));
+        var row = exporter.datasetForMatch("KR_TEST", preparationCatalog(), java.util.Map.of()).diagnostics().getFirst();
+        assertThat(row.subsequentCompletedItems()).extracting(ComponentCandidateScopeDiagnostics.Completion::itemId)
+                .containsExactly(500);
+    }
+
+    @Test
+    void preparation_candidates_are_identical_in_training_and_serving_regardless_of_observation() throws Exception {
+        var lookup = new PreparationLookup("16.18", "a".repeat(64), java.util.Map.of(
+                new PreparationLookup.Key(81, "TOP", 500), List.of(new PreparationLookup.Pattern(2, 50, .8, 200, 40))));
+        var training = new ComponentTrainingDataService(snapshots, new ObjectMapper(), lookup, compositions);
+        var model = mock(dfgg.application.recommend.v3.ranker.GradientBoostedTrees.class);
+        var serving = new dfgg.application.recommend.component.ComponentRecommendationService(model, lookup);
+        var response = preparationCatalog();
+        var served = serving.recommend(81, List.of(500), ItemInventory.empty(), 1200, 20_000,
+                "TOP", "16.18", response, NO_TAGS).getFirst().rankedPurchases();
+        for (int observed : List.of(1, 2)) {
+            prepare(List.of(snapshot(observed, ItemPurchaseType.COMPONENT, 1, observed == 1 ? 300 : 200, ItemInventory.empty()),
+                    snapshot(500, ItemPurchaseType.CORE, 2, 1000, ItemInventory.empty().add(observed))));
+            var row = training.datasetForMatch("KR_TEST", response, java.util.Map.of(1, 81)).examples().getFirst();
+            assertThat(row.status()).isEqualTo("READY");
+            assertThat(row.candidates()).extracting(ComponentTrainingCandidate::candidate)
+                    .containsExactlyElementsOf(served.stream().map(c -> c.candidate()).toList());
+            for (var candidate : row.candidates()) {
+                var evidence = candidate.candidate().features().subList(55, 59);
+                if (candidate.candidateSource() == dfgg.domain.match.ComponentCandidateGenerator.Source.PREPARATION) {
+                    assertThat(evidence).containsExactly(1.0, .25, Math.log1p(50), .8);
+                } else {
+                    assertThat(evidence).containsExactly(0.0, 0.0, 0.0, 0.0);
+                }
+            }
+            assertThat(row.candidates()).extracting(ComponentTrainingCandidate::candidateSource)
+                    .containsExactlyElementsOf(served.stream().map(c -> c.candidateSource()).toList());
+            assertThat(row.candidates().stream().filter(c -> c.label() == 1)).singleElement()
+                    .satisfies(c -> assertThat(c.candidate().itemQuantities()).isEqualTo(java.util.Map.of(observed, 1)));
+        }
+    }
+
+    private ItemResponse preparationCatalog() throws Exception {
+        return new ObjectMapper().readValue("""
+                {"version":"16.18.1","data":{
+                 "1":{"gold":{"total":300,"purchasable":true}},
+                 "2":{"gold":{"total":200,"purchasable":true}},
+                 "500":{"from":["1"],"gold":{"total":1000,"purchasable":true}},
+                 "501":{"from":["2"],"gold":{"total":1000,"purchasable":true}}}}
+                """, ItemResponse.class);
     }
 
     private ParticipantItemPurchaseSnapshot snapshot(int id, ItemPurchaseType type, int order, int cost, ItemInventory before) {

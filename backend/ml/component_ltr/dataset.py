@@ -1,13 +1,19 @@
-"""Java JSONL의 계약을 검증하고 Query별 연속 후보 배열을 만든다."""
+"""Java JSONL의 계약을 검증하고 Query별 연속 후보 배열을 만든다.
+
+Label 1은 관측 구매, Label 0은 비관측 대안이다. 구매 품질이나 최적성의 등급이 아니다.
+각 READY Query에 관측 구매와 수량이 일치하는 Label 1 후보가 정확히 하나 있어야 한다.
+"""
 from __future__ import annotations
 
+import math
 import json
+import hashlib
 from collections import Counter
 from pathlib import Path
 
 import numpy as np
 from dfgg_ltr.dataset import Dataset
-from component_ltr.feature_schema import FEATURE_NAMES, SCHEMA_VERSION, SCHEMA_FINGERPRINT
+from component_ltr.feature_schema import FEATURE_NAMES, SCHEMA_VERSION, SCHEMA_FINGERPRINT, COMPOSITION_FEATURE_START, COMPOSITION_FEATURE_END, PREPARATION_FEATURE_START
 
 
 class DatasetValidationError(ValueError):
@@ -49,13 +55,32 @@ def validate_row(row, seen):
         if (not candidate["itemQuantities"]
                 or any(type(v) is not int or v <= 0 for v in candidate["itemQuantities"].values())):
             raise ValueError("ITEM_QUANTITY")
+        source = candidate.get("candidateSource", "TARGET_PATH")
+        if source not in ("TARGET_PATH", "PREPARATION"):
+            raise ValueError("CANDIDATE_SOURCE")
+        if source == "PREPARATION":
+            count, rate = candidate.get("preparationPatternCount"), candidate.get("preparationFutureRecipeLinkRate")
+            if type(count) is not int or count < 50 or type(rate) not in (int, float) or not .7 <= rate <= 1:
+                raise ValueError("PREPARATION_PATTERN")
         vector = candidate["features"]
         if not isinstance(vector, list) or len(vector) != len(FEATURE_NAMES):
             raise ValueError("FEATURE_COUNT")
         if any(type(v) not in (int, float) or not np.isfinite(v) for v in vector):
             raise ValueError("FEATURE_NUMERIC")
+        evidence = vector[PREPARATION_FEATURE_START:]
+        if source == "TARGET_PATH" and evidence != [0, 0, 0, 0]:
+            raise ValueError("PREPARATION_FEATURES")
+        if source == "PREPARATION" and (evidence[0] != 1 or not 0 < evidence[1] <= 1
+                or not math.isclose(evidence[2], math.log1p(count), abs_tol=1e-12)
+                or evidence[3] != rate):
+            raise ValueError("PREPARATION_FEATURES")
         if candidate["label"] == 1 and candidate["itemQuantities"] != row["observedItems"]:
             raise ValueError("POSITIVE_ITEMS")
+    contexts = [candidate["features"][COMPOSITION_FEATURE_START:COMPOSITION_FEATURE_END] for candidate in row["candidates"]]
+    if any(value < 0 or value != int(value) for context in contexts for value in context):
+        raise ValueError("COMPOSITION_COUNT")
+    if any(context != contexts[0] for context in contexts[1:]):
+        raise ValueError("COMPOSITION_QUERY_MISMATCH")
     return qid
 
 
@@ -64,6 +89,7 @@ def load_dataset(path: Path, report=None) -> Dataset:
     features, labels, groups, qids = [], [], [], []
     seen, reasons, examples = set(), Counter(), []
     rows = 0
+    candidate_sources, data_versions = Counter(), set()
     with path.open(encoding="utf-8") as source:
         for rows, line in enumerate(source, 1):
             try:
@@ -77,7 +103,10 @@ def load_dataset(path: Path, report=None) -> Dataset:
                 if len(examples) < 20:
                     examples.append({"line": rows, "reason": reason})
                 continue
+            if row.get("dataVersion"):
+                data_versions.add(row["dataVersion"])
             for candidate in row["candidates"]:
+                candidate_sources[candidate.get("candidateSource", "TARGET_PATH")] += 1
                 features.append(candidate["features"])
                 labels.append(candidate["label"])
             groups.append(len(row["candidates"]))
@@ -86,7 +115,8 @@ def load_dataset(path: Path, report=None) -> Dataset:
         reasons["EMPTY_DATASET"] += 1
     summary = {"path": str(path), "rows": rows, "validGroups": len(groups),
                "invalidGroups": sum(reasons.values()), "excludedGroups": 0,
-               "errorCounts": dict(reasons), "errorExamples": examples}
+               "errorCounts": dict(reasons), "errorExamples": examples,
+               "candidateSources": dict(candidate_sources), "dataVersions": sorted(data_versions)}
     if report is not None:
         report.update(summary)
     if reasons:
@@ -114,6 +144,24 @@ def load_splits(directory: Path, report_path: Path):
                 split_errors.append({"reason": "MATCH_OVERLAP", "splits": [a, b], "count": len(overlap),
                                      "examples": sorted(overlap)[:20]})
         manifest = json.loads((directory / "manifest.json").read_text())
+        champion_hash = manifest.get("championMetadataSha256")
+        if champion_hash:
+            snapshot = directory / "champion-tags.json"
+            if not snapshot.is_file() or hashlib.sha256(snapshot.read_bytes()).hexdigest() != champion_hash:
+                split_errors.append({"reason": "CHAMPION_METADATA_HASH"})
+        lookup_hash = manifest.get("preparationLookupSha256")
+        if not lookup_hash and any(r["candidateSources"].get("PREPARATION", 0) for r in reports.values()):
+            split_errors.append({"reason": "PREPARATION_LOOKUP_MISSING"})
+        if lookup_hash:
+            lookup_bytes = (directory / "preparation-lookup.json").read_bytes()
+            lookup = json.loads(lookup_bytes)
+            expected_train = sorted(m for m, e in manifest["matches"].items() if e["split"] == "train")
+            if (hashlib.sha256(lookup_bytes).hexdigest() != lookup_hash or lookup.get("miningSplit") != "train"
+                    or lookup.get("trainMatchIds") != expected_train
+                    or lookup.get("schemaVersion") != "component-preparation-v2"
+                    or any(not r["dataVersions"] or any(v.rsplit(".", 1)[0] != lookup.get("patch")
+                           for v in r["dataVersions"]) for r in reports.values())):
+                split_errors.append({"reason": "PREPARATION_LOOKUP_CONTRACT"})
         for split, dataset in datasets.items():
             counts = Counter(qid.split(":")[0] for qid in dataset.qids)
             for match_id, count in counts.items():

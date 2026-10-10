@@ -1,5 +1,7 @@
 package dfgg.application.recommend.component;
 
+import static dfgg.application.recommend.context.TestCompositions.NO_TAGS;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -19,6 +21,12 @@ class CoreComponentRecommendationServiceTest {
     @Test
     void existing_core_top_five_are_connected_in_order_without_replacing_failed_targets() {
         var core = mock(NextItemRecommendationService.class);
+        var champions = mock(dfgg.application.champion.ChampionService.class);
+        var champion = mock(dfgg.domain.champion.Champion.class);
+        when(champion.getChampionId()).thenReturn(86L);
+        when(champions.findChampionByName("Garen")).thenReturn(champion);
+        var compositions = mock(dfgg.application.recommend.context.CompositionFeatureCalculator.class);
+        when(compositions.calculate(anyList(), anyList())).thenReturn(NO_TAGS);
         var component = mock(ComponentRecommendationService.class);
         var request = new NextItemRecommendationRequest(new ChampionDto("Garen", "TOP"), List.of(), List.of(), List.of(), "EMERALD", "16.18");
         var catalog = new ItemResponse("16.18.1", null, Map.of());
@@ -28,12 +36,12 @@ class CoreComponentRecommendationServiceTest {
                 id == 3097 ? ComponentRecommendationService.Status.UNSUPPORTED_CATALOG_ITEM : ComponentRecommendationService.Status.OK,
                 List.of(), id == 3097 ? "missing" : null)).toList();
         when(core.recommendNextItem(request)).thenReturn(new NextItemRecommendationResponse(coreItems));
-        when(component.recommend(eq(ids), any(), eq(350L), eq(600_000L), eq("TOP"), eq("16.18"), eq(catalog))).thenReturn(branches);
-        var results = new CoreComponentRecommendationService(core, component).recommend(request, ItemInventory.empty(), 350, 600_000, catalog);
+        when(component.recommend(eq(86), eq(ids), any(), eq(350L), eq(600_000L), eq("TOP"), eq("16.18"), eq(catalog), eq(NO_TAGS))).thenReturn(branches);
+        var results = new CoreComponentRecommendationService(core, component, champions, compositions).recommend(request, ItemInventory.empty(), 350, 600_000, catalog);
         assertThat(results).extracting(r -> r.target().id()).containsExactly(3071L, 6333L, 3047L, 3869L, 3097L);
         assertThat(results).extracting(CoreComponentRecommendationService.TargetRecommendation::coreRank).containsExactly(1, 2, 3, 4, 5);
         assertThat(results.getLast().component().status()).isEqualTo(ComponentRecommendationService.Status.UNSUPPORTED_CATALOG_ITEM);
         verify(core, times(1)).recommendNextItem(request);
-        verify(component, times(1)).recommend(eq(ids), any(), anyLong(), anyLong(), anyString(), anyString(), eq(catalog));
+        verify(component, times(1)).recommend(eq(86), eq(ids), any(), anyLong(), anyLong(), anyString(), anyString(), eq(catalog), eq(NO_TAGS));
     }
 }
