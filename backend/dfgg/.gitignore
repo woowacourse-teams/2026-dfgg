@@ -40,9 +40,38 @@ out/
 .env
 .env.*
 !.env.example
+*.md
+*.py
+
 
 # Component Target Item implementation records and reproducible experiment runner
 !implementation_investigation.md
 !component_target_item_implementation_report.md
 !scripts/run-component-target-experiments.py
 !scripts/component-core-bridge-analyze.py
+!scripts/component-label-consistency.py
+!scripts/test-component-label-consistency.py
+!component_ltr_label_consistency_experiment/report.md
+!docs/
+!docs/component-ltr-label-design-decision.md
+!dfgg_component_item_architecture.md
+!scripts/component-candidate-scope-analyze.py
+!docs/component-ltr-candidate-scope-design.md
+!component_candidate_scope_diagnostics/report.md
+!scripts/component-preparation-mine.py
+!scripts/component-preparation-evaluate.py
+!scripts/test-component-preparation-mine.py
+!component_preparation_v1_experiment/report.md
+!docs/component-ltr-preparation-v1.md
+__pycache__/
+
+# Component Game Context v1 design, results and reproducible comparison
+!docs/component-ltr-game-context-v1-design.md
+!docs/component-ltr-game-context-v1-implementation-report.md
+!scripts/run-component-game-context-experiment.py
+
+# Frozen Component evaluation framework
+!docs/component-ltr-evaluation-framework.md
+!docs/component-ltr-evaluation-results.md
+!scripts/component-evaluation.py
+!scripts/test-component-evaluation.py
