@@ -27,11 +27,11 @@ interface ActivePlayerStats {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // 지금 돌고 있는 수집기를 멈추는 함수
-let stopCurrent: (() => void) | null = null;
+let stopCurrent: (() => Promise<void>) | null = null;
 
 // 녹화 시작 시 호출: 세션 폴더에 events.jsonl, me.json 기록 시작
 export function startEventCollector(dir: string) {
-  stopEventCollector(); // 이전 수집기가 남아 있으면 정리
+  void stopEventCollector(); // 이전 수집기가 남아 있으면 정리
 
   // 수집기마다 자기 상태를 따로 가짐 -> 이전 수집기와 섞이지 않음
   let active = true; // 수집기를 활성 상태로 둔다.
@@ -42,7 +42,8 @@ export function startEventCollector(dir: string) {
   // 챔피언 체력 감소, 마나 사용 데이터를 모은다.
   const statsOut = fs.createWriteStream(path.join(dir, 'stats.jsonl'), { flags: 'a' });
 
-  void (async () => {
+  // 반복문이 끝나고 파일까지 닫히면 resolve되는 Promise
+  const finished = (async () => {
     while (active) {
       try {
         const receivedAt = Date.now();
@@ -95,19 +96,23 @@ export function startEventCollector(dir: string) {
       // 1초마다 while문을 반복한다.
       await sleep(POLL_MS);
     }
-    // 반복이 끝난 뒤에 파일 닫기 -> 닫힌 파일에 쓰는 일이 없음
-    out.end();
-    statsOut.end();
+    // 두 파일이 디스크에 다 써질 때까지 기다림
+    await Promise.all([
+      new Promise<void>((r) => out.end(r)),
+      new Promise<void>((r) => statsOut.end(r)),
+    ]);
   })();
 
   // 종료되면 수집기 끄기
   stopCurrent = () => {
     active = false;
+    return finished; // 멈추라고 한 뒤, 끝날 때까지 기다릴 수 있게 돌려줌
   };
 }
 
 // 녹화 종료 시 호출
-export function stopEventCollector() {
-  stopCurrent?.();
+export async function stopEventCollector() {
+  const wait = stopCurrent?.();
   stopCurrent = null;
+  await wait;
 }

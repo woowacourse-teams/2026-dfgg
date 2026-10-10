@@ -3,6 +3,9 @@ import type { GameflowPhase } from '../../shared/types';
 import { getLcuState, onPhaseChange } from '../lcu/state';
 import { startRecording, stopRecording } from './recoder';
 import { startEventCollector, stopEventCollector } from './eventCollector';
+import { buildHighlight } from './pipeline';
+
+let sessionDir: string | null = null; // 이번 판 세션 폴더 (녹화 시작 시 생성)
 
 const GAME_WINDOW_TITLE = 'League of Legends (TM) Client'; // 롤 게임 창 제목
 const WINDOW_POLL_MS = 2_000; // 게임 창 2초마다 확인
@@ -43,15 +46,28 @@ async function start() {
     return;
   }
   console.log('[highlight] 녹화 시작', session?.dir ?? '인코더 없음');
-  if (session) startEventCollector(session.dir);
+  if (session) {
+    sessionDir = session.dir;
+    startEventCollector(session.dir);
+  }
 }
 
 // 게임 종료 시 녹화 종료
-async function stop() {
+async function stop(build = true) {
   gameToken++; // 기다리던 start()가 있으면 취소됨
-  stopEventCollector();
-  const session = await stopRecording();
+  const dir = sessionDir;
+  sessionDir = null; // 진행 단계가 여러 번 바뀌어도 클립틍 한 번만 만들도록
+
+  // 녹화 정지와 이벤트 저장 마무리를 동시에 기다림
+  const [, session] = await Promise.all([stopEventCollector(), stopRecording()]);
   if (session) console.log('[highlight] 녹화 종료', session.videoPath);
+
+  if (!dir || !build) return;
+  const clips = await buildHighlight(dir);
+  console.log(
+    '[highlight] 클립 생성',
+    clips.map((c) => `${c.file} (${(c.end - c.start).toFixed(1)}초)`),
+  );
 }
 
 // 현재 phase에 따라서 실행할 함수를 정한다.
@@ -66,7 +82,7 @@ export function initHighlight() {
   onPhaseChange(handlePhase);
 }
 
-// main.ts의 will-quit에서 호출. 게임 도중 앱을 끄면 q를 보내서 파일 마무리
+// main.ts의 will-quit에서 호출. 앱 종료 중에는 클립을 만들지 않음 (만드는 도중에 앱이 꺼짐)
 export function endHighlight() {
-  void stop();
+  void stop(false);
 }
