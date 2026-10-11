@@ -12,6 +12,7 @@ import type {
   Summoner,
 } from '../../shared/types';
 import FeedbackModal from './components/feedback/FeedbackModal';
+import HighlightSection from './components/HighlightSection/HighlightSection';
 import MatchSection from './components/MatchSection/MatchSection';
 import ProfileHeader from './components/ProfileHeader/ProfileHeader';
 import RankSection from './components/RankSection/RankSection';
@@ -113,6 +114,7 @@ function App() {
       <ProfileHeader summoner={currentSummoner} status={lcuState} phase={lcuPhase} />
 
       <main className='content'>
+        <HighlightSection />
         {currentSummoner ? (
           <>
             <RankSection rankInfo={rankInfo} />
