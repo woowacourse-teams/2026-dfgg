@@ -34,14 +34,20 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+@ExtendWith(OutputCaptureExtension.class)
 class ComponentRuntimeConfigurationTest {
     private static final String BASE_URL = "https://ddragon.leagueoflegends.com";
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -162,6 +168,65 @@ class ComponentRuntimeConfigurationTest {
         }
         assertUnavailable(runner.withPropertyValues("recommendation.component-ltr.model-path="
                 + write("model.json", MAPPER.writeValueAsString(model()))));
+    }
+
+    @Test
+    void 서빙_환경변수로_모델과_조회표를_함께_준비한다() throws Exception {
+        byte[] lookup = lookup("16.18");
+        var model = model();
+        attachLookup(model, lookup);
+        String modelPath = write("model.json", MAPPER.writeValueAsString(model));
+        String lookupPath = write("lookup.json", new String(lookup, java.nio.charset.StandardCharsets.UTF_8));
+        expectVersions();
+        expectCatalog("en_US", "16.18.1");
+        expectCatalog("ko_KR", "16.18.1");
+
+        withApplicationYaml().withPropertyValues("COMPONENT_LTR_MODEL_PATH=" + modelPath,
+                        "COMPONENT_LTR_PREPARATION_LOOKUP_PATH=" + lookupPath)
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(ComponentRecommendationRuntime.class).isAvailable()).isTrue();
+                    assertThat(context.getEnvironment().getProperty("recommendation.component-ltr.model-path")).isEqualTo(modelPath);
+                    assertThat(context.getBean(dfgg.domain.match.PreparationLookup.class).sha256())
+                            .isEqualTo(model.get("preparation_lookup_sha256"));
+                    assertV3(context.getBean(RecommendationController.class));
+                    server.verify();
+                });
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   "})
+    void 빈_서빙_모델_경로는_로딩_오류_없이_비활성화한다(String path, CapturedOutput output) {
+        assertUnavailable(withApplicationYaml().withPropertyValues("COMPONENT_LTR_MODEL_PATH=" + path,
+                "COMPONENT_LTR_PREPARATION_LOOKUP_PATH=classpath:missing-lookup.json"));
+        verifyNoInteractions(builders);
+        assertThat(output).contains("Component 모델이 설정되지 않아").doesNotContain("Component 추천 준비 실패");
+    }
+
+    @Test
+    void 평가_스크립트_모델_경로만으로는_서빙을_활성화하지_않는다(CapturedOutput output) {
+        assertUnavailable(withApplicationYaml().withPropertyValues("COMPONENT_MODEL_PATH=/evaluation/model.json"));
+        verifyNoInteractions(builders);
+        assertThat(output).contains("Component 모델이 설정되지 않아").doesNotContain("Component 추천 준비 실패");
+    }
+
+    @Test
+    void 잘못된_서빙_모델_환경변수도_v3_기동을_막지_않는다(CapturedOutput output) {
+        assertUnavailable(withApplicationYaml().withPropertyValues("COMPONENT_LTR_MODEL_PATH=classpath:missing-model.json"));
+        verifyNoInteractions(builders);
+        assertThat(output).contains("Component 추천 준비 실패");
+    }
+
+    private ApplicationContextRunner withApplicationYaml() {
+        // 실제 설정 파일의 placeholder를 검증하되 개발자의 .env는 읽지 않는다.
+        return runner.withInitializer(context -> {
+            try {
+                var sources = new YamlPropertySourceLoader().load("application", new ClassPathResource("application.yml"));
+                sources.forEach(source -> context.getEnvironment().getPropertySources().addLast(source));
+            } catch (java.io.IOException exception) {
+                throw new java.io.UncheckedIOException(exception);
+            }
+        });
     }
 
     private void assertUnavailable(ApplicationContextRunner application) {

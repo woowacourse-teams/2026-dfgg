@@ -37,6 +37,9 @@ mining:
     match-page-size: "${MINING_BATCH_MATCH_PAGE_SIZE:200}"
 
 recommendation:
+  component-ltr:
+    model-path: "${COMPONENT_LTR_MODEL_PATH:}"
+    preparation-lookup-path: "${COMPONENT_LTR_PREPARATION_LOOKUP_PATH:}"
   recent-patch-window-size: "${RECOMMENDATION_RECENT_PATCH_WINDOW_SIZE:3}"
   counter:
     minimum-base-rate: "${RECOMMENDATION_COUNTER_MINIMUM_BASE_RATE:0.01}"
