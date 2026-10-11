@@ -34,6 +34,16 @@ public final class ItemInventory {
         return new ItemInventory(Map.of(), false, false);
     }
 
+    /** 현재 보유 수량을 한 번에 복사한다. 전용 슬롯 상태는 별도로 확인해야 한다. */
+    public static ItemInventory fromQuantities(Map<Integer, Integer> quantities) {
+        if (quantities == null || quantities.entrySet().stream().anyMatch(entry ->
+                entry.getKey() == null || entry.getKey() <= 0
+                        || entry.getValue() == null || entry.getValue() <= 0)) {
+            throw new IllegalArgumentException("보유 아이템 ID와 수량은 양수여야 합니다.");
+        }
+        return new ItemInventory(quantities, false, false);
+    }
+
     /** 아이템 한 개를 획득한다. */
     public ItemInventory add(int itemId) {
         validateItemId(itemId);
