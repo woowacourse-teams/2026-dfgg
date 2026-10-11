@@ -25,6 +25,7 @@ import { endGameTracking, initGameTracking, recoverLastGame } from './analytics/
 import { initAutoUpdate } from './autoUpdate';
 import { endHighlight, initHighlight } from './highlight/highlight';
 import { handleMediaProtocol, registerMediaScheme } from './highlight/mediaProtocol';
+import { cleanupOrphans } from './highlight/storage';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
@@ -141,6 +142,7 @@ if (!gotTheLock) {
     initIdentity();
     initGameTracking();
 
+    cleanupOrphans(); // 녹화 시작되기 전에 미사용 하이라이트 정리
     initHighlight();
 
     registerIpcHandlers();

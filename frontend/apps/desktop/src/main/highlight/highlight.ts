@@ -5,6 +5,7 @@ import { startRecording, stopRecording } from './recoder';
 import { startEventCollector, stopEventCollector } from './eventCollector';
 import { buildHighlight } from './pipeline';
 import { broadcastToAllWindows } from '../ipc/broadcast';
+import { cleanupSession, enforceLimit, hasEnoughSpace } from './storage';
 
 let sessionDir: string | null = null; // 이번 판 세션 폴더 (녹화 시작 시 생성)
 
@@ -37,6 +38,12 @@ async function start() {
   }
 
   if (!isInGame() || token !== gameToken) return;
+
+  // 남은 용량이 부족하면 이번 판은 녹화 안 함
+  if (!(await hasEnoughSpace())) {
+    console.warn('[highlight] 저장 공간 부족 (10GB 미만) → 녹화 안 함');
+    return;
+  }
 
   // 2. 녹화 시작
   const session = await startRecording();
@@ -72,6 +79,8 @@ async function stop(build = true) {
     '[highlight] 클립 생성',
     clips.map((c) => `${c.file} (${(c.end - c.start).toFixed(1)}초)`),
   );
+  cleanupSession(dir, clips.length); // 원본, 로그 삭제 (dev는 유지)
+  enforceLimit(); // 20판 초과분 삭제
 }
 
 // 현재 phase에 따라서 실행할 함수를 정한다.
