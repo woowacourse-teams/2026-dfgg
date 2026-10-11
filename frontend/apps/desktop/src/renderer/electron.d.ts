@@ -2,6 +2,8 @@ import type {
   EndedGame,
   FeedbackRating,
   GameflowPhase,
+  HighlightGame,
+  HighlightProgress,
   LcuCurrentRankedStats,
   LcuState,
   LcuStatus,
@@ -16,6 +18,7 @@ export {};
 type StatusListener = (status: LcuStatus) => void;
 type PhaseListener = (phase: GameflowPhase) => void;
 type ItemsListener = (items: RecommendationUpdate) => void;
+type HighlightProgressListener = (progress: HighlightProgress) => void;
 type Unsubscribe = () => void;
 
 declare global {
@@ -41,6 +44,10 @@ declare global {
     };
     feedback: {
       submit: (rating: FeedbackRating, game: EndedGame) => Promise<Record<string, string>>;
+    };
+    highlight: {
+      list: () => Promise<HighlightGame[]>;
+      onProgress: (callback: HighlightProgressListener) => Unsubscribe;
     };
   }
 }

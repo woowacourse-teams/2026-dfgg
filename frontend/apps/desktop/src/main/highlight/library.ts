@@ -28,8 +28,9 @@ export function listHighlights(): HighlightGame[] {
     if (!entry.isDirectory()) continue;
     const dir = path.join(root, entry.name);
 
-    const clips = readJson<HighlightClip[]>(path.join(dir, 'clips.json'));
-    if (!clips || clips.length === 0) continue; // 아직 만드는 중이거나 클립 없는 판은 제외
+    const all = readJson<HighlightClip[]>(path.join(dir, 'clips.json'));
+    const clips = (all ?? []).filter((c) => fs.existsSync(path.join(dir, 'clips', c.file))); // clips 폴더 안에 파일 존재하는 클립 정보만 저장
+    if (clips.length === 0) continue; // 아직 만드는 중이거나 클립 없는 판은 제외
 
     const session = readJson<{ startedAt: number }>(path.join(dir, 'session.json')); // 정렬에 쓸 게임 시작 시각
     games.push({

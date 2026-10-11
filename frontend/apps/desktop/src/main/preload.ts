@@ -3,6 +3,7 @@ import {
   EndedGame,
   FeedbackRating,
   GameflowPhase,
+  HighlightProgress,
   LcuStatus,
   RecommendationUpdate,
 } from '../shared/types';
@@ -53,4 +54,14 @@ contextBridge.exposeInMainWorld('analytics', {
 contextBridge.exposeInMainWorld('feedback', {
   submit: (rating: FeedbackRating, game: EndedGame) =>
     ipcRenderer.invoke('feedback:submit', rating, game),
+});
+
+contextBridge.exposeInMainWorld('highlight', {
+  list: () => ipcRenderer.invoke('highlight:list'),
+
+  onProgress: (callback: (progress: HighlightProgress) => void) => {
+    const listener = (_: IpcRendererEvent, progress: HighlightProgress) => callback(progress);
+    ipcRenderer.on('highlight:progress', listener);
+    return () => ipcRenderer.removeListener('highlight:progress', listener);
+  },
 });
