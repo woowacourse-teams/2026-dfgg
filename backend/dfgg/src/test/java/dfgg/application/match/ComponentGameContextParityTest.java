@@ -78,7 +78,7 @@ class ComponentGameContextParityTest {
         assertThat(served.status()).isEqualTo(ComponentRecommendationService.Status.OK);
         assertThat(served.rankedPurchases()).hasSizeGreaterThan(1);
         assertThat(trained.candidates()).extracting(ComponentTrainingCandidate::candidate)
-                .containsExactlyElementsOf(served.rankedPurchases().stream().map(ComponentRecommendationService.ScoredPurchase::candidate).toList());
+                .containsExactlyElementsOf(served.rankedPurchases().stream().map(ScoredPurchase::candidate).toList());
         assertThat(served.rankedPurchases()).allSatisfy(c -> {
             assertThat(c.candidate().features()).hasSize(59);
             assertThat(c.candidate().features().subList(46, 55)).isEqualTo(composition.values());

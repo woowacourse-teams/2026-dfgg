@@ -8,14 +8,12 @@ import dfgg.domain.match.ComponentTargetPolicy;
 import dfgg.domain.match.ItemInventory;
 import dfgg.infrastructure.external.catalog.DataDragonPurchaseItemCatalog;
 import dfgg.infrastructure.external.dto.ItemResponse;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import dfgg.application.recommend.context.CompositionFeatures;
 
 /** Core 순서를 유지하며 (현재 상태, 목표 하나)마다 독립적으로 후보를 생성하고 순위를 매긴다. */
 public final class ComponentRecommendationService {
-    private final GradientBoostedTrees model;
+    private final ComponentRanker ranker;
     private final PreparationLookup lookup;
 
     public ComponentRecommendationService(GradientBoostedTrees model) {
@@ -23,8 +21,12 @@ public final class ComponentRecommendationService {
     }
 
     public ComponentRecommendationService(GradientBoostedTrees model, PreparationLookup lookup) {
+        this(new ComponentRanker(model), lookup);
+    }
+
+    public ComponentRecommendationService(ComponentRanker ranker, PreparationLookup lookup) {
         this.lookup = lookup;
-        this.model = model;
+        this.ranker = ranker;
     }
 
     public List<TargetRecommendation> recommend(List<Integer> targetItemIds, ItemInventory inventory,
@@ -60,20 +62,8 @@ public final class ComponentRecommendationService {
             if (candidates.isEmpty()) {
                 return failure(id, Status.NO_CANDIDATE, "목표 보유 또는 예산/슬롯 조건을 만족하는 후보가 없습니다.");
             }
-            var scored = new ArrayList<ScoredPurchase>();
-            for (var candidate : candidates) {
-                var features = ComponentCandidateFeatures.calculate(inventory, candidate, id, catalog, response, time, position, composition);
-                double score = model.predict(features.features().stream().mapToDouble(Double::doubleValue).toArray());
-                if (!Double.isFinite(score)) throw new IllegalStateException("모델 점수가 유한하지 않습니다.");
-                scored.add(new ScoredPurchase(features, candidate.bundle().additionalCost(), score, 0, candidate.candidateSource(), candidate.preparationPatternCount(), candidate.preparationFutureRecipeLinkRate()));
-            }
-            scored.sort(Comparator.comparingDouble(ScoredPurchase::score).reversed());
-            var ranked = new ArrayList<ScoredPurchase>();
-            for (int i = 0; i < scored.size(); i++) {
-                var candidate = scored.get(i);
-                ranked.add(new ScoredPurchase(candidate.candidate(), candidate.additionalCost(), candidate.score(), i + 1, candidate.candidateSource(), candidate.preparationPatternCount(), candidate.preparationFutureRecipeLinkRate()));
-            }
-            return new TargetRecommendation(id, Status.OK, List.copyOf(ranked), null);
+            var ranked = ranker.rank(candidates, inventory, id, catalog, response, time, position, composition);
+            return new TargetRecommendation(id, Status.OK, ranked, null);
         } catch (IllegalArgumentException | IllegalStateException exception) {
             String reason = exception.getMessage();
             Status status = reason != null && reason.startsWith("UNSUPPORTED_TARGET_MECHANIC") ? Status.UNSUPPORTED_TARGET_MECHANIC
@@ -90,10 +80,4 @@ public final class ComponentRecommendationService {
 
     public enum Status { OK, NO_CANDIDATE, UNSUPPORTED_CATALOG_ITEM, UNSUPPORTED_TARGET_MECHANIC, UNSUPPORTED_TARGET_TYPE, CALCULATION_FAILED }
     public record TargetRecommendation(int targetItemId, Status status, List<ScoredPurchase> rankedPurchases, String reason) {}
-    public record ScoredPurchase(ComponentCandidateFeatures candidate, long additionalCost, double score, int rankWithinTarget,
-            ComponentCandidateGenerator.Source candidateSource, Integer preparationPatternCount, Double preparationFutureRecipeLinkRate) {
-        public ScoredPurchase(ComponentCandidateFeatures candidate, long additionalCost, double score, int rankWithinTarget) {
-            this(candidate, additionalCost, score, rankWithinTarget, ComponentCandidateGenerator.Source.TARGET_PATH, null, null);
-        }
-    }
 }

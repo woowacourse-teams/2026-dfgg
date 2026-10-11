@@ -1,6 +1,7 @@
 package dfgg.infrastructure.config;
 
 import dfgg.application.recommend.component.ComponentCandidateFeatures;
+import dfgg.application.recommend.component.ComponentRanker;
 import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
 import dfgg.application.recommend.v3.ranker.LightGbmModelLoader;
 import java.io.IOException;
@@ -22,7 +23,7 @@ public class ComponentLtrConfiguration {
     @Bean
     public dfgg.application.recommend.component.ComponentRecommendationService componentRecommendations(
             @org.springframework.beans.factory.annotation.Qualifier("componentLtrModel") GradientBoostedTrees model, dfgg.domain.match.PreparationLookup lookup) {
-        return new dfgg.application.recommend.component.ComponentRecommendationService(model, lookup);
+        return new dfgg.application.recommend.component.ComponentRecommendationService(new ComponentRanker(model), lookup);
     }
 
     /** file:/절대경로/model.json 또는 classpath:...를 지정하면 기동 시 계약을 검증한다. */

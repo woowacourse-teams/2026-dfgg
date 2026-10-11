@@ -12,6 +12,7 @@ import dfgg.application.match.ParticipantItemPurchaseSnapshotService;
 import dfgg.application.match.PurchaseInventoryReconstructor;
 import dfgg.application.recommend.component.ComponentRecommendationService;
 import dfgg.application.recommend.component.CoreComponentRecommendationService;
+import dfgg.application.recommend.component.ScoredPurchase;
 import dfgg.application.recommend.context.CompositionFeatureCalculator;
 import dfgg.domain.match.ItemInventory;
 import dfgg.domain.match.ItemPurchaseType;
@@ -171,7 +172,7 @@ class ComponentEvaluationFrameworkTest {
     }
 
     /** 후보의 구매 순서를 다시 실행해 남은 레시피, 비용, 실제 보유 상태를 검증한다. */
-    private void verifyPurchase(int target, ItemInventory before, ComponentRecommendationService.ScoredPurchase purchase) {
+    private void verifyPurchase(int target, ItemInventory before, ScoredPurchase purchase) {
         var matcher = new dfgg.domain.match.PurchaseRecipeMatcher(catalog);
         var resolver = new dfgg.domain.match.BuildPathResolver(catalog);
         ItemInventory after = before;
