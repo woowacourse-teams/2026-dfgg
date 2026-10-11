@@ -10,9 +10,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.Resource;
 
-/** 외부에서 학습한 Component 모델의 위치 선택·로딩·Bean 등록을 담당한다. */
+/**
+ * 외부에서 학습한 Component 모델의 위치 선택·로딩·Bean 등록을 담당한다.
+ * 지연 Bean은 ComponentRuntimeConfiguration의 실패 격리 구간에서 최초 로딩한다.
+ */
 @Configuration
 @org.springframework.context.annotation.Import(PreparationLookupConfiguration.class)
 @ConditionalOnProperty(name = "recommendation.component-ltr.model-path")
@@ -21,6 +25,7 @@ public class ComponentLtrConfiguration {
     public static final String SCHEMA_FINGERPRINT = "6f287c3c7dadb29c739cde1de020523db5136e80a29c71388523e47e2a7e49b3";
 
     @Bean
+    @Lazy
     public dfgg.application.recommend.component.ComponentRecommendationService componentRecommendations(
             @org.springframework.beans.factory.annotation.Qualifier("componentLtrModel") GradientBoostedTrees model, dfgg.domain.match.PreparationLookup lookup) {
         return new dfgg.application.recommend.component.ComponentRecommendationService(new ComponentRanker(model), lookup);
@@ -28,6 +33,7 @@ public class ComponentLtrConfiguration {
 
     /** file:/절대경로/model.json 또는 classpath:...를 지정하면 기동 시 계약을 검증한다. */
     @Bean
+    @Lazy
     public GradientBoostedTrees componentLtrModel(
             @Value("${recommendation.component-ltr.model-path}") Resource modelResource, dfgg.domain.match.PreparationLookup lookup) {
         try (var input = modelResource.getInputStream()) {

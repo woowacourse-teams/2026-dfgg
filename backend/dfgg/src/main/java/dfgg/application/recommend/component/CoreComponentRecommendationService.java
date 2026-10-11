@@ -10,10 +10,12 @@ import java.util.ArrayList;
 import java.util.List;
 import dfgg.application.recommend.context.CompositionFeatureCalculator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 /** 기존 Core 유스케이스의 Top-5와 명시적으로 제공된 현재 Inventory/예산을 연결한다. */
 @Service
+@Lazy // 평가용 연결 서비스는 모델을 기동 실패 격리 구간 밖에서 먼저 로딩하지 않는다.
 @ConditionalOnProperty(name = "recommendation.component-ltr.model-path")
 public class CoreComponentRecommendationService {
     private final dfgg.application.champion.ChampionService champions;

@@ -7,11 +7,13 @@ import java.io.UncheckedIOException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ResourceLoader;
 
 @Configuration
 public class PreparationLookupConfiguration {
     @Bean
+    @Lazy
     public PreparationLookup preparationLookup(@Value("${recommendation.component-ltr.preparation-lookup-path:}") String path,
                                                ResourceLoader resources) {
         if (path.isBlank()) return PreparationLookup.disabled();

@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.List;
 import java.util.Map;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 이 구분은 구매 품질이나 승률의 우열을 뜻하지 않는다.
  */
 @Service
+@Lazy // 학습 기능이 조회표를 먼저 로딩하여 Component 기동 실패 격리를 우회하지 않도록 한다.
 public class ComponentTrainingDataService {
     private final ParticipantItemPurchaseSnapshotService snapshots;
     private final ObjectMapper mapper;
