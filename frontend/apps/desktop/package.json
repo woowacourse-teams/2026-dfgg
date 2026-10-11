@@ -1,5 +1,6 @@
 {
   "name": "desktop",
+  "productName": "dfgg",
   "version": "2.0.2",
   "description": "League of Legends item build recommendations from the ten champions in your match",
   "author": {
@@ -180,7 +181,7 @@
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
-      "deleteAppDataOnUninstall": false,
+      "deleteAppDataOnUninstall": true,
       "runAfterFinish": true
     },
     "publish": [
