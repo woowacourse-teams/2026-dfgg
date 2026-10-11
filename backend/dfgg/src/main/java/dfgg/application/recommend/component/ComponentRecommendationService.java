@@ -36,33 +36,35 @@ public final class ComponentRecommendationService {
 
     public List<TargetRecommendation> recommend(Integer championId, List<Integer> targetItemIds, ItemInventory inventory,
             long availableGold, long gameTimeMs, String position, String patch, ItemResponse response, CompositionFeatures composition) {
-        java.util.Objects.requireNonNull(composition, "경기 조합은 필수입니다.");
-        lookup.validatePatch(patch);
-        if (lookup.enabled() && championId == null) throw new IllegalArgumentException("Preparation 추천에는 Champion ID가 필요합니다.");
-        String version = response.dataVersion() == null ? response.version() : response.dataVersion();
-        if (version == null || !version.matches("\\d+\\.\\d+\\.\\d+")
-                || !version.substring(0, version.lastIndexOf('.')).equals(patch)) {
-            throw new IllegalArgumentException("요청과 아이템 카탈로그의 패치가 다릅니다.");
-        }
-        if (inventory == null || availableGold < 0 || gameTimeMs < 0) {
-            throw new IllegalArgumentException("현재 Inventory, 예산, 시간이 필요합니다.");
-        }
-        return targetItemIds.stream().map(id -> recommendTarget(id, inventory, availableGold, gameTimeMs,
-                position, patch, response, championId, composition)).toList();
+        var normalizedPosition = new ChampionPositionNormalizer().normalize(position).orElse(null);
+        var query = new ComponentRecommendationQuery(championId, targetItemIds, inventory, availableGold,
+                gameTimeMs, normalizedPosition, patch, composition);
+        return recommend(query, response);
     }
 
-    private TargetRecommendation recommendTarget(int id, ItemInventory inventory, long gold, long time,
-            String position, String patch, ItemResponse response, Integer championId, CompositionFeatures composition) {
+    public List<TargetRecommendation> recommend(ComponentRecommendationQuery query, ItemResponse response) {
+        lookup.validatePatch(query.patch());
+        if (lookup.enabled() && query.championId() == null) throw new IllegalArgumentException("Preparation 추천에는 Champion ID가 필요합니다.");
+        String version = response.dataVersion() == null ? response.version() : response.dataVersion();
+        if (version == null || !version.matches("\\d+\\.\\d+\\.\\d+")
+                || !version.substring(0, version.lastIndexOf('.')).equals(query.patch())) {
+            throw new IllegalArgumentException("요청과 아이템 카탈로그의 패치가 다릅니다.");
+        }
+        return query.targetItemIds().stream().map(id -> recommendTarget(id, query, response)).toList();
+    }
+
+    private TargetRecommendation recommendTarget(int id, ComponentRecommendationQuery query, ItemResponse response) {
         var catalog = new DataDragonPurchaseItemCatalog(response.data());
         if (catalog.find(id).isEmpty()) return failure(id, Status.UNSUPPORTED_CATALOG_ITEM, "목표가 패치 카탈로그에 없습니다: " + id);
         try {
-            new ComponentTargetPolicy(catalog).validate(id, inventory);
-            String role = new ChampionPositionNormalizer().normalize(position).map(Enum::name).orElse("UNKNOWN");
-            var candidates = new ComponentCandidateGenerator(catalog, lookup).generate(championId, role, patch, id, inventory, gold);
+            new ComponentTargetPolicy(catalog).validate(id, query.inventory());
+            var candidates = new ComponentCandidateGenerator(catalog, lookup).generate(query.championId(),
+                    query.positionName(), query.patch(), id, query.inventory(), query.availableGold());
             if (candidates.isEmpty()) {
                 return failure(id, Status.NO_CANDIDATE, "목표 보유 또는 예산/슬롯 조건을 만족하는 후보가 없습니다.");
             }
-            var ranked = ranker.rank(candidates, inventory, id, catalog, response, time, position, composition);
+            var ranked = ranker.rank(candidates, query.inventory(), id, catalog, response,
+                    query.gameTimeMs(), query.positionName(), query.composition());
             return new TargetRecommendation(id, Status.OK, ranked, null);
         } catch (IllegalArgumentException | IllegalStateException exception) {
             String reason = exception.getMessage();

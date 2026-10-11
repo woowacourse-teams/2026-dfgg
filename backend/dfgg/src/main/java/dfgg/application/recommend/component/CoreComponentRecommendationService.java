@@ -1,6 +1,7 @@
 package dfgg.application.recommend.component;
 
 import dfgg.application.recommend.NextItemRecommendationService;
+import dfgg.application.ChampionPositionNormalizer;
 import dfgg.domain.match.ItemInventory;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import dfgg.presentation.dto.RecommendedItemDto;
@@ -40,8 +41,12 @@ public class CoreComponentRecommendationService {
         var allyIds = request.allies().stream().map(ally -> champions.findChampionByName(ally.name()).getChampionId()).toList();
         var enemyIds = request.enemies().stream().map(enemy -> champions.findChampionByName(enemy.name()).getChampionId()).toList();
         var composition = compositions.calculate(allyIds, enemyIds);
-        var components = componentRecommendations.recommend(Math.toIntExact(champions.findChampionByName(request.myChampion().name()).getChampionId()), targets, inventory, availableGold, gameTimeMs,
-                request.myChampion().position(), request.patch(), catalog, composition);
+        var query = new ComponentRecommendationQuery(
+                Math.toIntExact(champions.findChampionByName(request.myChampion().name()).getChampionId()),
+                targets, inventory, availableGold, gameTimeMs,
+                new ChampionPositionNormalizer().normalize(request.myChampion().position()).orElse(null),
+                request.patch(), composition);
+        var components = componentRecommendations.recommend(query, catalog);
         var results = new ArrayList<TargetRecommendation>();
         for (int i = 0; i < cores.size(); i++) {
             results.add(new TargetRecommendation(cores.get(i), i + 1, components.get(i)));
