@@ -1,9 +1,12 @@
 package dfgg.infrastructure.external.client;
 
 import dfgg.infrastructure.external.dto.ChampionResponse;
+import dfgg.infrastructure.external.dto.ItemData;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -161,6 +164,34 @@ public class DataDragonClient {
             }
         });
         return new ItemResponse(normalizePatch(version), version, response.data(), englishNames);
+    }
+
+    /** 지정한 운영 빌드의 한글 아이템 카탈로그와 같은 빌드의 영문 이름을 조회한다. */
+    public ItemResponse getLocalizedItems(String dataVersion) {
+        ItemResponse english = getItems(dataVersion);
+        ItemResponse korean = restClient.get()
+                .uri("/cdn/{version}/data/ko_KR/item.json", dataVersion)
+                .retrieve()
+                .body(ItemResponse.class);
+        if (korean == null || korean.data() == null || korean.data().isEmpty()) {
+            throw new IllegalStateException("Data Dragon 한글 아이템 카탈로그가 비어 있습니다.");
+        }
+        if (!dataVersion.equals(korean.version())) {
+            throw new IllegalStateException("Data Dragon 한글 응답 버전이 요청한 빌드와 다릅니다.");
+        }
+
+        Map<String, String> englishNames = new HashMap<>();
+        korean.data().forEach((id, item) -> {
+            if (item == null || item.name() == null || item.name().isBlank()) {
+                throw new IllegalStateException("Data Dragon 아이템의 한글 이름이 없습니다: " + id);
+            }
+            ItemData englishItem = english.data().get(id);
+            if (englishItem == null || englishItem.name() == null || englishItem.name().isBlank()) {
+                throw new IllegalStateException("Data Dragon 아이템의 영문 이름이 없습니다: " + id);
+            }
+            englishNames.put(id, englishItem.name());
+        });
+        return new ItemResponse(english.version(), dataVersion, Map.copyOf(korean.data()), Map.copyOf(englishNames));
     }
 
     /**
