@@ -1,6 +1,7 @@
 package dfgg.common.handler;
 
 import dfgg.common.exception.ChampionNotFoundException;
+import dfgg.common.exception.ComponentRecommendationUnavailableException;
 import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.common.exception.NextItemRecommendationNotFoundException;
 import java.util.stream.Collectors;
@@ -32,6 +33,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleNotFound(NextItemRecommendationNotFoundException exception) {
         log.warn("404 찾지 못함: {}", exception.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
+
+    @ExceptionHandler(ComponentRecommendationUnavailableException.class)
+    public ProblemDetail handleComponentUnavailable(ComponentRecommendationUnavailableException exception) {
+        log.warn("503 추천 준비 불가: {}", exception.getMessage());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
     }
 
     @Override
