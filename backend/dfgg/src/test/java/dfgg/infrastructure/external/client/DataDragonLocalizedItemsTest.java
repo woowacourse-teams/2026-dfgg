@@ -152,6 +152,48 @@ class DataDragonLocalizedItemsTest {
         server.verify();
     }
 
+    @Test
+    void 이름이_없고_협곡에서_사용하지_않는_항목은_카탈로그에서_제외한다() {
+        String items = """
+                {"version":"16.18.1","data":{
+                  "1036":{"name":"롱소드"},
+                  "2008":{"name":"","maps":{"11":false},"inStore":false},
+                  "772139":{"name":"","maps":{"11":false},"gold":{"purchasable":true}},
+                  "3867":{"name":"퀘스트 아이템","maps":{"11":true},"gold":{"purchasable":false}}
+                }}
+                """;
+        expectItems("en_US", items);
+        expectItems("ko_KR", items);
+
+        var response = client.getLocalizedItems("16.18.1");
+
+        assertThat(response.data()).containsOnlyKeys("1036", "3867");
+        assertThat(response.englishNames()).containsOnlyKeys("1036", "3867");
+        server.verify();
+    }
+
+    @Test
+    void 협곡_아이템의_이름_누락은_여전히_거부한다() {
+        expectItems("en_US", ENGLISH_ITEMS);
+        expectItems("ko_KR", """
+                {"version":"16.18.1","data":{"1036":{"name":"","maps":{"11":true}}}}
+                """);
+        assertThatThrownBy(() -> client.getLocalizedItems("16.18.1"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("한글 이름");
+        server.verify();
+    }
+
+    @Test
+    void 제외_항목만_있으면_빈_카탈로그로_거부한다() {
+        expectItems("en_US", ENGLISH_ITEMS);
+        expectItems("ko_KR", """
+                {"version":"16.18.1","data":{"2008":{"name":"","maps":{"11":false}}}}
+                """);
+        assertThatThrownBy(() -> client.getLocalizedItems("16.18.1"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("비어 있습니다");
+        server.verify();
+    }
+
     private void expectItems(String locale, String body) {
         server.expect(requestTo(ITEM_URL + locale + "/item.json"))
                 .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));

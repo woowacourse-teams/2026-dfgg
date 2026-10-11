@@ -180,8 +180,14 @@ public class DataDragonClient {
             throw new IllegalStateException("Data Dragon 한글 응답 버전이 요청한 빌드와 다릅니다.");
         }
 
+        Map<String, ItemData> localizedItems = new HashMap<>();
         Map<String, String> englishNames = new HashMap<>();
         korean.data().forEach((id, item) -> {
+            // 실제 카탈로그에는 이름이 없는 폐기·타 모드 항목이 포함된다. 협곡 미사용이 명시된 경우만 제외한다.
+            if (item != null && item.maps() != null && Boolean.FALSE.equals(item.maps().get("11"))
+                    && (item.name() == null || item.name().isBlank())) {
+                return;
+            }
             if (item == null || item.name() == null || item.name().isBlank()) {
                 throw new IllegalStateException("Data Dragon 아이템의 한글 이름이 없습니다: " + id);
             }
@@ -190,8 +196,12 @@ public class DataDragonClient {
                 throw new IllegalStateException("Data Dragon 아이템의 영문 이름이 없습니다: " + id);
             }
             englishNames.put(id, englishItem.name());
+            localizedItems.put(id, item);
         });
-        return new ItemResponse(english.version(), dataVersion, Map.copyOf(korean.data()), Map.copyOf(englishNames));
+        if (localizedItems.isEmpty()) {
+            throw new IllegalStateException("Data Dragon 한글 아이템 카탈로그가 비어 있습니다.");
+        }
+        return new ItemResponse(english.version(), dataVersion, Map.copyOf(localizedItems), Map.copyOf(englishNames));
     }
 
     /**
