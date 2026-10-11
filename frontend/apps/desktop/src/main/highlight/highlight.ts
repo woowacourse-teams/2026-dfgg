@@ -4,6 +4,7 @@ import { getLcuState, onPhaseChange } from '../lcu/state';
 import { startRecording, stopRecording } from './recoder';
 import { startEventCollector, stopEventCollector } from './eventCollector';
 import { buildHighlight } from './pipeline';
+import { broadcastToAllWindows } from '../ipc/broadcast';
 
 let sessionDir: string | null = null; // 이번 판 세션 폴더 (녹화 시작 시 생성)
 
@@ -63,7 +64,10 @@ async function stop(build = true) {
   if (session) console.log('[highlight] 녹화 종료', session.videoPath);
 
   if (!dir || !build) return;
-  const clips = await buildHighlight(dir);
+  const clips = await buildHighlight(dir, (p) => {
+    broadcastToAllWindows('highlight:progress', p); // 화면에 진행 사항 알림
+    console.log('[highlight] 진행', `${p.done}/${p.total}`, p.finished ? '완료' : '');
+  });
   console.log(
     '[highlight] 클립 생성',
     clips.map((c) => `${c.file} (${(c.end - c.start).toFixed(1)}초)`),

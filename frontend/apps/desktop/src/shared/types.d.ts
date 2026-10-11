@@ -1,5 +1,29 @@
 import type { LcuEventMap } from '../main/lcu/events';
 
+// 클립 하나 (clips.json 한 항목)
+export interface HighlightClip {
+  file: string; // *.mp4
+  start: number; // 원본 영상 기준 초
+  end: number;
+  events: number[]; // 포함된 EventID
+}
+
+// 한 판의 하이라이트
+export interface HighlightGame {
+  id: string; // 세션 폴더 이름 (2026-10-10T17-31-05-760Z)
+  startAt: number; // 녹화 시작 시각(ms) 화면에서 "오늘 02:31" 같은 표시에 사용
+  clips: HighlightClip[];
+}
+
+// 만드는 중 진행 상황
+export interface HighlightProgress {
+  id: string;
+  done: number; // 완성된 클립 수
+  total: number; // 만들 클립 수
+  clip?: HighlightClip; // 방금 완성된 클립
+  finished: boolean; // 전부 끝났는지
+}
+
 // 피드백 타입
 export type FeedbackRating = 'good' | 'soso' | 'bad';
 

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { planClips, videoOffset, type LiveEvent, type Stat } from './clipPlanner';
 import { cutClip } from './cutter';
 import { detectEncoder } from './encoder';
+import type { HighlightProgress } from '../../shared/types';
 
 export interface HighlightClip {
   file: string; // clips/ 안의 파일 이름
@@ -37,8 +38,13 @@ function readJson<T>(file: string): T | null {
 }
 
 // 게임 후 호출: 세션 폴더의 데이터로 클립 계산 -> 잘라서 저장 -> clips.json 기록
-export async function buildHighlight(dir: string): Promise<HighlightClip[]> {
+// onProgress: 클립 하나 끝날 때마다 호출
+export async function buildHighlight(
+  dir: string,
+  onProgress?: (p: HighlightProgress) => void,
+): Promise<HighlightClip[]> {
   const t0 = Date.now(); // 전체 시작 시각
+  const id = path.basename(dir); // 세션 폴더 이름 = 하이라이트 id
 
   const session = readJson<{ startedAt: number }>(path.join(dir, 'session.json'));
   const me = readJson<{ riotIdGameName: string }>(path.join(dir, 'me.json'));
@@ -57,6 +63,8 @@ export async function buildHighlight(dir: string): Promise<HighlightClip[]> {
   const outDir = path.join(dir, 'clips');
   fs.mkdirSync(outDir, { recursive: true });
 
+  onProgress?.({ id, done: 0, total: clips.length, finished: false }); // 진행 상태 수정
+
   const results: HighlightClip[] = [];
   // 하나씩 순서대로 (동시에 돌리면 GPU를 나눠 써서 전체가 오히려 느려질 수 있음)
   for (const [i, clip] of clips.entries()) {
@@ -64,7 +72,11 @@ export async function buildHighlight(dir: string): Promise<HighlightClip[]> {
     const tClip = Date.now(); // 클립 하나 시작 시각
     try {
       await cutClip(path.join(dir, 'raw.mkv'), clip, path.join(outDir, file), encoder.name);
-      results.push({ file, ...clip });
+      const made = { file, ...clip };
+      results.push(made); // 클립 파일과 클립 정보를 담은 results 배열에 저장
+
+      onProgress?.({ id, done: results.length, total: clips.length, clip: made, finished: false }); // 진행 사항 업데이트
+
       const len = clip.end - clip.start;
       const took = (Date.now() - tClip) / 1000; // 영상 길이 / 걸린 시간 = 몇 배속으로 만들었는지
       console.log(
@@ -76,7 +88,9 @@ export async function buildHighlight(dir: string): Promise<HighlightClip[]> {
     }
   }
 
+  // 클립을 다 만들면 clips.json에 만든 클립 정보 results 배열 저장
   fs.writeFileSync(path.join(dir, 'clips.json'), JSON.stringify(results, null, 2));
+  onProgress?.({ id, done: results.length, total: clips.length, finished: true }); // 진행 완료 상태 업데이트
   console.log(`[highlight] 전체 ${results.length}개 → ${((Date.now() - t0) / 1000).toFixed(1)}초`);
   return results;
 }

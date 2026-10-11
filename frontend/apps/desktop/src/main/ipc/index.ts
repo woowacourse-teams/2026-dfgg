@@ -13,6 +13,7 @@ import { setQuitSource } from '../analytics/sessionTracker';
 import { trackEvent, type EventData } from '../analytics/umami';
 import type { FeedbackRating, EndedGame } from '../../shared/types';
 import { submitFeedback } from '../api/feedback';
+import { listHighlights } from '../highlight/library';
 
 // ipc로 보내기
 export function registerIpcHandlers() {
@@ -48,4 +49,5 @@ export function registerIpcHandlers() {
   ipcMain.handle('feedback:submit', (_event, rating: FeedbackRating, game: EndedGame) =>
     submitFeedback(rating, game),
   );
+  ipcMain.handle('highlight:list', () => listHighlights());
 }
