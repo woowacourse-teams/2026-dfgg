@@ -1,5 +1,12 @@
 import type { LcuEventMap } from '../main/lcu/events';
 
+// 전적 카드에 하이라이트 보기 버튼을 그릴 때 필요
+export interface HighlightSummary {
+  id: string; // 세션 폴더 이름
+  count: number; // 클립 수
+  duration: number; // 클립 길이 합(초)
+}
+
 // 클립 하나 (clips.json 한 항목)
 export interface HighlightClip {
   file: string; // *.mp4

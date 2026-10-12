@@ -22,7 +22,7 @@ import { setQuitSource } from '../analytics/sessionTracker';
 import { trackEvent, type EventData } from '../analytics/umami';
 import type { FeedbackRating, EndedGame } from '../../shared/types';
 import { submitFeedback } from '../api/feedback';
-import { listHighlights } from '../highlight/library';
+import { getHighlight, highlightSummary } from '../highlight/library';
 
 // 오버레이가 마지막으로 알려 준 펼친 높이. 접었다 펼 때 이 높이로 돌아간다.
 let overlayHeight = EXPANDED_HEIGHT;
@@ -80,5 +80,14 @@ export function registerIpcHandlers() {
   ipcMain.handle('feedback:submit', (_event, rating: FeedbackRating, game: EndedGame) =>
     submitFeedback(rating, game),
   );
-  ipcMain.handle('highlight:list', () => listHighlights());
+  // 전체 하이라이트 목록 정보 가져오기
+  ipcMain.handle('highlight:summary', (_event, gameIds) => {
+    if (!Array.isArray(gameIds)) return {};
+    return highlightSummary(gameIds.filter((id): id is number => Number.isInteger(id)));
+  });
+  // 하이라이트 하나 정보 가져오기
+  ipcMain.handle('highlight:get', (_event, gameId) => {
+    if (!Number.isInteger(gameId)) return null;
+    return getHighlight(gameId as number);
+  });
 }
