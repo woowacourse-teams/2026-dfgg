@@ -1,6 +1,7 @@
 {
   "name": "desktop",
-  "version": "2.0.2",
+  "productName": "dfgg",
+  "version": "2.0.5",
   "description": "League of Legends item build recommendations from the ten champions in your match",
   "author": {
     "name": "dfgg"
@@ -14,6 +15,7 @@
     "build:renderer": "webpack --mode production",
     "build": "pnpm build:main && pnpm build:renderer",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "electron:start": "pnpm build:main && electron .",
     "electron:dev": "concurrently -k \"pnpm start\" \"wait-on http://localhost:3001/home/index.html && pnpm electron:start\"",
     "package": "pnpm build && electron-builder --win nsis",
@@ -39,6 +41,7 @@
     "esbuild": "^0.28.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "vitest": "^5.0.3",
     "wait-on": "^9.1.0"
   },
   "build": {
@@ -178,7 +181,7 @@
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
-      "deleteAppDataOnUninstall": false,
+      "deleteAppDataOnUninstall": true,
       "runAfterFinish": true
     },
     "publish": [
@@ -192,6 +195,13 @@
       {
         "from": "resources/icons",
         "to": "icons"
+      },
+      {
+        "from": "resources/ffmpeg",
+        "to": "ffmpeg",
+        "filter": [
+          "ffmpeg.exe"
+        ]
       }
     ]
   }

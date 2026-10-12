@@ -17,7 +17,15 @@ module.exports = (_env, argv) => {
 
   return {
     context: __dirname,
-    entry: Object.fromEntries(windows.map((name) => [name, `./src/renderer/${name}/index.tsx`])),
+    entry: Object.fromEntries(
+      windows.map((name) => {
+        const entry = `./src/renderer/${name}/index.tsx`;
+        const devMock = `./src/renderer/${name}/devMock.ts`;
+        // 개발 서버에서만 가짜 preload API 를 먼저 싣는다. 브라우저로 창을 바로 열어 볼 수 있게 한다.
+        const hasDevMock = !isProduction && fs.existsSync(path.join(__dirname, devMock));
+        return [name, hasDevMock ? [devMock, entry] : entry];
+      }),
+    ),
     output: {
       path: path.resolve(__dirname, 'out/renderer'),
       filename: '[name]/bundle.js',

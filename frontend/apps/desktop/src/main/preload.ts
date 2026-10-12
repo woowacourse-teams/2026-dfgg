@@ -3,14 +3,20 @@ import {
   EndedGame,
   FeedbackRating,
   GameflowPhase,
+  HighlightProgress,
   LcuStatus,
   RecommendationUpdate,
+  Summoner,
 } from '../shared/types';
 
 contextBridge.exposeInMainWorld('lcu', {
   currentSummoner: () => ipcRenderer.invoke('lcu:current-summoner'),
 
   getRankInfo: () => ipcRenderer.invoke('lcu:summoner-rank-info'),
+
+  getProfileBackground: () => ipcRenderer.invoke('lcu:profile-background'),
+
+  launchClient: () => ipcRenderer.invoke('lcu:launch-client'),
 
   getState: () => ipcRenderer.invoke('lcu:get-state'),
 
@@ -22,6 +28,18 @@ contextBridge.exposeInMainWorld('lcu', {
     const listener = (_: IpcRendererEvent, status: LcuStatus) => callback(status);
     ipcRenderer.on('lcu:status', listener);
     return () => ipcRenderer.removeListener('lcu:status', listener);
+  },
+
+  onSummonerChange: (callback: (summoner: Summoner) => void) => {
+    const listener = (_: IpcRendererEvent, summoner: Summoner) => callback(summoner);
+    ipcRenderer.on('lcu:summoner', listener);
+    return () => ipcRenderer.removeListener('lcu:summoner', listener);
+  },
+
+  onProfileBackgroundChange: (callback: (skinId: number | null) => void) => {
+    const listener = (_: IpcRendererEvent, skinId: number | null) => callback(skinId);
+    ipcRenderer.on('lcu:profile-background', listener);
+    return () => ipcRenderer.removeListener('lcu:profile-background', listener);
   },
 
   onPhaseChange: (callback: (phase: GameflowPhase) => void) => {
@@ -41,6 +59,7 @@ contextBridge.exposeInMainWorld('lcu', {
 
 contextBridge.exposeInMainWorld('windowControls', {
   setCollapsed: (collapsed: boolean) => ipcRenderer.send('window:set-collapsed', collapsed),
+  setOverlayHeight: (height: number) => ipcRenderer.send('window:set-overlay-height', height),
   minimize: () => ipcRenderer.send('window:minimize'),
   close: () => ipcRenderer.send('window:close'),
 });
@@ -53,4 +72,18 @@ contextBridge.exposeInMainWorld('analytics', {
 contextBridge.exposeInMainWorld('feedback', {
   submit: (rating: FeedbackRating, game: EndedGame) =>
     ipcRenderer.invoke('feedback:submit', rating, game),
+});
+
+contextBridge.exposeInMainWorld('highlight', {
+  list: () => ipcRenderer.invoke('highlight:list'),
+
+  summary: (gameIds: number[]) => ipcRenderer.invoke('highlight:summary', gameIds),
+
+  get: (gameId: number) => ipcRenderer.invoke('highlight:get', gameId),
+
+  onProgress: (callback: (progress: HighlightProgress) => void) => {
+    const listener = (_: IpcRendererEvent, progress: HighlightProgress) => callback(progress);
+    ipcRenderer.on('highlight:progress', listener);
+    return () => ipcRenderer.removeListener('highlight:progress', listener);
+  },
 });

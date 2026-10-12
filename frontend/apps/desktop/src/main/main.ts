@@ -23,12 +23,17 @@ import {
 } from './analytics/sessionTracker';
 import { endGameTracking, initGameTracking, recoverLastGame } from './analytics/gameTracker';
 import { initAutoUpdate } from './autoUpdate';
+import { endHighlight, initHighlight } from './highlight/highlight';
+import { handleMediaProtocol, registerMediaScheme } from './highlight/mediaProtocol';
+import { cleanupOrphans } from './highlight/storage';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
 // home 창을 저장하고, 이미 실행되고 있는 같은 프로그램 인스턴스를 확인하는 변수
 let homeWindow: BrowserWindow | null = null;
 const gotTheLock = app.requestSingleInstanceLock();
+
+registerMediaScheme(); // dfgg-media 스킴 등록
 
 // 렌더러는 창 단위(out/renderer/home, out/renderer/overlay ...)로 빌드된다.
 function loadRenderer(win: BrowserWindow, name: string) {
@@ -124,6 +129,8 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(async () => {
+    handleMediaProtocol();
+
     initAutoUpdate();
 
     // 지난 실행에서 못 보낸 이벤트부터 정리해서 보낸다.
@@ -134,6 +141,9 @@ if (!gotTheLock) {
     // LCU 연결 전에 구독해야 첫 connected 를 놓치지 않는다.
     initIdentity();
     initGameTracking();
+
+    cleanupOrphans(); // 녹화 시작되기 전에 미사용 하이라이트 정리
+    initHighlight();
 
     registerIpcHandlers();
     homeWindow = createWindow();
@@ -164,6 +174,7 @@ if (!gotTheLock) {
 }
 
 app.on('will-quit', () => {
+  endHighlight();
   endGameTracking();
   endSessionTracking();
   stopLivePolling();

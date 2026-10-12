@@ -1,5 +1,37 @@
 import type { LcuEventMap } from '../main/lcu/events';
 
+// 전적 카드에 하이라이트 보기 버튼을 그릴 때 필요
+export interface HighlightSummary {
+  id: string; // 세션 폴더 이름
+  count: number; // 클립 수
+  duration: number; // 클립 길이 합(초)
+}
+
+// 클립 하나 (clips.json 한 항목)
+export interface HighlightClip {
+  file: string; // *.mp4
+  start: number; // 원본 영상 기준 초
+  end: number;
+  events: number[]; // 포함된 EventID
+}
+
+// 한 판의 하이라이트
+export interface HighlightGame {
+  id: string; // 세션 폴더 이름 (2026-10-10T17-31-05-760Z)
+  gameId: number | null;
+  startAt: number; // 녹화 시작 시각(ms) 화면에서 "오늘 02:31" 같은 표시에 사용
+  clips: HighlightClip[];
+}
+
+// 만드는 중 진행 상황
+export interface HighlightProgress {
+  id: string;
+  done: number; // 완성된 클립 수
+  total: number; // 만들 클립 수
+  clip?: HighlightClip; // 방금 완성된 클립
+  finished: boolean; // 전부 끝났는지
+}
+
 // 피드백 타입
 export type FeedbackRating = 'good' | 'soso' | 'bad';
 
@@ -36,6 +68,12 @@ export interface Summoner {
   xpUntilNextLevel: number;
   percentCompleteForNextLevel: number;
 }
+
+/** 소환사 프로필 꾸밈 정보 (/lol-summoner/v1/current-summoner/summoner-profile). 프로필 배경만 쓴다. */
+export type LcuSummonerProfile = {
+  /** 챔피언 id * 1000 + 스킨 번호. 예: 103015 = 아리(103)의 15번 스킨 */
+  backgroundSkinId?: number;
+};
 
 export type LcuEvent = {
   [K in keyof LcuEventMap]: {
