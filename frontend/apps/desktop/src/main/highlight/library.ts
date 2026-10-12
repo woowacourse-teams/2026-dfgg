@@ -33,8 +33,11 @@ export function listHighlights(): HighlightGame[] {
     if (clips.length === 0) continue; // 아직 만드는 중이거나 클립 없는 판은 제외
 
     const session = readJson<{ startedAt: number }>(path.join(dir, 'session.json')); // 정렬에 쓸 게임 시작 시각
+    const match = readJson<{ gameId: number }>(path.join(dir, 'match.json'));
+
     games.push({
       id: entry.name,
+      gameId: match?.gameId ?? null,
       startAt: session?.startedAt ?? fs.statSync(dir).mtimeMs, // session.json이 없으면 폴더 수정 시각
       clips,
     });

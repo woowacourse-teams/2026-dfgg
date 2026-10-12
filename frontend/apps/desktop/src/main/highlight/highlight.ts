@@ -6,6 +6,7 @@ import { startEventCollector, stopEventCollector } from './eventCollector';
 import { buildHighlight } from './pipeline';
 import { broadcastToAllWindows } from '../ipc/broadcast';
 import { cleanupSession, enforceLimit, hasEnoughSpace } from './storage';
+import { saveMatchInfo } from './matchInfo';
 
 let sessionDir: string | null = null; // 이번 판 세션 폴더 (녹화 시작 시 생성)
 
@@ -57,6 +58,7 @@ async function start() {
   if (session) {
     sessionDir = session.dir;
     startEventCollector(session.dir);
+    void saveMatchInfo(session.dir);
   }
 }
 

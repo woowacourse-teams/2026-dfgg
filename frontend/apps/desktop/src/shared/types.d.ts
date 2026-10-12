@@ -11,6 +11,7 @@ export interface HighlightClip {
 // 한 판의 하이라이트
 export interface HighlightGame {
   id: string; // 세션 폴더 이름 (2026-10-10T17-31-05-760Z)
+  gameId: number | null;
   startAt: number; // 녹화 시작 시각(ms) 화면에서 "오늘 02:31" 같은 표시에 사용
   clips: HighlightClip[];
 }
