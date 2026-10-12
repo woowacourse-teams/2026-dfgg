@@ -4,6 +4,7 @@ import type {
   GameflowPhase,
   HighlightGame,
   HighlightProgress,
+  HighlightSummary,
   LcuCurrentRankedStats,
   LcuState,
   LcuStatus,
@@ -57,6 +58,8 @@ declare global {
     };
     highlight: {
       list: () => Promise<HighlightGame[]>;
+      summary: () => Promise<Record<number, HighlightSummary>>;
+      get: () => Promise<HighlightGame | null>;
       onProgress: (callback: HighlightProgressListener) => Unsubscribe;
     };
   }

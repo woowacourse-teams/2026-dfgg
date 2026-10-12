@@ -77,6 +77,10 @@ contextBridge.exposeInMainWorld('feedback', {
 contextBridge.exposeInMainWorld('highlight', {
   list: () => ipcRenderer.invoke('highlight:list'),
 
+  summary: () => ipcRenderer.invoke('highlight:summary'),
+
+  get: () => ipcRenderer.invoke('highlight:get'),
+
   onProgress: (callback: (progress: HighlightProgress) => void) => {
     const listener = (_: IpcRendererEvent, progress: HighlightProgress) => callback(progress);
     ipcRenderer.on('highlight:progress', listener);

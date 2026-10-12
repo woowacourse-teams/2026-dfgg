@@ -22,7 +22,7 @@ import { setQuitSource } from '../analytics/sessionTracker';
 import { trackEvent, type EventData } from '../analytics/umami';
 import type { FeedbackRating, EndedGame } from '../../shared/types';
 import { submitFeedback } from '../api/feedback';
-import { getHighlight, highlightSummary } from '../highlight/library';
+import { getHighlight, highlightSummary, listHighlights } from '../highlight/library';
 
 // 오버레이가 마지막으로 알려 준 펼친 높이. 접었다 펼 때 이 높이로 돌아간다.
 let overlayHeight = EXPANDED_HEIGHT;
@@ -80,7 +80,9 @@ export function registerIpcHandlers() {
   ipcMain.handle('feedback:submit', (_event, rating: FeedbackRating, game: EndedGame) =>
     submitFeedback(rating, game),
   );
-  // 전체 하이라이트 목록 정보 가져오기
+  // 하이라이트 모아보기용: 최근 20판 클립 목록 포함
+  ipcMain.handle('highlight:list', () => listHighlights());
+  // 전적 하이라이트용: 넘겨준 gameId 중 하이라이트 있는 판만
   ipcMain.handle('highlight:summary', (_event, gameIds) => {
     if (!Array.isArray(gameIds)) return {};
     return highlightSummary(gameIds.filter((id): id is number => Number.isInteger(id)));
