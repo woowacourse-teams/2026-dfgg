@@ -174,7 +174,9 @@ wait_for() {  # 설명, 시도 횟수, 명령...
   return 1
 }
 prometheus_healthy() { curl -fsS http://127.0.0.1:9090/-/healthy; }
-prometheus_config_loaded() { curl -fsS http://127.0.0.1:9090/metrics | grep -q '^prometheus_config_last_reload_successful 1'; }
+prometheus_config_loaded() {
+  [[ "$(curl -fsS http://127.0.0.1:9090/metrics | awk '$1 == "prometheus_config_last_reload_successful" { print $2 }')" == 1 ]]
+}
 grafana_healthy() { curl -fsS http://127.0.0.1:3000/api/health | jq -e '.database == "ok"'; }
 nginx_proxies_grafana() { curl -fsS http://127.0.0.1/api/health | jq -e '.database == "ok"'; }
 
