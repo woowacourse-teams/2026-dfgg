@@ -1,4 +1,10 @@
-import type { Summoner, Lockfile, GameflowPhase, LcuCurrentRankedStats } from '../../shared/types';
+import type {
+  LcuSummonerProfile,
+  Summoner,
+  Lockfile,
+  GameflowPhase,
+  LcuCurrentRankedStats,
+} from '../../shared/types';
 import { LcuGame, type LcuMatchHistory } from './matchHistory.types';
 import { lcuRequest } from './client';
 import type { LcuGameQueue } from './gameQueues.types';
@@ -7,6 +13,14 @@ import type { LcuEndOfGameStats, LcuGameflowSession } from './gameflow.types';
 // 소환사 정보 얻는 api
 export function getCurrentSummoner(lockfile: Lockfile) {
   return lcuRequest<Summoner>(lockfile, '/lol-summoner/v1/current-summoner');
+}
+
+// 소환사가 클라이언트에서 설정한 프로필 배경 얻는 api
+export function getSummonerProfile(lockfile: Lockfile) {
+  return lcuRequest<LcuSummonerProfile>(
+    lockfile,
+    '/lol-summoner/v1/current-summoner/summoner-profile',
+  );
 }
 
 // 현재 game flow phase 얻는 api

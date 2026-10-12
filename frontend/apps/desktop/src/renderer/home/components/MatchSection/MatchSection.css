@@ -1,495 +1,290 @@
-/* ---------- 전적 ---------- */
-.matches {
-  /* 승패와 평점 색은 이 구역 안에서만 쓴다 */
-  --win: #4f8cff;
-  --lose: #e05563;
-  --best: #e8b54a;
-}
-
-.matches-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.matches-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--text-dim);
-  text-transform: uppercase;
-}
-
-.matches-count {
-  color: var(--text-dim);
-  font-size: 12px;
-}
-
 .matches-empty {
-  margin: 24px 0;
+  margin: 0;
+  padding: 20px 0;
   text-align: center;
-  color: var(--text-dim);
-  font-size: 13px;
+  font-size: 12px;
+  color: var(--ink-3);
 }
 
+/* 한 판이 한 장의 카드다. 챔피언 그림이 들어가 줄마다 표정이 다르다. */
 .match-list {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/*
- * 승패를 카드 배경으로 깐다. 왼쪽 띠만으로는 목록을 훑을 때 눈에 안 들어온다.
- * 색을 옅게 섞어야 그 위의 글자가 그대로 읽힌다.
- */
-.match-card {
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--off);
-  border-radius: 10px;
+.match {
+  --result: var(--win);
+
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
   background: var(--surface);
   overflow: hidden;
+  transition: border-color var(--duration-fast) ease;
 }
 
-.match-card-win {
-  border-left-color: var(--win);
-  background: linear-gradient(90deg, rgba(79, 140, 255, 0.1), transparent 260px), var(--surface);
+.match-loss {
+  --result: var(--loss);
 }
 
-.match-card-lose {
-  border-left-color: var(--lose);
-  background: linear-gradient(90deg, rgba(224, 85, 99, 0.1), transparent 260px), var(--surface);
+@media (hover: hover) {
+  .match:hover {
+    border-color: var(--line-strong);
+  }
 }
 
-/*
- * 480px 에서는 한 줄에 다 못 넣는다.
- * 1행은 챔피언·승패·KDA, 2행은 아이템과 지표로 내린다.
- */
-/*
- * 왼쪽은 큐·시간 + 아이템, 오른쪽은 KDA + 지표로 두 덩어리를 맞춘다.
- * 지표를 아래로 내리면 오른쪽이 비면서 카드만 높아진다.
- */
-.match-head {
+/* ---------- 전적 카드 ---------- */
+.match-card {
+  position: relative;
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 150px 13px;
-  grid-template-rows: auto auto;
+  grid-template-columns: 96px 1fr auto 14px;
   align-items: center;
-  gap: 5px 9px;
+  gap: 12px;
   width: 100%;
-  padding: 9px 10px;
-  border: 0;
+  min-height: 84px;
+  padding: 0 12px 0 0;
+  border: none;
   background: transparent;
-  color: inherit;
-  font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: transform var(--duration-press) var(--ease-out);
 }
 
-.match-head:hover {
-  background: rgba(255, 255, 255, 0.04);
+/* 눌렸다는 걸 바로 돌려준다 */
+.match-card:active {
+  transform: scale(0.985);
 }
 
-/*
- * 행만 정하고 열을 비워 두면 자동 배치가 엉뚱한 칸을 잡는다.
- * 행이 명시된 항목이 먼저 놓이기 때문에, 챔피언과 화살표가 1·2열을 나눠 가진다.
- * 그래서 여섯 조각 모두 열과 행을 못 박는다.
- */
-.match-portrait {
-  grid-column: 1;
-  grid-row: 1 / 3;
+/* 이긴 판은 그림 쪽에서 붉은 빛이 카드 안으로 번진다 */
+.match-win .match-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(230 57 80 / 16%), transparent 58%);
+  pointer-events: none;
+}
+
+/* ---------- 챔피언 그림 ---------- */
+.match-art {
+  position: relative;
+  align-self: stretch;
+  overflow: hidden;
+  /* 로고의 기울기를 따라 오른쪽 변을 비스듬히 자른다 */
+  clip-path: polygon(0 0, 100% 0, 80% 100%, 0 100%);
+}
+
+.match-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  transition:
+    transform 700ms var(--ease-out),
+    filter var(--duration-normal) ease;
+}
+
+/* 진 판은 색을 빼서 한눈에 구분된다. 이긴 판만 화면에서 색이 산다. */
+.match-loss .match-art img {
+  filter: grayscale(1) brightness(0.62);
+}
+
+/* 올리면 그림이 다가오고, 진 판도 색이 조금 돌아온다 */
+@media (hover: hover) {
+  .match:hover .match-art img {
+    transform: scale(1.1);
+  }
+
+  .match-loss:hover .match-art img {
+    filter: grayscale(0.5) brightness(0.8);
+  }
+}
+
+/* ---------- 정보 ---------- */
+.match-info {
+  position: relative;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 3px;
+  gap: 4px;
+  padding: 12px 0;
 }
 
-.match-champion {
-  display: block;
-  width: 48px;
-  height: 48px;
-  border-radius: 9px;
-  background: var(--surface-hover);
-}
-
-.match-level {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-dim);
-  line-height: 1;
+.match-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11.5px;
   white-space: nowrap;
 }
 
-.match-arrow {
-  grid-column: 4;
-  grid-row: 1 / 3;
-  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', sans-serif;
-  font-size: 10px;
-  color: var(--text-dim);
-  text-align: center;
+.match-result {
+  font-weight: 700;
+  color: var(--result);
 }
 
-/* ---------- 왼쪽: 큐·시간 + 아이템 ---------- */
-.match-info {
-  grid-column: 2;
-  grid-row: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+.match-loss .match-result {
+  color: var(--ink-2);
 }
 
 .match-queue {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-/* 승패는 색으로만 구분한다. 크기까지 키우면 한 줄에 안 들어간다. */
-.match-result {
-  font-weight: 700;
-}
-
-.match-card-win .match-result {
-  color: var(--win);
-}
-
-.match-card-lose .match-result {
-  color: var(--lose);
-}
-
-.match-queue,
-.match-when {
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--ink-2);
 }
 
 .match-when {
-  font-size: 11px;
-  color: var(--text-dim);
+  color: var(--ink-3);
 }
 
-.match-head .items {
-  grid-column: 2;
-  grid-row: 2;
-}
-
-/* ---------- 오른쪽: KDA + 지표 ---------- */
-.match-side {
-  grid-column: 3;
-  grid-row: 1 / 3;
+/* ---------- 이름표 붙은 수치 ---------- */
+.chips {
   display: flex;
-  flex-direction: column;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
-}
-
-/* 지표는 2x2 로 깔아야 세로가 짧아지고 왼쪽 덩어리와 높이가 맞는다 */
-.match-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px 8px;
-}
-
-.match-stat {
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 6%);
   font-size: 11px;
+  color: var(--ink-2);
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
 
-/* 이름표는 값보다 약하게 — 값이 먼저 읽혀야 한다 */
-.match-stat i {
-  margin-right: 3px;
-  color: var(--text-dim);
-  font-size: 10px;
-  font-style: normal;
-}
-
-.match-sub {
-  margin-left: 2px;
-  font-size: 10px;
-  color: var(--text-dim);
-}
-
-/* ---------- KDA ---------- */
-.kda {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  white-space: nowrap;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.kda-line {
-  font-weight: 700;
-}
-
-.kda-big .kda-line {
-  font-size: 15px;
-}
-
-/* 접힌 카드의 KDA 는 지표와 같은 덩어리라 왼쪽 정렬로 줄을 맞춘다 */
-.match-side .kda {
-  flex-direction: row;
-  align-items: baseline;
-  gap: 6px;
-  text-align: left;
-}
-
-.kda-small .kda-line {
-  font-size: 11px;
-}
-
-/* 평점은 색으로 등급을 나눠 10명을 훑을 때 눈이 멈추게 한다 */
-.kda-ratio {
-  font-size: 10px;
+/* 이름표는 흐리게, 값은 또렷하게 */
+.chip b {
   font-weight: 600;
-  color: var(--text-dim);
+  color: var(--ink);
 }
 
-.kda-best {
-  color: var(--best);
+/* 평점 칩은 등급 색으로 물든다 */
+.chip-ratio.kda-best {
+  color: var(--gold);
+}
+
+.chip-ratio.kda-good {
+  color: var(--good);
+}
+
+.chip-ratio.kda-best,
+.chip-ratio.kda-good {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.chip-ratio.kda-best b,
+.chip-ratio.kda-good b {
+  color: inherit;
 }
 
 .kda-good {
-  color: var(--win);
+  color: var(--good);
 }
 
-.kda-bad {
-  opacity: 0.7;
+/* ---------- KDA ---------- */
+.kda-line {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
 }
 
-/* 데스만 붉게 — 한눈에 읽히는 관습 */
-.deaths {
-  color: var(--lose);
-}
-
-.slash {
-  color: var(--text-dim);
+.kda-line i {
+  margin: 0 1px;
+  font-style: normal;
   font-weight: 400;
+  color: var(--ink-3);
 }
 
-/* ---------- 아이템 칸 ---------- */
+/* 데스는 한 단 낮춰 킬과 어시스트가 먼저 읽히게 한다 */
+.kda-line b {
+  font-weight: 800;
+  color: var(--ink-3);
+}
+
+/* ---------- 아이템 ---------- */
+/* 카드에서는 아이템을 4칸씩 두 줄로 쌓는다. 한 줄로 늘이면 KDA 가 밀린다. */
 .items {
-  display: flex;
-  gap: 2px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 24px);
+  gap: 3px;
 }
 
 .item-slot {
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  background: var(--bg);
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  object-fit: cover;
 }
 
-/* 안 산 칸도 자리를 잡아야 아이템 줄의 길이가 판마다 흔들리지 않는다 */
 .item-slot-empty {
-  border: 1px solid var(--border);
-  background: transparent;
+  background: rgb(255 255 255 / 5%);
 }
 
-.roster .item-slot {
-  width: 15px;
-  height: 15px;
-  border-radius: 3px;
+/* 카드에서는 빈 칸을 그리지 않는다. 산 것만 보여야 빌드가 한눈에 들어온다. */
+.match-card .item-slot-empty {
+  display: none;
 }
 
-/* ---------- 펼친 10명 ---------- */
-.roster {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  padding: 10px;
-  border-top: 1px solid var(--border);
-  background: var(--bg);
+/* 마지막 칸은 장신구라 둥글게 둔다 */
+.item-slot:last-child {
+  border-radius: 50%;
 }
 
-.roster-empty {
-  margin: 0;
-  padding: 16px;
-  border-top: 1px solid var(--border);
-  text-align: center;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-/* ---------- 팀 합계 비교 막대 ---------- */
-.compare-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.compare {
+.match-arrow {
+  position: relative;
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) 84px;
-  align-items: center;
-  gap: 7px;
+  place-items: center;
+  color: var(--ink-3);
+  transition: transform var(--duration-normal) var(--ease-out);
 }
 
-.compare-name {
-  font-size: 10px;
-  color: var(--text-dim);
+.match-card[aria-expanded='true'] .match-arrow {
+  transform: rotate(180deg);
 }
 
-/* 우리 팀 몫을 왼쪽에서 채우고, 남은 폭이 곧 상대 팀 몫이 된다 */
-.compare-bar {
-  height: 7px;
-  border-radius: 4px;
-  background: var(--lose);
-  overflow: hidden;
-}
-
-.compare-mine {
-  display: block;
-  height: 100%;
-  background: var(--win);
-}
-
-.compare-values {
-  font-size: 10px;
-  color: var(--text-dim);
-  text-align: right;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.compare-values b:first-child {
-  color: var(--win);
-}
-
-.compare-values b:last-child {
-  color: var(--lose);
-}
-
-/* ---------- 팀 블록 ---------- */
-.roster-team {
-  padding-left: 8px;
-  border-left: 3px solid var(--off);
-}
-
-.roster-team-win {
-  border-left-color: var(--win);
-}
-
-.roster-team-lose {
-  border-left-color: var(--lose);
-}
-
-.roster-title {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin: 0 0 4px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.roster-team-win .roster-result {
-  color: var(--win);
-}
-
-.roster-team-lose .roster-result {
-  color: var(--lose);
-}
-
-.roster-side {
-  font-weight: 500;
-  color: var(--text-dim);
-}
-
-.roster-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* 챔피언 | Lv | 이름(남는 폭) | KDA | 피해량 | CS | 아이템 */
-.roster-row {
+/* ---------- 펼친 상세 ---------- */
+/*
+ * 높이를 모르는 내용을 펼칠 때 height 를 직접 못 움직인다.
+ * 격자 줄 높이를 0fr → 1fr 로 바꾸면 내용 높이만큼 자연스럽게 열린다.
+ */
+.match-detail {
   display: grid;
-  grid-template-columns: 26px 15px minmax(0, 1fr) 58px 38px 36px auto;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 4px;
-  border-radius: 5px;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  transition:
+    grid-template-rows var(--duration-normal) var(--ease-out),
+    opacity var(--duration-normal) ease;
+
+  @starting-style {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
 }
 
-/* 10명 중 나를 찾기 쉽게 배경과 테두리를 준다 */
-.roster-row-me {
-  background: var(--surface-hover);
-  box-shadow: inset 2px 0 0 var(--text-dim);
-}
-
-.roster-champion {
-  display: block;
-  width: 26px;
-  height: 26px;
-  border-radius: 5px;
-  background: var(--surface-hover);
-}
-
-.roster-level {
-  font-size: 10px;
-  color: var(--text-dim);
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-/* 소환사 이름은 24자까지 봤다. 반드시 접어야 한다. */
-.roster-name {
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.roster-row-me .roster-name {
-  font-weight: 700;
-}
-
-/* ---------- 피해량 ---------- */
-/* 숫자 아래에 얇은 막대를 깔아 10명이 세로로 비교되게 한다 */
-.roster-damage,
-.roster-cs {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.roster-damage-value {
-  font-size: 10px;
-  color: var(--text-dim);
-}
-
-.roster-damage-track {
-  height: 3px;
-  border-radius: 2px;
-  background: var(--border);
+.match-detail-inner {
+  min-height: 0;
   overflow: hidden;
 }
 
-.roster-damage-fill {
-  display: block;
-  height: 100%;
-  border-radius: 2px;
-  background: var(--lose);
-}
-
-.roster-cs-value {
-  font-size: 11px;
-}
-
-.roster-sub {
-  font-size: 9px;
-  color: var(--text-dim);
+@media (prefers-reduced-motion: reduce) {
+  .match-card,
+  .match-art img,
+  .match-arrow,
+  .match-detail {
+    transition: none;
+  }
 }
