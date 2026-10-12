@@ -9,10 +9,15 @@ scrape_configs:
   - job_name: dfgg-app
     metrics_path: /blue
     static_configs:
+      # production
       - targets: [ "10.0.0.221:9090" ]
         labels: { env: prod, slot: blue }
+      # 수집용
       - targets: [ "10.0.0.114:9090" ]
         labels: { env: dev, slot: blue }
+      # 부하 테스트
+      - targets: [ "10.0.0.231:9090" ]
+        labels: { env: perf, slot: blue }
 
   - job_name: dfgg-app-green
     metrics_path: /green
@@ -29,6 +34,8 @@ scrape_configs:
         labels: { env: prod }
       - targets: [ "10.0.0.114:9090" ]
         labels: { env: dev }
+      - targets: [ "10.0.0.231:9090" ]
+        labels: { env: perf }
 
   - job_name: dfgg-monitoring
     static_configs:
