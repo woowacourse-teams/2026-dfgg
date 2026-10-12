@@ -7,7 +7,16 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'dist-desktop/**', 'node_modules/**', '*.config.js'] },
+  {
+    ignores: [
+      '**/dist/**',
+      '**/build/**',
+      '**/out/**',
+      '**/release/**',
+      'node_modules/**',
+      '**/*.config.js',
+    ],
+  },
 
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -15,10 +24,9 @@ export default tseslint.config(
   {
     files: [
       'apps/web/src/**/*.{ts,tsx}',
-      'apps/desktop/main-window/**/*.{ts,tsx}',
-      'apps/desktop/overlay/**/*.{ts,tsx}',
-      // 두 창이 함께 쓰는 렌더러 코드와 웹·앱 공용 코드도 브라우저에서 돈다.
-      'apps/desktop/components/**/*.{ts,tsx}',
+      'apps/admin/src/**/*.{ts,tsx}',
+      // 렌더러 코드와 웹·앱 공용 코드는 브라우저에서 돈다.
+      'apps/desktop/src/renderer/**/*.{ts,tsx}',
       'packages/**/*.{ts,tsx}',
     ],
     languageOptions: {
@@ -41,8 +49,14 @@ export default tseslint.config(
     },
   },
   {
-    files: ['apps/desktop/electron/**/*.ts'],
+    files: ['apps/desktop/src/main/**/*.ts'],
     languageOptions: { globals: globals.node },
+  },
+  {
+    // 관리자 페이지의 로컬 API(dev server 미들웨어)는 Node CommonJS 다.
+    files: ['apps/admin/server/**/*.js', 'apps/admin/scripts/**/*.js'],
+    languageOptions: { globals: globals.node, sourceType: 'commonjs' },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
 
   prettier,

@@ -1,0 +1,61 @@
+/*
+ * min-height 면 내용만큼 .app 이 늘어나 자기 안에서는 넘치지 않는다.
+ * 그러면 스크롤바가 문서에 생겨서 여기 건 overflow 설정이 닿지 않는다.
+ * height 로 못 박아야 .app 이 스크롤 상자가 된다.
+ */
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.app::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- 본문 ---------- */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px 16px 28px;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 10px 2px 12px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/*
+ * 처음 뜰 때 위에서부터 차례로 올라온다. 한 번만 보이는 움직임이라 넣었다.
+ * 구역이 한꺼번에 튀어나오면 어디부터 읽을지 눈이 헤맨다.
+ */
+.rise {
+  animation: rise 320ms var(--ease-out) backwards;
+  animation-delay: calc(var(--rise-order, 0) * 45ms);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
+}

@@ -1,4 +1,6 @@
 dist
 dist-desktop
+build
+release
 node_modules
 pnpm-lock.yaml

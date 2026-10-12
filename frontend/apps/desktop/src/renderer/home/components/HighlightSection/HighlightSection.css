@@ -1,0 +1,39 @@
+.highlights {
+  margin-bottom: 20px;
+}
+
+.highlights-title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+
+.highlights-progress {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--gold);
+}
+
+.highlights-games {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.highlights-games button {
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.highlights-games button.active {
+  border-color: var(--accent);
+  color: var(--ink);
+}

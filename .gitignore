@@ -35,3 +35,7 @@ out/
 *.war
 !gradle/wrapper/gradle-wrapper.jar
 release/
+
+umami-to-posthog/
+
+frontend/apps/desktop/resources/ffmpeg/

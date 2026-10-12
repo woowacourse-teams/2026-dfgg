@@ -1,0 +1,30 @@
+.hl-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10; /* 녹화 해상도 1280x800 */
+  border-radius: var(--radius-m);
+  background: #000;
+}
+
+.hl-clips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.hl-clips button {
+  min-width: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.hl-clips button.active {
+  border-color: var(--accent);
+  color: var(--ink);
+}

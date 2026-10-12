@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "forceConsistentCasingInFileNames": true,
+    "target": "es2020",
+    "lib": ["dom", "dom.iterable", "es2020"],
+    "module": "esnext",
+    "strict": true,
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "noEmit": true,
+    "isolatedModules": true
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"],
+  "exclude": ["node_modules"]
+}
