@@ -288,3 +288,36 @@
     transition: none;
   }
 }
+
+/* ---------- 하이라이트 ---------- */
+/* 카드 아래 한 줄. 카드와 한 몸처럼 보이게 위쪽에 선만 둔다 */
+.match-highlight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 14px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .match-highlight:hover {
+    background: var(--surface-2);
+  }
+}
+
+.match-highlight[aria-expanded='true'] {
+  color: var(--ink);
+}
+
+.match-highlight-player {
+  padding: 0 14px 14px;
+}

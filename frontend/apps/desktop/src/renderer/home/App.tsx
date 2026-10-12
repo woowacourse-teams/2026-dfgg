@@ -16,6 +16,7 @@ import EmptyState from './components/EmptyState/EmptyState';
 import FeedbackModal from './components/feedback/FeedbackModal';
 import HighlightSection from './components/HighlightSection/HighlightSection';
 import MatchSection from './components/MatchSection/MatchSection';
+import PostGameSection from './components/PostGameSection/PostGameSection';
 import ProfileHeader from './components/ProfileHeader/ProfileHeader';
 import QueueTabs from './components/QueueTabs/QueueTabs';
 import { championSplashUrl, skinSplashUrl, useDdragonVersion } from './lib/ddragon';
@@ -139,9 +140,14 @@ function App() {
     };
   }, [lcuState]);
 
+  const loadedOnce = useRef(false); // 앱을 켠 뒤 전적을 한 번이라도 받았는지
+
   // 랭크와 전적은 게임이 끝났을 때만 바뀌므로 그 시점에만 다시 받는다.
   useEffect(() => {
-    if (lcuPhase !== 'None' && lcuPhase !== 'EndOfGame') return;
+    if (lcuState !== 'connected') return;
+    const idle = lcuPhase === 'None' || lcuPhase === 'EndOfGame';
+    if (!idle && loadedOnce.current) return;
+    loadedOnce.current = true;
 
     window.lcu.getRankInfo().then(setRankInfo);
     window.lcu
@@ -151,16 +157,25 @@ function App() {
         console.error('전적을 불러오지 못했습니다.');
         Sentry.captureException(error);
       });
-  }, [lcuPhase]);
+  }, [lcuPhase, lcuState]);
+
+  useEffect(() => {
+    window.highlight.onProgress((p) => {
+      if (!p.finished) return;
+      window.lcu
+        .getMatchHistoryInfo()
+        .then(setMatches)
+        .catch((error) => Sentry.captureException(error));
+    });
+  });
 
   return (
     <div className='app'>
       <ProfileHeader summoner={currentSummoner} backdropUrl={backdropUrl} />
 
-      <HighlightSection />
-
       {currentSummoner ? (
         <main className='content'>
+          <PostGameSection matches={matches} version={version} phase={lcuPhase} />
           <QueueTabs tabs={tabs} active={activeQueue} onChange={setQueue} />
           {/* 탭을 바꾸면 통계 판을 새로 그려 숫자가 다시 세어 올라가게 한다 */}
           <section className='bento-section'>

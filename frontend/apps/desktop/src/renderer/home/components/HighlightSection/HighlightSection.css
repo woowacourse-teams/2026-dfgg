@@ -7,24 +7,15 @@
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: var(--text-dim);
+  color: var(--ink-2);
 }
 
 .highlights-progress {
   margin: 0 0 8px;
   font-size: 12px;
-  color: var(--warn);
+  color: var(--gold);
 }
 
-.highlights-video {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 10; /* 녹화 해상도 1280x800 */
-  border-radius: 12px;
-  background: #000;
-}
-
-.highlights-clips,
 .highlights-games {
   display: flex;
   flex-wrap: wrap;
@@ -32,19 +23,17 @@
   margin-top: 8px;
 }
 
-.highlights-clips button,
 .highlights-games button {
   padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface-2);
+  color: var(--ink-2);
   font-size: 12px;
   cursor: pointer;
 }
 
-.highlights-clips button.active,
 .highlights-games button.active {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--ink);
 }

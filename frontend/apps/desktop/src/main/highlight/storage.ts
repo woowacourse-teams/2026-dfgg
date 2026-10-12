@@ -3,8 +3,8 @@ import path from 'node:path';
 import { app } from 'electron';
 import { highlightsRoot } from './library';
 
-const MAX_GAMES = 20; // 보관할 최대 판 수
-const MIN_FREE_BYTES = 10 * 1024 ** 3; // 10GB 미만이면 녹화 안 함
+const MAX_GAMES = 5; // 보관할 최대 판 수
+const MIN_FREE_BYTES = (app.isPackaged ? 10 : 3) * 1024 ** 3; // 10GB 미만이면 녹화 안 함
 const SESSION_NAME = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/; // 우리가 만든 세션 폴더 이름 형식
 const TEMP_FILES = ['raw.mkv', 'ffmpeg.log', 'events.jsonl', 'stats.jsonl', 'me.json']; // 클립 완성 후 필요 없는 파일
 

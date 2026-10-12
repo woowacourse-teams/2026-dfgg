@@ -1,21 +1,59 @@
 import './MatchSection.css';
 
 import * as Sentry from '@sentry/electron/renderer';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import type { MatchDetail as Detail, MatchSummary } from '../../../../shared/types';
+import type {
+  HighlightGame,
+  HighlightSummary,
+  MatchDetail as Detail,
+  MatchSummary,
+} from '../../../../shared/types';
 import { ChevronIcon, ClockIcon } from '../../../icons';
 import { championTileUrl } from '../../lib/ddragon';
 import { formatMinutes, formatWhen, queueLabel } from '../../lib/format';
+import HighlightPlayer from '../HighlightSection/HighlightPlayer';
 import MatchDetail from './MatchDetail';
 import { ItemRow, KdaLine, RatioChip } from './parts';
 
-function MatchCard({ match, version }: { match: MatchSummary; version: string | null }) {
+// 47.3 → '0:47'. 기존 formatMinutes는 '18분' 단위라 클립 길이에는 안 맞음
+const formatClock = (sec: number) => {
+  const s = Math.round(sec);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+export function MatchCard({
+  match,
+  version,
+  highlight,
+}: {
+  match: MatchSummary;
+  version: string | null;
+  highlight?: HighlightSummary;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [failed, setFailed] = useState(false);
 
+  const [highlightOpen, setHighlightOpen] = useState(false);
+  const [highlightGame, setHighlightGame] = useState<HighlightGame | null | undefined>(undefined);
+
   const { stats } = match;
+
+  const toggleHight = () => {
+    const next = !highlightOpen;
+    setHighlightOpen(next);
+    if (next) window.analytics.track('highlight-open', { queue: match.queueName });
+
+    if (!next || highlightGame !== undefined) return;
+    window.highlight
+      .get(match.gameId)
+      .then(setHighlightGame)
+      .catch((error) => {
+        setHighlightGame(null);
+        Sentry.captureException(error);
+      });
+  };
 
   const toggle = () => {
     const next = !expanded;
@@ -71,6 +109,29 @@ function MatchCard({ match, version }: { match: MatchSummary; version: string | 
         </span>
       </button>
 
+      {highlight && (
+        <button
+          type='button'
+          className='match-highlight'
+          onClick={toggleHight}
+          aria-expanded={highlightOpen}
+        >
+          ▶ 하이라이트 · 클립 {highlight.count}개 · {formatClock(highlight.duration)}
+        </button>
+      )}
+
+      {highlightOpen && (
+        <div className='match-highlight-player'>
+          {highlightGame ? (
+            <HighlightPlayer game={highlightGame} autoPlay />
+          ) : (
+            <p className='matches-empty'>
+              {highlightGame === null ? '하이라이트가 삭제됐습니다' : '불러오는 중...'}
+            </p>
+          )}
+        </div>
+      )}
+
       {expanded && (
         <div className='match-detail'>
           {/* 높이를 0에서 펼치려면 안쪽 상자가 넘치는 부분을 잘라 줘야 한다 */}
@@ -96,6 +157,15 @@ function MatchSection({
   matches: MatchSummary[] | null;
   version: string | null;
 }) {
+  const [highlights, setHighlights] = useState<Record<number, HighlightSummary>>({});
+
+  useEffect(() => {
+    if (!matches?.length) return;
+    const ids = matches.map((m) => m.gameId);
+
+    window.highlight.summary(ids).then(setHighlights);
+  }, [matches]);
+
   return (
     <section className='matches'>
       <div className='section-head'>
@@ -107,7 +177,12 @@ function MatchSection({
 
       <ul className='match-list'>
         {matches?.map((match) => (
-          <MatchCard key={match.gameId} match={match} version={version} />
+          <MatchCard
+            key={match.gameId}
+            match={match}
+            version={version}
+            highlight={highlights[match.gameId]}
+          />
         ))}
       </ul>
     </section>

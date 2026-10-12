@@ -58,8 +58,8 @@ declare global {
     };
     highlight: {
       list: () => Promise<HighlightGame[]>;
-      summary: () => Promise<Record<number, HighlightSummary>>;
-      get: () => Promise<HighlightGame | null>;
+      summary: (gameIds: number[]) => Promise<Record<number, HighlightSummary>>;
+      get: (gameId: number) => Promise<HighlightGame | null>;
       onProgress: (callback: HighlightProgressListener) => Unsubscribe;
     };
   }
