@@ -167,7 +167,7 @@ function App() {
         .then(setMatches)
         .catch((error) => Sentry.captureException(error));
     });
-  });
+  }, []);
 
   return (
     <div className='app'>
