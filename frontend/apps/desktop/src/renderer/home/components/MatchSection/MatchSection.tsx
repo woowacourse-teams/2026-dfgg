@@ -43,7 +43,8 @@ export function MatchCard({
   const toggleHight = () => {
     const next = !highlightOpen;
     setHighlightOpen(next);
-    if (next) window.analytics.track('highlight-open', { queue: match.queueName });
+    if (next)
+      window.analytics.track('highlight-open', { queue: match.queueName, source: 'match-card' });
 
     if (!next || highlightGame !== undefined) return;
     window.highlight
@@ -123,7 +124,7 @@ export function MatchCard({
       {highlightOpen && (
         <div className='match-highlight-player'>
           {highlightGame ? (
-            <HighlightPlayer game={highlightGame} autoPlay />
+            <HighlightPlayer game={highlightGame} autoPlay source='match-card' />
           ) : (
             <p className='matches-empty'>
               {highlightGame === null ? '하이라이트가 삭제됐습니다' : '불러오는 중...'}

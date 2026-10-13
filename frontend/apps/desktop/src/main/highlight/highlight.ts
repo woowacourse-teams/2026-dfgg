@@ -1,12 +1,15 @@
+import path from 'node:path';
+import { readJson } from './library';
 import { desktopCapturer } from 'electron';
 import type { GameflowPhase } from '../../shared/types';
 import { getLcuState, onPhaseChange } from '../lcu/state';
-import { startRecording, stopRecording } from './recoder';
+import { readCaptureStats, startRecording, stopRecording } from './recoder';
 import { startEventCollector, stopEventCollector } from './eventCollector';
 import { buildHighlight } from './pipeline';
 import { broadcastToAllWindows } from '../ipc/broadcast';
 import { cleanupSession, enforceLimit, hasEnoughSpace } from './storage';
 import { saveMatchInfo } from './matchInfo';
+import { trackEvent } from '../analytics/umami';
 
 let sessionDir: string | null = null; // 이번 판 세션 폴더 (녹화 시작 시 생성)
 
@@ -42,6 +45,7 @@ async function start() {
 
   // 남은 용량이 부족하면 이번 판은 녹화 안 함
   if (!(await hasEnoughSpace())) {
+    trackEvent('desktop-highlight-skip', { reason: 'low-disk' }); // 저장 공간 부족
     console.warn('[highlight] 저장 공간 부족 (10GB 미만) → 녹화 안 함');
     return;
   }
@@ -51,6 +55,7 @@ async function start() {
 
   // 3. startRecording을 기다리는 사이에 정지 요청이 왔으면 바로 정지
   if (token !== gameToken) {
+    trackEvent('desktop-highlight-stop', { reason: 'cancelled' }); // 녹화 시작 전에 정지 요청
     await stopRecording();
     return;
   }
@@ -59,6 +64,9 @@ async function start() {
     sessionDir = session.dir;
     startEventCollector(session.dir);
     void saveMatchInfo(session.dir);
+  } else {
+    trackEvent('desktop-highlight-skip', { reason: 'no-encoder' }); // 쓸 수 있는 인코더 없음
+    return;
   }
 }
 
@@ -70,12 +78,34 @@ async function stop(build = true) {
 
   // 녹화 정지와 이벤트 저장 마무리를 동시에 기다림
   const [, session] = await Promise.all([stopEventCollector(), stopRecording()]);
-  if (session) console.log('[highlight] 녹화 종료', session.videoPath);
+  if (session) {
+    console.log('[highlight] 녹화 종료', session.videoPath);
+  }
 
-  if (!dir || !build) return;
+  if (!dir || !build) {
+    return;
+  }
+
+  const t0 = Date.now();
+  let planned = 0;
+
   const clips = await buildHighlight(dir, (p) => {
+    planned = p.total;
     broadcastToAllWindows('highlight:progress', p); // 화면에 진행 사항 알림
     console.log('[highlight] 진행', `${p.done}/${p.total}`, p.finished ? '완료' : '');
+  });
+
+  const meta = readJson<{ encoder?: string }>(path.join(dir, 'session.json'));
+  const match = readJson<{ queueId?: number }>(path.join(dir, 'match.json'));
+
+  trackEvent('desktop-highlight-built', {
+    clips: clips.length, // 만든 클립 수
+    planned, // 계획한 클립 수 → planned - clips = 자르기 실패 수
+    totalSec: Math.round(clips.reduce((sum, c) => sum + (c.end - c.start), 0)),
+    buildSec: Math.round((Date.now() - t0) / 1000),
+    encoder: meta?.encoder,
+    queueId: match?.queueId,
+    ...readCaptureStats(dir),
   });
   console.log(
     '[highlight] 클립 생성',

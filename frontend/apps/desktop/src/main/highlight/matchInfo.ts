@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fetchGameflowSession } from '../lcu/service';
+import { trackEvent } from '../analytics/umami';
 
 // match.josn: 이 세션이 어느 판인지 확인
 export interface MatchInfo {
@@ -29,6 +30,7 @@ export async function saveMatchInfo(dir: string): Promise<void> {
     }
     await sleep(RETRY_MS);
   }
+  trackEvent('desktop-highlight-error', { reason: 'game-id' }); // gameId를 못 받아 전적과 연결 실패
   // 끝까지 실패하면 match.json 없이 진행 (시간 매칭으로 나중에 채움)
   console.warn('[highlight] gameId를 가져오지 못함', dir);
 }
