@@ -52,7 +52,7 @@ function HighlightSection() {
         </p>
       )}
 
-      {game && <HighlightPlayer key={game.id} game={game} autoPlay={autoPlay} />}
+      {game && <HighlightPlayer key={game.id} game={game} autoPlay={autoPlay} source='section' />}
 
       {games.length > 1 && (
         <div className='highlights-games'>
