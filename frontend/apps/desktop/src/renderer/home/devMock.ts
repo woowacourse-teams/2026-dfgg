@@ -293,6 +293,9 @@ if (!window.lcu) {
     minimize: log('windowControls.minimize'),
     close: log('windowControls.close'),
   };
-  window.analytics = { track: log('analytics.track') };
+  window.analytics = {
+    track: log('analytics.track'),
+    overlayClick: log('analytics.overlayClick'),
+  };
   window.feedback = { submit: async () => ({}) };
 }
