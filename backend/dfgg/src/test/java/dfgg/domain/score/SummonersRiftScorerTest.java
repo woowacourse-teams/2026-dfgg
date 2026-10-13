@@ -93,4 +93,28 @@ class SummonersRiftScorerTest {
                 .isInstanceOf(InvalidDfScoreRequestException.class)
                 .hasMessageContaining("같은 포지션");
     }
+
+    @Test
+    @DisplayName("참조 경기의 10명 점수는 참조 구현과 같고, 참가자 순서를 지킨다")
+    void score_WhenReferenceMatch_EqualReferenceScoresInOrder() {
+        // given
+        ScoringParticipants match = new ScoringParticipants(List.of(
+                new ScoringParticipant(100, ChampionPosition.TOP, true, 5, 3, 4, 25000, 30000, 13000, 18, 6000, 7000),
+                new ScoringParticipant(100, ChampionPosition.JUNGLE, true, 6, 4, 10, 18000, 35000, 12000, 40, 1000, 25000),
+                new ScoringParticipant(100, ChampionPosition.MID, true, 7, 2, 6, 30000, 15000, 13500, 22, 4000, 5000),
+                new ScoringParticipant(100, ChampionPosition.BOTTOM, true, 8, 3, 5, 32000, 14000, 14500, 15, 5000, 9000),
+                new ScoringParticipant(100, ChampionPosition.SUPPORT, true, 1, 4, 18, 9000, 16000, 8500, 80, 500, 800),
+                new ScoringParticipant(200, ChampionPosition.TOP, false, 3, 6, 3, 20000, 32000, 11000, 15, 3000, 3500),
+                new ScoringParticipant(200, ChampionPosition.JUNGLE, false, 4, 7, 6, 15000, 33000, 10000, 35, 0, 18000),
+                new ScoringParticipant(200, ChampionPosition.MID, false, 5, 6, 4, 24000, 18000, 11500, 20, 2000, 2500),
+                new ScoringParticipant(200, ChampionPosition.BOTTOM, false, 4, 7, 3, 22000, 15000, 11000, 12, 1500, 4000),
+                new ScoringParticipant(200, ChampionPosition.SUPPORT, false, 0, 6, 10, 7000, 17000, 7000, 70, 0, 300)));
+
+        // when
+        List<DfScore> scores = scorer.score(match, new GameDuration(1800));
+
+        // then
+        assertThat(scores).extracting(DfScore::value)
+                .containsExactly(66.7, 66.1, 74.5, 66.1, 67.8, 47.2, 49.3, 54.9, 40.2, 46.4);
+    }
 }

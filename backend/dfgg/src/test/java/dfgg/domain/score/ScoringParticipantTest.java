@@ -3,6 +3,7 @@ package dfgg.domain.score;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import dfgg.common.exception.InvalidDfScoreRequestException;
 import dfgg.domain.champion.ChampionPosition;
@@ -93,5 +94,33 @@ class ScoringParticipantTest {
 
         // then
         assertThat(kda).isEqualTo(8.0);
+    }
+
+    @Test
+    @DisplayName("허용치를 넘은 데스 수를 구한다")
+    void excessDeaths_WhenDiedMoreThanAllowed_ReturnDifference() {
+        // given
+        ScoringParticipant participant = new ScoringParticipant(100, ChampionPosition.TOP, true,
+                3, 10, 5, 20000, 18000, 11000, 20, 3000, 5000);
+
+        // when
+        double excess = participant.excessDeaths(8.55);
+
+        // then
+        assertThat(excess).isCloseTo(1.45, within(1e-9));
+    }
+
+    @Test
+    @DisplayName("허용치 이하로 죽었으면 넘은 데스는 0이다")
+    void excessDeaths_WhenDiedWithinAllowed_ReturnZero() {
+        // given
+        ScoringParticipant participant = new ScoringParticipant(100, ChampionPosition.TOP, true,
+                3, 4, 5, 20000, 18000, 11000, 20, 3000, 5000);
+
+        // when
+        double excess = participant.excessDeaths(8.55);
+
+        // then
+        assertThat(excess).isZero();
     }
 }

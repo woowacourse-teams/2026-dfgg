@@ -83,4 +83,24 @@ class PositionScoreProfileTest {
         // then
         assertThat(pushing).isEqualTo(original);
     }
+
+    @Test
+    @DisplayName("기본점수가 포지션 평균이면 50점이다")
+    void standardize_WhenBaseScoreEqualsPositionMean_ReturnFifty() {
+        // when
+        DfScore score = PositionScoreProfile.TOP.standardize(40.5);
+
+        // then
+        assertThat(score.value()).isEqualTo(50.0);
+    }
+
+    @Test
+    @DisplayName("기본점수가 포지션 평균보다 표준편차 하나 높으면 70점이다")
+    void standardize_WhenOneStandardDeviationAbove_ReturnSeventy() {
+        // when
+        DfScore score = PositionScoreProfile.TOP.standardize(40.5 + 19.4);
+
+        // then
+        assertThat(score.value()).isEqualTo(70.0);
+    }
 }

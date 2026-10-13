@@ -6,6 +6,7 @@ import dfgg.common.exception.InvalidDfScoreRequestException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * 채점할 경기의 참가자 10명. 모든 모드에 공통인 규칙(두 팀 × 5명, 킬 관여, 오브젝트 피해)을 지킨다.
@@ -90,6 +91,13 @@ public class ScoringParticipants {
                 .mapToDouble(participant -> participant.statOf(feature))
                 .average()
                 .orElseThrow();
+    }
+
+    /** 참가자 순서를 지켜 하나씩 바꾼다. */
+    public <T> List<T> mapEach(Function<ScoringParticipant, T> mapper) {
+        return participants.stream()
+                .map(mapper)
+                .toList();
     }
 
     public TeamContribution teamContributionOf(ScoringParticipant participant) {

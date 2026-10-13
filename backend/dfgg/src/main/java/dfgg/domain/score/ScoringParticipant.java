@@ -74,6 +74,11 @@ public class ScoringParticipant {
         return (double) killInvolvement() / Math.max(deaths, 1);
     }
 
+    /** 허용 데스를 넘은 만큼. 넘지 않았으면 0이다. */
+    public double excessDeaths(double allowedDeaths) {
+        return Math.max(0, deaths - allowedDeaths);
+    }
+
     /** 개인 지표 항목의 값. */
     public double statOf(ScoreFeature feature) {
         return switch (feature) {

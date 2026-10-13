@@ -17,40 +17,47 @@ import java.util.List;
  * 계수[pos][f] = exp( 평균over(pos 참가자)( ln( (값 + 1) / (그 경기 10명 평균 + 1) ) ) )
  */
 public enum PositionScoreProfile {
-    TOP(List.of(
+    TOP(40.5, 19.4, List.of(
             new FeatureRule(CHAMPION_DAMAGE, 1.07, .393),
             new FeatureRule(GOLD, 0.97, .236),
             new FeatureRule(DAMAGE_TAKEN_PER_LIFE, 1.07, .157),
             new FeatureRule(VISION_SCORE, 0.63, .079),
             new FeatureRule(TURRET_DAMAGE, 1.07, .135))),
-    JUNGLE(List.of(
+    JUNGLE(51.5, 19.6, List.of(
             new FeatureRule(CHAMPION_DAMAGE, 0.87, .267),
             new FeatureRule(GOLD, 1.06, .200),
             new FeatureRule(DAMAGE_TAKEN_PER_LIFE, 1.16, .133),
             new FeatureRule(VISION_SCORE, 0.87, .133),
             new FeatureRule(EPIC_MONSTER_DAMAGE, 2.09, .267))),
-    MID(List.of(
+    MID(43.1, 20.7, List.of(
             new FeatureRule(CHAMPION_DAMAGE, 1.09, .476),
             new FeatureRule(GOLD, 0.99, .238),
             new FeatureRule(DAMAGE_TAKEN_PER_LIFE, 0.88, .079),
             new FeatureRule(VISION_SCORE, 0.63, .079),
             new FeatureRule(TURRET_DAMAGE, 0.82, .128))),
-    BOTTOM(List.of(
+    BOTTOM(46.0, 22.2, List.of(
             new FeatureRule(CHAMPION_DAMAGE, 1.11, .492),
             new FeatureRule(GOLD, 1.15, .328),
             new FeatureRule(DAMAGE_TAKEN_PER_LIFE, 0.74, 0),
             new FeatureRule(VISION_SCORE, 0.56, .082),
             new FeatureRule(TURRET_DAMAGE, 0.91, .098))),
-    SUPPORT(List.of(
+    SUPPORT(46.7, 17.0, List.of(
             new FeatureRule(CHAMPION_DAMAGE, 0.54, .200),
             new FeatureRule(GOLD, 0.75, .067),
             new FeatureRule(DAMAGE_TAKEN_PER_LIFE, 0.72, .200),
             new FeatureRule(VISION_SCORE, 2.11, .533))),
     ;
 
+    private static final double STANDARD_SCORE_CENTER = 50;
+    private static final double STANDARD_SCORE_SPREAD = 20;
+
+    private final double baseScoreMean;
+    private final double baseScoreStandardDeviation;
     private final List<FeatureRule> rules;
 
-    PositionScoreProfile(List<FeatureRule> rules) {
+    PositionScoreProfile(double baseScoreMean, double baseScoreStandardDeviation, List<FeatureRule> rules) {
+        this.baseScoreMean = baseScoreMean;
+        this.baseScoreStandardDeviation = baseScoreStandardDeviation;
         this.rules = rules;
     }
 
@@ -66,6 +73,12 @@ public enum PositionScoreProfile {
         return rules.stream()
                 .mapToDouble(rule -> rule.weightedScore(participant, match))
                 .sum();
+    }
+
+    /** 50 + 20 × (기본점수 − 포지션 평균) ÷ 포지션 표준편차. 포지션마다 평균 50, 퍼짐을 같게 맞춘다. */
+    public DfScore standardize(double baseScore) {
+        double z = (baseScore - baseScoreMean) / baseScoreStandardDeviation;
+        return new DfScore(STANDARD_SCORE_CENTER + STANDARD_SCORE_SPREAD * z);
     }
 
     double weightSum() {
