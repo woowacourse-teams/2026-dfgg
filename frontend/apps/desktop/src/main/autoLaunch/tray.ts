@@ -1,4 +1,4 @@
-import { BrowserWindow, Menu, Tray, app, nativeImage } from 'electron';
+import { BrowserWindow, Menu, Tray, app, nativeImage, shell } from 'electron';
 import path from 'node:path';
 import { setQuitSource } from '../analytics/sessionTracker';
 
@@ -9,6 +9,12 @@ function resolveTrayIconPath() {
   return app.isPackaged
     ? path.join(process.resourcesPath, 'icons', 'icon.ico')
     : path.join(app.getAppPath(), 'resources', 'icons', 'icon.ico');
+}
+
+function noticePath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'ffmpeg', 'NOTICE.txt')
+    : path.join(app.getAppPath(), 'resources', 'ffmpeg', 'NOTICE.txt');
 }
 
 // 트레이 설정하기
@@ -27,6 +33,8 @@ export function setTray(home: BrowserWindow) {
       label: '열기',
       click: () => home.show(),
     },
+    { label: '오픈소스 라이선스', click: () => void shell.openPath(noticePath()) },
+    { type: 'separator' },
     {
       label: '종료',
       click: () => {

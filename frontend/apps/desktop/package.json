@@ -200,7 +200,9 @@
         "from": "resources/ffmpeg",
         "to": "ffmpeg",
         "filter": [
-          "ffmpeg.exe"
+          "ffmpeg.exe",
+          "LICENSE.txt",
+          "NOTICE.txt"
         ]
       }
     ]
