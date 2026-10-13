@@ -2,8 +2,15 @@ import { execFile } from 'child_process';
 import { promisify } from 'node:util';
 import { getFfmpegPath } from './ffmpegPath';
 import type { Clip } from './clipPlanner';
+import { getWatermarkPath } from './ffmpegPath';
 
 const execFileAsync = promisify(execFile);
+
+// 왼쪽 위에 워터마크. 오른쪽 아래 미니맵, 오른쪽 위 점수판, 왼쪽 아래 채팅을 피한다.
+const WATERMARK_FILTER =
+  '[1:v]format=rgba,colorchannelmixer=aa=0.85[logo];' + // 로고 불투명도 85%
+  '[0:v][logo]overlay=x=W*0.015:y=H*0.02:format=auto,' + // 화면 크기 비율로 위치 지정
+  'format=nv12'; // 기존 -vf 와 같은 색 형식으로 맞춤
 
 // raw.mkv에서 clip 구간만 잘라 mp4로 저장
 export async function cutClip(input: string, clip: Clip, output: string, encoder: string) {
@@ -17,22 +24,24 @@ export async function cutClip(input: string, clip: Clip, output: string, encoder
       'error',
       '-y',
       '-ss',
-      clip.start.toFixed(2), // -i 앞에 두면: 가까운 키프레임으로 빠르게 이동 → 정확한 위치부터 디코딩
+      clip.start.toFixed(2),
       '-t',
-      duration.toFixed(2), // 이만큼만 읽음
+      duration.toFixed(2),
       '-i',
-      input,
-      '-vf',
-      'format=nv12', // 모든 하드웨어 인코더가 받는 색 형식 + Electron에서 재생 가능한 형식
+      input, // [0] 녹화 원본
+      '-i',
+      getWatermarkPath(), // [1] 워터마크 PNG
+      '-filter_complex',
+      WATERMARK_FILTER, // 기존 '-vf', 'format=nv12' 두 줄은 지우고 이걸로 바꿈
       '-c:v',
-      encoder, // 2단계에서 감지한 인코더 (h264_qsv 등)
+      encoder,
       '-b:v',
       '6M',
-      '-an', // 오디오 없음
+      '-an',
       '-movflags',
-      '+faststart', // mp4 목차를 파일 앞에 → 앱에서 바로 재생 시작
+      '+faststart',
       output,
     ],
-    { windowsHide: true, timeout: 120_000 }, // 클릭 하나에 2분 넘으면 포기
+    { windowsHide: true, timeout: 120_000 },
   );
 }
