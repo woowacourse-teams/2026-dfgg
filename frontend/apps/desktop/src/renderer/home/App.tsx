@@ -113,6 +113,48 @@ function App() {
   const loadedOnce = useRef(false); // 앱을 켠 뒤 전적을 한 번이라도 받았는지
 
   // state 정보가 바뀔 때만 소환사 정보를 가져온다.
+  // 연결되면 소환사 정보를 가져온다. 클라이언트가 막 켜졌을 땐 500이나 null이 와서 될 때까지 다시 시도한다.
+  useEffect(() => {
+    if (lcuState !== 'connected') return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const load = (tries: number) => {
+      window.lcu
+        .currentSummoner()
+        .then((summoner) => {
+          if (cancelled) return;
+          if (!summoner) throw new Error('소환사 정보 빈 응답'); // 준비 전이면 null → catch로 보내 재시도
+          setCurrentSummoner(summoner);
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          if (tries < 10) {
+            timer = setTimeout(() => load(tries + 1), 3000);
+            return;
+          }
+          console.error('소환사 정보를 불러오지 못했습니다.');
+          Sentry.captureException(error);
+        });
+    };
+    load(1);
+
+    // 프로필 배경은 설정 안 했으면 null이 정상이라 재시도하지 않는다.
+    window.lcu
+      .getProfileBackground()
+      .then((skinId) => {
+        if (!cancelled) setBackgroundSkinId(skinId);
+      })
+      .catch((error) => Sentry.captureException(error));
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [lcuState]);
+
+  // 랭크와 전적은 게임이 끝났을 때만 바뀌므로 그 시점에만 다시 받는다.
   useEffect(() => {
     if (lcuState !== 'connected') return;
     const idle = lcuPhase === 'None' || lcuPhase === 'EndOfGame';
@@ -146,23 +188,6 @@ function App() {
       clearTimeout(timer);
     };
   }, [lcuState, lcuPhase]);
-
-  // 랭크와 전적은 게임이 끝났을 때만 바뀌므로 그 시점에만 다시 받는다.
-  useEffect(() => {
-    if (lcuState !== 'connected') return;
-    const idle = lcuPhase === 'None' || lcuPhase === 'EndOfGame';
-    if (!idle && loadedOnce.current) return;
-    loadedOnce.current = true;
-
-    window.lcu.getRankInfo().then(setRankInfo);
-    window.lcu
-      .getMatchHistoryInfo()
-      .then(setMatches)
-      .catch((error) => {
-        console.error('전적을 불러오지 못했습니다.');
-        Sentry.captureException(error);
-      });
-  }, [lcuPhase, lcuState]);
 
   useEffect(() => {
     return window.highlight.onProgress((p) => {
