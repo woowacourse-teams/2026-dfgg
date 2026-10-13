@@ -1,0 +1,71 @@
+package dfgg.domain.score;
+
+import dfgg.common.exception.InvalidDfScoreRequestException;
+import dfgg.domain.champion.ChampionPosition;
+
+/**
+ * 채점할 참가자 한 명의 원시 값. 포지션은 없을 수 있다 — 칼바람처럼 포지션이 없는 모드가 있다.
+ */
+public class ScoringParticipant {
+
+    private final int teamId;
+    private final ChampionPosition position;
+    private final boolean win;
+    private final int kills;
+    private final int deaths;
+    private final int assists;
+    private final int championDamage;
+    private final int damageTaken;
+    private final int gold;
+    private final int visionScore;
+    private final int turretDamage;
+    private final int objectiveDamage;
+
+    public ScoringParticipant(int teamId, ChampionPosition position, boolean win,
+                              int kills, int deaths, int assists,
+                              int championDamage, int damageTaken, int gold, int visionScore,
+                              int turretDamage, int objectiveDamage) {
+        validateObjectiveDamage(turretDamage, objectiveDamage);
+        this.teamId = teamId;
+        this.position = position;
+        this.win = win;
+        this.kills = kills;
+        this.deaths = deaths;
+        this.assists = assists;
+        this.championDamage = championDamage;
+        this.damageTaken = damageTaken;
+        this.gold = gold;
+        this.visionScore = visionScore;
+        this.turretDamage = turretDamage;
+        this.objectiveDamage = objectiveDamage;
+    }
+
+    /** Riot의 오브젝트 피해는 포탑 피해를 포함한다. 작으면 두 값 중 하나가 잘못 들어왔다. */
+    private void validateObjectiveDamage(int turretDamage, int objectiveDamage) {
+        if (objectiveDamage < turretDamage) {
+            throw new InvalidDfScoreRequestException(
+                    "오브젝트 피해(%d)가 포탑 피해(%d)보다 작을 수 없습니다".formatted(objectiveDamage, turretDamage));
+        }
+    }
+
+    public int teamId() {
+        return teamId;
+    }
+
+    public boolean hasPosition() {
+        return position != null;
+    }
+
+    public ChampionPosition position() {
+        return position;
+    }
+
+    public int kills() {
+        return kills;
+    }
+
+    /** 킬 관여 수(킬 + 어시스트). */
+    public int killInvolvement() {
+        return kills + assists;
+    }
+}
