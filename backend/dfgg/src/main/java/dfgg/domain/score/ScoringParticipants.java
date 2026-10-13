@@ -91,4 +91,20 @@ public class ScoringParticipants {
                 .average()
                 .orElseThrow();
     }
+
+    public TeamContribution teamContributionOf(ScoringParticipant participant) {
+        return new TeamContribution(killParticipationOf(participant), participant.kda());
+    }
+
+    private double killParticipationOf(ScoringParticipant participant) {
+        int teamKills = teamKillsOf(participant);
+        if (teamKills == 0) {
+            return 0;
+        }
+        return (double) participant.killInvolvement() / teamKills;
+    }
+
+    public int teamKillsOf(ScoringParticipant participant) {
+        return teamKills(groupByTeam(participants).get(participant.teamId()));
+    }
 }

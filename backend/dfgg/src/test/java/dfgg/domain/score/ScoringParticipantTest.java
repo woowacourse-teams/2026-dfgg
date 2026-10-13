@@ -66,4 +66,32 @@ class ScoringParticipantTest {
         // then
         assertThat(epicMonsterDamage).isEqualTo(22000.0);
     }
+
+    @Test
+    @DisplayName("KDA는 (킬 + 어시스트) ÷ 데스다")
+    void kda_WhenDied_DivideByDeaths() {
+        // given
+        ScoringParticipant participant = new ScoringParticipant(100, ChampionPosition.TOP, true,
+                3, 4, 5, 20000, 18000, 11000, 20, 3000, 5000);
+
+        // when
+        double kda = participant.kda();
+
+        // then
+        assertThat(kda).isEqualTo(2.0);
+    }
+
+    @Test
+    @DisplayName("데스가 0이면 KDA는 킬 + 어시스트다")
+    void kda_WhenNeverDied_ReturnKillInvolvement() {
+        // given
+        ScoringParticipant participant = new ScoringParticipant(100, ChampionPosition.TOP, true,
+                3, 0, 5, 20000, 18000, 11000, 20, 3000, 5000);
+
+        // when
+        double kda = participant.kda();
+
+        // then
+        assertThat(kda).isEqualTo(8.0);
+    }
 }

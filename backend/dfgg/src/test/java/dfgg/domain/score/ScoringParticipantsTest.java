@@ -3,6 +3,7 @@ package dfgg.domain.score;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import dfgg.common.exception.InvalidDfScoreRequestException;
 import dfgg.domain.champion.ChampionPosition;
@@ -119,5 +120,56 @@ class ScoringParticipantsTest {
 
         // then
         assertThat(average).isEqualTo(21000.0);
+    }
+
+    @Test
+    @DisplayName("참가자가 속한 팀의 킬 합을 구한다")
+    void teamKillsOf_WhenParticipantGiven_ReturnKillsOfSameTeam() {
+        // given
+        List<ScoringParticipant> participants = validGame();
+        ScoringParticipant carry = participant(200, ChampionPosition.MID, 7, 3);
+        participants.set(7, carry);
+        ScoringParticipants match = new ScoringParticipants(participants);
+
+        // when
+        int teamKills = match.teamKillsOf(carry);
+
+        // then
+        assertThat(teamKills).isEqualTo(15);
+    }
+
+    @Test
+    @DisplayName("팀 기여는 그 팀 킬에 대한 KP와 참가자 KDA로 계산한다")
+    void teamContributionOf_WhenParticipantGiven_UseTeamKillsAndKda() {
+        // given
+        List<ScoringParticipant> participants = validGame();
+        ScoringParticipant carry = participant(200, ChampionPosition.MID, 7, 3);
+        participants.set(7, carry);
+        ScoringParticipants match = new ScoringParticipants(participants);
+
+        // when
+        double score = match.teamContributionOf(carry).score();
+
+        // then
+        double killParticipation = (7 + 3) / 15.0;
+        double kda = (7 + 3) / 4.0;
+        assertThat(score).isCloseTo(0.5 * killParticipation + 0.5 * (kda / (kda + 3)), within(1e-12));
+    }
+
+    @Test
+    @DisplayName("팀 킬이 0이면 KP는 0이다 — 0으로 나누지 않는다")
+    void teamContributionOf_WhenTeamHasNoKills_UseZeroKillParticipation() {
+        // given
+        List<ScoringParticipant> participants = validGame();
+        for (int index = 0; index < 5; index++) {
+            participants.set(index, participant(100, POSITIONS.get(index), 0, 0));
+        }
+        ScoringParticipants match = new ScoringParticipants(participants);
+
+        // when
+        TeamContribution contribution = match.teamContributionOf(participants.getFirst());
+
+        // then
+        assertThat(contribution.killParticipation()).isZero();
     }
 }

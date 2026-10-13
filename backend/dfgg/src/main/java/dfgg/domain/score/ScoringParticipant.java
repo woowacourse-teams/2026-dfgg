@@ -69,6 +69,11 @@ public class ScoringParticipant {
         return kills + assists;
     }
 
+    /** (킬 + 어시스트) ÷ 데스. 데스가 0이면 1로 나눈다. */
+    public double kda() {
+        return (double) killInvolvement() / Math.max(deaths, 1);
+    }
+
     /** 개인 지표 항목의 값. */
     public double statOf(ScoreFeature feature) {
         return switch (feature) {

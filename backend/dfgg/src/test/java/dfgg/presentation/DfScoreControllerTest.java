@@ -38,7 +38,7 @@ class DfScoreControllerTest {
     void setUp() {
         RestAssured.port = port;
     }
-    
+
     private int teamIdOf(int index) {
         if (index < 5) {
             return 100;
