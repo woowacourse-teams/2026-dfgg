@@ -1,4 +1,4 @@
-import type { GameflowPhase, RecommendedItem } from '../../shared/types';
+import type { GameflowPhase, OverlayClickTarget, RecommendedItem } from '../../shared/types';
 import { fetchEndOfGameStats, fetchGameflowSession, fetchQueueName } from '../lcu/service';
 import { getLcuState, onPhaseChange } from '../lcu/state';
 import { getIdentity, type Identity } from './identity';
@@ -6,6 +6,7 @@ import { Stopwatch } from './stopwatch';
 import { readStore, updateStore, type PendingEvent } from './store';
 import { enqueue, trackEvent } from './umami';
 import { reportError } from '../sentry';
+import { BrowserWindow, screen } from 'electron';
 
 const SNAPSHOT_INTERVAL_MS = 60_000;
 // 게임은 끝났지만 결과 화면 전인 phase. 이때는 게임을 끝내지 않는다.
@@ -27,12 +28,43 @@ type Game = {
   // 산 아이템이 직전 추천 목록에 있었던 횟수
   followed: number;
   followedTop1: number;
+  overlayClicks: Partial<Record<OverlayClickTarget, number>>;
+  overlayMoves: number;
 };
 
 let game: Game | null = null;
 // 오버레이 접힘 상태는 게임이 바뀌어도 유지된다.
 let overlayCollapsed = false;
 let timer: NodeJS.Timeout | null = null;
+let overlayWindow: BrowserWindow | null = null;
+
+export function setOverlayWindow(win: BrowserWindow) {
+  overlayWindow = win;
+  win.on('moved', () => {
+    if (game) game.overlayMoves++;
+  });
+}
+
+export function recordOverlayClick(target: OverlayClickTarget) {
+  if (!game) return;
+  game.overlayClicks[target] = (game.overlayClicks[target] ?? 0) + 1;
+}
+
+// 게임이 끝날 때 오버레이가 모니터의 어디에 있었는지 (비율이라 해상도와 상관없이 비교 가능)
+function overlayPosition() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return {}; // 창이 없으면 위치 정보 없이 보냄
+  const b = overlayWindow.getBounds();
+  const d = screen.getDisplayMatching(b).bounds;
+  const cx = (b.x + b.width / 2 - d.x) / d.width;
+  const cy = (b.y + b.height / 2 - d.y) / d.height;
+  return {
+    overlayX: Math.round(cx * 100),
+    overlayY: Math.round(cy * 100),
+    overlayArea: `${cy < 0.5 ? 'top' : 'bottom'}-${cx < 0.5 ? 'left' : 'right'}`,
+    displayW: d.width,
+    displayH: d.height,
+  };
+}
 
 function toEvent(current: Game, result: string): PendingEvent {
   const overlayExpandedSec = current.overlayExpanded.seconds();
@@ -58,6 +90,12 @@ function toEvent(current: Game, result: string): PendingEvent {
       purchases: current.purchases,
       followed: current.followed,
       followedTop1: current.followedTop1,
+      overlayClicks: Object.values(current.overlayClicks).reduce((a, b) => a + b, 0),
+      ...Object.fromEntries(
+        Object.entries(current.overlayClicks).map(([k, v]) => [`click_${k}`, v]),
+      ),
+      overlayMoves: current.overlayMoves,
+      ...overlayPosition(),
     },
   };
 }
@@ -89,6 +127,8 @@ async function startGame() {
     purchases: 0,
     followed: 0,
     followedTop1: 0,
+    overlayClicks: {},
+    overlayMoves: 0,
   };
   game = current;
   syncOverlay();

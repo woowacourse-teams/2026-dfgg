@@ -5,6 +5,7 @@ import {
   GameflowPhase,
   HighlightProgress,
   LcuStatus,
+  OverlayClickTarget,
   RecommendationUpdate,
   Summoner,
 } from '../shared/types';
@@ -67,6 +68,7 @@ contextBridge.exposeInMainWorld('windowControls', {
 contextBridge.exposeInMainWorld('analytics', {
   track: (name: string, data?: Record<string, string | number | boolean>) =>
     ipcRenderer.send('analytics:track', name, data),
+  overlayClick: (target: OverlayClickTarget) => ipcRenderer.send('overlay:click', target),
 });
 
 contextBridge.exposeInMainWorld('feedback', {

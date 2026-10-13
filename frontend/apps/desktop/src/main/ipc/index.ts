@@ -17,15 +17,17 @@ import {
   MIN_EXPANDED_HEIGHT,
   MAX_EXPANDED_HEIGHT,
 } from '../constants';
-import { setOverlayCollapsed } from '../analytics/gameTracker';
+import { recordOverlayClick, setOverlayCollapsed } from '../analytics/gameTracker';
 import { setQuitSource } from '../analytics/sessionTracker';
 import { trackEvent, type EventData } from '../analytics/umami';
-import type { FeedbackRating, EndedGame } from '../../shared/types';
+import type { FeedbackRating, EndedGame, OverlayClickTarget } from '../../shared/types';
 import { submitFeedback } from '../api/feedback';
 import { getHighlight, highlightSummary, listHighlights } from '../highlight/library';
 
 // 오버레이가 마지막으로 알려 준 펼친 높이. 접었다 펼 때 이 높이로 돌아간다.
 let overlayHeight = EXPANDED_HEIGHT;
+
+const CLICK_TARGETS = new Set(['item', 'collapse', 'expand', 'empty', 'other']);
 
 // 창 크기를 바꾼다. 크기 조절을 막아 둔 창이라 잠깐 풀었다가 다시 잠근다.
 function resizeWindow(win: BrowserWindow, width: number, height: number, resizable: boolean) {
@@ -91,5 +93,10 @@ export function registerIpcHandlers() {
   ipcMain.handle('highlight:get', (_event, gameId) => {
     if (!Number.isInteger(gameId)) return null;
     return getHighlight(gameId as number);
+  });
+  ipcMain.on('overlay:click', (_event, target) => {
+    if (typeof target === 'string' && CLICK_TARGETS.has(target)) {
+      recordOverlayClick(target as OverlayClickTarget);
+    }
   });
 }

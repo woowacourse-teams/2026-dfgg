@@ -2,7 +2,7 @@ import './style.css';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import type { NamedEntry, RecommendedItem } from '../../shared/types';
+import type { NamedEntry, OverlayClickTarget, RecommendedItem } from '../../shared/types';
 import { ChevronIcon } from '../icons';
 
 type Variant = 'ally' | 'counter';
@@ -60,6 +60,7 @@ function Pick({ item, rank }: { item: RecommendedItem; rank: number }) {
 
   return (
     <li
+      data-click='item'
       className={`pick ${isBest ? 'pick-best' : ''} ${rank > TOP_COUNT ? 'pick-rest' : ''}`}
       style={{ '--order': rank - 1 } as React.CSSProperties}
     >
@@ -177,10 +178,15 @@ function App() {
     window.windowControls.setCollapsed(next);
   };
 
+  const trackClick = (e: React.PointerEvent) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-click]');
+    window.analytics.overlayClick((el?.dataset.click as OverlayClickTarget) ?? 'other');
+  };
+
   if (isCollapsed) {
     return (
       // 바깥 테두리는 잡고 끄는 자리, 가운데 로고는 누르는 자리다. 접힌 채로도 창을 옮길 수 있어야 한다.
-      <div className='overlay-collapsed'>
+      <div className='overlay-collapsed' onPointerDown={trackClick}>
         <button type='button' aria-label='오버레이 펼치기' onClick={toggleCollapsed}>
           <img src='./icon.png' alt='' />
         </button>
@@ -191,7 +197,7 @@ function App() {
   const hasItems = items !== null && items.length > 0;
 
   return (
-    <div className='overlay' ref={overlayRef}>
+    <div className='overlay' ref={overlayRef} onPointerDown={trackClick}>
       <header className='bar'>
         <span className='bar-title'>
           {purchasedCount === null ? '추천 아이템' : `${purchasedCount + 1}코어 추천`}
@@ -203,6 +209,7 @@ function App() {
           className='bar-button'
           aria-label='오버레이 접기'
           onClick={toggleCollapsed}
+          data-click='collapse'
         >
           <ChevronIcon />
         </button>
@@ -216,7 +223,7 @@ function App() {
           ))}
         </ol>
       ) : (
-        <div className='overlay-empty'>
+        <div className='overlay-empty' data-click='empty'>
           {isInGame && <span className='overlay-loader' aria-hidden='true' />}
           <p>{isInGame ? '추천을 계산하는 중이에요' : '게임에 들어가면 추천이 시작돼요'}</p>
         </div>
