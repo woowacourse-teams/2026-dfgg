@@ -1,5 +1,6 @@
 package dfgg.domain.score;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -102,5 +103,21 @@ class ScoringParticipantsTest {
         // when & then
         assertThatCode(() -> new ScoringParticipants(participants))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("항목의 10명 평균을 구한다")
+    void averageOf_WhenFeatureGiven_ReturnMeanOfTenParticipants() {
+        // given
+        List<ScoringParticipant> participants = validGame();
+        participants.set(0, new ScoringParticipant(100, ChampionPosition.TOP, true,
+                2, 4, 3, 30000, 18000, 11000, 20, 3000, 5000));
+        ScoringParticipants match = new ScoringParticipants(participants);
+
+        // when
+        double average = match.averageOf(ScoreFeature.CHAMPION_DAMAGE);
+
+        // then
+        assertThat(average).isEqualTo(21000.0);
     }
 }

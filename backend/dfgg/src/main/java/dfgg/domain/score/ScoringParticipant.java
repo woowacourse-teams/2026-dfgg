@@ -68,4 +68,16 @@ public class ScoringParticipant {
     public int killInvolvement() {
         return kills + assists;
     }
+
+    /** 개인 지표 항목의 값. */
+    public double statOf(ScoreFeature feature) {
+        return switch (feature) {
+            case CHAMPION_DAMAGE -> championDamage;
+            case GOLD -> gold;
+            case DAMAGE_TAKEN_PER_LIFE -> (double) damageTaken / (deaths + 1);
+            case VISION_SCORE -> visionScore;
+            case TURRET_DAMAGE -> turretDamage;
+            case EPIC_MONSTER_DAMAGE -> objectiveDamage - turretDamage;
+        };
+    }
 }

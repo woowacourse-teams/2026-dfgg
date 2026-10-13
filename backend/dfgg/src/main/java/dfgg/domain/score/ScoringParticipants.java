@@ -83,4 +83,12 @@ public class ScoringParticipants {
                 .count();
         return distinctPositions == team.size();
     }
+
+    /** 항목의 10명 평균. 포지션과 관계없이 경기 참가자 전체로 구한다. */
+    public double averageOf(ScoreFeature feature) {
+        return participants.stream()
+                .mapToDouble(participant -> participant.statOf(feature))
+                .average()
+                .orElseThrow();
+    }
 }
