@@ -160,7 +160,7 @@ function App() {
   }, [lcuPhase, lcuState]);
 
   useEffect(() => {
-    window.highlight.onProgress((p) => {
+    return window.highlight.onProgress((p) => {
       if (!p.finished) return;
       window.lcu
         .getMatchHistoryInfo()
