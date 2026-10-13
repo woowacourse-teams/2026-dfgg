@@ -14,7 +14,6 @@ import type {
 import Bento from './components/Bento/Bento';
 import EmptyState from './components/EmptyState/EmptyState';
 import FeedbackModal from './components/feedback/FeedbackModal';
-import HighlightSection from './components/HighlightSection/HighlightSection';
 import MatchSection from './components/MatchSection/MatchSection';
 import PostGameSection from './components/PostGameSection/PostGameSection';
 import ProfileHeader from './components/ProfileHeader/ProfileHeader';
@@ -111,36 +110,42 @@ function App() {
     };
   }, []);
 
+  const loadedOnce = useRef(false); // 앱을 켠 뒤 전적을 한 번이라도 받았는지
+
   // state 정보가 바뀔 때만 소환사 정보를 가져온다.
   useEffect(() => {
     if (lcuState !== 'connected') return;
+    const idle = lcuPhase === 'None' || lcuPhase === 'EndOfGame';
+    if (!idle && loadedOnce.current) return;
 
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    window.lcu
-      .currentSummoner()
-      .then((summoner) => {
-        if (!cancelled) setCurrentSummoner(summoner);
-      })
-      .catch((error) => {
-        console.error('소환사 정보를 불러오지 못했습니다.');
-        Sentry.captureException(error);
-      });
-
-    // 프로필 배경은 못 받아도 화면은 그려야 하므로 실패하면 조용히 대체 그림을 쓴다.
-    window.lcu
-      .getProfileBackground()
-      .then((skinId) => {
-        if (!cancelled) setBackgroundSkinId(skinId);
-      })
-      .catch((error) => Sentry.captureException(error));
+    const load = (tries: number) => {
+      Promise.all([window.lcu.getRankInfo(), window.lcu.getMatchHistoryInfo()])
+        .then(([rank, history]) => {
+          if (cancelled) return;
+          setRankInfo(rank);
+          setMatches(history);
+          loadedOnce.current = true;
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          if (tries < 10) {
+            timer = setTimeout(() => load(tries + 1), 3000);
+            return;
+          }
+          console.error('전적을 불러오지 못했습니다.');
+          Sentry.captureException(error);
+        });
+    };
+    load(1);
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, [lcuState]);
-
-  const loadedOnce = useRef(false); // 앱을 켠 뒤 전적을 한 번이라도 받았는지
+  }, [lcuState, lcuPhase]);
 
   // 랭크와 전적은 게임이 끝났을 때만 바뀌므로 그 시점에만 다시 받는다.
   useEffect(() => {
