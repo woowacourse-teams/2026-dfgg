@@ -2,7 +2,7 @@
 
 **Item build recommendations for the game you're actually in.**
 
-Live service: http://3.39.39.73/
+Live service: https://www.dfgg.pro/
 
 dfgg recommends League of Legends item builds based on the specific ten champions in your
 match — not on a fixed, statistics-averaged build path.
@@ -48,6 +48,23 @@ control density, healing and shielding, AD/AP damage split, and tank count.
 
 ![Home](/image.png)
 
+### 2. Desktop app (Windows)
+
+The desktop app does the same job without typing anything in.
+
+- **In-game overlay** — reads the ten champions from the League client's local Live Client
+  Data API and shows the recommended item order in a small, movable overlay. It can be
+  collapsed at any time and never sends input to the game.
+- **Home window** — your own profile, current rank and recent match history, read from the
+  local League client.
+- **Highlights** — while you play, dfgg records the League game window on your PC and cuts
+  short clips around your own kills, assists and objectives. After the game a highlight page
+  shows the result together with the clips.
+  - Recording, encoding and storage happen **only on your PC**. Videos are never uploaded.
+  - Only the most recent 20 games are kept; the raw recording is deleted once clips are made.
+  - Recording is skipped when free disk space is low.
+  - Uninstalling the app removes all recordings and app data.
+
 ---
 
 ## Roadmap
@@ -55,7 +72,9 @@ control density, healing and shielding, AD/AP damage split, and tank count.
 - [v] Recommendations past the third core item, including late-game situational swaps
 - [v] A one-line, plain-language rationale attached to every recommended item
 - [ ] Position-specific handling — support items, jungle timing
-- [ ] Domain and HTTPS for the production deployment
+- [v] Domain and HTTPS for the production deployment
+- [v] Desktop overlay, match history and local game highlights
+- [ ] Highlight on/off setting and recording notice
 
 ---
 
@@ -64,6 +83,8 @@ control density, healing and shielding, AD/AP damage split, and tank count.
 ```
 dfgg/
 ├── frontend/
+│   └── apps/
+│       └── desktop/   # Electron app (overlay, home, highlights)
 └── backend/
 ```
 
@@ -81,9 +102,34 @@ cd backend
 
 - **Frontend**: React, TypeScript, Webpack
 - **Backend**: Java, Spring Boot, PostgreSQL
+- **Desktop**: Electron, React, TypeScript, FFmpeg (LGPLv3, Windows Graphics Capture)
 - **Infrastructure**: AWS EC2
+- **Analytics**: Umami, PostHog (production builds only)
 - **Data**: Riot Games API (ACCOUNT-V1, SUMMONER-V4, LEAGUE-V4, MATCH-V5,
   CHAMPION-MASTERY-V4, SPECTATOR-V5) and Data Dragon for static champion and item data
+
+### Local endpoints used by the desktop app (read-only)
+
+| Source | Endpoint | Used for |
+| --- | --- | --- |
+| LCU | `/lol-gameflow/v1/gameflow-phase` (+ websocket event) | Detect lobby / in-game / end of game |
+| LCU | `/lol-gameflow/v1/session` | `gameId` and queue to link highlights to a match |
+| LCU | `/lol-summoner/v1/current-summoner` (+ `/summoner-profile`) | Your own profile |
+| LCU | `/lol-ranked/v1/current-ranked-stats` | Your own rank |
+| LCU | `/lol-match-history/v1/products/lol/current-summoner/matches`, `/lol-match-history/v1/games/{gameId}` | Your match history |
+| LCU | `/lol-end-of-game/v1/eog-stats-block` | Post-game result page |
+| LCU | `/lol-game-queues/v1/queues`, `/lol-patch/v1/game-version` | Queue names, patch version |
+| Live Client | `/liveclientdata/playerlist`, `/liveclientdata/activeplayer` | Champions in the game, overlay recommendations |
+| Live Client | `/liveclientdata/eventdata`, `/liveclientdata/gamestats` | Timing your own kills/assists/objectives for clips |
+
+dfgg only reads these endpoints. It never writes to the client and never automates any
+action.
+
+### Third-party notice
+
+The desktop app bundles an unmodified FFmpeg build (BtbN, LGPLv3, no GPL components). The
+license text and source link ship with the app in `resources/ffmpeg/LICENSE.txt` and
+`resources/ffmpeg/NOTICE.txt`.
 
 ---
 
@@ -95,7 +141,8 @@ The service is free to use.
 
 dfgg presents only information a player can already see in champion select and on the
 in-game scoreboard. It does not surface any game-session-specific information that would
-otherwise be unknown to the player.
+otherwise be unknown to the player. Highlights are recorded from the player's own screen and
+stay on the player's PC.
 
 dfgg is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games
 or anyone officially involved in producing or managing Riot Games properties. Riot Games and
