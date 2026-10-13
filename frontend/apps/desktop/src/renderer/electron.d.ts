@@ -10,6 +10,7 @@ import type {
   LcuStatus,
   MatchDetail,
   MatchSummary,
+  OverlayClickTarget,
   RecommendationUpdate,
   Summoner,
 } from '../shared/types';
@@ -52,6 +53,7 @@ declare global {
     };
     analytics: {
       track: (name: string, data?: Record<string, string | number | boolean>) => void;
+      overlayClick: (target: OverlayClickTarget) => void;
     };
     feedback: {
       submit: (rating: FeedbackRating, game: EndedGame) => Promise<Record<string, string>>;

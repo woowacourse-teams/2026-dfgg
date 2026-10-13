@@ -37,7 +37,15 @@ function PostGameSection({
         }
         setProgress(null);
         // 세션 id(p.id)로 방생 판을 찾는다. 클립이 0개면 목록에 없어서 null → 카드 안 뛸
-        window.highlight.list().then((list) => setGame(list.find((g) => g.id === p.id) ?? null));
+        window.highlight.list().then((list) => {
+          const found = list.find((g) => g.id === p.id) ?? null;
+          setGame(found);
+          if (found)
+            window.analytics.track('postgame-highlight-show', {
+              clips: found.clips.length,
+              type: '방금 판 하이라이트가 화면에 뜰 때',
+            });
+        });
       }),
     [],
   );
@@ -55,7 +63,13 @@ function PostGameSection({
         <button
           type='button'
           className='postgame-close'
-          onClick={() => setClosed(true)}
+          onClick={() => {
+            setClosed(true);
+            window.analytics.track('postgame-close', {
+              clips: game?.clips.length ?? 0,
+              making: progress !== null,
+            });
+          }}
           aria-label='닫기'
         >
           ✕
@@ -78,7 +92,7 @@ function PostGameSection({
             <p className='postgame-note'>전적에 반영되는 중이에요</p>
           )}
           <div className='postgame-player'>
-            <HighlightPlayer key={game.id} game={game} autoPlay />
+            <HighlightPlayer key={game.id} game={game} autoPlay source='postgame' />
           </div>
         </>
       )}

@@ -1,5 +1,7 @@
 import type { LcuEventMap } from '../main/lcu/events';
 
+export type OverlayClickTarget = 'item' | 'collapse' | 'expand' | 'empty' | 'other';
+
 // 전적 카드에 하이라이트 보기 버튼을 그릴 때 필요
 export interface HighlightSummary {
   id: string; // 세션 폴더 이름

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { app } from 'electron';
 import { getFfmpegPath } from './ffmpegPath';
 import { detectEncoder } from './encoder';
+import { trackEvent } from '../analytics/umami';
 
 // 캡처 설정: 노트북 테스트에서 확정한 값 그대로
 const CAPTURE =
@@ -28,7 +29,9 @@ export async function startRecording(): Promise<RecordingSession | null> {
   if (proc) return current; // 이미 녹화 중이면 중복 실행 안 함 (재접속 등 두 번 불려도 안전)
 
   const encoder = await detectEncoder(); // 2단계 결과
-  if (!encoder) return null;
+  if (!encoder) {
+    return null;
+  }
 
   // 세션 폴더: %APPDATA%/<앱이름>/highlights/2026-10-08T07-50-00-000Z/
   const id = new Date().toISOString().replace(/[:.]/g, '-'); // 윈도우 파일명에 : 를 못 써서 치환
@@ -71,11 +74,32 @@ export async function startRecording(): Promise<RecordingSession | null> {
   p.stderr?.pipe(fs.createWriteStream(path.join(dir, 'ffmpeg.log')));
 
   // 끝났을 때 할 일 등록 예약
-  p.once('exit', (code) => {
-    console.log('[recorder] exit', code);
+  p.once('exit', (code, signal) => {
+    console.log('[recorder] exit', code, signal);
+
+    // 정상 종료(q 또는 게임 창 닫힘)는 code 0. 그 외는 실패로 기록
+    if (code !== 0) {
+      trackEvent('desktop-highlight-error', {
+        stage: 'record',
+        code: code ?? -1, // 강제 종료(kill)면 code가 null
+        signal: signal ?? undefined, // 강제 종료면 'SIGTERM'
+        encoder: encoder.name,
+        recordSec: Math.round((Date.now() - startedAt) / 1000), // 시작 직후 죽었는지, 한참 녹화하다 죽었는지
+        reason: 'ffmpeg-exit', // ffmpeg 비정상 종료 (캡처 실패, 인코더 오류 등)
+      });
+    }
     proc = null;
     current = null;
     stopping = false;
+  });
+
+  // ffmpeg.exe 실행 자체가 실패한 경우 (파일 없음, 권한 등). 이때는 exit가 안 올 수 있음
+  p.once('error', (error) => {
+    trackEvent('desktop-highlight-error', {
+      stage: 'spawn',
+      message: error.message,
+      reason: 'ffmpeg-spawn', // ffmpeg.exe 실행 실패
+    });
   });
 
   // 현재 상태 저장하고 반환
@@ -101,4 +125,26 @@ export function stopRecording(): Promise<RecordingSession | null> {
     });
     p.stdin?.write('q'); // 터미널에서 q 누르는 것과 같음 -> ffmpeg가 파일 마무리하고 종료
   });
+}
+
+// 녹화 품질 지표: ffmpeg.log 끝부분의 진행 줄에서 frame, dup, drop, speed를 읽는다
+// 예) frame=59560 fps= 30 ... dup=6097 drop=0 speed=0.998x
+export function readCaptureStats(dir: string) {
+  try {
+    const log = fs.readFileSync(path.join(dir, 'ffmpeg.log'), 'utf-8').slice(-4000); // 끝부분만
+    const all = [...log.matchAll(/frame=\s*(\d+).*?dup=(\d+) drop=(\d+) speed=\s*([\d.]+)x/g)];
+    const last = all.at(-1); // 진행 줄이 계속 갱신되므로 마지막이 최종 값
+    if (!last) return {};
+
+    const frames = Number(last[1]);
+    const dup = Number(last[2]);
+    return {
+      frames,
+      dupRatio: frames > 0 ? Math.round((dup / frames) * 1000) / 10 : 0, // % (소수 한 자리)
+      drop: Number(last[3]),
+      speed: Number(last[4]), // 1보다 작으면 인코딩이 실시간을 못 따라감
+    };
+  } catch {
+    return {}; // 로그가 없으면 지표 없이 보냄
+  }
 }

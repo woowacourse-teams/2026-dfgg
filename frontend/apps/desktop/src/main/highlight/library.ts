@@ -10,7 +10,7 @@ export function highlightsRoot() {
   return path.join(app.getPath('userData'), 'highlights');
 }
 
-function readJson<T>(file: string): T | null {
+export function readJson<T>(file: string): T | null {
   try {
     return JSON.parse(fs.readFileSync(file, 'utf-8').replace(/^\uFEFF/, '')) as T;
   } catch {
@@ -22,6 +22,10 @@ function readJson<T>(file: string): T | null {
 function readGame(dir: string, id: string): HighlightGame | null {
   const all = readJson<HighlightClip[]>(path.join(dir, 'clips.json'));
   const clips = (all ?? []).filter((c) => fs.existsSync(path.join(dir, 'clips', c.file)));
+  if (clips.length === 0) {
+    return null;
+  }
+
   const session = readJson<{ startedAt: number }>(path.join(dir, 'session.json')); // 정렬에 쓸 게임 시작 시각
   const match = readJson<{ gameId: number }>(path.join(dir, 'match.json'));
 

@@ -8,11 +8,20 @@ import type { HighlightGame } from '../../../../shared/types';
 export const clipUrl = (id: string, file: string) => `dfgg-media://clip/${id}/clips/${file}`;
 
 // 한 판의 클립을 보여주는 플레이어. 하이라이트 섹션과 전적 카드에서 같이 쓴다
-function HighlightPlayer({ game, autoPlay = false }: { game: HighlightGame; autoPlay?: boolean }) {
+function HighlightPlayer({
+  game,
+  autoPlay = false,
+  source,
+}: {
+  game: HighlightGame;
+  autoPlay?: boolean;
+  source: string;
+}) {
   const [clipIndex, setClipIndex] = useState(0);
   const [playing, setPlaying] = useState(autoPlay); // 클립을 고른 뒤부터는 자동재생
 
   const clip = game.clips[clipIndex] ?? game.clips[0];
+  const total = game.clips.length;
 
   const select = (i: number) => {
     setClipIndex(i);
@@ -28,6 +37,7 @@ function HighlightPlayer({ game, autoPlay = false }: { game: HighlightGame; auto
         autoPlay={playing}
         onEnded={() => {
           if (clipIndex + 1 < game.clips.length) select(clipIndex + 1); // 쇼츠처럼 다음 클립
+          window.analytics.track('highlight-complete', { source, total });
         }}
       />
 
@@ -38,7 +48,10 @@ function HighlightPlayer({ game, autoPlay = false }: { game: HighlightGame; auto
               key={c.file}
               type='button'
               className={i === clipIndex ? 'active' : ''}
-              onClick={() => select(i)}
+              onClick={() => {
+                select(i);
+                window.analytics.track('highlight-clip-select', { source, index: i + 1, total });
+              }}
             >
               {i + 1}
             </button>
