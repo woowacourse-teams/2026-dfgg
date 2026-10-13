@@ -70,6 +70,7 @@ async function sendPosthog({ name, data, id, timestamp }: PendingEvent) {
         $os: 'Windows',
         language: app.isReady() ? app.getLocale() : undefined,
         ...data,
+        ...(data?.riotId ? { $set: { name: data.riotId, riot_id: data.riotId } } : {}),
       },
     }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -96,7 +97,13 @@ export function enqueue(event: PendingEvent) {
 
 // 메인 프로세스에서 이벤트 보내기. 실패해도 앱 동작에는 영향을 주지 않는다.
 export function trackEvent(name: string, data?: EventData, id = getIdentity()?.puuid) {
-  const event: PendingEvent = { name, data, id, timestamp: new Date().toISOString() };
+  const riotId = getIdentity()?.riotId;
+  const event: PendingEvent = {
+    name,
+    data: { riotId, ...data },
+    id,
+    timestamp: new Date().toISOString(),
+  };
 
   // 개발 중 트래픽은 집계하지 않는다.
   if (!app.isPackaged) {
