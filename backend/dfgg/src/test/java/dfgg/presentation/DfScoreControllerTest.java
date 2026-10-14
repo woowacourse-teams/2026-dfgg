@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
 import io.restassured.RestAssured;
@@ -260,5 +261,16 @@ class DfScoreControllerTest {
                 .when().post("/api/df-score")
                 .then().statusCode(200)
                 .body("participants", hasSize(10));
+    }
+
+    @Test
+    @DisplayName("채점 대상 경기는 10명 모두 점수를 받는다")
+    void score_WhenScorableMatch_ReturnScoreForEveryParticipant() {
+        // when & then
+        given().contentType(ContentType.JSON)
+                .body(body(420, 1800, tenParticipants()))
+                .when().post("/api/df-score")
+                .then().statusCode(200)
+                .body("participants.score", everyItem(notNullValue()));
     }
 }

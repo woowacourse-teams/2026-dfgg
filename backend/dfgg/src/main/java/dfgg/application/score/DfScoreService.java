@@ -1,8 +1,8 @@
 package dfgg.application.score;
 
+import dfgg.domain.score.DfScore;
 import dfgg.domain.score.MatchScorer;
 import dfgg.domain.score.MatchScorers;
-import dfgg.domain.score.ScoringParticipants;
 import dfgg.domain.score.SummonersRiftScorer;
 import dfgg.presentation.dto.request.DfScoreRequest;
 import dfgg.presentation.dto.response.DfScoreResponse;
@@ -23,9 +23,7 @@ public class DfScoreService {
         if (scorer.isEmpty() || !request.toScoringMatch().isScorable()) {
             return DfScoreResponse.unscored(request.puuids());
         }
-        ScoringParticipants participants = request.toScoringParticipants();
-        scorer.get().validate(participants);
-        // 점수 계산은 아직 없다 — 검증까지만 하고 점수 없이 응답한다.
-        return DfScoreResponse.unscored(request.puuids());
+        List<DfScore> scores = scorer.get().score(request.toScoringParticipants(), request.toGameDuration());
+        return DfScoreResponse.scored(request.puuids(), scores);
     }
 }

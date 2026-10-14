@@ -1,5 +1,6 @@
 package dfgg.presentation.dto.request;
 
+import dfgg.domain.score.GameDuration;
 import dfgg.domain.score.ScoringMatch;
 import dfgg.domain.score.ScoringParticipants;
 import dfgg.presentation.dto.ParticipantStatsDto;
@@ -25,6 +26,10 @@ public record DfScoreRequest(
 
     public ScoringMatch toScoringMatch() {
         return new ScoringMatch(gameDurationSec, participants.size());
+    }
+
+    public GameDuration toGameDuration() {
+        return new GameDuration(gameDurationSec);
     }
 
     public ScoringParticipants toScoringParticipants() {
