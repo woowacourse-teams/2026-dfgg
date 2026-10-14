@@ -117,4 +117,24 @@ class SummonersRiftScorerTest {
         assertThat(scores).extracting(DfScore::value)
                 .containsExactly(66.7, 66.1, 74.5, 66.1, 67.8, 47.2, 49.3, 54.9, 40.2, 46.4);
     }
+
+    @Test
+    @DisplayName("15분(900초) 이상이면 채점한다")
+    void isLongEnough_WhenFifteenMinutes_ReturnTrue() {
+        // when
+        boolean longEnough = scorer.isLongEnough(new GameDuration(900));
+
+        // then
+        assertThat(longEnough).isTrue();
+    }
+
+    @Test
+    @DisplayName("15분 미만이면 채점하지 않는다")
+    void isLongEnough_WhenShorterThanFifteenMinutes_ReturnFalse() {
+        // when
+        boolean longEnough = scorer.isLongEnough(new GameDuration(899));
+
+        // then
+        assertThat(longEnough).isFalse();
+    }
 }

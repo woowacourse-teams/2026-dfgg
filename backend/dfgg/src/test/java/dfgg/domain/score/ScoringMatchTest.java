@@ -10,42 +10,29 @@ import org.junit.jupiter.params.provider.ValueSource;
 class ScoringMatchTest {
 
     @Test
-    @DisplayName("15분 이상, 10명이 한 경기는 채점한다")
-    void isScorable_WhenFullGameAndLongEnough_ReturnTrue() {
+    @DisplayName("10명이 한 경기는 온전한 경기다")
+    void isFullGame_WhenTenParticipants_ReturnTrue() {
         // given
-        ScoringMatch match = new ScoringMatch(900, 10);
+        ScoringMatch match = new ScoringMatch(10);
 
         // when
-        boolean scorable = match.isScorable();
+        boolean fullGame = match.isFullGame();
 
         // then
-        assertThat(scorable).isTrue();
-    }
-
-    @Test
-    @DisplayName("15분(900초) 미만인 경기는 채점하지 않는다")
-    void isScorable_WhenShorterThanFifteenMinutes_ReturnFalse() {
-        // given
-        ScoringMatch match = new ScoringMatch(899, 10);
-
-        // when
-        boolean scorable = match.isScorable();
-
-        // then
-        assertThat(scorable).isFalse();
+        assertThat(fullGame).isTrue();
     }
 
     @ParameterizedTest(name = "참가자 {0}명")
     @ValueSource(ints = {0, 9, 11})
     @DisplayName("참가자가 10명이 아니면 채점하지 않는다")
-    void isScorable_WhenParticipantCountIsNotTen_ReturnFalse(int participantCount) {
+    void isFullGame_WhenParticipantCountIsNotTen_ReturnFalse(int participantCount) {
         // given
-        ScoringMatch match = new ScoringMatch(1800, participantCount);
+        ScoringMatch match = new ScoringMatch(participantCount);
 
         // when
-        boolean scorable = match.isScorable();
+        boolean fullGame = match.isFullGame();
 
         // then
-        assertThat(scorable).isFalse();
+        assertThat(fullGame).isFalse();
     }
 }

@@ -25,7 +25,7 @@ public record DfScoreRequest(
 ) {
 
     public ScoringMatch toScoringMatch() {
-        return new ScoringMatch(gameDurationSec, participants.size());
+        return new ScoringMatch(participants.size());
     }
 
     public GameDuration toGameDuration() {

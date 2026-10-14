@@ -7,4 +7,8 @@ public record GameDuration(int seconds) {
     public double minutes() {
         return seconds / SECONDS_PER_MINUTE;
     }
+
+    public boolean isAtLeast(int minimumSeconds) {
+        return seconds >= minimumSeconds;
+    }
 }

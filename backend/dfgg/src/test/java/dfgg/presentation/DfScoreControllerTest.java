@@ -4,6 +4,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
@@ -81,7 +82,7 @@ class DfScoreControllerTest {
     void score_WhenQueueIsNotSupported_ReturnNullForEveryParticipant() {
         // when & then
         given().contentType(ContentType.JSON)
-                .body(body(450, 1800, 10))
+                .body(body(1700, 1800, 10))
                 .when().post("/api/df-score")
                 .then().statusCode(200)
                 .body("participants", hasSize(10))
@@ -222,8 +223,8 @@ class DfScoreControllerTest {
     }
 
     @Test
-    @DisplayName("포지션이 없는 칼바람 경기는 400이 아니라 점수 없이 응답한다")
-    void score_WhenUnsupportedQueueHasNoPosition_ReturnNullForEveryParticipant() {
+    @DisplayName("포지션이 없는 칼바람 경기도 채점하고 MVP·ACE를 정한다")
+    void score_WhenAramMatchHasNoPosition_ReturnScoresAndBadges() {
         // given
         List<String> participants = tenParticipants().stream()
                 .map(participant -> participant.replaceAll("\"position\": \"[A-Z]+\"", "\"position\": null"))
@@ -231,7 +232,24 @@ class DfScoreControllerTest {
 
         // when & then
         given().contentType(ContentType.JSON)
-                .body(body(450, 1800, participants))
+                .body(body(450, 600, participants))
+                .when().post("/api/df-score")
+                .then().statusCode(200)
+                .body("participants.score", everyItem(notNullValue()))
+                .body("participants.badge", hasItems("MVP", "ACE"));
+    }
+
+    @Test
+    @DisplayName("칼바람은 8분 미만이면 점수 없이 응답한다")
+    void score_WhenAramShorterThanEightMinutes_ReturnNullForEveryParticipant() {
+        // given
+        List<String> participants = tenParticipants().stream()
+                .map(participant -> participant.replaceAll("\"position\": \"[A-Z]+\"", "\"position\": null"))
+                .toList();
+
+        // when & then
+        given().contentType(ContentType.JSON)
+                .body(body(450, 479, participants))
                 .when().post("/api/df-score")
                 .then().statusCode(200)
                 .body("participants.score", everyItem(nullValue()));

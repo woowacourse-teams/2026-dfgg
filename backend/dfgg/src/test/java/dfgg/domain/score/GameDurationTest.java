@@ -19,4 +19,12 @@ class GameDurationTest {
         // then
         assertThat(minutes).isEqualTo(30.25);
     }
+
+    @Test
+    @DisplayName("기준 시간 이상인지 안다")
+    void isAtLeast_WhenComparedWithMinimumSeconds_TrueOnlyFromMinimum() {
+        // when & then
+        assertThat(new GameDuration(900).isAtLeast(900)).isTrue();
+        assertThat(new GameDuration(899).isAtLeast(900)).isFalse();
+    }
 }
