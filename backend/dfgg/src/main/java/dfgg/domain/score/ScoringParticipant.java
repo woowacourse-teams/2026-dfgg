@@ -60,6 +60,14 @@ public class ScoringParticipant {
         return position;
     }
 
+    public boolean isWinner() {
+        return win;
+    }
+
+    public int deaths() {
+        return deaths;
+    }
+
     public int kills() {
         return kills;
     }

@@ -23,6 +23,7 @@ public class ScoringParticipants {
         Map<Integer, List<ScoringParticipant>> teams = groupByTeam(participants);
         validateTeamCount(teams);
         teams.values().forEach(this::validateTeam);
+        validateSingleWinner(teams);
         this.participants = List.copyOf(participants);
     }
 
@@ -39,7 +40,28 @@ public class ScoringParticipants {
 
     private void validateTeam(List<ScoringParticipant> team) {
         validateTeamSize(team);
+        validateSameResult(team);
         validateKillInvolvement(team);
+    }
+
+    private void validateSameResult(List<ScoringParticipant> team) {
+        long results = team.stream()
+                .map(ScoringParticipant::isWinner)
+                .distinct()
+                .count();
+        if (results != 1) {
+            throw new InvalidDfScoreRequestException(
+                    "팀 %d 안에서 승패가 엇갈립니다".formatted(team.getFirst().teamId()));
+        }
+    }
+
+    private void validateSingleWinner(Map<Integer, List<ScoringParticipant>> teams) {
+        long winningTeams = teams.values().stream()
+                .filter(team -> team.getFirst().isWinner())
+                .count();
+        if (winningTeams != 1) {
+            throw new InvalidDfScoreRequestException("한 팀만 이겨야 합니다");
+        }
     }
 
     private void validateTeamSize(List<ScoringParticipant> team) {

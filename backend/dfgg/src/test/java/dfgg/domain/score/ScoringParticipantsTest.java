@@ -172,4 +172,34 @@ class ScoringParticipantsTest {
         // then
         assertThat(contribution.killParticipation()).isZero();
     }
+
+    @Test
+    @DisplayName("한 팀 안에서 승패가 엇갈리면 예외가 발생한다")
+    void constructor_WhenWinIsMixedInTeam_ThrowInvalidDfScoreRequestException() {
+        // given
+        List<ScoringParticipant> participants = validGame();
+        participants.set(1, new ScoringParticipant(100, ChampionPosition.JUNGLE, false,
+                2, 4, 3, 20000, 18000, 11000, 20, 3000, 5000));
+
+        // when & then
+        assertThatThrownBy(() -> new ScoringParticipants(participants))
+                .isInstanceOf(InvalidDfScoreRequestException.class)
+                .hasMessageContaining("승패");
+    }
+
+    @Test
+    @DisplayName("두 팀이 모두 이겼거나 모두 졌으면 예외가 발생한다 — 한 팀만 이긴다")
+    void constructor_WhenBothTeamsWon_ThrowInvalidDfScoreRequestException() {
+        // given
+        List<ScoringParticipant> participants = validGame();
+        for (int index = 5; index < 10; index++) {
+            participants.set(index, new ScoringParticipant(200, POSITIONS.get(index - 5), true,
+                    2, 4, 3, 20000, 18000, 11000, 20, 3000, 5000));
+        }
+
+        // when & then
+        assertThatThrownBy(() -> new ScoringParticipants(participants))
+                .isInstanceOf(InvalidDfScoreRequestException.class)
+                .hasMessageContaining("한 팀");
+    }
 }

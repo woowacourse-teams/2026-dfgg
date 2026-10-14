@@ -273,4 +273,46 @@ class DfScoreControllerTest {
                 .then().statusCode(200)
                 .body("participants.score", everyItem(notNullValue()));
     }
+
+    @Test
+    @DisplayName("참조 경기의 점수가 참조 구현과 같고, 이긴 팀 최고점은 MVP·진 팀 최고점은 ACE다")
+    void score_WhenReferenceMatch_ReturnScoresAndBadges() {
+        // given
+        String body = """
+                {"queueId": 420, "gameDurationSec": 1800, "participants": [
+                 {"puuid": "p1", "teamId": 100, "position": "TOP", "win": true, "kills": 5, "deaths": 3, "assists": 4, "totalDamageDealtToChampions": 25000, "totalDamageTaken": 30000, "goldEarned": 13000, "visionScore": 18, "damageDealtToTurrets": 6000, "damageDealtToObjectives": 7000},
+                 {"puuid": "p2", "teamId": 100, "position": "JUNGLE", "win": true, "kills": 6, "deaths": 4, "assists": 10, "totalDamageDealtToChampions": 18000, "totalDamageTaken": 35000, "goldEarned": 12000, "visionScore": 40, "damageDealtToTurrets": 1000, "damageDealtToObjectives": 25000},
+                 {"puuid": "p3", "teamId": 100, "position": "MID", "win": true, "kills": 7, "deaths": 2, "assists": 6, "totalDamageDealtToChampions": 30000, "totalDamageTaken": 15000, "goldEarned": 13500, "visionScore": 22, "damageDealtToTurrets": 4000, "damageDealtToObjectives": 5000},
+                 {"puuid": "p4", "teamId": 100, "position": "BOTTOM", "win": true, "kills": 8, "deaths": 3, "assists": 5, "totalDamageDealtToChampions": 32000, "totalDamageTaken": 14000, "goldEarned": 14500, "visionScore": 15, "damageDealtToTurrets": 5000, "damageDealtToObjectives": 9000},
+                 {"puuid": "p5", "teamId": 100, "position": "SUPPORT", "win": true, "kills": 1, "deaths": 4, "assists": 18, "totalDamageDealtToChampions": 9000, "totalDamageTaken": 16000, "goldEarned": 8500, "visionScore": 80, "damageDealtToTurrets": 500, "damageDealtToObjectives": 800},
+                 {"puuid": "p6", "teamId": 200, "position": "TOP", "win": false, "kills": 3, "deaths": 6, "assists": 3, "totalDamageDealtToChampions": 20000, "totalDamageTaken": 32000, "goldEarned": 11000, "visionScore": 15, "damageDealtToTurrets": 3000, "damageDealtToObjectives": 3500},
+                 {"puuid": "p7", "teamId": 200, "position": "JUNGLE", "win": false, "kills": 4, "deaths": 7, "assists": 6, "totalDamageDealtToChampions": 15000, "totalDamageTaken": 33000, "goldEarned": 10000, "visionScore": 35, "damageDealtToTurrets": 0, "damageDealtToObjectives": 18000},
+                 {"puuid": "p8", "teamId": 200, "position": "MID", "win": false, "kills": 5, "deaths": 6, "assists": 4, "totalDamageDealtToChampions": 24000, "totalDamageTaken": 18000, "goldEarned": 11500, "visionScore": 20, "damageDealtToTurrets": 2000, "damageDealtToObjectives": 2500},
+                 {"puuid": "p9", "teamId": 200, "position": "BOTTOM", "win": false, "kills": 4, "deaths": 7, "assists": 3, "totalDamageDealtToChampions": 22000, "totalDamageTaken": 15000, "goldEarned": 11000, "visionScore": 12, "damageDealtToTurrets": 1500, "damageDealtToObjectives": 4000},
+                 {"puuid": "p10", "teamId": 200, "position": "SUPPORT", "win": false, "kills": 0, "deaths": 6, "assists": 10, "totalDamageDealtToChampions": 7000, "totalDamageTaken": 17000, "goldEarned": 7000, "visionScore": 70, "damageDealtToTurrets": 0, "damageDealtToObjectives": 300}
+                ]}""";
+
+        // when & then
+        given().contentType(ContentType.JSON)
+                .body(body)
+                .when().post("/api/df-score")
+                .then().statusCode(200)
+                .body("participants.score", contains(66.7f, 66.1f, 74.5f, 66.1f, 67.8f, 47.2f, 49.3f, 54.9f, 40.2f, 46.4f))
+                .body("participants.badge", contains(null, null, "MVP", null, null, null, null, "ACE", null, null));
+    }
+
+    @Test
+    @DisplayName("한 팀 안에서 승패가 엇갈리면 400으로 응답한다")
+    void score_WhenWinIsMixedInTeam_ReturnBadRequest() {
+        // given
+        List<String> participants = tenParticipants();
+        participants.set(1, participant(1).replace("\"win\": true", "\"win\": false"));
+
+        // when & then
+        given().contentType(ContentType.JSON)
+                .body(body(420, 1800, participants))
+                .when().post("/api/df-score")
+                .then().statusCode(400)
+                .body("detail", containsString("승패"));
+    }
 }

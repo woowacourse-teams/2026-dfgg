@@ -1,8 +1,9 @@
 package dfgg.application.score;
 
-import dfgg.domain.score.DfScore;
 import dfgg.domain.score.MatchScorer;
 import dfgg.domain.score.MatchScorers;
+import dfgg.domain.score.MatchScores;
+import dfgg.domain.score.ScoringParticipants;
 import dfgg.domain.score.SummonersRiftScorer;
 import dfgg.presentation.dto.request.DfScoreRequest;
 import dfgg.presentation.dto.response.DfScoreResponse;
@@ -23,7 +24,9 @@ public class DfScoreService {
         if (scorer.isEmpty() || !request.toScoringMatch().isScorable()) {
             return DfScoreResponse.unscored(request.puuids());
         }
-        List<DfScore> scores = scorer.get().score(request.toScoringParticipants(), request.toGameDuration());
-        return DfScoreResponse.scored(request.puuids(), scores);
+        ScoringParticipants participants = request.toScoringParticipants();
+        MatchScores matchScores = new MatchScores(participants,
+                scorer.get().score(participants, request.toGameDuration()));
+        return DfScoreResponse.scored(request.puuids(), matchScores);
     }
 }

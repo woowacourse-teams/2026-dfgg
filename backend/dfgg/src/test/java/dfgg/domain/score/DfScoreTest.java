@@ -3,6 +3,7 @@ package dfgg.domain.score;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -36,5 +37,19 @@ class DfScoreTest {
 
         // then
         assertThat(value).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("반올림한 값이 같아도 반올림 전 값으로 비교한다")
+    void compareTo_WhenRoundedValuesTie_CompareExactValues() {
+        // given
+        DfScore lower = new DfScore(74.21);
+        DfScore higher = new DfScore(74.24);
+
+        // when
+        int comparison = higher.compareTo(lower);
+
+        // then
+        assertThat(comparison).isPositive();
     }
 }
