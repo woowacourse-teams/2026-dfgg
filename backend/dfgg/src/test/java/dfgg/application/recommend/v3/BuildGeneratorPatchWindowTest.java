@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.ChampionPositionNormalizer;
 import dfgg.application.recommend.v3.generator.BuildCandidateGenerator;
+import dfgg.application.recommend.v3.generator.RecentPatchWindowCache;
 import dfgg.application.utils.WilsonScoreCalculator;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
@@ -41,7 +42,7 @@ class BuildGeneratorPatchWindowTest {
         return new BuildCandidateGenerator(
                 participantRepository, championItemStatsRepository,
                 new ChampionPositionNormalizer(), new WilsonScoreCalculator(),
-                recentPatchWindowSize
+                new RecentPatchWindowCache(participantRepository, recentPatchWindowSize)
         );
     }
 

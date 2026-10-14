@@ -18,7 +18,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -39,26 +38,20 @@ public class BuildCandidateGenerator implements CandidateGenerator {
     private final ChampionItemStatsRepository championItemStatsRepository;
     private final ChampionPositionNormalizer positionNormalizer;
     private final WilsonScoreCalculator wilsonScoreCalculator;
-
-    /**
-     * 집계({@code ItemStatsAggregationService})가 쓰는 값과 반드시 같아야 한다. 서로 다르면
-     * {@code champion_item_stats._recent}(집계 시점 윈도)와 전개 통계(서빙 시점 윈도)가
-     * 다른 "최근"을 뜻하게 되고, 그 어긋남은 추천 결과만 봐서는 드러나지 않는다.
-     */
-    private final int recentPatchWindowSize;
+    private final RecentPatchWindowCache recentPatchWindow;
 
     public BuildCandidateGenerator(
             NormalizedMatchParticipantRepository participantRepository,
             ChampionItemStatsRepository championItemStatsRepository,
             ChampionPositionNormalizer positionNormalizer,
             WilsonScoreCalculator wilsonScoreCalculator,
-            @Value("${recommendation.recent-patch-window-size}") int recentPatchWindowSize
+            RecentPatchWindowCache recentPatchWindow
     ) {
         this.participantRepository = participantRepository;
         this.championItemStatsRepository = championItemStatsRepository;
         this.positionNormalizer = positionNormalizer;
         this.wilsonScoreCalculator = wilsonScoreCalculator;
-        this.recentPatchWindowSize = recentPatchWindowSize;
+        this.recentPatchWindow = recentPatchWindow;
     }
 
     @Override
@@ -180,7 +173,7 @@ public class BuildCandidateGenerator implements CandidateGenerator {
     }
 
     private Collection<String> recentPatches() {
-        RecentPatchWindow window = RecentPatchWindow.of(participantRepository.findDistinctPatches(), recentPatchWindowSize);
+        RecentPatchWindow window = recentPatchWindow.current();
         if (window.isEmpty()) {
             return List.of("");
         }
