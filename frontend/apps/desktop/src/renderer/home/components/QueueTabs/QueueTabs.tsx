@@ -1,5 +1,6 @@
 import './QueueTabs.css';
 
+import { t } from '../../../i18n';
 import type { QueueFilter } from '../../lib/queues';
 
 type Tab = { key: QueueFilter; label: string; count: number };
@@ -21,7 +22,7 @@ function QueueTabs({ tabs, active, onChange }: Props) {
     <div
       className='queue-tabs'
       role='tablist'
-      aria-label='게임 종류'
+      aria-label={t.queue.tabsLabel}
       style={{ '--tab-count': tabs.length, '--tab-active': activeIndex } as React.CSSProperties}
     >
       <span className='queue-tabs-thumb' aria-hidden='true' />

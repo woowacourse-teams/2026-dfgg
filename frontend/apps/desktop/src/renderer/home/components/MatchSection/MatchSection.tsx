@@ -9,6 +9,7 @@ import type {
   MatchDetail as Detail,
   MatchSummary,
 } from '../../../../shared/types';
+import { t } from '../../../i18n';
 import { ChevronIcon, ClockIcon } from '../../../icons';
 import { championTileUrl } from '../../lib/ddragon';
 import { formatMinutes, formatWhen, queueLabel } from '../../lib/format';
@@ -83,7 +84,7 @@ export function MatchCard({
 
         <span className='match-info'>
           <span className='match-top'>
-            <b className='match-result'>{match.win ? '승리' : '패배'}</b>
+            <b className='match-result'>{match.win ? t.result.win : t.result.loss}</b>
             <span className='match-queue'>{queueLabel(match)}</span>
             <span className='match-when'>{formatWhen(match.gameCreationDate)}</span>
           </span>
@@ -117,7 +118,7 @@ export function MatchCard({
           onClick={toggleHight}
           aria-expanded={highlightOpen}
         >
-          ▶ 하이라이트 · 클립 {highlight.count}개 · {formatClock(highlight.duration)}
+          {t.match.highlight(highlight.count, formatClock(highlight.duration))}
         </button>
       )}
 
@@ -127,7 +128,7 @@ export function MatchCard({
             <HighlightPlayer game={highlightGame} autoPlay source='match-card' />
           ) : (
             <p className='matches-empty'>
-              {highlightGame === null ? '하이라이트가 삭제됐습니다' : '불러오는 중...'}
+              {highlightGame === null ? t.match.highlightDeleted : t.common.loading}
             </p>
           )}
         </div>
@@ -140,9 +141,7 @@ export function MatchCard({
             {detail ? (
               <MatchDetail detail={detail} summary={match} version={version} />
             ) : (
-              <p className='matches-empty'>
-                {failed ? '기록을 가져오지 못했습니다' : '불러오는 중...'}
-              </p>
+              <p className='matches-empty'>{failed ? t.match.loadFailed : t.common.loading}</p>
             )}
           </div>
         </div>
@@ -170,11 +169,11 @@ function MatchSection({
   return (
     <section className='matches'>
       <div className='section-head'>
-        <h1 className='section-title'>전적</h1>
+        <h1 className='section-title'>{t.match.title}</h1>
       </div>
 
-      {matches === null && <p className='matches-empty'>전적을 불러오는 중...</p>}
-      {matches?.length === 0 && <p className='matches-empty'>최근 전적이 없습니다</p>}
+      {matches === null && <p className='matches-empty'>{t.match.loading}</p>}
+      {matches?.length === 0 && <p className='matches-empty'>{t.match.empty}</p>}
 
       <ul className='match-list'>
         {matches?.map((match) => (

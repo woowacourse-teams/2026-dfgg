@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/electron/renderer';
 import { useEffect, useState } from 'react';
 
 import type { EndedGame, FeedbackRating } from '../../../../shared/types';
+import { t } from '../../../i18n';
 
 interface FeedbackModalProps {
   game: EndedGame;
@@ -11,9 +12,9 @@ interface FeedbackModalProps {
 }
 
 const OPTIONS: { rating: FeedbackRating; label: string }[] = [
-  { rating: 'good', label: '좋음' },
-  { rating: 'soso', label: '보통' },
-  { rating: 'bad', label: '나쁨' },
+  { rating: 'good', label: t.feedback.good },
+  { rating: 'soso', label: t.feedback.soso },
+  { rating: 'bad', label: t.feedback.bad },
 ];
 
 // 감사 문구를 보여준 뒤 닫히기까지의 시간
@@ -43,18 +44,23 @@ export default function FeedbackModal({ game, onClose }: FeedbackModalProps) {
 
   return (
     <div className='feedback-modal' role='dialog' aria-labelledby='feedback-title'>
-      <button type='button' className='feedback-close' aria-label='닫기' onClick={onClose}>
+      <button
+        type='button'
+        className='feedback-close'
+        aria-label={t.common.close}
+        onClick={onClose}
+      >
         ×
       </button>
 
       {status === 'done' ? (
         <p id='feedback-title' className='feedback-title'>
-          소중한 의견 감사합니다!
+          {t.feedback.thanks}
         </p>
       ) : (
         <>
           <p id='feedback-title' className='feedback-title'>
-            이번 게임의 아이템 추천은 어땠나요?
+            {t.feedback.question}
           </p>
 
           <div className='feedback-options'>
@@ -71,9 +77,7 @@ export default function FeedbackModal({ game, onClose }: FeedbackModalProps) {
             ))}
           </div>
 
-          {status === 'error' && (
-            <p className='feedback-error'>전송하지 못했어요. 다시 눌러 주세요.</p>
-          )}
+          {status === 'error' && <p className='feedback-error'>{t.feedback.failed}</p>}
         </>
       )}
     </div>

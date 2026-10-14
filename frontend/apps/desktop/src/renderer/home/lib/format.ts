@@ -1,4 +1,5 @@
 import type { MatchSummary } from '../../../shared/types';
+import { INTL, t } from '../../i18n';
 import { QUEUE_FILTERS, queueOf } from './queues';
 
 const MINUTE_SECONDS = 60;
@@ -9,26 +10,26 @@ const RECENT_DAYS = 30;
 
 /** '18분'. 초까지 적으면 숫자가 늘 뿐 읽는 데 도움이 안 된다. */
 export const formatMinutes = (seconds: number): string =>
-  `${Math.round(seconds / MINUTE_SECONDS)}분`;
+  t.duration.minutes(Math.round(seconds / MINUTE_SECONDS));
 
 /** '19,700'. 자리가 넉넉한 곳에서는 줄이지 않고 그대로 적는 편이 읽기 쉽다. */
-export const formatNumber = (value: number): string => value.toLocaleString('ko-KR');
+export const formatNumber = (value: number): string => value.toLocaleString(INTL);
 
 /** 최근 판은 '3시간 전', 오래된 판은 날짜로 보여준다. */
 export function formatWhen(iso: string): string {
   const played = new Date(iso);
   const diff = Date.now() - played.getTime();
 
-  if (diff < HOUR_MS) return `${Math.max(1, Math.floor(diff / MINUTE_MS))}분 전`;
-  if (diff < DAY_MS) return `${Math.floor(diff / HOUR_MS)}시간 전`;
-  if (diff < RECENT_DAYS * DAY_MS) return `${Math.floor(diff / DAY_MS)}일 전`;
+  if (diff < HOUR_MS) return t.ago.min(Math.max(1, Math.floor(diff / MINUTE_MS)));
+  if (diff < DAY_MS) return t.ago.hour(Math.floor(diff / HOUR_MS));
+  if (diff < RECENT_DAYS * DAY_MS) return t.ago.day(Math.floor(diff / DAY_MS));
 
-  return played.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
+  return played.toLocaleDateString(INTL, { month: 'numeric', day: 'numeric' });
 }
 
 /** 탭과 같은 짧은 이름을 쓴다. 클라이언트가 주는 이름('솔로 랭크 게임')은 한 줄에 넣기엔 길다. */
 export function queueLabel(match: MatchSummary): string {
-  if (match.isCustom) return '사용자 설정';
+  if (match.isCustom) return t.queue.custom;
   const queue = queueOf(match);
   return queue === 'etc'
     ? match.queueName

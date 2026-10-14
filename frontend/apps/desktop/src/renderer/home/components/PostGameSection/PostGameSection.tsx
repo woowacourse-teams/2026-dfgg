@@ -8,6 +8,7 @@ import type {
   HighlightProgress,
   MatchSummary,
 } from '../../../../shared/types';
+import { t } from '../../../i18n';
 import HighlightPlayer from '../HighlightSection/HighlightPlayer';
 import { MatchCard } from '../MatchSection/MatchSection';
 
@@ -59,7 +60,7 @@ function PostGameSection({
   return (
     <section className='postgame'>
       <div className='section-head'>
-        <h1 className='section-title'>방금 끝난 판</h1>
+        <h1 className='section-title'>{t.postGame.title}</h1>
         <button
           type='button'
           className='postgame-close'
@@ -70,7 +71,7 @@ function PostGameSection({
               making: progress !== null,
             });
           }}
-          aria-label='닫기'
+          aria-label={t.common.close}
         >
           ✕
         </button>
@@ -78,7 +79,7 @@ function PostGameSection({
 
       {progress && (
         <p className='postgame-progress'>
-          하이라이트 만드는 중... {progress.done}/{progress.total}
+          {t.highlight.makingShort(progress.done, progress.total)}
         </p>
       )}
 
@@ -89,7 +90,7 @@ function PostGameSection({
               <MatchCard match={match} version={version} />
             </ul>
           ) : (
-            <p className='postgame-note'>전적에 반영되는 중이에요</p>
+            <p className='postgame-note'>{t.postGame.syncing}</p>
           )}
           <div className='postgame-player'>
             <HighlightPlayer key={game.id} game={game} autoPlay source='postgame' />

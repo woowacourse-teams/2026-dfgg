@@ -25,6 +25,8 @@ type Unsubscribe = () => void;
 
 declare global {
   interface Window {
+    /** main 이 정한 화면 언어('ko' | 'en'). 브라우저에서 devMock 으로 열면 없다. */
+    appLocale?: string | null;
     lcu: {
       currentSummoner: () => Promise<Summoner | null>;
       getRankInfo: () => Promise<LcuCurrentRankedStats | null>;

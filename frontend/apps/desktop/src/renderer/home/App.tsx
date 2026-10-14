@@ -11,6 +11,7 @@ import type {
   MatchSummary,
   Summoner,
 } from '../../shared/types';
+import { t } from '../i18n';
 import Bento from './components/Bento/Bento';
 import EmptyState from './components/EmptyState/EmptyState';
 import FeedbackModal from './components/feedback/FeedbackModal';
@@ -211,7 +212,7 @@ function App() {
           <section className='bento-section'>
             {summary && (
               <div className='section-head'>
-                <h1 className='section-title'>최근 {summary.games}판 요약</h1>
+                <h1 className='section-title'>{t.summary.title(summary.games)}</h1>
               </div>
             )}
             <Bento key={activeQueue} summary={summary} rankInfo={rankInfo} />

@@ -9,6 +9,7 @@ import type {
   MatchSummary,
   MatchTeam,
 } from '../../../../shared/types';
+import { t } from '../../../i18n';
 import { championIconUrl } from '../../lib/ddragon';
 import { csPerMin, formatNumber, percentOf, perMinute } from '../../lib/format';
 import { Hatch, ItemRow, KdaLine } from './parts';
@@ -24,8 +25,8 @@ const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 type BoardView = 'damage' | 'items';
 
 const BOARD_VIEWS: { key: BoardView; label: string }[] = [
-  { key: 'damage', label: '피해량' },
-  { key: 'items', label: '아이템' },
+  { key: 'damage', label: t.match.damage },
+  { key: 'items', label: t.match.items },
 ];
 
 const sum = (members: MatchParticipant[], pick: (stats: MatchStats) => number) =>
@@ -50,19 +51,19 @@ function Scoreline({
     <header className='score'>
       <div className='score-board'>
         <div className={`score-side ${myTeam?.win ? 'score-win' : ''}`}>
-          <b>{myTeam?.win ? '승리' : '패배'}</b>
-          <span>우리 팀</span>
+          <b>{myTeam?.win ? t.result.win : t.result.loss}</b>
+          <span>{t.match.myTeam}</span>
         </div>
 
         <p className='score-kills'>
           <strong className='score-mine'>{sum(mine, (stats) => stats.kills)}</strong>
-          <i>킬</i>
+          <i>{t.match.kills}</i>
           <strong>{sum(theirs, (stats) => stats.kills)}</strong>
         </p>
 
         <div className={`score-side score-right ${theirTeam?.win ? 'score-win' : ''}`}>
-          <b>{theirTeam?.win ? '승리' : '패배'}</b>
-          <span>상대 팀</span>
+          <b>{theirTeam?.win ? t.result.win : t.result.loss}</b>
+          <span>{t.match.theirTeam}</span>
         </div>
       </div>
 
@@ -70,7 +71,7 @@ function Scoreline({
       <div className='score-gold'>
         <span>{formatNumber(myGold)}</span>
         <span className='score-gold-track'>
-          <i>골드</i>
+          <i>{t.match.gold}</i>
           <span className='score-gold-bar'>
             <Hatch percent={percentOf(myGold, myGold + theirGold) || PERCENT / 2} from='left' />
           </span>
@@ -102,7 +103,7 @@ function MyPlay({
   const damageRank = team.filter((member) => member.stats.damageDealt > me.damageDealt).length + 1;
 
   return (
-    <section className='my-play' aria-label='내 플레이'>
+    <section className='my-play' aria-label={t.match.myPlay}>
       <div className='my-ring'>
         <svg
           width={RING_SIZE}
@@ -125,27 +126,27 @@ function MyPlay({
           {killShare}
           <small>%</small>
         </span>
-        <span className='my-ring-label'>킬 관여</span>
+        <span className='my-ring-label'>{t.match.killShare}</span>
       </div>
 
       {/* 칸마다 이름표 → 큰 숫자 → 알약 순서. 알약에는 그 숫자를 풀어 주는 한마디를 넣는다. */}
       <dl className='my-stats'>
         <div>
-          <dt>가한 피해</dt>
+          <dt>{t.match.damageDealt}</dt>
           <dd>{formatNumber(me.damageDealt)}</dd>
           <dd className={`my-pill ${damageRank === 1 ? 'my-pill-top' : ''}`}>
-            팀 내 {damageRank}위
+            {t.match.damageRank(damageRank)}
           </dd>
         </div>
         <div>
-          <dt>분당 CS</dt>
+          <dt>{t.match.csPerMin}</dt>
           <dd>{csPerMin(me.cs, duration)}</dd>
-          <dd className='my-pill'>총 {me.cs}개</dd>
+          <dd className='my-pill'>{t.match.csTotal(me.cs)}</dd>
         </div>
         <div>
-          <dt>골드</dt>
+          <dt>{t.match.gold}</dt>
           <dd>{formatNumber(me.goldEarned)}</dd>
-          <dd className='my-pill'>분당 {perMinute(me.goldEarned, duration)}</dd>
+          <dd className='my-pill'>{t.match.perMinute(perMinute(me.goldEarned, duration))}</dd>
         </div>
       </dl>
     </section>
@@ -179,7 +180,7 @@ function Fighter({
       <span className='fighter-portrait'>
         <img src={championIconUrl(player.championId)} alt='' />
         {/* 이 판에서 피해를 가장 많이 넣은 한 명. 이름 줄에 두면 긴 이름을 밀어내서 그림에 얹는다. */}
-        {isTopDamage && <em>최다 딜</em>}
+        {isTopDamage && <em>{t.match.topDamage}</em>}
       </span>
 
       <div className='fighter-body'>
@@ -242,7 +243,7 @@ function MatchDetail({ detail, summary, version }: Props) {
       <section className='board'>
         <div className='board-head'>
           {/* 줄마다 피해량과 아이템을 다 넣으면 난잡하다. 하나씩 골라 본다. */}
-          <div className='board-views' role='tablist' aria-label='보기'>
+          <div className='board-views' role='tablist' aria-label={t.match.viewLabel}>
             {BOARD_VIEWS.map(({ key, label }) => (
               <button
                 key={key}

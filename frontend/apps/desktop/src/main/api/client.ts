@@ -1,5 +1,5 @@
-import { app } from 'electron';
 import { getApiBaseUrl } from './config';
+import { mainLocale } from '../locale';
 import { reportError } from '../sentry';
 
 const API_TIMEOUT_MS = 5000;
@@ -16,7 +16,8 @@ export async function apiPost<T>(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept-Language': app.getLocale(),
+        // UI 언어와 같은 기준으로 보내 추천 내용과 화면 언어가 어긋나지 않게 한다.
+        'Accept-Language': mainLocale(),
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),

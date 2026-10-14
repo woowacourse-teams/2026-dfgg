@@ -173,7 +173,8 @@
       "displayName": "dfgg",
       "backgroundColor": "#0e1428",
       "languages": [
-        "ko-KR"
+        "ko-KR",
+        "en-US"
       ],
       "customExtensionsPath": "resources/installer/appx-extensions.xml"
     },
