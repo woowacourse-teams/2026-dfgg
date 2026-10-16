@@ -42,11 +42,11 @@ groups:
           severity: critical
         annotations:
           summary: '{{ $labels.env }} 환경에 살아있는 슬롯이 없습니다. 놀고 있는 슬롯은 원래 0이므로, 합이 0이면 전부 죽은 것입니다.'
-          __dashboardUid__: dfgg-service-health
+          dashboard: Grafana → dfgg 폴더 → dfgg — 서비스 건강
         noDataState: Alerting
         execErrState: Error
       - uid: dfgg-5xx-rate
-        title: 5xx 비율 1% 초과
+        title: 5xx 비율 1% 초과 (dev)
         condition: B
         data:
           - refId: A
@@ -56,7 +56,7 @@ groups:
             datasourceUid: dfgg-prometheus
             model:
               refId: A
-              expr: (sum(rate(http_server_requests_seconds_count{job=~"dfgg-app.*", status=~"5.."}[5m])) by (env) or vector(0)) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~"dfgg-app.*"}[5m]))
+              expr: (sum(rate(http_server_requests_seconds_count{job=~"dfgg-app.*", env="dev", status=~"5.."}[5m])) by (env) or vector(0)) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~"dfgg-app.*", env="dev"}[5m]))
                 by (env), 0.001)
               instant: true
               intervalMs: 1000
@@ -79,8 +79,63 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: '{{ $labels.env }} 5xx 비율이 1%를 넘었습니다.'
-          __dashboardUid__: dfgg-service-health
+          summary: '{{ $labels.env }} 5xx 비율이 1%를 넘었습니다. prod는 비율이 아니라 건수로 따로 본다(dfgg-prod-5xx).'
+          dashboard: Grafana → dfgg 폴더 → dfgg — 서비스 건강
+        noDataState: OK
+        execErrState: Error
+      - uid: dfgg-prod-5xx
+        title: prod 5xx 응답 발생
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: dfgg-cloudwatch
+            model:
+              refId: A
+              queryMode: Logs
+              region: ap-northeast-2
+              logGroups:
+                - arn: /dfgg/prod
+                  name: /dfgg/prod
+              expression: |-
+                fields @timestamp
+                | filter @logStream like "nginx-access" and @message like /status=5\d\d /
+                | stats count(*) as errors by bin(1m)
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: sum
+              settings:
+                mode: dropNN
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0
+        for: 0s
+        labels:
+          env: prod
+          severity: critical
+        annotations:
+          summary: 'prod에서 최근 5분 동안 5xx 응답이 {{ $values.B.Value }}건 났습니다(nginx 기준). 원인은 CloudWatch 저장 쿼리 dfgg/prod 2. 오류만 (ERROR) 또는 대시보드 로그 패널에서 traceId로 찾습니다.'
+          dashboard: Grafana → dfgg 폴더 → dfgg — 서비스 건강
         noDataState: OK
         execErrState: Error
       - uid: dfgg-v3-p95
@@ -117,7 +172,7 @@ groups:
           severity: warning
         annotations:
           summary: '{{ $labels.env }} 추천 p95가 1초를 넘었습니다. 기준값은 T14 조치 후 목표이며 T15에서 실측으로 확정합니다.'
-          __dashboardUid__: dfgg-service-health
+          dashboard: Grafana → dfgg 폴더 → dfgg — 서비스 건강
         noDataState: OK
         execErrState: Error
       - uid: dfgg-rds-credit
@@ -173,11 +228,11 @@ groups:
           severity: warning
         annotations:
           summary: dfgg-db-prod의 CPU 크레딧이 50 아래입니다. 바닥나면 CPU가 기준선으로 묶여 갑자기 느려집니다.
-          __dashboardUid__: dfgg-service-health
+          dashboard: Grafana → dfgg 폴더 → dfgg — 서비스 건강
         noDataState: OK
         execErrState: Error
       - uid: dfgg-rds-storage
-        title: RDS 여유 디스크 부족 (prod)
+        title: RDS 여유 디스크 부족 (main)
         condition: C
         data:
           - refId: A
@@ -194,7 +249,7 @@ groups:
               metricName: FreeStorageSpace
               statistic: Average
               dimensions:
-                DBInstanceIdentifier: dfgg-db-prod
+                DBInstanceIdentifier: dfgg-db-main
               period: '300'
               region: ap-northeast-2
               matchExact: true
@@ -226,10 +281,11 @@ groups:
                       - 2147483648
         for: 10m
         labels:
+          env: main
           severity: critical
         annotations:
-          summary: dfgg-db-prod의 여유 디스크가 2GB 아래입니다.
-          __dashboardUid__: dfgg-service-health
+          summary: 'dfgg-db-main(수집 DB)의 여유 디스크가 2GB 아래입니다. 이 DB는 여유가 10% 아래로 가면 RDS가 디스크를 자동으로 늘리므로(9/21·9/26·10/1에 10GiB씩), 이 알림은 자동 확장이 일어나지 않았다는 뜻입니다 — 상한 도달이나 6시간 대기 중 급증을 의심합니다.'
+          dashboard: Grafana → dfgg 폴더 → dfgg — 서비스 건강
         noDataState: OK
         execErrState: Error
 contactPoints:

@@ -1,6 +1,7 @@
 package dfgg.evaluation;
 
 import dfgg.application.champion.ChampionService;
+import dfgg.domain.language.Language;
 import dfgg.application.recommend.NextItemRecommendationService;
 import dfgg.application.recommend.v3.CandidateGenerator;
 import dfgg.application.recommend.v3.CandidateSource;
@@ -49,7 +50,7 @@ class EvidenceTest {
                 allies.stream().map(name -> new ChampionDto(name, "MID")).toList(),
                 enemies.stream().map(name -> new ChampionDto(name, "MID")).toList(),
                 "PLATINUM", "16.16");
-        NextItemRecommendationResponse response = service.recommendNextItem(request);
+        NextItemRecommendationResponse response = service.recommendNextItem(request, Language.KO_KR);
 
         RecommendationQuery query = new RecommendationQuery(
                 idOf("Renekton"), ChampionPosition.TOP, List.of(),
@@ -80,7 +81,7 @@ class EvidenceTest {
                             .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
                             .map(e -> "%s %.2f".formatted(
                                     profiles.containsKey(e.getKey())
-                                            ? profiles.get(e.getKey()).name() : e.getKey(),
+                                            ? profiles.get(e.getKey()).name().get("ko-KR") : e.getKey(),
                                     e.getValue()))
                             .reduce((a, b) -> a + ", " + b).orElse("");
                     System.out.println("CHECK>>>     " + source + ": " + named);

@@ -12,6 +12,7 @@ import dfgg.application.recommend.v3.feature.*;
 import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
 import dfgg.application.champion.ChampionService;
 import dfgg.domain.champion.*;
+import dfgg.domain.language.Language;
 import dfgg.domain.match.*;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import dfgg.presentation.dto.*;
@@ -69,7 +70,7 @@ class ComponentGameContextParityTest {
         var request = new NextItemRecommendationRequest(new ChampionDto("C1", "TOP"), List.of(),
                 List.of(new ChampionDto("C2", "MID")), List.of(new ChampionDto("C3", "TOP"),
                 new ChampionDto("C4", "BOTTOM"), new ChampionDto("C999", "MID")), null, "16.18");
-        when(core.recommendNextItem(request)).thenReturn(new NextItemRecommendationResponse(
+        when(core.recommendNextItem(request, Language.KO_KR)).thenReturn(new NextItemRecommendationResponse(
                 List.of(new RecommendedItemDto(500L, "target", "image", null))));
         clearInvocations(championRepository);
         var serving = new ComponentRecommendationService(mock(GradientBoostedTrees.class));

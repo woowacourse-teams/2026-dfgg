@@ -2,6 +2,7 @@ package dfgg.application.recommend.component;
 
 import dfgg.application.recommend.NextItemRecommendationService;
 import dfgg.application.ChampionPositionNormalizer;
+import dfgg.domain.language.Language;
 import dfgg.domain.match.ItemInventory;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import dfgg.presentation.dto.RecommendedItemDto;
@@ -38,7 +39,8 @@ public class CoreComponentRecommendationService {
                 || !request.patch().equals(version.substring(0, version.lastIndexOf('.')))) {
             throw new IllegalArgumentException("Core 요청과 Component 카탈로그의 명시적인 동일 패치가 필요합니다.");
         }
-        var cores = coreRecommendations.recommendNextItem(request).recommendedItems();
+        // 목표 ID만 쓰므로 표시 언어는 결과에 영향이 없다.
+        var cores = coreRecommendations.recommendNextItem(request, Language.KO_KR).recommendedItems();
         var targets = cores.stream().map(core -> Math.toIntExact(core.id())).toList();
         var allyIds = request.allies().stream().map(ally -> champions.findChampionByName(ally.name()).getChampionId()).toList();
         var enemyIds = request.enemies().stream().map(enemy -> champions.findChampionByName(enemy.name()).getChampionId()).toList();

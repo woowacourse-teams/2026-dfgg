@@ -167,7 +167,7 @@ class EvidenceReachesResponseLayerTest {
         assertThat(attributed).isNotEmpty();
         assertThat(profiles.keySet()).containsAll(attributed);
         assertThat(profiles.values()).allSatisfy(profile ->
-                assertThat(profile.name()).isNotBlank());
+                assertThat(profile.name().get("ko-KR")).isNotBlank());
     }
 
     @Test

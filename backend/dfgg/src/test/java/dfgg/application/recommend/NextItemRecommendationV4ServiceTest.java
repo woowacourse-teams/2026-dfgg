@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import dfgg.domain.language.Language;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.champion.ChampionService;
 import dfgg.application.recommend.component.ComponentCandidateFeatures;
@@ -44,6 +45,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -69,7 +71,7 @@ class NextItemRecommendationV4ServiceTest {
                   "2055":{"name":"제어 와드","stacks":2,"gold":{"total":75,"purchasable":true}},
                   "3123":{"name":"처형인의 대검","gold":{"total":800,"purchasable":true}},
                   "3076":{"name":"덤불 조끼","gold":{"total":800,"purchasable":true}}
-                }}
+                },"englishNames":{"3123":"Executioner's Calling","3076":"Bramble Vest"}}
                 """, ItemResponse.class);
         service = service(ComponentRecommendationRuntime.available(component, catalog));
     }
@@ -87,7 +89,7 @@ class NextItemRecommendationV4ServiceTest {
                 new TargetRecommendation(3086, Status.NO_CANDIDATE, List.of(), "gold"),
                 new TargetRecommendation(3133, Status.OK, List.of(purchase(1036, 2), purchase(1052, 1)), null)));
 
-        var response = service.recommendNextItem(request);
+        var response = service.recommendNextItem(request, Language.KO_KR);
 
         assertThat(response.recommendedItems()).extracting(item -> item.id()).containsExactly(3133L, 3086L, 3071L);
         var recommended = response.recommendedItems().getFirst();
@@ -118,7 +120,7 @@ class NextItemRecommendationV4ServiceTest {
         assertThat(query.patch()).isEqualTo("16.18");
         assertThat(query.composition()).isSameAs(NO_TAGS);
         verify(core).recommendNextItem(new NextItemRecommendationRequest(request.myChampion(), List.of(3031L),
-                request.allies(), request.enemies(), "EMERALD", "16.18"));
+                request.allies(), request.enemies(), "EMERALD", "16.18"), Language.KO_KR);
         verify(compositions).calculate(List.of(1L, 2L, 3L, 4L), List.of(5L, 6L, 7L, 8L, 9L));
     }
 
@@ -129,7 +131,7 @@ class NextItemRecommendationV4ServiceTest {
         prepareCore(List.of(coreItem(3133)));
         when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
                 new TargetRecommendation(3133, Status.NO_CANDIDATE, List.of(), null)));
-        service.recommendNextItem(request(patch, List.of()));
+        service.recommendNextItem(request(patch, List.of()), Language.KO_KR);
         var captured = ArgumentCaptor.forClass(ComponentRecommendationQuery.class);
         verify(component).recommend(captured.capture(), eq(catalog));
         assertThat(captured.getValue().patch()).isEqualTo("16.18");
@@ -143,7 +145,7 @@ class NextItemRecommendationV4ServiceTest {
                 new double[]{2}, new double[]{1, 1})));
         var connected = service(ComponentRecommendationRuntime.available(new ComponentRecommendationService(model), catalog));
 
-        var response = connected.recommendNextItem(request(null, List.of(new InventoryItemRequest(1036L, 1))));
+        var response = connected.recommendNextItem(request(null, List.of(new InventoryItemRequest(1036L, 1))), Language.KO_KR);
 
         assertThat(response.recommendedItems()).hasSize(2).allSatisfy(item -> {
             assertThat(item.purchaseBundle()).isNotNull();
@@ -155,7 +157,7 @@ class NextItemRecommendationV4ServiceTest {
     @ParameterizedTest
     @ValueSource(strings = {"16.17", "16.18.1", "invalid"})
     void 운영_패치와_다르면_추천을_호출하지_않는다(String patch) {
-        assertThatThrownBy(() -> service.recommendNextItem(request(patch, List.of())))
+        assertThatThrownBy(() -> service.recommendNextItem(request(patch, List.of()), Language.KO_KR))
                 .isInstanceOf(InvalidRecommendationRequestException.class);
         verifyNoInteractions(core, component, champions, compositions);
     }
@@ -163,7 +165,7 @@ class NextItemRecommendationV4ServiceTest {
     @Test
     void 준비되지_않은_Component는_상세_원인_없는_서비스_불가_예외를_반환한다() {
         var unavailable = service(ComponentRecommendationRuntime.unavailable());
-        assertThatThrownBy(() -> unavailable.recommendNextItem(request(null, List.of())))
+        assertThatThrownBy(() -> unavailable.recommendNextItem(request(null, List.of()), Language.KO_KR))
                 .isInstanceOf(ComponentRecommendationUnavailableException.class)
                 .hasMessage("현재 Component 추천을 사용할 수 없습니다.");
         verifyNoInteractions(core, component, champions, compositions);
@@ -171,23 +173,23 @@ class NextItemRecommendationV4ServiceTest {
 
     @Test
     void 모르는_보유_아이템은_입력_오류로_거부한다() {
-        assertThatThrownBy(() -> service.recommendNextItem(request(null, List.of(new InventoryItemRequest(999L, 1)))))
+        assertThatThrownBy(() -> service.recommendNextItem(request(null, List.of(new InventoryItemRequest(999L, 1))), Language.KO_KR))
                 .isInstanceOf(InvalidRecommendationRequestException.class).hasMessageContaining("999");
         verifyNoInteractions(core, component, champions, compositions);
     }
 
     @Test
     void Core가_빈_결과이면_Component를_계산하지_않는다() {
-        when(core.recommendNextItem(any())).thenReturn(new NextItemRecommendationResponse(List.of()));
-        assertThat(service.recommendNextItem(request(null, List.of())).recommendedItems()).isEmpty();
+        when(core.recommendNextItem(any(), any())).thenReturn(new NextItemRecommendationResponse(List.of()));
+        assertThat(service.recommendNextItem(request(null, List.of()), Language.KO_KR).recommendedItems()).isEmpty();
         verifyNoInteractions(component, champions, compositions);
     }
 
     @Test
     void Core의_실패를_빈_정상_응답으로_바꾸지_않는다() {
         var failure = new NextItemRecommendationNotFoundException("Garen", "TOP");
-        when(core.recommendNextItem(any())).thenThrow(failure);
-        assertThatThrownBy(() -> service.recommendNextItem(request(null, List.of()))).isSameAs(failure);
+        when(core.recommendNextItem(any(), any())).thenThrow(failure);
+        assertThatThrownBy(() -> service.recommendNextItem(request(null, List.of()), Language.KO_KR)).isSameAs(failure);
         verifyNoInteractions(component, champions, compositions);
     }
 
@@ -197,7 +199,7 @@ class NextItemRecommendationV4ServiceTest {
         when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
                 new TargetRecommendation(3133, Status.CALCULATION_FAILED, List.of(), "internal failure"),
                 new TargetRecommendation(3086, Status.OK, List.of(), null)));
-        var response = service.recommendNextItem(request(null, List.of()));
+        var response = service.recommendNextItem(request(null, List.of()), Language.KO_KR);
         assertThat(response.recommendedItems()).hasSize(3).allSatisfy(item -> assertThat(item.purchaseBundle()).isNull());
     }
 
@@ -207,17 +209,22 @@ class NextItemRecommendationV4ServiceTest {
         when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
                 new TargetRecommendation(3133, Status.OK, List.of(purchase(999, 1), purchase(1036, 1)), null),
                 new TargetRecommendation(3086, Status.OK, List.of(purchase(1052, 1)), null)));
-        var response = service.recommendNextItem(request(null, List.of()));
+        var response = service.recommendNextItem(request(null, List.of()), Language.KO_KR);
         assertThat(response.recommendedItems().getFirst().purchaseBundle()).isNull();
         assertThat(response.recommendedItems().getLast().purchaseBundle()).isNotNull();
     }
 
-    @Test
-    void 상대_조합_근거가_있으면_효과당_하나의_상황_대응_아이템을_함께_반환한다() {
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '"', textBlock = """
+            KO_KR | 처형인의 대검 | 워윅
+            EN_US | "Executioner's Calling" | Warwick
+            """)
+    void 상대_조합_근거가_있으면_효과당_하나의_상황_대응_아이템을_요청_언어로_함께_반환한다(
+            Language language, String itemName, String championName) {
         prepareCore(List.of(coreItem(3133)));
         Champion warwick = mock(Champion.class);
         when(warwick.getChampionId()).thenReturn(7L);
-        when(warwick.getName()).thenReturn(Map.of("ko-KR", "워윅"));
+        when(warwick.getName()).thenReturn(Map.of("ko-KR", "워윅", "en-US", "Warwick"));
         when(warwick.getRiotKey()).thenReturn("Warwick");
         when(champions.findChampionByName("champion7")).thenReturn(warwick);
         when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
@@ -231,14 +238,14 @@ class NextItemRecommendationV4ServiceTest {
                 lookup, new dfgg.domain.match.SituationalThresholds(2.0, .01));
 
         var response = service(ComponentRecommendationRuntime.available(component, catalog), situational)
-                .recommendNextItem(request(null, List.of(new InventoryItemRequest(1036L, 2))));
+                .recommendNextItem(request(null, List.of(new InventoryItemRequest(1036L, 2))), language);
 
         assertThat(response.recommendedItems()).hasSize(1);
         assertThat(response.situationalItems()).singleElement().satisfies(item -> {
             assertThat(item.itemId()).isEqualTo(3123L);
-            assertThat(item.name()).isEqualTo("처형인의 대검");
+            assertThat(item.name()).isEqualTo(itemName);
             assertThat(item.effect()).isEqualTo("GRIEVOUS_WOUNDS");
-            assertThat(item.reasonChampions()).extracting(ChampionRefDto::name).containsExactly("워윅");
+            assertThat(item.reasonChampions()).extracting(ChampionRefDto::name).containsExactly(championName);
             assertThat(item.additionalCost()).isEqualTo(800);
             assertThat(item.affordable()).isTrue();
         });
@@ -249,7 +256,7 @@ class NextItemRecommendationV4ServiceTest {
         prepareCore(List.of(coreItem(3133)));
         when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
                 new TargetRecommendation(3133, Status.OK, List.of(purchase(1036, 1)), null)));
-        assertThat(service.recommendNextItem(request(null, List.of())).situationalItems()).isEmpty();
+        assertThat(service.recommendNextItem(request(null, List.of()), Language.KO_KR).situationalItems()).isEmpty();
     }
 
     @Test
@@ -258,11 +265,11 @@ class NextItemRecommendationV4ServiceTest {
         var candidate = new ComponentCandidateFeatures(Map.of(1036, 1, 1052, 1), List.of(1036), Map.of(), features());
         when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
                 new TargetRecommendation(3133, Status.OK, List.of(new ScoredPurchase(candidate, 750, 1, 1)), null)));
-        assertThat(service.recommendNextItem(request(null, List.of())).recommendedItems().getFirst().purchaseBundle()).isNull();
+        assertThat(service.recommendNextItem(request(null, List.of()), Language.KO_KR).recommendedItems().getFirst().purchaseBundle()).isNull();
     }
 
     private void prepareCore(List<RecommendedItemDto> items) {
-        when(core.recommendNextItem(any())).thenReturn(new NextItemRecommendationResponse(items));
+        when(core.recommendNextItem(any(), any())).thenReturn(new NextItemRecommendationResponse(items));
         for (int id = 1; id <= 9; id++) champion("champion" + id, id);
         champion("Garen", 86);
         when(compositions.calculate(anyList(), anyList())).thenReturn(NO_TAGS);

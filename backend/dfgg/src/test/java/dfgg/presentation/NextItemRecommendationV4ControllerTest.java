@@ -7,7 +7,9 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -25,6 +27,7 @@ import dfgg.application.recommend.v3.ranker.DecisionTree;
 import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
 import dfgg.common.exception.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
+import dfgg.domain.language.Language;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import dfgg.presentation.dto.RecommendationDescription;
 import dfgg.presentation.dto.RecommendedItemDto;
@@ -74,7 +77,7 @@ class NextItemRecommendationV4ControllerTest {
         when(runtime.isAvailable()).thenReturn(true);
         when(runtime.catalog()).thenReturn(catalog);
         when(runtime.recommend(any())).thenAnswer(invocation -> component.recommend(invocation.getArgument(0), catalog));
-        when(core.recommendNextItem(any())).thenReturn(new NextItemRecommendationResponse(List.of(
+        when(core.recommendNextItem(any(), any())).thenReturn(new NextItemRecommendationResponse(List.of(
                 coreItem(3133), coreItem(9999))));
         when(compositions.calculate(anyList(), anyList())).thenReturn(NO_TAGS);
         for (int id = 1; id <= 10; id++) {
@@ -172,9 +175,22 @@ class NextItemRecommendationV4ControllerTest {
                 .andExpect(jsonPath("$.recommendedItems[0]", not(hasKey("purchaseBundle"))));
     }
 
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
+            ko-KR | KO_KR
+            en | EN_US
+            null | EN_US
+            """)
+    void Accept_Language_헤더의_언어로_Core를_조회한다(String acceptLanguage, Language expected) throws Exception {
+        var request = post(ENDPOINT).contentType(MediaType.APPLICATION_JSON).content(body());
+        if (acceptLanguage != null) request.header("Accept-Language", acceptLanguage);
+        mvc.perform(request).andExpect(status().isOk());
+        verify(core).recommendNextItem(any(), eq(expected));
+    }
+
     @Test
     void Core_추천이_없으면_404이다() throws Exception {
-        when(core.recommendNextItem(any())).thenThrow(new NextItemRecommendationNotFoundException("champion10", "TOP"));
+        when(core.recommendNextItem(any(), any())).thenThrow(new NextItemRecommendationNotFoundException("champion10", "TOP"));
         mvc.perform(post(ENDPOINT).contentType(MediaType.APPLICATION_JSON).content(body()))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
@@ -182,7 +198,7 @@ class NextItemRecommendationV4ControllerTest {
 
     @Test
     void Core가_빈_결과이면_200과_빈_목록을_반환한다() throws Exception {
-        when(core.recommendNextItem(any())).thenReturn(new NextItemRecommendationResponse(List.of()));
+        when(core.recommendNextItem(any(), any())).thenReturn(new NextItemRecommendationResponse(List.of()));
         mvc.perform(post(ENDPOINT).contentType(MediaType.APPLICATION_JSON).content(body()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.recommendedItems").isEmpty());

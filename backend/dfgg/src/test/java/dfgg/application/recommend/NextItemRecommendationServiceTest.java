@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import dfgg.application.champion.ChampionService;
+import dfgg.domain.language.Language;
 import dfgg.application.item.ItemService;
 import dfgg.application.recommend.v3.CandidateGenerator;
 import dfgg.application.recommend.v3.CandidateSource;
@@ -51,6 +52,7 @@ class NextItemRecommendationServiceTest {
     private static final long INFINITY_EDGE = 3031L;
     private static final long LIANDRY = 6653L;
     private static final long MIKAELS_BLESSING = 3222L;
+    private static final long ZEKES_CONVERGENCE = 3050L;
 
     private ChampionService championService;
     private ItemService itemService;
@@ -187,7 +189,7 @@ class NextItemRecommendationServiceTest {
                 .thenReturn(rankedOf(KRAKEN));
 
         // when
-        service.recommendNextItem(requestWithPatch(patch));
+        service.recommendNextItem(requestWithPatch(patch), Language.KO_KR);
 
         // then
         ArgumentCaptor<RecommendationQuery> query = ArgumentCaptor.forClass(RecommendationQuery.class);
@@ -204,7 +206,7 @@ class NextItemRecommendationServiceTest {
                 .thenReturn(rankedOf(KRAKEN));
 
         // when
-        service.recommendNextItem(requestWithPatch("16.17"));
+        service.recommendNextItem(requestWithPatch("16.17"), Language.KO_KR);
 
         // then
         ArgumentCaptor<RecommendationQuery> query = ArgumentCaptor.forClass(RecommendationQuery.class);
@@ -221,7 +223,7 @@ class NextItemRecommendationServiceTest {
                 .thenReturn(rankedOf(LIANDRY, KRAKEN, INFINITY_EDGE));
 
         // when
-        NextItemRecommendationResponse response = service.recommendNextItem(request());
+        NextItemRecommendationResponse response = service.recommendNextItem(request(), Language.KO_KR);
 
         // then
         assertThat(response.recommendedItems()).extracting(item -> item.id())
@@ -238,7 +240,7 @@ class NextItemRecommendationServiceTest {
         when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(List.of());
 
         // when & then
-        assertThatThrownBy(() -> service.recommendNextItem(request()))
+        assertThatThrownBy(() -> service.recommendNextItem(request(), Language.KO_KR))
                 .isInstanceOf(NextItemRecommendationNotFoundException.class);
     }
 
@@ -256,7 +258,7 @@ class NextItemRecommendationServiceTest {
                 "EMERALD", "16.17");
 
         // when & then
-        assertThatThrownBy(() -> service.recommendNextItem(request))
+        assertThatThrownBy(() -> service.recommendNextItem(request, Language.KO_KR))
                 .isInstanceOf(InvalidRecommendationRequestException.class);
     }
 
@@ -274,7 +276,7 @@ class NextItemRecommendationServiceTest {
                 "EMERALD", "16.17");
 
         // when & then
-        assertThatThrownBy(() -> service.recommendNextItem(request))
+        assertThatThrownBy(() -> service.recommendNextItem(request, Language.KO_KR))
                 .isInstanceOf(InvalidRecommendationRequestException.class);
     }
 
@@ -286,11 +288,41 @@ class NextItemRecommendationServiceTest {
         when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(MIKAELS_BLESSING));
 
         // when
-        NextItemRecommendationResponse response = service.recommendNextItem(request());
+        NextItemRecommendationResponse response = service.recommendNextItem(request(), Language.KO_KR);
 
         // then
         assertThat(response.recommendedItems().getFirst().description().traits())
                 .containsExactly("CC 해제 및 회복");
+    }
+
+    @Test
+    @DisplayName("영어로 요청하면 traits를 영어 표시명으로 낸다")
+    void recommendNextItem_WhenEnglishRequested_ReturnsEnglishDisplayNames() {
+        // given
+        givenCandidates(MIKAELS_BLESSING);
+        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(MIKAELS_BLESSING));
+
+        // when
+        NextItemRecommendationResponse response = service.recommendNextItem(request(), Language.EN_US);
+
+        // then
+        assertThat(response.recommendedItems().getFirst().description().traits())
+                .containsExactly("CC Cleanse & Heal");
+    }
+
+    @Test
+    @DisplayName("표시명이 없는 판정용 특성은 traits에 싣지 않는다 — 빈 문자열이 화면에 새지 않는다")
+    void recommendNextItem_WhenItemHasTraitWithoutDisplayName_OmitsIt() {
+        // given: 지크의 융합은 표시용 특성과 v2 판정용 ENGAGE(표시명 없음)를 함께 갖는다
+        givenCandidates(ZEKES_CONVERGENCE);
+        when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(ZEKES_CONVERGENCE));
+
+        // when
+        NextItemRecommendationResponse response = service.recommendNextItem(request(), Language.KO_KR);
+
+        // then
+        assertThat(response.recommendedItems().getFirst().description().traits())
+                .containsExactly("궁극기 연계 피해 및 둔화");
     }
 
     @Test
@@ -302,7 +334,7 @@ class NextItemRecommendationServiceTest {
         when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(KRAKEN));
 
         // when
-        service.recommendNextItem(request());
+        service.recommendNextItem(request(), Language.KO_KR);
 
         // then
         assertThat(logAppender.list).extracting(ILoggingEvent::getFormattedMessage)
@@ -320,7 +352,7 @@ class NextItemRecommendationServiceTest {
         when(candidateRanker.rank(any(), any(), anyInt())).thenReturn(rankedOf(KRAKEN));
 
         // when
-        service.recommendNextItem(request());
+        service.recommendNextItem(request(), Language.KO_KR);
 
         // then
         assertThat(logAppender.list).extracting(ILoggingEvent::getFormattedMessage)
@@ -341,7 +373,7 @@ class NextItemRecommendationServiceTest {
                 "EMERALD", "16.17");
 
         // when & then
-        assertThatThrownBy(() -> service.recommendNextItem(request))
+        assertThatThrownBy(() -> service.recommendNextItem(request, Language.KO_KR))
                 .isInstanceOf(InvalidRecommendationRequestException.class)
                 .hasMessageContaining("징크스");
     }
@@ -360,7 +392,7 @@ class NextItemRecommendationServiceTest {
                 "EMERALD", "16.17");
 
         // when & then
-        assertThatThrownBy(() -> service.recommendNextItem(request))
+        assertThatThrownBy(() -> service.recommendNextItem(request, Language.KO_KR))
                 .isInstanceOf(InvalidRecommendationRequestException.class)
                 .hasMessageContaining("징크스");
     }
@@ -373,7 +405,7 @@ class NextItemRecommendationServiceTest {
                 List.of(3031L, 3036L, 3046L, 3072L, 3094L, 6672L));
 
         // when
-        NextItemRecommendationResponse response = service.recommendNextItem(request);
+        NextItemRecommendationResponse response = service.recommendNextItem(request, Language.KO_KR);
 
         // then
         assertThat(response.recommendedItems()).isEmpty();
@@ -389,7 +421,7 @@ class NextItemRecommendationServiceTest {
                 List.of(3031L, 3036L, 3046L, 3072L, 3094L));
 
         // when
-        NextItemRecommendationResponse response = service.recommendNextItem(request);
+        NextItemRecommendationResponse response = service.recommendNextItem(request, Language.KO_KR);
 
         // then
         assertThat(response.recommendedItems()).extracting(item -> item.id()).containsExactly(KRAKEN);

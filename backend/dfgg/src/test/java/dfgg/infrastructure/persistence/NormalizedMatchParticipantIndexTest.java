@@ -14,9 +14,8 @@ import org.springframework.test.context.ActiveProfiles;
 
 /**
  * 엔티티 매핑이 선언한 인덱스가 실제 DB 스키마에 만들어지는지 검증한다.
- *
- * 추천 API의 안전 구역 조회({@code findNextItemDistribution})는 1~2코어 추천마다 호출되는
- * 핫패스인데, 받쳐주는 인덱스가 없으면 참가자 테이블 전체를 순차 스캔한다. 인덱스 선언이
+ * <p>
+ * 추천 API의 안전 구역 조회({@code findNextItemDistribution})는 1~2코어 추천마다 호출되는 핫패스인데, 받쳐주는 인덱스가 없으면 참가자 테이블 전체를 순차 스캔한다. 인덱스 선언이
  * 실수로 빠지거나 컬럼명이 바뀌어 조용히 무효해지는 걸 막기 위한 회귀 방어선이다.
  */
 @DataJpaTest
@@ -46,6 +45,25 @@ class NormalizedMatchParticipantIndexTest {
         assertThat(indexDefinitions)
                 .anySatisfy(definition -> assertThat(indexedColumnsOf(definition))
                         .containsExactly("champion_id", "position", "patch"));
+    }
+
+    @Test
+    @DisplayName("v3 Build 전이 쿼리가 힙을 읽지 않도록 필요한 열을 모두 담은 부분 인덱스가 있다")
+    void normalizedMatchParticipants_WhenSchemaCreated_HasCoveringIndexForBuildTransitionQueries() {
+        // given
+
+        // when
+        String definition = jdbcTemplate.queryForObject(
+                "SELECT pg_get_indexdef(i.indexrelid) FROM pg_index i "
+                        + "WHERE i.indexrelid = 'idx_nmp_build_transition'::regclass AND i.indisvalid",
+                String.class
+        );
+
+        // then
+        assertThat(indexedColumnsOf(definition)).containsExactly("champion_id", "position");
+        assertThat(definition)
+                .contains("INCLUDE (core_item_purchase_order, patch, win)")
+                .contains("WHERE core_item_purchase_order_complete");
     }
 
     /**

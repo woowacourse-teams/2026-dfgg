@@ -3,6 +3,7 @@ package dfgg.evaluation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.itemstats.ItemStatsAggregationService;
+import dfgg.domain.language.Language;
 import dfgg.application.recommend.NextItemRecommendationService;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionRepository;
@@ -91,7 +92,7 @@ class EvidenceSanityEvaluationTest {
 
             NextItemRecommendationResponse response;
             try {
-                response = recommendationService.recommendNextItem(request);
+                response = recommendationService.recommendNextItem(request, Language.KO_KR);
             } catch (RuntimeException exception) {
                 continue;
             }

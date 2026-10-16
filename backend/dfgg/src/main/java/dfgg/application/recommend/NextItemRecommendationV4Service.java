@@ -13,6 +13,7 @@ import dfgg.presentation.dto.SituationalItemDto;
 import dfgg.common.exception.ComponentRecommendationUnavailableException;
 import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.domain.champion.ChampionPosition;
+import dfgg.domain.language.Language;
 import dfgg.domain.match.ItemInventory;
 import dfgg.infrastructure.config.LeagueOfLegendsVersionProperties;
 import dfgg.infrastructure.external.catalog.DataDragonPurchaseItemCatalog;
@@ -59,7 +60,7 @@ public class NextItemRecommendationV4Service {
         this.situationalItems = situationalItems;
     }
 
-    public NextItemRecommendationV4Response recommendNextItem(NextItemRecommendationV4Request request) {
+    public NextItemRecommendationV4Response recommendNextItem(NextItemRecommendationV4Request request, Language language) {
         String patch = operatingPatch(request.patch());
         if (!components.isAvailable()) {
             throw new ComponentRecommendationUnavailableException();
@@ -68,8 +69,8 @@ public class NextItemRecommendationV4Service {
         ItemInventory inventory = inventory(request, catalog);
         var coreRequest = new NextItemRecommendationRequest(request.myChampion(), request.purchasedItemIds(),
                 request.allies(), request.enemies(), request.tier(), patch);
-        var cores = coreRecommendations.recommendNextItem(coreRequest).recommendedItems();
-        var situationalItems = situationalItems(request, inventory, catalog);
+        var cores = coreRecommendations.recommendNextItem(coreRequest, language).recommendedItems();
+        var situationalItems = situationalItems(request, inventory, catalog, language);
         if (cores.isEmpty()) {
             return new NextItemRecommendationV4Response(List.of(), situationalItems);
         }
@@ -83,7 +84,7 @@ public class NextItemRecommendationV4Service {
 
     /** 상대 조합에 대한 추천이라 Core 목표와 무관하게 요청당 한 번 계산한다. */
     private List<SituationalItemDto> situationalItems(NextItemRecommendationV4Request request, ItemInventory inventory,
-            ItemResponse catalog) {
+            ItemResponse catalog, Language language) {
         if (!situational.isAvailable()) return List.of();
         Map<Long, Champion> enemies = request.enemies().stream()
                 .map(enemy -> champions.findChampionByName(enemy.name()))
@@ -92,7 +93,7 @@ public class NextItemRecommendationV4Service {
         var recommendations = situational.recommend(championId, ChampionPosition.valueOf(request.myChampion().position()).name(),
                 enemies.keySet().stream().map(Math::toIntExact).toList(), inventory,
                 request.purchasedItemIds().stream().map(Math::toIntExact).toList(), request.availableGold(), catalog);
-        return situationalItems.toDtos(recommendations, catalog, enemies);
+        return situationalItems.toDtos(recommendations, catalog, enemies, language);
     }
 
     private String operatingPatch(String requested) {

@@ -73,7 +73,7 @@ class ComponentV4ServingSmokeTest {
         when(championService.findChampionByName(any())).thenAnswer(invocation ->
                 champions.get(Long.parseLong(invocation.getArgument(0))));
         var core = mock(NextItemRecommendationService.class);
-        when(core.recommendNextItem(any())).thenReturn(new NextItemRecommendationResponse(TARGETS.stream()
+        when(core.recommendNextItem(any(), any())).thenReturn(new NextItemRecommendationResponse(TARGETS.stream()
                 .map(id -> new RecommendedItemDto(id, "Core fixture " + id, "fixture-image", null)).toList()));
 
         new ApplicationContextRunner()

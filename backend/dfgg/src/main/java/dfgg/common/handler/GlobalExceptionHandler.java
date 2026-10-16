@@ -2,6 +2,7 @@ package dfgg.common.handler;
 
 import dfgg.common.exception.ChampionNotFoundException;
 import dfgg.common.exception.ComponentRecommendationUnavailableException;
+import dfgg.common.exception.InvalidDfScoreRequestException;
 import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.common.exception.NextItemRecommendationNotFoundException;
 import java.util.stream.Collectors;
@@ -23,7 +24,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler({ChampionNotFoundException.class, InvalidRecommendationRequestException.class})
+    @ExceptionHandler({ChampionNotFoundException.class, InvalidRecommendationRequestException.class,
+            InvalidDfScoreRequestException.class})
     public ProblemDetail handleBadRequest(RuntimeException exception) {
         log.warn("400 잘못된 요청: {}", exception.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.*;
 
 import dfgg.application.recommend.NextItemRecommendationService;
 import dfgg.domain.champion.ChampionPosition;
+import dfgg.domain.language.Language;
 import dfgg.domain.match.ItemInventory;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import dfgg.presentation.dto.ChampionDto;
@@ -36,7 +37,7 @@ class CoreComponentRecommendationServiceTest {
         var branches = ids.stream().map(id -> new ComponentRecommendationService.TargetRecommendation(id,
                 id == 3097 ? ComponentRecommendationService.Status.UNSUPPORTED_CATALOG_ITEM : ComponentRecommendationService.Status.OK,
                 List.of(), id == 3097 ? "missing" : null)).toList();
-        when(core.recommendNextItem(request)).thenReturn(new NextItemRecommendationResponse(coreItems));
+        when(core.recommendNextItem(request, Language.KO_KR)).thenReturn(new NextItemRecommendationResponse(coreItems));
         var expectedQuery = new ComponentRecommendationQuery(86, ids, ItemInventory.empty(), 350, 600_000,
                 ChampionPosition.TOP, "16.18", NO_TAGS);
         when(component.recommend(expectedQuery, catalog)).thenReturn(branches);
@@ -44,7 +45,7 @@ class CoreComponentRecommendationServiceTest {
         assertThat(results).extracting(r -> r.target().id()).containsExactly(3071L, 6333L, 3047L, 3869L, 3097L);
         assertThat(results).extracting(CoreComponentRecommendationService.TargetRecommendation::coreRank).containsExactly(1, 2, 3, 4, 5);
         assertThat(results.getLast().component().status()).isEqualTo(ComponentRecommendationService.Status.UNSUPPORTED_CATALOG_ITEM);
-        verify(core, times(1)).recommendNextItem(request);
+        verify(core, times(1)).recommendNextItem(request, Language.KO_KR);
         verify(component, times(1)).recommend(expectedQuery, catalog);
     }
 }

@@ -29,7 +29,7 @@ public class ChampionDirectory {
         for (Champion champion : championRepository.findAllById(Set.copyOf(championIds))) {
             profiles.put(champion.getChampionId(),
                     new ChampionProfile(champion.getChampionId(), champion.getRiotKey(),
-                            champion.getName().get("ko-KR")));
+                            champion.getName()));
         }
         return Map.copyOf(profiles);
     }

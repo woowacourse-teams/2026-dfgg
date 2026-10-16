@@ -2,6 +2,7 @@ package dfgg.infrastructure.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.RETURNS_SELF;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -30,6 +31,8 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.HexFormat;
+import dfgg.presentation.dto.ChampionDto;
+import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +67,7 @@ class ComponentRuntimeConfigurationTest {
         when(builders.clone()).thenReturn(builders);
         when(builders.build()).thenReturn(http.build());
         var core = mock(NextItemRecommendationService.class);
-        when(core.recommendNextItem(null)).thenReturn(new NextItemRecommendationResponse(List.of()));
+        when(core.recommendNextItem(any(), any())).thenReturn(new NextItemRecommendationResponse(List.of()));
         runner = new ApplicationContextRunner()
                 .withUserConfiguration(ComponentLtrConfiguration.class, ComponentPolicyLookupConfiguration.class,
                         ComponentRuntimeConfiguration.class, CoreComponentRecommendationService.class,
@@ -242,7 +245,7 @@ class ComponentRuntimeConfigurationTest {
     }
 
     private void assertV3(RecommendationController controller) {
-        assertThat(controller.recommendV3(null).getBody().recommendedItems()).isEmpty();
+        assertThat(controller.recommendV3(new NextItemRecommendationRequest(new ChampionDto("Garen", "TOP"), List.of(), List.of(), List.of(), null, null), null).getBody().recommendedItems()).isEmpty();
     }
 
     private ComponentRecommendationQuery query(String patch) {
