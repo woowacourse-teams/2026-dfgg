@@ -48,11 +48,12 @@ function sameItems(a: number[], b: number[]) {
 
 // 구매 순서를 유지하면서 아이템 리스트 업데이트 하기
 // 원딜은 역할 퀘스트를 깨면 신발이 인벤토리 밖 전용 칸으로 옮겨지고 Live API 에서도 사라진다.
-// 그래서 신발은 한 번 산 것이 보이면 게임이 끝날 때까지 가진 것으로 본다.
-function updatePurchaseOrder(itemIds: number[], bootsItemIds: Set<number>) {
+// 그래서 원딜일 경우 신발은 한 번 산 것이 보이면 게임이 끝날 때까지 가진 것으로 본다.
+function updatePurchaseOrder(itemIds: number[], bootsItemIds: Set<number>, isBottom: boolean) {
   const current = new Set(itemIds);
   for (const id of purchasedItemIds) {
-    if (!current.has(id) && !bootsItemIds.has(id)) purchasedItemIds.delete(id);
+    const keepBoots = isBottom && bootsItemIds.has(id);
+    if (!current.has(id) && !keepBoots) purchasedItemIds.delete(id);
   }
   for (const id of current) purchasedItemIds.add(id);
 }
@@ -87,7 +88,7 @@ async function tick() {
           const newItemIds = itemIds.filter((id) => !purchasedItemIds.has(id));
           recordPurchases(newItemIds, getLcuState().recommendations);
         }
-        updatePurchaseOrder(itemIds, bootsItemIds);
+        updatePurchaseOrder(itemIds, bootsItemIds, myPlayers.position === 'BOTTOM');
 
         console.log('아이템 변경', itemIds);
 

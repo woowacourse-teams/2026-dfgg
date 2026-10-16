@@ -1,4 +1,5 @@
 import type { MatchDetail, MatchStats, MatchSummary } from '../../shared/types';
+import { mainStrings } from '../locale';
 import type {
   LcuGame,
   LcuMatchHistory,
@@ -54,7 +55,7 @@ function toMatchSummary(game: LcuGame, queueNames: Map<number, string>): MatchSu
   return {
     gameId: game.gameId,
     queueId: game.queueId,
-    queueName: queueNames.get(game.queueId) ?? '기타',
+    queueName: queueNames.get(game.queueId) ?? mainStrings().queue.etc,
     gameMode: game.gameMode,
     isCustom: game.gameType === 'CUSTOM_GAME',
     gameDuration: game.gameDuration,

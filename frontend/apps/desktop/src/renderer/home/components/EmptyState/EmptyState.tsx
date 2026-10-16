@@ -4,13 +4,14 @@ import * as Sentry from '@sentry/electron/renderer';
 import { useState } from 'react';
 
 import type { LcuStatus } from '../../../../shared/types';
+import { t } from '../../../i18n';
 
 // 소환사 정보가 없는 이유를 상태별로 구분해 알린다.
 // 클라이언트가 꺼져 있는데 '불러오는 중' 이라고 하면 오해를 준다.
 const TITLE: Record<LcuStatus, string> = {
-  disconnected: '롤 클라이언트를 실행해 주세요',
-  connecting: '클라이언트에 연결하는 중',
-  connected: '소환사 정보를 불러오는 중',
+  disconnected: t.empty.disconnected,
+  connecting: t.empty.connecting,
+  connected: t.empty.connected,
 };
 
 /** 버튼을 누른 뒤 클라이언트 창이 뜰 때까지 다시 못 누르게 막아 두는 시간 */
@@ -55,12 +56,12 @@ function EmptyState({ status }: { status: LcuStatus | null }) {
             disabled={launch === 'launching'}
             onClick={launchClient}
           >
-            {launch === 'launching' ? '클라이언트 여는 중...' : '클라이언트 실행'}
+            {launch === 'launching' ? t.empty.launching : t.empty.launch}
           </button>
 
           {launch === 'failed' && (
             <p className='empty-error' role='alert'>
-              롤 설치 위치를 찾지 못했어요. 직접 실행해 주세요.
+              {t.empty.launchFailed}
             </p>
           )}
         </>

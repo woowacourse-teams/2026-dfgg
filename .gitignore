@@ -39,3 +39,5 @@ release/
 umami-to-posthog/
 
 frontend/apps/desktop/resources/ffmpeg/
+
+frontend/apps/desktop/to-shorts.ps1

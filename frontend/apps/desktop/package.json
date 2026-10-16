@@ -1,7 +1,7 @@
 {
   "name": "desktop",
   "productName": "dfgg",
-  "version": "2.0.7",
+  "version": "2.0.9",
   "description": "League of Legends item build recommendations from the ten champions in your match",
   "author": {
     "name": "dfgg"
@@ -173,7 +173,8 @@
       "displayName": "dfgg",
       "backgroundColor": "#0e1428",
       "languages": [
-        "ko-KR"
+        "ko-KR",
+        "en-US"
       ],
       "customExtensionsPath": "resources/installer/appx-extensions.xml"
     },

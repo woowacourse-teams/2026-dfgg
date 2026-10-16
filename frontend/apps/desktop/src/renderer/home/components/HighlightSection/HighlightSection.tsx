@@ -3,6 +3,7 @@ import './HighlightSection.css';
 import { useEffect, useState } from 'react';
 
 import type { HighlightGame, HighlightProgress } from '../../../../shared/types';
+import { t } from '../../../i18n';
 import HighlightPlayer from './HighlightPlayer';
 
 // 1791653466702 → '10/10 17:31'
@@ -44,12 +45,10 @@ function HighlightSection() {
 
   return (
     <section className='highlights'>
-      <h2 className='highlights-title'>하이라이트</h2>
+      <h2 className='highlights-title'>{t.highlight.title}</h2>
 
       {progress && (
-        <p className='highlights-progress'>
-          이번 판 하이라이트 만드는 중... {progress.done}/{progress.total}
-        </p>
+        <p className='highlights-progress'>{t.highlight.making(progress.done, progress.total)}</p>
       )}
 
       {game && <HighlightPlayer key={game.id} game={game} autoPlay={autoPlay} source='section' />}
@@ -66,7 +65,7 @@ function HighlightSection() {
                 setAutoPlay(true);
               }}
             >
-              {formatDate(g.startAt)} · {g.clips.length}개
+              {formatDate(g.startAt)} · {t.highlight.clipCount(g.clips.length)}
             </button>
           ))}
         </div>

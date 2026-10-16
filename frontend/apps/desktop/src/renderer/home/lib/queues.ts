@@ -1,4 +1,5 @@
 import type { MatchSummary } from '../../../shared/types';
+import { t } from '../../i18n';
 
 const SOLO_QUEUE_ID = 420;
 const FLEX_QUEUE_ID = 440;
@@ -18,12 +19,12 @@ const QUEUE_BY_ID: Record<number, QueueFilter> = {
 
 /** 탭에 보이는 순서대로. */
 export const QUEUE_FILTERS: { key: QueueFilter; label: string }[] = [
-  { key: 'all', label: '전체' },
-  { key: 'solo', label: '솔로랭크' },
-  { key: 'flex', label: '자유랭크' },
-  { key: 'normal', label: '일반' },
-  { key: 'aram', label: '칼바람' },
-  { key: 'etc', label: '기타' },
+  { key: 'all', label: t.queue.all },
+  { key: 'solo', label: t.queue.solo },
+  { key: 'flex', label: t.queue.flex },
+  { key: 'normal', label: t.queue.normal },
+  { key: 'aram', label: t.queue.aram },
+  { key: 'etc', label: t.queue.etc },
 ];
 
 export const queueOf = (match: MatchSummary): QueueFilter => QUEUE_BY_ID[match.queueId] ?? 'etc';

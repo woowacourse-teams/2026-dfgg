@@ -3,19 +3,20 @@ import './style.css';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import type { NamedEntry, OverlayClickTarget, RecommendedItem } from '../../shared/types';
+import { t } from '../i18n';
 import { ChevronIcon } from '../icons';
 
 type Variant = 'ally' | 'counter';
 
 const VARIANT_LABEL: Record<Variant, string> = {
-  ally: '시너지',
-  counter: '카운터',
+  ally: t.overlay.ally,
+  counter: t.overlay.counter,
 };
 
 // 초상화에 붙는 설명. 챔피언 이름과 관계를 한 줄에 담는다.
 const VARIANT_RELATION: Record<Variant, string> = {
-  ally: '아군 — 시너지 좋음',
-  counter: '상대 — 카운터로 좋음',
+  ally: t.overlay.allyRelation,
+  counter: t.overlay.counterRelation,
 };
 
 /** 순위 숫자를 붙이는 개수. 그 아래는 자리로만 순서를 알린다. */
@@ -67,7 +68,7 @@ function Pick({ item, rank }: { item: RecommendedItem; rank: number }) {
       <span className='pick-art'>
         <img src={item.imageUrl} alt='' />
         {rank <= TOP_COUNT && (
-          <b className='pick-rank' aria-label={`추천 ${rank}순위`}>
+          <b className='pick-rank' aria-label={t.overlay.rank(rank)}>
             {rank}
           </b>
         )}
@@ -103,7 +104,7 @@ function Pick({ item, rank }: { item: RecommendedItem; rank: number }) {
 /** 지금 몇 번째 아이템을 살 차례인지 빗금 여섯 칸으로 보여 준다. */
 function BuildProgress({ purchased }: { purchased: number }) {
   return (
-    <ol className='progress' aria-label={`아이템 ${BUILD_SLOTS}칸 중 ${purchased}칸 구매`}>
+    <ol className='progress' aria-label={t.overlay.progress(BUILD_SLOTS, purchased)}>
       {Array.from({ length: BUILD_SLOTS }, (_, slot) => (
         <li
           key={slot}
@@ -187,7 +188,7 @@ function App() {
     return (
       // 바깥 테두리는 잡고 끄는 자리, 가운데 로고는 누르는 자리다. 접힌 채로도 창을 옮길 수 있어야 한다.
       <div className='overlay-collapsed' onPointerDown={trackClick}>
-        <button type='button' aria-label='오버레이 펼치기' onClick={toggleCollapsed}>
+        <button type='button' aria-label={t.overlay.expand} onClick={toggleCollapsed}>
           <img src='./icon.png' alt='' />
         </button>
       </div>
@@ -200,14 +201,14 @@ function App() {
     <div className='overlay' ref={overlayRef} onPointerDown={trackClick}>
       <header className='bar'>
         <span className='bar-title'>
-          {purchasedCount === null ? '추천 아이템' : `${purchasedCount + 1}코어 추천`}
+          {purchasedCount === null ? t.overlay.title : t.overlay.coreTitle(purchasedCount + 1)}
         </span>
         {purchasedCount !== null && <BuildProgress purchased={purchasedCount} />}
 
         <button
           type='button'
           className='bar-button'
-          aria-label='오버레이 접기'
+          aria-label={t.overlay.collapse}
           onClick={toggleCollapsed}
           data-click='collapse'
         >
@@ -225,7 +226,7 @@ function App() {
       ) : (
         <div className='overlay-empty' data-click='empty'>
           {isInGame && <span className='overlay-loader' aria-hidden='true' />}
-          <p>{isInGame ? '추천을 계산하는 중이에요' : '게임에 들어가면 추천이 시작돼요'}</p>
+          <p>{isInGame ? t.overlay.calculating : t.overlay.waiting}</p>
         </div>
       )}
     </div>
