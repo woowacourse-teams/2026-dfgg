@@ -39,9 +39,9 @@ class ComponentLightGbmParityTest {
         try (var context = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
             var properties = new java.util.HashMap<String, Object>();
             properties.put("recommendation.component-ltr.model-path", modelPath.toUri().toString());
-            if (modelJson.hasNonNull("preparation_lookup_sha256")) {
-                properties.put("recommendation.component-ltr.preparation-lookup-path",
-                        modelPath.resolveSibling("preparation-lookup.json").toUri().toString());
+            if (modelJson.hasNonNull("policy_lookup_sha256")) {
+                properties.put("recommendation.component-ltr.policy-lookup-path",
+                        modelPath.resolveSibling("component-policy-lookup.json").toUri().toString());
             }
             context.getEnvironment().getPropertySources().addFirst(
                     new org.springframework.core.env.MapPropertySource("component-test", properties));

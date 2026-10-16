@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
 import dfgg.domain.match.ComponentCandidateGenerator;
 import dfgg.domain.match.ItemInventory;
-import dfgg.domain.match.PreparationLookup;
+import dfgg.domain.match.ComponentPolicyLookup;
 import dfgg.infrastructure.external.catalog.DataDragonPurchaseItemCatalog;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import java.util.ArrayList;
@@ -40,8 +40,8 @@ class ComponentRankerTest {
     @Test
     void ranking_does_not_reorder_input_or_accumulate_state_across_calls() {
         when(model.predict(any(double[].class))).thenAnswer(invocation -> ((double[]) invocation.getArgument(0))[0]);
-        var candidates = new ArrayList<>(new ComponentCandidateGenerator(catalog, PreparationLookup.disabled())
-                .generate(81, "BOTTOM", "16.18", 3, ItemInventory.empty(), 200));
+        var candidates = new ArrayList<>(new ComponentCandidateGenerator(catalog)
+                .generate(List.of(), 3, ItemInventory.empty(), 200));
         var original = List.copyOf(candidates);
 
         var ranked = rank(candidates);

@@ -40,10 +40,10 @@ public record ComponentCandidateFeatures(Map<Integer, Integer> itemQuantities, L
             "target_remaining_gold_after_purchase", "target_remaining_recipe_depth", "contains_direct_target_material",
             "target_material_coverage_after_purchase", "target_progress_gain");
 
-    public static final List<String> PREPARATION_FEATURE_NAMES = List.of("is_preparation_candidate",
-            "preparation_observation_rate", "preparation_support_log", "preparation_future_recipe_link_rate");
+    public static final List<String> POLICY_FEATURE_NAMES = List.of("is_prepared_candidate",
+            "prepared_line_purchase_rate", "prepared_support_log");
     public static final List<String> FEATURE_NAMES = java.util.stream.Stream.of(
-            PURCHASE_FEATURE_NAMES, CompositionFeatures.FEATURE_NAMES, PREPARATION_FEATURE_NAMES)
+            PURCHASE_FEATURE_NAMES, CompositionFeatures.FEATURE_NAMES, POLICY_FEATURE_NAMES)
             .flatMap(List::stream).toList();
 
     public static ComponentCandidateFeatures calculate(dfgg.domain.match.ItemInventory before,
@@ -51,7 +51,7 @@ public record ComponentCandidateFeatures(Map<Integer, Integer> itemQuantities, L
             PurchaseItemCatalog catalog, ItemResponse response, long gameTimeMs, String position, CompositionFeatures composition) {
         var base = calculate(before, candidate.bundle(), targetItemId, catalog, response, gameTimeMs, position, composition);
         var vector = new java.util.ArrayList<>(base.features().subList(0, 55));
-        vector.addAll(candidate.preparationFeatures());
+        vector.addAll(candidate.policyFeatures());
         return new ComponentCandidateFeatures(base.itemQuantities(), base.purchaseOrder(), base.inventoryAfter(), vector);
     }
 
@@ -103,7 +103,7 @@ public record ComponentCandidateFeatures(Map<Integer, Integer> itemQuantities, L
         vector.add(current.materialCoverage());
         vector.add(current.fraction() - previous.fraction());
         vector.addAll(java.util.Objects.requireNonNull(composition, "경기 조합은 필수입니다.").values());
-        vector.addAll(List.of(0.0, 0.0, 0.0, 0.0));
+        vector.addAll(dfgg.domain.match.ComponentPolicyEvidence.NONE);
         return new ComponentCandidateFeatures(candidate.itemQuantities(), candidate.purchaseOrder(),
                 after.quantities(), vector);
     }

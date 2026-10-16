@@ -5,7 +5,7 @@ import dfgg.application.recommend.component.ComponentCandidateFeatures;
 import dfgg.application.recommend.component.ComponentCompositionReader;
 import dfgg.application.recommend.context.CompositionFeatures;
 import dfgg.domain.match.ComponentCandidateGenerator;
-import dfgg.domain.match.PreparationLookup;
+import dfgg.domain.match.ComponentPolicyLookup;
 import dfgg.application.ChampionPositionNormalizer;
 import dfgg.domain.match.ComponentTargetPolicy;
 import dfgg.domain.match.ItemPurchaseType;
@@ -30,12 +30,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class ComponentTrainingDataService {
     private final ParticipantItemPurchaseSnapshotService snapshots;
     private final ObjectMapper mapper;
-    private final PreparationLookup lookup;
+    private final ComponentPolicyLookup lookup;
 
     private final ComponentCompositionReader compositions;
 
     public ComponentTrainingDataService(ParticipantItemPurchaseSnapshotService snapshots, ObjectMapper mapper,
-            PreparationLookup lookup, ComponentCompositionReader compositions) {
+            ComponentPolicyLookup lookup, ComponentCompositionReader compositions) {
         this.lookup = lookup;
         this.snapshots = snapshots;
         this.mapper = mapper;
@@ -80,9 +80,9 @@ public class ComponentTrainingDataService {
         var catalog = new DataDragonPurchaseItemCatalog(response.data());
         lookup.validatePatch(version.substring(0, version.lastIndexOf('.')));
         if (lookup.enabled() && prepared.bundles().stream().anyMatch(b -> !championIds.containsKey(b.participantId()))) {
-            throw new IllegalArgumentException("Preparation 학습에 참가자 Champion ID가 필요합니다.");
+            throw new IllegalArgumentException("정책 학습에 참가자 Champion ID가 필요합니다.");
         }
-        var resolver = new ComponentCandidateGenerator(catalog, lookup);
+        var resolver = new ComponentCandidateGenerator(catalog);
         var contexts = compositions.forMatch(prepared.bundles().getFirst().matchId());
         return prepared.bundles().stream()
                 .map(bundle -> example(bundle, prepared.snapshots(), catalog, resolver, version, response, championIds.get(bundle.participantId()),
@@ -125,7 +125,7 @@ public class ComponentTrainingDataService {
             targets.validate(target.purchase().getItemId(), bundle.inventoryBefore());
             String role = new ChampionPositionNormalizer().normalize(bundle.purchases().getFirst().purchase().getPosition())
                     .map(Enum::name).orElse("UNKNOWN");
-            candidates = resolver.generate(championId, role, version.substring(0, version.lastIndexOf('.')),
+            candidates = resolver.generate(lookup.evidenceFor(championId, role),
                     target.purchase().getItemId(), bundle.inventoryBefore(), bundle.goldLower());
         } catch (IllegalArgumentException | IllegalStateException exception) {
             return result(bundle, target, catalog, purchases, version, "CANDIDATE_RESOLUTION_FAILED: " + exception.getMessage(), List.of());
@@ -146,7 +146,7 @@ public class ComponentTrainingDataService {
             rows = candidates.stream().map(c -> new ComponentTrainingCandidate(
                     ComponentCandidateFeatures.calculate(bundle.inventoryBefore(), c, target.purchase().getItemId(), catalog, response,
                             bundle.purchases().getFirst().sourceEvent().gameTimeMs(), bundle.purchases().getFirst().purchase().getPosition(), composition),
-                    usable ? (c.bundle().itemQuantities().equals(bundle.itemQuantities()) ? 1 : 0) : null, c.candidateSource(), c.preparationPatternCount(), c.preparationFutureRecipeLinkRate())).toList();
+                    usable ? (c.bundle().itemQuantities().equals(bundle.itemQuantities()) ? 1 : 0) : null, c.candidateSource(), c.policyItemId())).toList();
         } catch (IllegalArgumentException | IllegalStateException exception) {
             return result(bundle, target, catalog, purchases, version, "FEATURE_CALCULATION_FAILED: " + exception.getMessage(), List.of());
         }
@@ -187,7 +187,7 @@ public class ComponentTrainingDataService {
                 .filter(id -> bundle.inventoryBefore().quantityOf(id) > 0).count();
     }
 
-    public static final String SCHEMA_VERSION = "component-bundle-validation-v7";
+    public static final String SCHEMA_VERSION = "component-bundle-validation-v9";
     public record MatchDataset(List<Example> examples, List<ComponentCandidateScopeDiagnostics.Diagnostic> diagnostics) {}
     public record Example(String schemaVersion, String targetSource, String dataVersion, String matchId,
                           int participantId, int startPurchaseOrder, int endPurchaseOrder, String position,

@@ -44,7 +44,7 @@ class ComponentTargetRelationshipTest {
         var candidate = find(4, before, 350, Map.of(1, 1));
         var a = vector(before, candidate, 4);
         var b = vector(before, candidate, 5);
-        assertThat(a).hasSize(59);
+        assertThat(a).hasSize(58);
         assertThat(a.subList(0, 41)).isEqualTo(b.subList(0, 41));
         assertThat(a.subList(41, 46)).isNotEqualTo(b.subList(41, 46));
         assertThat(a.get(41)).isEqualTo(2650);

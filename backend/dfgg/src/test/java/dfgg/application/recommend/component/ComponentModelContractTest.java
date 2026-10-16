@@ -13,15 +13,15 @@ class ComponentModelContractTest {
     @Test
     void model_and_lookup_must_have_the_same_hash_including_disabled_lookup() throws Exception {
         var config = new ComponentLtrConfiguration();
-        var lookup = new dfgg.domain.match.PreparationLookup("16.18", "a".repeat(64), Map.of());
-        for (String model : java.util.List.of("{}", "{\"preparation_lookup_sha256\":\"" + "b".repeat(64) + "\"}")) {
+        var lookup = new dfgg.domain.match.ComponentPolicyLookup("16.18", "a".repeat(64), Map.of());
+        for (String model : java.util.List.of("{}", "{\"policy_lookup_sha256\":\"" + "b".repeat(64) + "\"}")) {
             var resource = new org.springframework.core.io.ByteArrayResource(model.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             assertThatThrownBy(() -> config.componentLtrModel(resource, lookup))
                     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("SHA-256");
         }
         var resource = new org.springframework.core.io.ByteArrayResource(
-                ("{\"preparation_lookup_sha256\":\"" + "a".repeat(64) + "\"}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        assertThatThrownBy(() -> config.componentLtrModel(resource, dfgg.domain.match.PreparationLookup.disabled()))
+                ("{\"policy_lookup_sha256\":\"" + "a".repeat(64) + "\"}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertThatThrownBy(() -> config.componentLtrModel(resource, dfgg.domain.match.ComponentPolicyLookup.disabled()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("SHA-256");
     }
 

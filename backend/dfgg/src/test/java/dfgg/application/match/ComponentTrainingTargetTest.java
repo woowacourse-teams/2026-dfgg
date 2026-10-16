@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 class ComponentTrainingTargetTest {
     private final ParticipantItemPurchaseSnapshotService snapshots = mock(ParticipantItemPurchaseSnapshotService.class);
     private final dfgg.application.recommend.component.ComponentCompositionReader compositions = mock(dfgg.application.recommend.component.ComponentCompositionReader.class);
-    private final ComponentTrainingDataService exporter = new ComponentTrainingDataService(snapshots, new ObjectMapper(), PreparationLookup.disabled(), compositions);
+    private final ComponentTrainingDataService exporter = new ComponentTrainingDataService(snapshots, new ObjectMapper(), ComponentPolicyLookup.disabled(), compositions);
 
     @org.junit.jupiter.api.BeforeEach
     void composition() {
@@ -77,7 +77,7 @@ class ComponentTrainingTargetTest {
         assertThat(rows).hasSize(2).allMatch(row -> row.status().equals("READY"));
         assertThat(rows).extracting(ComponentTrainingDataService.Example::completedCoreCount).containsExactly(0L, 1L);
         assertThat(rows.getFirst().featureNames()).isEqualTo(rows.getLast().featureNames());
-        assertThat(rows.getFirst().featureNames()).hasSize(59).doesNotContain("completedCoreCount", "completed_core_count", "target_item_id");
+        assertThat(rows.getFirst().featureNames()).hasSize(58).doesNotContain("completedCoreCount", "completed_core_count", "target_item_id");
         assertThat(rows).allMatch(row -> row.candidates().stream().filter(c -> c.label() == 1).count() == 1);
     }
 
@@ -201,16 +201,16 @@ class ComponentTrainingTargetTest {
     }
 
     @Test
-    void preparation_candidates_are_identical_in_training_and_serving_regardless_of_observation() throws Exception {
-        var lookup = new PreparationLookup("16.18", "a".repeat(64), java.util.Map.of(
-                new PreparationLookup.Key(81, "TOP", 500), List.of(new PreparationLookup.Pattern(2, 50, .8, 200, 40))));
+    void policy_candidates_are_identical_in_training_and_serving_regardless_of_observation() throws Exception {
+        var lookup = new dfgg.domain.match.ComponentPolicyLookup("16.18", "a".repeat(64), java.util.Map.of(
+                new dfgg.domain.match.ComponentPolicyLookup.RoleKey(81, "TOP"), new dfgg.domain.match.ComponentPolicyLookup.Prepared(1062, .85)));
         var training = new ComponentTrainingDataService(snapshots, new ObjectMapper(), lookup, compositions);
         var model = mock(dfgg.application.recommend.v3.ranker.GradientBoostedTrees.class);
         var serving = new dfgg.application.recommend.component.ComponentRecommendationService(model, lookup);
         var response = preparationCatalog();
         var served = serving.recommend(81, List.of(500), ItemInventory.empty(), 1200, 20_000,
                 "TOP", "16.18", response, NO_TAGS).getFirst().rankedPurchases();
-        for (int observed : List.of(1, 2)) {
+        for (int observed : List.of(1, 3070)) {
             prepare(List.of(snapshot(observed, ItemPurchaseType.COMPONENT, 1, observed == 1 ? 300 : 200, ItemInventory.empty()),
                     snapshot(500, ItemPurchaseType.CORE, 2, 1000, ItemInventory.empty().add(observed))));
             var row = training.datasetForMatch("KR_TEST", response, java.util.Map.of(1, 81)).examples().getFirst();
@@ -218,11 +218,11 @@ class ComponentTrainingTargetTest {
             assertThat(row.candidates()).extracting(ComponentTrainingCandidate::candidate)
                     .containsExactlyElementsOf(served.stream().map(c -> c.candidate()).toList());
             for (var candidate : row.candidates()) {
-                var evidence = candidate.candidate().features().subList(55, 59);
-                if (candidate.candidateSource() == dfgg.domain.match.ComponentCandidateGenerator.Source.PREPARATION) {
-                    assertThat(evidence).containsExactly(1.0, .25, Math.log1p(50), .8);
+                var evidence = candidate.candidate().features().subList(55, 58);
+                if (candidate.candidateSource() == dfgg.domain.match.ComponentCandidateGenerator.Source.PREPARED) {
+                    assertThat(evidence).containsExactly(1.0, .85, Math.log1p(1062));
                 } else {
-                    assertThat(evidence).containsExactly(0.0, 0.0, 0.0, 0.0);
+                    assertThat(evidence).containsExactly(0.0, 0.0, 0.0);
                 }
             }
             assertThat(row.candidates()).extracting(ComponentTrainingCandidate::candidateSource)
@@ -237,6 +237,7 @@ class ComponentTrainingTargetTest {
                 {"version":"16.18.1","data":{
                  "1":{"gold":{"total":300,"purchasable":true}},
                  "2":{"gold":{"total":200,"purchasable":true}},
+                 "3070":{"gold":{"total":200,"purchasable":true}},
                  "500":{"from":["1"],"gold":{"total":1000,"purchasable":true}},
                  "501":{"from":["2"],"gold":{"total":1000,"purchasable":true}}}}
                 """, ItemResponse.class);

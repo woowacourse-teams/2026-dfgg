@@ -13,7 +13,12 @@ from pathlib import Path
 
 import numpy as np
 from dfgg_ltr.dataset import Dataset
-from component_ltr.feature_schema import FEATURE_NAMES, SCHEMA_VERSION, SCHEMA_FINGERPRINT, COMPOSITION_FEATURE_START, COMPOSITION_FEATURE_END, PREPARATION_FEATURE_START
+from component_ltr.feature_schema import FEATURE_NAMES, SCHEMA_VERSION, SCHEMA_FINGERPRINT, COMPOSITION_FEATURE_START, COMPOSITION_FEATURE_END, POLICY_FEATURE_START
+
+# Java PreparedComponentPolicy의 화이트리스트와 같아야 한다.
+POLICY_ITEMS = {"PREPARED": {3070}}
+POLICY_LOOKUP_FILE = "component-policy-lookup.json"
+POLICY_LOOKUP_SCHEMA = "component-policy-lookup-v2"
 
 
 class DatasetValidationError(ValueError):
@@ -56,24 +61,22 @@ def validate_row(row, seen):
                 or any(type(v) is not int or v <= 0 for v in candidate["itemQuantities"].values())):
             raise ValueError("ITEM_QUANTITY")
         source = candidate.get("candidateSource", "TARGET_PATH")
-        if source not in ("TARGET_PATH", "PREPARATION"):
+        if source not in ("TARGET_PATH", *POLICY_ITEMS):
             raise ValueError("CANDIDATE_SOURCE")
-        if source == "PREPARATION":
-            count, rate = candidate.get("preparationPatternCount"), candidate.get("preparationFutureRecipeLinkRate")
-            if type(count) is not int or count < 50 or type(rate) not in (int, float) or not .7 <= rate <= 1:
-                raise ValueError("PREPARATION_PATTERN")
+        policy_item = candidate.get("policyItemId")
+        if source != "TARGET_PATH" and (policy_item not in POLICY_ITEMS[source]
+                                        or str(policy_item) not in candidate["itemQuantities"]):
+            raise ValueError("POLICY_ITEM")
         vector = candidate["features"]
         if not isinstance(vector, list) or len(vector) != len(FEATURE_NAMES):
             raise ValueError("FEATURE_COUNT")
         if any(type(v) not in (int, float) or not np.isfinite(v) for v in vector):
             raise ValueError("FEATURE_NUMERIC")
-        evidence = vector[PREPARATION_FEATURE_START:]
-        if source == "TARGET_PATH" and evidence != [0, 0, 0, 0]:
-            raise ValueError("PREPARATION_FEATURES")
-        if source == "PREPARATION" and (evidence[0] != 1 or not 0 < evidence[1] <= 1
-                or not math.isclose(evidence[2], math.log1p(count), abs_tol=1e-12)
-                or evidence[3] != rate):
-            raise ValueError("PREPARATION_FEATURES")
+        evidence = vector[POLICY_FEATURE_START:]
+        if source == "TARGET_PATH" and evidence != [0] * 3:
+            raise ValueError("POLICY_FEATURES")
+        if source == "PREPARED" and (evidence[0] != 1 or not .3 <= evidence[1] <= 1 or evidence[2] < math.log1p(50)):
+            raise ValueError("POLICY_FEATURES")
         if candidate["label"] == 1 and candidate["itemQuantities"] != row["observedItems"]:
             raise ValueError("POSITIVE_ITEMS")
     contexts = [candidate["features"][COMPOSITION_FEATURE_START:COMPOSITION_FEATURE_END] for candidate in row["candidates"]]
@@ -149,19 +152,19 @@ def load_splits(directory: Path, report_path: Path):
             snapshot = directory / "champion-tags.json"
             if not snapshot.is_file() or hashlib.sha256(snapshot.read_bytes()).hexdigest() != champion_hash:
                 split_errors.append({"reason": "CHAMPION_METADATA_HASH"})
-        lookup_hash = manifest.get("preparationLookupSha256")
-        if not lookup_hash and any(r["candidateSources"].get("PREPARATION", 0) for r in reports.values()):
-            split_errors.append({"reason": "PREPARATION_LOOKUP_MISSING"})
+        lookup_hash = manifest.get("policyLookupSha256")
+        if not lookup_hash and any(r["candidateSources"].get(s, 0) for r in reports.values() for s in POLICY_ITEMS):
+            split_errors.append({"reason": "POLICY_LOOKUP_MISSING"})
         if lookup_hash:
-            lookup_bytes = (directory / "preparation-lookup.json").read_bytes()
+            lookup_bytes = (directory / POLICY_LOOKUP_FILE).read_bytes()
             lookup = json.loads(lookup_bytes)
             expected_train = sorted(m for m, e in manifest["matches"].items() if e["split"] == "train")
             if (hashlib.sha256(lookup_bytes).hexdigest() != lookup_hash or lookup.get("miningSplit") != "train"
                     or lookup.get("trainMatchIds") != expected_train
-                    or lookup.get("schemaVersion") != "component-preparation-v2"
+                    or lookup.get("schemaVersion") != POLICY_LOOKUP_SCHEMA
                     or any(not r["dataVersions"] or any(v.rsplit(".", 1)[0] != lookup.get("patch")
                            for v in r["dataVersions"]) for r in reports.values())):
-                split_errors.append({"reason": "PREPARATION_LOOKUP_CONTRACT"})
+                split_errors.append({"reason": "POLICY_LOOKUP_CONTRACT"})
         for split, dataset in datasets.items():
             counts = Counter(qid.split(":")[0] for qid in dataset.qids)
             for match_id, count in counts.items():

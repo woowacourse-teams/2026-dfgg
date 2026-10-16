@@ -9,7 +9,7 @@ import java.util.Objects;
 /**
  * Core가 정한 목표 목록과 동일 시점의 현재 상태를 Component 추천에 전달한다.
  * 평가 입력의 포지션 결측은 UNKNOWN 피처로 유지한다.
- * championId가 없는 기존 평가 입력은 Preparation을 사용하지 않을 때만 서비스에서 허용한다.
+ * championId가 없는 기존 평가 입력은 정책 조회표를 사용하지 않을 때만 서비스에서 허용한다.
  */
 public record ComponentRecommendationQuery(
         Integer championId,

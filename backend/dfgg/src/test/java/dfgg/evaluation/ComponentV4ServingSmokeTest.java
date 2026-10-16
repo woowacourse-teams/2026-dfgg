@@ -58,7 +58,7 @@ class ComponentV4ServingSmokeTest {
     @Test
     void trained_component_model_serves_v4_with_live_operating_catalog() throws Exception {
         Path model = Path.of(System.getProperty("evaluation.component.model")).toAbsolutePath();
-        Path lookup = model.resolveSibling("preparation-lookup.json");
+        Path lookup = model.resolveSibling("component-policy-lookup.json");
         Path tags = model.resolveSibling("champion-tags.json");
         var modelJson = JSON.readTree(model.toFile());
         assertThat(sha256(tags)).isEqualTo(modelJson.path("champion_metadata_sha256").asText());
@@ -81,7 +81,7 @@ class ComponentV4ServingSmokeTest {
                 .withBean(LeagueOfLegendsVersionProperties.class, () -> new LeagueOfLegendsVersionProperties(patch))
                 .withBean(RestClient.Builder.class, RestClient::builder)
                 .withPropertyValues("recommendation.component-ltr.model-path=" + model.toUri(),
-                        "recommendation.component-ltr.preparation-lookup-path=" + lookup.toUri())
+                        "recommendation.component-ltr.policy-lookup-path=" + lookup.toUri())
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     var runtime = context.getBean(ComponentRecommendationRuntime.class);

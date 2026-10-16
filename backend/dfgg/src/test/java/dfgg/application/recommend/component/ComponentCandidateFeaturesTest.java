@@ -33,7 +33,7 @@ class ComponentCandidateFeaturesTest {
                 new DataDragonPurchaseItemCatalog(response.data()), response, 120_000, "TOP", NO_TAGS).features();
         assertThat(features.get(16)).isEqualTo(0.0); // 공격력 구매가 공격속도를 바꿨다고 학습시키지 않는다.
         assertThat(features.get(10)).isEqualTo(10.0);
-        assertThat(features).hasSize(59);
+        assertThat(features).hasSize(58);
         assertThat(features.get(29)).isEqualTo(0.0); // 구매할 롱소드의 공격력은 이전 보유량에 포함하지 않는다.
         assertThat(features.get(35)).isCloseTo(0.7, org.assertj.core.data.Offset.offset(1e-12));
     }

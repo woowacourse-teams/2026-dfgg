@@ -159,12 +159,12 @@ class ComponentV4DatabaseServingTest {
     private Map<String, Object> provenance() throws Exception {
         byte[] core = resourceBytes("recommendation.ltr.model-path");
         byte[] component = resourceBytes("recommendation.component-ltr.model-path");
-        byte[] lookup = resourceBytes("recommendation.component-ltr.preparation-lookup-path");
+        byte[] lookup = resourceBytes("recommendation.component-ltr.policy-lookup-path");
         var model = JSON.readTree(component);
         String championHash = hash(JSON.writeValueAsBytes(jdbc.queryForList(
                 "select c.champion_id, t.tag from champions c left join champion_tags t on t.champion_id=c.champion_id order by c.champion_id, t.tag")));
         assertThat(championHash).isEqualTo(model.path("champion_metadata_sha256").asText());
-        assertThat(hash(lookup)).isEqualTo(model.path("preparation_lookup_sha256").asText());
+        assertThat(hash(lookup)).isEqualTo(model.path("policy_lookup_sha256").asText());
         var result = new LinkedHashMap<String, Object>();
         result.put("purpose", "HTTP_DATABASE_SMOKE_NOT_PRODUCTION_APPROVAL");
         result.put("coreModelSha256", hash(core));

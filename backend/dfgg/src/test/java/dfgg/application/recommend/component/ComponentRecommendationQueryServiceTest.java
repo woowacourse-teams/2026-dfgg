@@ -9,7 +9,7 @@ import dfgg.application.recommend.v3.ranker.DecisionTree;
 import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.match.ItemInventory;
-import dfgg.domain.match.PreparationLookup;
+import dfgg.domain.match.ComponentPolicyLookup;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +33,8 @@ class ComponentRecommendationQueryServiceTest {
                   "2":{"gold":{"total":200,"purchasable":true}},
                   "3":{"from":["1","1","2"],"gold":{"total":1000,"purchasable":true}},
                   "4":{"from":["1","2"],"gold":{"total":1500,"purchasable":true}},
-                  "5":{"gold":{"total":150,"purchasable":true}}
+                  "5":{"gold":{"total":150,"purchasable":true}},
+                  "3070":{"gold":{"total":150,"purchasable":true}}
                 }}
                 """, ItemResponse.class);
     }
@@ -63,9 +64,9 @@ class ComponentRecommendationQueryServiceTest {
     }
 
     @Test
-    void query_and_legacy_calls_preserve_preparation_features_and_lookup_validation() {
-        var lookup = new PreparationLookup("16.18", "a".repeat(64), Map.of(
-                new PreparationLookup.Key(81, "TOP", 3), List.of(new PreparationLookup.Pattern(5, 50, .8, 200, 40))));
+    void query_and_legacy_calls_preserve_policy_features_and_lookup_validation() {
+        var lookup = new ComponentPolicyLookup("16.18", "a".repeat(64), Map.of(
+                new ComponentPolicyLookup.RoleKey(81, "TOP"), new ComponentPolicyLookup.Prepared(1062, .85)));
         var service = new ComponentRecommendationService(model, lookup);
         var inventory = ItemInventory.empty();
         var query = query(81, List.of(3), inventory, ChampionPosition.TOP, "16.18");
@@ -74,13 +75,13 @@ class ComponentRecommendationQueryServiceTest {
         assertThat(results).isEqualTo(service.recommend(81, List.of(3), inventory, 200, 600_000,
                 "TOP", "16.18", response, COMPOSITION));
         assertThat(results.getFirst().rankedPurchases()).anySatisfy(p -> {
-            assertThat(p.candidate().itemQuantities()).isEqualTo(Map.of(5, 1));
-            assertThat(p.candidate().features().subList(55, 59)).containsExactly(1.0, .25, Math.log1p(50), .8);
+            assertThat(p.candidate().itemQuantities()).isEqualTo(Map.of(3070, 1));
+            assertThat(p.candidate().features().subList(55, 58)).containsExactly(1.0, .85, Math.log1p(1062));
         });
         assertThatThrownBy(() -> service.recommend(query(null, List.of(3), inventory, ChampionPosition.TOP, "16.18"), response))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Champion ID");
         assertThatThrownBy(() -> service.recommend(query(81, List.of(3), inventory, ChampionPosition.TOP, "16.19"), response))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Lookup 패치");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("조회표 패치");
     }
 
     @Test

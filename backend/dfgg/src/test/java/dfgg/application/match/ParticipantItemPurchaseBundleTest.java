@@ -188,7 +188,7 @@ class ParticipantItemPurchaseBundleTest {
                   "1037":{"gold":{"total":875,"purchasable":true},"stats":{"FlatPhysicalDamageMod":25},"into":["3071"]},
                   "3071":{"gold":{"total":1575,"purchasable":true},"stats":{"FlatPhysicalDamageMod":40},"from":["1036","1037"]}}}
                 """, dfgg.infrastructure.external.dto.ItemResponse.class);
-        var exporter = new ComponentTrainingDataService(service, mapper, dfgg.domain.match.PreparationLookup.disabled(), compositions());
+        var exporter = new ComponentTrainingDataService(service, mapper, dfgg.domain.match.ComponentPolicyLookup.disabled(), compositions());
         var examples = exporter.examplesForMatch("KR_TEST", catalog);
         assertThat(examples).hasSize(2).allMatch(e -> e.status().equals("READY"));
         var first = examples.getFirst();
@@ -208,13 +208,13 @@ class ParticipantItemPurchaseBundleTest {
         assertThat(writer.toString().lines().toList()).hasSize(2);
         var json = mapper.readTree(writer.toString().lines().findFirst().orElseThrow());
         assertThat(json.path("targetSource").asText()).isEqualTo("OBSERVED_FUTURE_TARGET_ITEM");
-        assertThat(json.path("featureNames").size()).isEqualTo(59);
+        assertThat(json.path("featureNames").size()).isEqualTo(58);
         var exportedCandidate = json.path("candidates").get(0);
-        assertThat(exportedCandidate.path("features").size()).isEqualTo(59);
+        assertThat(exportedCandidate.path("features").size()).isEqualTo(58);
         assertThat(exportedCandidate.has("itemQuantities")).isTrue();
         assertThat(exportedCandidate.has("label")).isTrue();
         assertThat(exportedCandidate.has("candidate")).isFalse(); // Python이 읽던 평탄 JSONL 형식을 유지한다.
-        assertThat(json.path("schemaVersion").asText()).isEqualTo("component-bundle-validation-v7");
+        assertThat(json.path("schemaVersion").asText()).isEqualTo("component-bundle-validation-v9");
         var wrongPatch = new dfgg.infrastructure.external.dto.ItemResponse("16.19.1", null, catalog.data());
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> exporter.examplesForMatch("KR_TEST", wrongPatch))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -227,7 +227,7 @@ class ParticipantItemPurchaseBundleTest {
                 """);
         var mapper = new ObjectMapper();
         var catalog = new dfgg.infrastructure.external.dto.ItemResponse("16.18.1", null, java.util.Map.of());
-        var example = new ComponentTrainingDataService(service, mapper, dfgg.domain.match.PreparationLookup.disabled(), compositions()).examplesForMatch("KR_TEST", catalog).getFirst();
+        var example = new ComponentTrainingDataService(service, mapper, dfgg.domain.match.ComponentPolicyLookup.disabled(), compositions()).examplesForMatch("KR_TEST", catalog).getFirst();
         assertThat(example.status()).isEqualTo("NO_OBSERVED_TARGET");
         assertThat(example.candidates()).isEmpty();
     }
@@ -245,7 +245,7 @@ class ParticipantItemPurchaseBundleTest {
                   "1037":{"gold":{"total":300,"purchasable":true}},
                   "3071":{"from":["1037"],"gold":{"total":350,"purchasable":true}}}}
                 """, dfgg.infrastructure.external.dto.ItemResponse.class);
-        var first = new ComponentTrainingDataService(service, mapper, dfgg.domain.match.PreparationLookup.disabled(), compositions()).examplesForMatch("KR_TEST", catalog).getFirst();
+        var first = new ComponentTrainingDataService(service, mapper, dfgg.domain.match.ComponentPolicyLookup.disabled(), compositions()).examplesForMatch("KR_TEST", catalog).getFirst();
         assertThat(first.status()).isEqualTo("OBSERVED_BUNDLE_MISSING");
         assertThat(first.candidates()).isNotEmpty().allMatch(c -> c.label() == null);
         assertThat(first.candidates().getFirst().candidate().itemQuantities()).doesNotContainKey(1036);
@@ -259,7 +259,7 @@ class ParticipantItemPurchaseBundleTest {
                 {"type":"ITEM_UNDO","participantId":1,"beforeId":3071,"afterId":0,"timestamp":21000}
                 """);
         var catalog = new dfgg.infrastructure.external.dto.ItemResponse("16.18.1", null, java.util.Map.of());
-        var first = new ComponentTrainingDataService(service, new ObjectMapper(), dfgg.domain.match.PreparationLookup.disabled(), compositions())
+        var first = new ComponentTrainingDataService(service, new ObjectMapper(), dfgg.domain.match.ComponentPolicyLookup.disabled(), compositions())
                 .examplesForMatch("KR_TEST", catalog).getFirst();
         assertThat(first.status()).isEqualTo("NO_OBSERVED_TARGET");
     }

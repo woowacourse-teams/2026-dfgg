@@ -55,9 +55,9 @@ class ComponentDatasetExportTest {
         String patch = version.substring(0, version.lastIndexOf('.'));
         String participantSource = System.getProperty("evaluation.component.participants");
         Map<String, Map<Integer, Integer>> participantMetadata = participantMetadata(mapper, participantSource, patch);
-        String lookupSource = System.getProperty("evaluation.component.preparation-lookup");
-        var lookup = lookupSource == null ? dfgg.domain.match.PreparationLookup.disabled()
-                : dfgg.infrastructure.recommend.PreparationLookupLoader.load(Files.readAllBytes(Path.of(lookupSource)));
+        String lookupSource = System.getProperty("evaluation.component.policy-lookup");
+        var lookup = lookupSource == null ? dfgg.domain.match.ComponentPolicyLookup.disabled()
+                : dfgg.infrastructure.recommend.ComponentPolicyLookupLoader.load(Files.readAllBytes(Path.of(lookupSource)));
         var service = new ComponentTrainingDataService(snapshots, mapper, lookup, compositions);
         boolean scopeOnly = Boolean.getBoolean("evaluation.component.scope-only");
         String comparisonSource = System.getProperty("evaluation.component.compare-source");
@@ -82,7 +82,7 @@ class ComponentDatasetExportTest {
             if (!expectedTrain.equals(new java.util.TreeSet<>(matches.subList(0, trainEnd)))) {
                 throw new IllegalArgumentException("Lookup mining Train 경기와 export split이 다릅니다.");
             }
-            Files.copy(Path.of(lookupSource), directory.resolve("preparation-lookup.json"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(Path.of(lookupSource), directory.resolve("component-policy-lookup.json"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
         try (var all = trainingWriter(directory.resolve(Boolean.getBoolean("evaluation.component.gzip-all") ? "all.jsonl.gz" : "all.jsonl"), scopeOnly);
              var train = trainingWriter(directory.resolve("train.jsonl"), scopeOnly);
@@ -156,7 +156,7 @@ class ComponentDatasetExportTest {
         }
         datasetManifest.put("schemaVersion", ComponentTrainingDataService.SCHEMA_VERSION);
         datasetManifest.put("championMetadataSha256", HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(championMetadataBytes)));
-        if (lookup.enabled()) datasetManifest.put("preparationLookupSha256", lookup.sha256());
+        if (lookup.enabled()) datasetManifest.put("policyLookupSha256", lookup.sha256());
         mapper.writerWithDefaultPrettyPrinter().writeValue(directory.resolve("manifest.json").toFile(), datasetManifest);
         var report = new LinkedHashMap<String, Object>();
         report.put("schemaVersion", ComponentTrainingDataService.SCHEMA_VERSION);
@@ -223,7 +223,7 @@ class ComponentDatasetExportTest {
         var mapper = new ObjectMapper();
         var response = mapper.readValue(Path.of(System.getProperty("evaluation.component.catalog")).toFile(), ItemResponse.class);
         var catalog = new dfgg.infrastructure.external.catalog.DataDragonPurchaseItemCatalog(response.data());
-        var service = new ComponentTrainingDataService(snapshots, mapper, dfgg.domain.match.PreparationLookup.disabled(), compositions);
+        var service = new ComponentTrainingDataService(snapshots, mapper, dfgg.domain.match.ComponentPolicyLookup.disabled(), compositions);
         var reports = new ArrayList<Map<String, Object>>();
         for (String matchId : System.getProperty("evaluation.component.inspect").split(",")) {
             var examples = service.examplesForMatch(matchId, response);

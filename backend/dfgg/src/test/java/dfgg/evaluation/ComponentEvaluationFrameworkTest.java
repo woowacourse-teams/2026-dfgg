@@ -18,7 +18,7 @@ import dfgg.domain.match.ItemInventory;
 import dfgg.domain.match.ItemPurchaseType;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
-import dfgg.domain.match.PreparationLookup;
+import dfgg.domain.match.ComponentPolicyLookup;
 import dfgg.infrastructure.external.catalog.DataDragonPurchaseItemCatalog;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import dfgg.presentation.dto.ChampionDto;
@@ -54,7 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
 class ComponentEvaluationFrameworkTest {
     @Autowired CoreComponentRecommendationService serving;
     @Autowired ComponentRecommendationService components;
-    @Autowired PreparationLookup lookup;
+    @Autowired ComponentPolicyLookup lookup;
     @Autowired CompositionFeatureCalculator compositions;
     @Autowired ChampionService champions;
     @Autowired ParticipantItemPurchaseSnapshotService snapshots;
@@ -92,8 +92,8 @@ class ComponentEvaluationFrameworkTest {
         byte[] core = resourceBytes("recommendation.ltr.model-path");
         byte[] component = resourceBytes("recommendation.component-ltr.model-path");
         assertThat(mapper.readTree(core).path("objective").asText()).isEqualTo("lambdarank");
-        assertThat(mapper.readTree(component).path("feature_names").size()).isEqualTo(59);
-        String lookupHash = hash(resourceBytes("recommendation.component-ltr.preparation-lookup-path"));
+        assertThat(mapper.readTree(component).path("feature_names").size()).isEqualTo(58);
+        String lookupHash = hash(resourceBytes("recommendation.component-ltr.policy-lookup-path"));
         assertThat(lookupHash).isEqualTo(lookup.sha256());
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("purpose", "PRODUCTION_SNAPSHOT_DIAGNOSTIC_NOT_INDEPENDENT_HOLDOUT");
@@ -128,7 +128,8 @@ class ComponentEvaluationFrameworkTest {
             var predictions = serving.recommend(request, inventory, scenario.gold(), 480_000, response);
             assertThat(predictions).hasSize(5);
             var branches = new ArrayList<Map<String, Object>>();
-            int preparationCandidates = 0;
+            int policyCandidates = 0;
+            var policies = lookup.evidenceFor(81, "BOTTOM");
             int emptyBranches = 0;
             for (var prediction : predictions) {
                 var branch = prediction.component();
@@ -144,28 +145,28 @@ class ComponentEvaluationFrameworkTest {
                     assertThat(signatures.add(purchase.candidate().itemQuantities())).isTrue();
                     verifyPurchase(branch.targetItemId(), inventory, purchase);
                     assertThat(purchase.additionalCost()).isBetween(0L, scenario.gold());
-                    assertThat(purchase.candidate().features()).hasSize(59);
+                    assertThat(purchase.candidate().features()).hasSize(58);
                     assertThat(purchase.candidate().features().subList(46, 55)).isEqualTo(composition.values());
                     assertThat(purchase.candidate().features().get(4)).isLessThanOrEqualTo(6.0);
                     purchase.candidate().itemQuantities().keySet().forEach(id -> assertThat(catalog.find(id)).isPresent());
-                    if (purchase.candidateSource() == dfgg.domain.match.ComponentCandidateGenerator.Source.PREPARATION) {
-                        preparationCandidates++;
-                        assertThat(purchase.candidate().itemQuantities()).hasSize(1);
-                        int id = purchase.candidate().itemQuantities().keySet().iterator().next();
+                    if (purchase.candidateSource() != dfgg.domain.match.ComponentCandidateGenerator.Source.TARGET_PATH) {
+                        policyCandidates++;
+                        int id = purchase.policyItemId();
+                        assertThat(purchase.candidate().itemQuantities()).containsKey(id);
                         assertThat(inventory.quantityOf(id)).isZero();
-                        assertThat(lookup.find(81, "BOTTOM", branch.targetItemId()).stream().map(PreparationLookup.Pattern::itemId)).contains(id);
+                        assertThat(policies).extracting(dfgg.domain.match.ComponentPolicyEvidence::itemId).contains(id);
                     }
                 }
                 branches.add(branchRow(prediction));
             }
-            if (scenario.name().equals("preparation_ezreal")) assertThat(preparationCandidates).isPositive();
+            if (scenario.name().equals("preparation_ezreal")) assertThat(policyCandidates).isPositive();
             if (scenario.name().equals("low_gold")) assertThat(emptyBranches).isEqualTo(predictions.size());
             if (scenario.name().equals("enemy_tank_heavy")) assertThat(composition.enemyTankCount()).isGreaterThanOrEqualTo(3);
             if (scenario.name().equals("enemy_mage_heavy")) assertThat(composition.enemyMageCount()).isGreaterThanOrEqualTo(3);
             results.add(Map.of("name", scenario.name(), "input", Map.of("request", request, "championId", 81,
                     "inventory", scenario.inventory(), "gold", scenario.gold(), "gameTimeMs", 480_000, "composition", composition),
                     "branches", branches, "checks", Map.of("passed", true, "branchIndependence", true, "affordability", true,
-                            "catalogAndSlots", true, "compositionFeatures", true, "preparationCandidates", preparationCandidates, "emptyBranches", emptyBranches)));
+                            "catalogAndSlots", true, "compositionFeatures", true, "policyCandidates", policyCandidates, "emptyBranches", emptyBranches)));
         }
         write("mock-serving-results.json", Map.of("accuracyApplicable", false, "scenarios", results));
         System.out.println("FRAMEWORK_MOCK scenarios=" + results.size());
@@ -201,7 +202,7 @@ class ComponentEvaluationFrameworkTest {
         row.put("status", branch.status().name());
         row.put("reason", branch.reason());
         row.put("candidateCount", branch.rankedPurchases().size());
-        row.put("preparationCandidateCount", branch.rankedPurchases().stream().filter(p -> p.candidateSource() == dfgg.domain.match.ComponentCandidateGenerator.Source.PREPARATION).count());
+        row.put("policyCandidateCount", branch.rankedPurchases().stream().filter(p -> p.candidateSource() != dfgg.domain.match.ComponentCandidateGenerator.Source.TARGET_PATH).count());
         row.put("top3", branch.rankedPurchases().stream().limit(3).map(p -> Map.of(
                 "rank", p.rankWithinTarget(), "items", namedItems(p.candidate().itemQuantities()), "itemQuantities", p.candidate().itemQuantities(),
                 "source", p.candidateSource().name(), "score", p.score(), "cost", p.additionalCost(), "features", p.candidate().features())).toList());

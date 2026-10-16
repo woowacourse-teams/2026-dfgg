@@ -42,6 +42,6 @@ public final class ComponentRanker {
             throw new IllegalStateException("모델 점수가 유한하지 않습니다.");
         }
         return new ScoredPurchase(features, candidate.bundle().additionalCost(), score, 0,
-                candidate.candidateSource(), candidate.preparationPatternCount(), candidate.preparationFutureRecipeLinkRate());
+                candidate.candidateSource(), candidate.policyItemId());
     }
 }

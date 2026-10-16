@@ -8,7 +8,7 @@ import dfgg.application.recommend.v3.ranker.DecisionTree;
 import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
 import dfgg.domain.match.ComponentCandidateGenerator;
 import dfgg.domain.match.ItemInventory;
-import dfgg.domain.match.PreparationLookup;
+import dfgg.domain.match.ComponentPolicyLookup;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +27,8 @@ class ComponentRecommendationRankingTest {
                   "2":{"gold":{"total":200,"purchasable":true}},
                   "3":{"from":["1","1","2"],"gold":{"total":1000,"purchasable":true}},
                   "4":{"gold":{"total":150,"purchasable":true}},
-                  "5":{"from":["1"],"gold":{"total":500,"purchasable":true}}
+                  "5":{"from":["1"],"gold":{"total":500,"purchasable":true}},
+                  "3070":{"gold":{"total":150,"purchasable":true}}
                 }}
                 """, ItemResponse.class);
     }
@@ -46,33 +47,30 @@ class ComponentRecommendationRankingTest {
         assertThat(result.rankedPurchases().get(1).candidate().purchaseOrder()).containsExactly(1, 1);
         assertThat(result.rankedPurchases().get(1).candidate().inventoryAfter()).isEqualTo(Map.of(1, 2));
         assertThat(result.rankedPurchases()).allSatisfy(p -> {
-            assertThat(p.candidate().features()).hasSize(59);
+            assertThat(p.candidate().features()).hasSize(58);
             assertThat(p.candidate().features().get(22)).isEqualTo(10.0);
             assertThat(p.candidateSource()).isEqualTo(ComponentCandidateGenerator.Source.TARGET_PATH);
-            assertThat(p.preparationPatternCount()).isNull();
-            assertThat(p.preparationFutureRecipeLinkRate()).isNull();
+            assertThat(p.policyItemId()).isNull();
         });
     }
 
     @Test
-    void ranks_preparation_features_and_preserves_their_evidence() {
-        var pattern = new PreparationLookup.Pattern(4, 50, .8, 200, 40);
-        var lookup = new PreparationLookup("16.18", "a".repeat(64),
-                Map.of(new PreparationLookup.Key(81, "BOTTOM", 3), List.of(pattern)));
+    void ranks_policy_features_and_preserves_their_evidence() {
+        var lookup = new ComponentPolicyLookup("16.18", "a".repeat(64),
+                Map.of(new ComponentPolicyLookup.RoleKey(81, "BOTTOM"), new ComponentPolicyLookup.Prepared(1062, .85)));
         var service = new ComponentRecommendationService(splitModel(55, .5, 1, 5), lookup);
         var ranked = recommend(service, List.of(3), 200).getFirst().rankedPurchases();
 
         assertThat(ranked).hasSize(4);
         var preparation = ranked.getFirst();
-        assertThat(preparation.candidate().itemQuantities()).isEqualTo(Map.of(4, 1));
+        assertThat(preparation.candidate().itemQuantities()).isEqualTo(Map.of(3070, 1));
         assertThat(preparation.additionalCost()).isEqualTo(150);
         assertThat(preparation.score()).isEqualTo(5);
         assertThat(preparation.rankWithinTarget()).isEqualTo(1);
-        assertThat(preparation.candidateSource()).isEqualTo(ComponentCandidateGenerator.Source.PREPARATION);
-        assertThat(preparation.preparationPatternCount()).isEqualTo(50);
-        assertThat(preparation.preparationFutureRecipeLinkRate()).isEqualTo(.8);
-        assertThat(preparation.candidate().features().subList(55, 59))
-                .containsExactly(1.0, .25, Math.log1p(50), .8);
+        assertThat(preparation.candidateSource()).isEqualTo(ComponentCandidateGenerator.Source.PREPARED);
+        assertThat(preparation.policyItemId()).isEqualTo(3070);
+        assertThat(preparation.candidate().features().subList(55, 58))
+                .containsExactly(1.0, .85, Math.log1p(1062));
     }
 
     @ParameterizedTest

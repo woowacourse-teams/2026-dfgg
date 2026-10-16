@@ -9,9 +9,9 @@ import dfgg.application.recommend.component.ComponentCandidateFeatures;
  */
 public record ComponentTrainingCandidate(@JsonUnwrapped ComponentCandidateFeatures candidate, Integer label,
         dfgg.domain.match.ComponentCandidateGenerator.Source candidateSource,
-        Integer preparationPatternCount, Double preparationFutureRecipeLinkRate) {
+        Integer policyItemId) {
     public ComponentTrainingCandidate(ComponentCandidateFeatures candidate, Integer label) {
-        this(candidate, label, dfgg.domain.match.ComponentCandidateGenerator.Source.TARGET_PATH, null, null);
+        this(candidate, label, dfgg.domain.match.ComponentCandidateGenerator.Source.TARGET_PATH, null);
     }
     public ComponentTrainingCandidate {
         if (candidate == null || label != null && label != 0 && label != 1) {

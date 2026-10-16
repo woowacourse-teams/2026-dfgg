@@ -66,7 +66,7 @@ class ComponentRuntimeConfigurationTest {
         var core = mock(NextItemRecommendationService.class);
         when(core.recommendNextItem(null)).thenReturn(new NextItemRecommendationResponse(List.of()));
         runner = new ApplicationContextRunner()
-                .withUserConfiguration(ComponentLtrConfiguration.class, PreparationLookupConfiguration.class,
+                .withUserConfiguration(ComponentLtrConfiguration.class, ComponentPolicyLookupConfiguration.class,
                         ComponentRuntimeConfiguration.class, CoreComponentRecommendationService.class,
                         ComponentTrainingDataService.class, RecommendationController.class)
                 .withBean(RestClient.Builder.class, () -> builders)
@@ -85,7 +85,7 @@ class ComponentRuntimeConfigurationTest {
     @Test
     void 모델_미설정이면_사용하지_않는_조회표_오류도_v3를_막지_않는다() {
         assertUnavailable(runner.withPropertyValues(
-                "recommendation.component-ltr.preparation-lookup-path=classpath:missing-lookup.json"));
+                "recommendation.component-ltr.policy-lookup-path=classpath:missing-lookup.json"));
         verifyNoInteractions(builders);
     }
 
@@ -95,7 +95,7 @@ class ComponentRuntimeConfigurationTest {
         Map<String, Object> model = model();
         String lookupPath = "";
         if (failure.equals("wrong-schema")) model.put("schema_fingerprint", "invalid");
-        if (failure.equals("wrong-hash")) model.put("preparation_lookup_sha256", "a".repeat(64));
+        if (failure.equals("wrong-hash")) model.put("policy_lookup_sha256", "a".repeat(64));
         if (failure.equals("missing-lookup")) lookupPath = "classpath:missing-lookup.json";
         if (failure.equals("invalid-lookup")) lookupPath = write("lookup.json", "{}");
         if (failure.equals("wrong-patch")) {
@@ -107,7 +107,7 @@ class ComponentRuntimeConfigurationTest {
                 : write("model.json", failure.equals("invalid-json") ? "broken" : MAPPER.writeValueAsString(model));
 
         assertUnavailable(runner.withPropertyValues("recommendation.component-ltr.model-path=" + modelPath,
-                "recommendation.component-ltr.preparation-lookup-path=" + lookupPath));
+                "recommendation.component-ltr.policy-lookup-path=" + lookupPath));
         verifyNoInteractions(builders);
     }
 
@@ -125,7 +125,7 @@ class ComponentRuntimeConfigurationTest {
         expectCatalog("en_US", "16.18.1");
         expectCatalog("ko_KR", "16.18.1");
         runner.withPropertyValues("recommendation.component-ltr.model-path=" + write("model.json", MAPPER.writeValueAsString(model)),
-                        "recommendation.component-ltr.preparation-lookup-path=" + lookupPath)
+                        "recommendation.component-ltr.policy-lookup-path=" + lookupPath)
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     var runtime = context.getBean(ComponentRecommendationRuntime.class);
@@ -182,13 +182,13 @@ class ComponentRuntimeConfigurationTest {
         expectCatalog("ko_KR", "16.18.1");
 
         withApplicationYaml().withPropertyValues("COMPONENT_LTR_MODEL_PATH=" + modelPath,
-                        "COMPONENT_LTR_PREPARATION_LOOKUP_PATH=" + lookupPath)
+                        "COMPONENT_LTR_POLICY_LOOKUP_PATH=" + lookupPath)
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context.getBean(ComponentRecommendationRuntime.class).isAvailable()).isTrue();
                     assertThat(context.getEnvironment().getProperty("recommendation.component-ltr.model-path")).isEqualTo(modelPath);
-                    assertThat(context.getBean(dfgg.domain.match.PreparationLookup.class).sha256())
-                            .isEqualTo(model.get("preparation_lookup_sha256"));
+                    assertThat(context.getBean(dfgg.domain.match.ComponentPolicyLookup.class).sha256())
+                            .isEqualTo(model.get("policy_lookup_sha256"));
                     assertV3(context.getBean(RecommendationController.class));
                     server.verify();
                 });
@@ -198,7 +198,7 @@ class ComponentRuntimeConfigurationTest {
     @ValueSource(strings = {"", "   "})
     void 빈_서빙_모델_경로는_로딩_오류_없이_비활성화한다(String path, CapturedOutput output) {
         assertUnavailable(withApplicationYaml().withPropertyValues("COMPONENT_LTR_MODEL_PATH=" + path,
-                "COMPONENT_LTR_PREPARATION_LOOKUP_PATH=classpath:missing-lookup.json"));
+                "COMPONENT_LTR_POLICY_LOOKUP_PATH=classpath:missing-lookup.json"));
         verifyNoInteractions(builders);
         assertThat(output).contains("Component 모델이 설정되지 않아").doesNotContain("Component 추천 준비 실패");
     }
@@ -259,14 +259,15 @@ class ComponentRuntimeConfigurationTest {
     }
 
     private byte[] lookup(String patch) throws Exception {
-        return MAPPER.writeValueAsBytes(Map.of("schemaVersion", "component-preparation-v2", "miningSplit", "train",
-                "minPatternCount", 50, "minFutureRecipeLinkRate", .70, "maxCandidatesPerKey", 3,
-                "entries", List.of(), "trainMatchIds", List.of("KR_TEST"), "splitManifestSha256", "a".repeat(64), "patch", patch));
+        return MAPPER.writeValueAsBytes(Map.of("schemaVersion", "component-policy-lookup-v2", "miningSplit", "train",
+                "trainMatchIds", List.of("KR_TEST"), "patch", patch,
+                "prepared", Map.of("whitelist", Map.of("3070", List.of(3003, 3004, 3119)), "minGames", 50,
+                        "minLinePurchaseRate", .30, "entries", List.of())));
     }
 
     private void attachLookup(Map<String, Object> model, byte[] lookup) throws Exception {
-        model.put("preparation_lookup_sha256", HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(lookup)));
-        model.put("preparation_lookup_schema_version", "component-preparation-v2");
+        model.put("policy_lookup_sha256", HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(lookup)));
+        model.put("policy_lookup_schema_version", "component-policy-lookup-v2");
     }
 
     private String write(String name, String body) throws Exception {

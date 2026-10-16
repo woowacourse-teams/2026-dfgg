@@ -58,7 +58,7 @@ class ComponentGameContextParityTest {
         var snapshots = mock(ParticipantItemPurchaseSnapshotService.class);
         when(snapshots.prepareForMatch("M")).thenReturn(new ParticipantItemPurchaseSnapshotService.PreparedPurchases(
                 List.of(first, target), List.of(new ParticipantItemPurchaseBundle(List.of(first), Set.of()))));
-        var trained = new ComponentTrainingDataService(snapshots, new ObjectMapper(), PreparationLookup.disabled(), reader)
+        var trained = new ComponentTrainingDataService(snapshots, new ObjectMapper(), ComponentPolicyLookup.disabled(), reader)
                 .examplesForMatch("M", response).getFirst();
         assertThat(trained.status()).isEqualTo("READY");
 
@@ -80,7 +80,7 @@ class ComponentGameContextParityTest {
         assertThat(trained.candidates()).extracting(ComponentTrainingCandidate::candidate)
                 .containsExactlyElementsOf(served.rankedPurchases().stream().map(ScoredPurchase::candidate).toList());
         assertThat(served.rankedPurchases()).allSatisfy(c -> {
-            assertThat(c.candidate().features()).hasSize(59);
+            assertThat(c.candidate().features()).hasSize(58);
             assertThat(c.candidate().features().subList(46, 55)).isEqualTo(composition.values());
         });
         verify(championRepository, times(2)).findAllWithTagsByChampionIdIn(any());

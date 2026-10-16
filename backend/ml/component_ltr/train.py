@@ -16,7 +16,7 @@ from pathlib import Path
 
 import lightgbm as lgb
 import numpy as np
-from component_ltr.dataset import load_splits
+from component_ltr.dataset import load_splits, POLICY_LOOKUP_FILE
 from component_ltr.feature_schema import CONTEXT_FEATURE_START, CONTEXT_FEATURE_END, SCHEMA_VERSION, FEATURE_NAMES, COMPOSITION_FEATURE_START, COMPOSITION_FEATURE_END
 from dfgg_ltr.dataset import Dataset
 from component_ltr.evaluate import evaluate, evaluate_baselines, stratified_evaluation
@@ -36,7 +36,7 @@ def main() -> None:
     parser.add_argument("--drop-features", nargs="*", default=[], choices=FEATURE_NAMES[41:],
                         help="실험 전용: Target 관계/Composition 열을 실제로 제거한다. 서빙 계약과 호환되지 않는다")
     parser.add_argument("--without-composition", action="store_true",
-                        help="실험 전용: Composition 9개 열만 제거한다 (Preparation 4열은 유지)")
+                        help="실험 전용: Composition 9개 열만 제거한다 (Prepared 3열은 유지)")
     args = parser.parse_args()
     if args.rounds <= 0:
         parser.error("rounds는 양수여야 합니다")
@@ -51,7 +51,7 @@ def main() -> None:
             dataset.features[:, CONTEXT_FEATURE_START:CONTEXT_FEATURE_END] = 0.0
     disabled = sorted(set(args.drop_features) | (set(FEATURE_NAMES[COMPOSITION_FEATURE_START:COMPOSITION_FEATURE_END])
                                                if args.without_composition else set()))
-    model_version = "component-ltr-v7" if not disabled else "component-ltr-v7-ablation"
+    model_version = "component-ltr-v9" if not disabled else "component-ltr-v9-ablation"
     if disabled:
         keep = [i for i, name in enumerate(FEATURE_NAMES) if name not in disabled]
         names = [FEATURE_NAMES[i] for i in keep]
@@ -85,12 +85,12 @@ def main() -> None:
     flat_scores = [predict_with_flat_trees(exported["trees"], row) for row in sample]
     np.testing.assert_allclose(flat_scores, booster.predict(sample), rtol=1e-10, atol=1e-10)
     manifest = json.loads((args.data_dir / "manifest.json").read_text())
-    lookup_hash = manifest.get("preparationLookupSha256")
+    lookup_hash = manifest.get("policyLookupSha256")
     champion_metadata_hash = manifest.get("championMetadataSha256")
     exported["champion_metadata_sha256"] = champion_metadata_hash
     if lookup_hash:
-        exported["preparation_lookup_sha256"] = lookup_hash
-        exported["preparation_lookup_schema_version"] = json.loads((args.data_dir / "preparation-lookup.json").read_text())["schemaVersion"]
+        exported["policy_lookup_sha256"] = lookup_hash
+        exported["policy_lookup_schema_version"] = json.loads((args.data_dir / POLICY_LOOKUP_FILE).read_text())["schemaVersion"]
     exported.update({"model_version": model_version, "target_source": "OBSERVED_FUTURE_TARGET_ITEM", "deployable": False})
     args.out_dir.mkdir(parents=True, exist_ok=True)
     booster.save_model(str(args.out_dir / "booster.txt"))
@@ -103,15 +103,15 @@ def main() -> None:
                 "featureCount": len(train.feature_names), "features": train.feature_names,
                 "championMetadataSha256": champion_metadata_hash,
                 "schemaFingerprint": train.schema_fingerprint, "randomSeed": params["seed"],
-                "preparationLookupSchemaVersion": exported.get("preparation_lookup_schema_version"),
-                "bestIteration": booster.best_iteration, "preparationLookupSha256": lookup_hash,
+                "policyLookupSchemaVersion": exported.get("policy_lookup_schema_version"),
+                "bestIteration": booster.best_iteration, "policyLookupSha256": lookup_hash,
                 "compositionFeaturesEnabled": not args.without_composition,
                 "contextFeaturesEnabled": not args.without_context, "droppedFeatures": disabled,
                 "modelSha256": hashlib.sha256((args.out_dir / "model.json").read_bytes()).hexdigest(),
                 "recipeDepthDefinition": "minimum actual combine operations; direct target purchase costs one operation"}
     (args.out_dir / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2))
     if lookup_hash:
-        shutil.copyfile(args.data_dir / "preparation-lookup.json", args.out_dir / "preparation-lookup.json")
+        shutil.copyfile(args.data_dir / POLICY_LOOKUP_FILE, args.out_dir / POLICY_LOOKUP_FILE)
     if champion_metadata_hash:
         shutil.copyfile(args.data_dir / "champion-tags.json", args.out_dir / "champion-tags.json")
     shutil.copyfile(args.data_dir / "manifest.json", args.out_dir / "split_manifest.json")

@@ -20,7 +20,7 @@ def test_bundle_dataset_contract(tmp_path):
     assert dataset.features.shape == (2, len(FEATURE_NAMES))
     # Java 모델 로더의 계약 지문과 동일해야 한다.
     assert dataset.schema_fingerprint == SCHEMA_FINGERPRINT == (
-        '6f287c3c7dadb29c739cde1de020523db5136e80a29c71388523e47e2a7e49b3'
+        '4ad69fefc4cea9ebca4ad15fb4e4c4f552fec1fe11ffb4e97d52441a0565e6b5'
     )
     row['candidates'][0]['label'] = 0
     path.write_text(json.dumps(row) + '\n')
@@ -140,7 +140,7 @@ def test_target_is_part_of_query_identity_and_feature_order_matches_java(tmp_pat
     declaration = java.split('FEATURE_NAMES = List.of(', 1)[1].split(');', 1)[0]
     context = (Path(__file__).parents[2] / 'dfgg/src/main/java/dfgg/application/recommend/context/CompositionFeatures.java').read_text()
     composition = context.split('FEATURE_NAMES = List.of(', 1)[1].split(');', 1)[0]
-    assert re.findall(r'"([a-z_]+)"', declaration + composition + java.split('PREPARATION_FEATURE_NAMES = List.of(', 1)[1].split(');', 1)[0]) == FEATURE_NAMES
+    assert re.findall(r'"([a-z_]+)"', declaration + composition + java.split('POLICY_FEATURE_NAMES = List.of(', 1)[1].split(');', 1)[0]) == FEATURE_NAMES
     config = (Path(__file__).parents[2] / 'dfgg/src/main/java/dfgg/infrastructure/config/ComponentLtrConfiguration.java').read_text()
     assert SCHEMA_FINGERPRINT in config
 
@@ -164,10 +164,10 @@ def test_stratification_uses_metadata_without_adding_features(tmp_path, ranking_
     assert result['target_kind']['TIER_TWO_BOOTS']['groups'] == 1
     assert result['completed_core_count']['2']['hit@1'] == 1
     assert result['gold_lower_range']['500-999']['hit@1'] == 1
-    assert dataset.features.shape[1] == 59
+    assert dataset.features.shape[1] == 58
 
 
-def test_preparation_lookup_binding_is_required_and_train_only(tmp_path):
+def test_policy_lookup_binding_is_required_and_train_only(tmp_path):
     import hashlib
     from component_ltr.dataset import load_splits
     matches = {}
@@ -177,8 +177,8 @@ def test_preparation_lookup_binding_is_required_and_train_only(tmp_path):
         row = dict(schemaVersion=SCHEMA_VERSION, featureNames=FEATURE_NAMES, status='READY',
                    targetSource='OBSERVED_FUTURE_TARGET_ITEM', matchId=match, participantId=1, targetItemId=3078,
                    dataVersion='16.18.1', startPurchaseOrder=1, endPurchaseOrder=1, observedItems={'3070': 1},
-                   candidates=[dict(itemQuantities={'3070': 1}, label=1, features=[0] * 55 + [1, .25, math.log1p(50), .8],
-                                    candidateSource='PREPARATION', preparationPatternCount=50, preparationFutureRecipeLinkRate=.8),
+                   candidates=[dict(itemQuantities={'3070': 1}, label=1, features=[0] * 55 + [1, .85, math.log1p(1062)],
+                                    candidateSource='PREPARED', policyItemId=3070),
                                dict(itemQuantities={'1036': 1}, label=0, features=[0] * len(FEATURE_NAMES))])
         (tmp_path / (split + '.jsonl')).write_text(json.dumps(row) + '\n')
     manifest = {'matches': matches}
@@ -186,20 +186,20 @@ def test_preparation_lookup_binding_is_required_and_train_only(tmp_path):
     report = tmp_path / 'validation-report.json'
     with pytest.raises(ValueError):
         load_splits(tmp_path, report)
-    assert json.loads(report.read_text())['splitErrors'][0]['reason'] == 'PREPARATION_LOOKUP_MISSING'
-    lookup = dict(schemaVersion='component-preparation-v2', patch='16.18', miningSplit='train', trainMatchIds=['KR_train'])
-    lookup_path = tmp_path / 'preparation-lookup.json'
+    assert json.loads(report.read_text())['splitErrors'][0]['reason'] == 'POLICY_LOOKUP_MISSING'
+    lookup = dict(schemaVersion='component-policy-lookup-v2', patch='16.18', miningSplit='train', trainMatchIds=['KR_train'])
+    lookup_path = tmp_path / 'component-policy-lookup.json'
     lookup_path.write_text(json.dumps(lookup))
-    manifest['preparationLookupSha256'] = hashlib.sha256(lookup_path.read_bytes()).hexdigest()
+    manifest['policyLookupSha256'] = hashlib.sha256(lookup_path.read_bytes()).hexdigest()
     (tmp_path / 'manifest.json').write_text(json.dumps(manifest))
     assert len(load_splits(tmp_path, report)) == 3
     lookup['trainMatchIds'] += ['KR_test']
     lookup_path.write_text(json.dumps(lookup))
-    manifest['preparationLookupSha256'] = hashlib.sha256(lookup_path.read_bytes()).hexdigest()
+    manifest['policyLookupSha256'] = hashlib.sha256(lookup_path.read_bytes()).hexdigest()
     (tmp_path / 'manifest.json').write_text(json.dumps(manifest))
     with pytest.raises(ValueError):
         load_splits(tmp_path, report)
-    assert json.loads(report.read_text())['splitErrors'][0]['reason'] == 'PREPARATION_LOOKUP_CONTRACT'
+    assert json.loads(report.read_text())['splitErrors'][0]['reason'] == 'POLICY_LOOKUP_CONTRACT'
 
 
 @pytest.mark.parametrize("fault,reason", [("negative", "COMPOSITION_COUNT"),
@@ -235,10 +235,30 @@ def test_metadata_snapshot_hash_is_checked_before_training(tmp_path, ranking_row
     assert {'reason': 'CHAMPION_METADATA_HASH'} in report['splitErrors']
 
 
-@pytest.mark.parametrize("values", [[1, .25, 3.9, .8], [0, .25, 0, 0], [0, 0, 0, .8]])
-def test_target_path_cannot_carry_preparation_evidence(tmp_path, ranking_row, values):
+@pytest.mark.parametrize("values", [[1, .85, 6.9], [0, .85, 0], [0, 0, 6.9]])
+def test_target_path_cannot_carry_policy_evidence(tmp_path, ranking_row, values):
     ranking_row['candidates'][0]['features'][55:] = values
     path = tmp_path / 'train.jsonl'
     path.write_text(json.dumps(ranking_row) + '\n')
-    with pytest.raises(ValueError, match='PREPARATION_FEATURES'):
+    with pytest.raises(ValueError, match='POLICY_FEATURES'):
         load_dataset(path)
+
+
+@pytest.mark.parametrize("source,item,values,reason", [
+    ("PREPARED", 3070, [1, .85, 6.9], None),
+    ("PREPARED", 3070, [1, .2, 6.9], "POLICY_FEATURES"),
+    ("PREPARED", 3070, [1, .85, 1.0], "POLICY_FEATURES"),
+    ("PREPARED", 3916, [1, .85, 6.9], "POLICY_ITEM"),
+    ("SITUATIONAL", 3916, [1, .85, 6.9], "CANDIDATE_SOURCE"),
+])
+def test_policy_candidates_carry_their_own_evidence(tmp_path, ranking_row, source, item, values, reason):
+    candidate = ranking_row['candidates'][1]
+    candidate.update(candidateSource=source, policyItemId=item, itemQuantities={str(item): 1})
+    candidate['features'][55:] = values
+    path = tmp_path / 'train.jsonl'
+    path.write_text(json.dumps(ranking_row) + '\n')
+    if reason is None:
+        assert len(load_dataset(path).qids) == 1
+    else:
+        with pytest.raises(ValueError, match=reason):
+            load_dataset(path)

@@ -2,7 +2,7 @@ package dfgg.infrastructure.config;
 
 import dfgg.application.recommend.component.ComponentRecommendationRuntime;
 import dfgg.application.recommend.component.ComponentRecommendationService;
-import dfgg.domain.match.PreparationLookup;
+import dfgg.domain.match.ComponentPolicyLookup;
 import dfgg.infrastructure.external.client.DataDragonClient;
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -22,7 +22,7 @@ public class ComponentRuntimeConfiguration {
     @Bean
     public ComponentRecommendationRuntime componentRecommendationRuntime(
             ObjectProvider<ComponentRecommendationService> recommendations,
-            ObjectProvider<PreparationLookup> lookups,
+            ObjectProvider<ComponentPolicyLookup> lookups,
             LeagueOfLegendsVersionProperties version,
             RestClient.Builder restClients,
             @Value("${recommendation.component-ltr.model-path:}") String modelPath) {
