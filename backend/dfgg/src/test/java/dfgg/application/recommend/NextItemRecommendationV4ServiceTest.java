@@ -32,6 +32,7 @@ import dfgg.domain.image.ImageUrls;
 import dfgg.infrastructure.config.LeagueOfLegendsVersionProperties;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import dfgg.presentation.dto.ChampionDto;
+import dfgg.presentation.dto.ChampionRefDto;
 import dfgg.presentation.dto.RecommendationDescription;
 import dfgg.presentation.dto.RecommendedItemDto;
 import dfgg.presentation.dto.request.InventoryItemRequest;
@@ -65,7 +66,9 @@ class NextItemRecommendationV4ServiceTest {
                   "1001":{"name":"장화","tags":["Boots"],"gold":{"total":300,"purchasable":true}},
                   "3133":{"name":"목표 A","from":["1036","1036"],"gold":{"total":1100,"purchasable":true}},
                   "3071":{"name":"목표 B","from":["1036","1036"],"gold":{"total":1100,"purchasable":true}},
-                  "2055":{"name":"제어 와드","stacks":2,"gold":{"total":75,"purchasable":true}}
+                  "2055":{"name":"제어 와드","stacks":2,"gold":{"total":75,"purchasable":true}},
+                  "3123":{"name":"처형인의 대검","gold":{"total":800,"purchasable":true}},
+                  "3076":{"name":"덤불 조끼","gold":{"total":800,"purchasable":true}}
                 }}
                 """, ItemResponse.class);
         service = service(ComponentRecommendationRuntime.available(component, catalog));
@@ -210,6 +213,46 @@ class NextItemRecommendationV4ServiceTest {
     }
 
     @Test
+    void 상대_조합_근거가_있으면_효과당_하나의_상황_대응_아이템을_함께_반환한다() {
+        prepareCore(List.of(coreItem(3133)));
+        Champion warwick = mock(Champion.class);
+        when(warwick.getChampionId()).thenReturn(7L);
+        when(warwick.getName()).thenReturn(Map.of("ko-KR", "워윅"));
+        when(warwick.getRiotKey()).thenReturn("Warwick");
+        when(champions.findChampionByName("champion7")).thenReturn(warwick);
+        when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
+                new TargetRecommendation(3133, Status.OK, List.of(purchase(1036, 1)), null)));
+        var lookup = new dfgg.domain.match.SituationalComponentLookup("16.18",
+                Map.of(new dfgg.domain.match.SituationalComponentLookup.LiftKey(3123, 7, "TOP"), new dfgg.domain.match.SituationalComponentLookup.Lift(40, 3.0),
+                        new dfgg.domain.match.SituationalComponentLookup.LiftKey(3076, 7, "TOP"), new dfgg.domain.match.SituationalComponentLookup.Lift(40, 2.5)),
+                Map.of(new dfgg.domain.match.SituationalComponentLookup.BaseKey(86, "TOP", 3123), .05,
+                        new dfgg.domain.match.SituationalComponentLookup.BaseKey(86, "TOP", 3076), .10));
+        var situational = dfgg.application.recommend.situational.SituationalComponentRuntime.available(
+                lookup, new dfgg.domain.match.SituationalThresholds(2.0, .01));
+
+        var response = service(ComponentRecommendationRuntime.available(component, catalog), situational)
+                .recommendNextItem(request(null, List.of(new InventoryItemRequest(1036L, 2))));
+
+        assertThat(response.recommendedItems()).hasSize(1);
+        assertThat(response.situationalItems()).singleElement().satisfies(item -> {
+            assertThat(item.itemId()).isEqualTo(3123L);
+            assertThat(item.name()).isEqualTo("처형인의 대검");
+            assertThat(item.effect()).isEqualTo("GRIEVOUS_WOUNDS");
+            assertThat(item.reasonChampions()).extracting(ChampionRefDto::name).containsExactly("워윅");
+            assertThat(item.additionalCost()).isEqualTo(800);
+            assertThat(item.affordable()).isTrue();
+        });
+    }
+
+    @Test
+    void 상황_대응_조회표가_없으면_빈_목록을_반환한다() {
+        prepareCore(List.of(coreItem(3133)));
+        when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
+                new TargetRecommendation(3133, Status.OK, List.of(purchase(1036, 1)), null)));
+        assertThat(service.recommendNextItem(request(null, List.of())).situationalItems()).isEmpty();
+    }
+
+    @Test
     void 구매_수량과_실행_순서가_모순인_묶음은_반환하지_않는다() {
         prepareCore(List.of(coreItem(3133)));
         var candidate = new ComponentCandidateFeatures(Map.of(1036, 1, 1052, 1), List.of(1036), Map.of(), features());
@@ -246,8 +289,14 @@ class NextItemRecommendationV4ServiceTest {
     }
 
     private NextItemRecommendationV4Service service(ComponentRecommendationRuntime runtime) {
+        return service(runtime, dfgg.application.recommend.situational.SituationalComponentRuntime.disabled());
+    }
+
+    private NextItemRecommendationV4Service service(ComponentRecommendationRuntime runtime,
+            dfgg.application.recommend.situational.SituationalComponentRuntime situational) {
         return new NextItemRecommendationV4Service(core, runtime, champions, compositions,
-                new ComponentPurchaseBundleMapper(images), new LeagueOfLegendsVersionProperties("16.18"));
+                new ComponentPurchaseBundleMapper(images), new LeagueOfLegendsVersionProperties("16.18"),
+                situational, new dfgg.application.recommend.situational.SituationalItemMapper(images));
     }
 
     private NextItemRecommendationV4Request request(String patch, List<InventoryItemRequest> inventory) {

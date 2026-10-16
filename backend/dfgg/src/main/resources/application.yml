@@ -40,6 +40,10 @@ recommendation:
   component-ltr:
     model-path: "${COMPONENT_LTR_MODEL_PATH:}"
     policy-lookup-path: "${COMPONENT_LTR_POLICY_LOOKUP_PATH:}"
+  situational:
+    lookup-path: "${SITUATIONAL_LOOKUP_PATH:}"
+    min-lift: "${SITUATIONAL_MIN_LIFT:2.0}"
+    min-base-rate: "${SITUATIONAL_MIN_BASE_RATE:0.01}"
   recent-patch-window-size: "${RECOMMENDATION_RECENT_PATCH_WINDOW_SIZE:3}"
   counter:
     minimum-base-rate: "${RECOMMENDATION_COUNTER_MINIMUM_BASE_RATE:0.01}"

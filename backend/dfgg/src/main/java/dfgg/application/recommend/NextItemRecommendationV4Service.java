@@ -6,6 +6,10 @@ import dfgg.application.recommend.component.ComponentRecommendationQuery;
 import dfgg.application.recommend.component.ComponentRecommendationRuntime;
 import dfgg.application.recommend.component.ComponentRecommendationService;
 import dfgg.application.recommend.context.CompositionFeatureCalculator;
+import dfgg.application.recommend.situational.SituationalComponentRuntime;
+import dfgg.application.recommend.situational.SituationalItemMapper;
+import dfgg.domain.champion.Champion;
+import dfgg.presentation.dto.SituationalItemDto;
 import dfgg.common.exception.ComponentRecommendationUnavailableException;
 import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.domain.champion.ChampionPosition;
@@ -19,6 +23,7 @@ import dfgg.presentation.dto.RecommendedItemV4Dto;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.request.NextItemRecommendationV4Request;
 import dfgg.presentation.dto.response.NextItemRecommendationV4Response;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -36,17 +41,22 @@ public class NextItemRecommendationV4Service {
     private final CompositionFeatureCalculator compositions;
     private final ComponentPurchaseBundleMapper bundles;
     private final LeagueOfLegendsVersionProperties version;
+    private final SituationalComponentRuntime situational;
+    private final SituationalItemMapper situationalItems;
 
     public NextItemRecommendationV4Service(NextItemRecommendationService coreRecommendations,
             ComponentRecommendationRuntime components, ChampionService champions,
             CompositionFeatureCalculator compositions, ComponentPurchaseBundleMapper bundles,
-            LeagueOfLegendsVersionProperties version) {
+            LeagueOfLegendsVersionProperties version, SituationalComponentRuntime situational,
+            SituationalItemMapper situationalItems) {
         this.coreRecommendations = coreRecommendations;
         this.components = components;
         this.champions = champions;
         this.compositions = compositions;
         this.bundles = bundles;
         this.version = version;
+        this.situational = situational;
+        this.situationalItems = situationalItems;
     }
 
     public NextItemRecommendationV4Response recommendNextItem(NextItemRecommendationV4Request request) {
@@ -59,15 +69,30 @@ public class NextItemRecommendationV4Service {
         var coreRequest = new NextItemRecommendationRequest(request.myChampion(), request.purchasedItemIds(),
                 request.allies(), request.enemies(), request.tier(), patch);
         var cores = coreRecommendations.recommendNextItem(coreRequest).recommendedItems();
+        var situationalItems = situationalItems(request, inventory, catalog);
         if (cores.isEmpty()) {
-            return new NextItemRecommendationV4Response(List.of());
+            return new NextItemRecommendationV4Response(List.of(), situationalItems);
         }
         var query = query(request, cores, inventory, patch);
         Map<Integer, ComponentRecommendationService.TargetRecommendation> byTarget = components.recommend(query).stream()
                 .collect(Collectors.toMap(ComponentRecommendationService.TargetRecommendation::targetItemId, Function.identity()));
         return new NextItemRecommendationV4Response(cores.stream()
                 .map(core -> RecommendedItemV4Dto.of(core, bundles.toDto(byTarget.get(Math.toIntExact(core.id())), catalog)))
-                .toList());
+                .toList(), situationalItems);
+    }
+
+    /** 상대 조합에 대한 추천이라 Core 목표와 무관하게 요청당 한 번 계산한다. */
+    private List<SituationalItemDto> situationalItems(NextItemRecommendationV4Request request, ItemInventory inventory,
+            ItemResponse catalog) {
+        if (!situational.isAvailable()) return List.of();
+        Map<Long, Champion> enemies = request.enemies().stream()
+                .map(enemy -> champions.findChampionByName(enemy.name()))
+                .collect(Collectors.toMap(Champion::getChampionId, Function.identity(), (first, second) -> first, LinkedHashMap::new));
+        int championId = Math.toIntExact(champions.findChampionByName(request.myChampion().name()).getChampionId());
+        var recommendations = situational.recommend(championId, ChampionPosition.valueOf(request.myChampion().position()).name(),
+                enemies.keySet().stream().map(Math::toIntExact).toList(), inventory,
+                request.purchasedItemIds().stream().map(Math::toIntExact).toList(), request.availableGold(), catalog);
+        return situationalItems.toDtos(recommendations, catalog, enemies);
     }
 
     private String operatingPatch(String requested) {

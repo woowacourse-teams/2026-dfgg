@@ -106,7 +106,8 @@ class NextItemRecommendationV4ControllerTest {
                 .andExpect(jsonPath("$.recommendedItems[1]", hasKey("purchaseBundle")))
                 .andExpect(jsonPath("$.recommendedItems[1].purchaseBundle", nullValue()))
                 .andExpect(jsonPath("$.recommendedItems[1]", not(hasKey("reason"))))
-                .andExpect(jsonPath("$.recommendedItems[1]", not(hasKey("status"))));
+                .andExpect(jsonPath("$.recommendedItems[1]", not(hasKey("status"))))
+                .andExpect(jsonPath("$.situationalItems.length()").value(0));
     }
 
     @ParameterizedTest
