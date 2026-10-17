@@ -197,7 +197,9 @@ class RiotMatchControllerIntegrationTest {
                 Map.of("ko-KR", "아트록스"),
                 List.of(ChampionTag.FIGHTER)
         ));
-        itemRepository.save(new Item(3071L, Map.of("ko-KR", "칠흑의 양날 도끼")));
+        // Core 집계 대상이 되도록 실제처럼 조합식을 둔다.
+        itemRepository.save(new Item(3071L, Map.of("ko-KR", "칠흑의 양날 도끼"), null,
+                List.of("3044", "3133"), List.of(), List.of()));
         playerRepository.save(new Player(
                 "puuid-1",
                 "KR",

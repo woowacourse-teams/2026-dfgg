@@ -655,9 +655,10 @@ class ChampionBuildStatsRebuildMatchServiceIntegrationTest {
                 new Champion(2L, "Ally", Map.of("ko-KR", "아군"), List.of(ChampionTag.FIGHTER)),
                 new Champion(3L, "Enemy", Map.of("ko-KR", "적군"), List.of(ChampionTag.TANK))
         ));
+        // Core는 조합식이 있는 완성 아이템이다. 재료만 있으면 Core 구매 순서가 비어 표본이 생기지 않는다.
         itemRepository.saveAll(List.of(
-                new Item(3071L, Map.of("ko-KR", "아이템 A")),
-                new Item(6610L, Map.of("ko-KR", "아이템 B"))
+                new Item(3071L, Map.of("ko-KR", "아이템 A"), null, List.of("3044", "3133"), List.of(), List.of()),
+                new Item(6610L, Map.of("ko-KR", "아이템 B"), null, List.of("3044", "3077"), List.of(), List.of())
         ));
     }
 
