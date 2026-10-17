@@ -1,0 +1,172 @@
+package dfgg.application.recommend.v3.generator;
+
+import dfgg.application.recommend.v3.CandidateGenerator;
+import dfgg.application.recommend.v3.CandidateSource;
+import dfgg.application.recommend.v3.GeneratorResult;
+import dfgg.application.recommend.v3.RecommendationQuery;
+import dfgg.application.recommend.v3.ScoredItem;
+import dfgg.application.utils.WilsonScoreCalculator;
+import dfgg.domain.champion.ChampionPosition;
+import dfgg.domain.itemstats.ChampionItemRollup;
+import dfgg.domain.itemstats.ChampionItemRollupRepository;
+import dfgg.domain.itemstats.ChampionItemStats;
+import dfgg.domain.itemstats.ChampionItemStatsRepository;
+import dfgg.domain.itemstats.ChampionPairItemStats;
+import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
+import dfgg.domain.itemstats.PairRelation;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+/**
+ * "현재 적 조합 때문에 어떤 아이템의 가치가 오르는가"로 후보를 찾는다.
+ * <p>
+ * 여기서는 {@code [내 챔피언 + 적 챔피언 + 아이템]} 삼중항을 쓴다.
+ * 구매자가 키에 들어 있으므로 남의 아이템이 내 근거가 될 수 없다.
+ * 점수는 raw 확률이 아니라 {@code P(item|나,적) / P(item|나)} lift이며,
+ * 분모가 내 챔피언 자신의 구매율이라 "내가 원래 안 사는 아이템"이라는 사실이 계산에 직접 들어간다.
+ * <p>
+ * 그렇다고 AD/AP를 막지는 않는다. lift·원 확률·base rate 셋을 따로 LTR에 넘겨,
+ * "base rate가 바닥인데 lift만 높은 후보"를 모델이 학습으로 눌러주게 한다.
+ * 규칙으로 막으면 AD 르블랑 같은 비정형 빌드의 정답까지 지워진다.
+ */
+@Component
+public class CounterCandidateGenerator implements CandidateGenerator {
+
+    private final ChampionPairItemStatsRepository pairRepository;
+    private final ChampionItemStatsRepository championItemStatsRepository;
+    private final ChampionItemRollupRepository championItemRollupRepository;
+    private final PairLiftCalculator pairLiftCalculator;
+    private final WilsonScoreCalculator wilsonScoreCalculator;
+    private final int minimumPairGames;
+    private final double minimumBaseRate;
+    private final ChampionBaselineReader championBaselineReader;
+
+    public CounterCandidateGenerator(
+            ChampionPairItemStatsRepository pairRepository,
+            ChampionItemStatsRepository championItemStatsRepository,
+            ChampionItemRollupRepository championItemRollupRepository,
+            PairLiftCalculator pairLiftCalculator,
+            WilsonScoreCalculator wilsonScoreCalculator,
+            @Value("${recommendation.pair-synergy.minimum-pair-games}") int minimumPairGames,
+            @Value("${recommendation.counter.minimum-base-rate}") double minimumBaseRate,
+            ChampionBaselineReader championBaselineReader
+    ) {
+        this.pairRepository = pairRepository;
+        this.championItemStatsRepository = championItemStatsRepository;
+        this.championItemRollupRepository = championItemRollupRepository;
+        this.pairLiftCalculator = pairLiftCalculator;
+        this.wilsonScoreCalculator = wilsonScoreCalculator;
+        this.minimumPairGames = minimumPairGames;
+        this.minimumBaseRate = minimumBaseRate;
+        this.championBaselineReader = championBaselineReader;
+    }
+
+    @Override
+    public CandidateSource source() {
+        return CandidateSource.COUNTER;
+    }
+
+    @Override
+    public GeneratorResult generate(RecommendationQuery query, int topK) {
+        // 분모는 feature 추출기와 같은 곳에서 읽는다. off-role이면 챔피언 전체로 물러선다.
+        ChampionBaseline baseline = championBaselineReader.read(query.myChampionId(), query.position());
+        Map<Long, Integer> baseCountByItem = baseline.purchaseCountAllByItem();
+        int baseGameCount = baseline.gameCountAll();
+
+        // 아이템 → (적 챔피언 → lift). 적별 lift를 개별 보존한 뒤 집계한다.
+        Map<Long, Map<Long, Double>> liftByItemAndEnemy = new HashMap<>();
+        for (ChampionPairItemStats stats : enemyStats(query)) {
+            if (stats.getPairGameCountAll() < minimumPairGames
+                    || query.purchasedItemIds().contains(stats.getItemId())
+                    || belowBaseRateFloor(baseCountByItem, baseGameCount, stats.getItemId())) {
+                continue;
+            }
+            PairLift lift = pairLiftCalculator.calculate(
+                    stats.getCoCountAll(), stats.getPairGameCountAll(),
+                    baseCountByItem.getOrDefault(stats.getItemId(), 0), baseGameCount
+            );
+            liftByItemAndEnemy
+                    .computeIfAbsent(stats.getItemId(), itemId -> new HashMap<>())
+                    .put(Long.valueOf(stats.getOtherChampionId()), lift.lift());
+        }
+
+        if (liftByItemAndEnemy.isEmpty()) {
+            return GeneratorResult.of(source(), championBaseRate(query, topK),
+                    PairBackoffLevel.BASE_RATE.ordinal());
+        }
+
+        List<ScoredItem> ranked = liftByItemAndEnemy.entrySet().stream()
+                // 랭킹에는 최댓값 하나를 쓰지만 적별 lift도 함께 남긴다. 여기서 버리면
+                // "누구 때문에 올라왔는가"를 나중에 다시 조회해야 한다.
+                .map(entry -> new ScoredItem(
+                        entry.getKey(), PairScoreAggregate.of(entry.getValue()).max(), entry.getValue()))
+                .sorted(byScoreThenItemId())
+                .limit(topK)
+                .toList();
+        return GeneratorResult.of(source(), ranked, PairBackoffLevel.TRIPLE.ordinal());
+    }
+
+    /**
+     * 내 챔피언이 애초에 거의 사지 않는 아이템을 후보에서 뺀다.
+     * <p>
+     * lift는 {@code P(item|나,적) / P(item|나)}라 분모가 바닥이면 분자가 조금만 커도 값이 폭발한다.
+     * 실측에서 lift 37배 구간의 정답률이 0.00%였고, 한 판짜리 우연이 상위를 점령해
+     * 진짜 근거를 topK 밖으로 밀어냈다. {@code minimumPairGames}가 분자에 두는 표본 하한을
+     * 분모에도 두는 셈이다.
+     * <p>
+     * 아이템 타입으로 막는 것이 아니므로 비정형 빌드라도 그 챔피언이 실제로 사는 것이면 남는다.
+     * 다만 문턱을 올릴수록 드문 정답을 지우므로 recall과 함께 봐야 한다.
+     * 0.0은 아무것도 거르지 않는다. 설정에 기본값을 두지 않는 것은 의도다 —
+     * 인라인 기본값이 있으면 설정 누락이 조용히 하한 해제로 돌아간다.
+     */
+    private boolean belowBaseRateFloor(
+            Map<Long, Integer> baseCountByItem, int baseGameCount, Long itemId) {
+        if (minimumBaseRate <= 0.0 || baseGameCount == 0) {
+            return false;
+        }
+        return (double) baseCountByItem.getOrDefault(itemId, 0) / baseGameCount < minimumBaseRate;
+    }
+
+    private List<ChampionPairItemStats> enemyStats(RecommendationQuery query) {
+        if (query.enemyChampionIds().isEmpty()) {
+            return List.of();
+        }
+        return pairRepository.findByMyChampionIdAndRelationAndOtherChampionIdIn(
+                Math.toIntExact(query.myChampionId()), PairRelation.ENEMY,
+                query.enemyChampionIds().stream().map(Math::toIntExact).toList()
+        );
+    }
+
+    private List<ChampionItemStats> positionStats(long myChampionId, ChampionPosition position) {
+        return championItemStatsRepository.findByChampionIdAndPosition(Math.toIntExact(myChampionId), position);
+    }
+
+    /** 만난 적 있는 적이 하나도 없을 때의 마지막 수단. backoff level이 "조합 근거가 아니다"를 알린다. */
+    private List<ScoredItem> championBaseRate(RecommendationQuery query, int topK) {
+        List<ChampionItemStats> positionStats = positionStats(query.myChampionId(), query.position());
+        if (!positionStats.isEmpty()) {
+            return positionStats.stream()
+                    .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
+                    .map(stat -> new ScoredItem(stat.getItemId(), wilsonScoreCalculator.lowerBound(
+                            stat.getPurchaseCountAll(), stat.getChampionGameCountAll())))
+                    .sorted(byScoreThenItemId())
+                    .limit(topK)
+                    .toList();
+        }
+        return championItemRollupRepository.findByChampionId(Math.toIntExact(query.myChampionId())).stream()
+                .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
+                .map(stat -> new ScoredItem(stat.getItemId(), wilsonScoreCalculator.lowerBound(
+                        stat.getPurchaseCountAll(), stat.getChampionGameCountAll())))
+                .sorted(byScoreThenItemId())
+                .limit(topK)
+                .toList();
+    }
+
+    private Comparator<ScoredItem> byScoreThenItemId() {
+        return Comparator.comparingDouble(ScoredItem::score).reversed().thenComparing(ScoredItem::itemId);
+    }
+}

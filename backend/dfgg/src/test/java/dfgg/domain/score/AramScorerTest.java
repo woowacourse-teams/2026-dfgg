@@ -1,0 +1,90 @@
+package dfgg.domain.score;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/**
+ * 기준값은 명세(docs/match-score.md 11절)대로 Python 참조 구현이 계산했다.
+ */
+class AramScorerTest {
+
+    private final AramScorer scorer = new AramScorer();
+
+    /** 100팀이 이긴 칼바람 경기. 포지션이 없다. 팀 킬은 45:31이고 p10은 20데스다. */
+    private ScoringParticipants referenceMatch() {
+        return new ScoringParticipants(List.of(
+                new ScoringParticipant(100, null, true, 12, 8, 20, 45000, 38000, 14000, 0, 3000, 3000),
+                new ScoringParticipant(100, null, true, 6, 10, 25, 28000, 52000, 12500, 0, 1500, 1500),
+                new ScoringParticipant(100, null, true, 9, 6, 18, 38000, 25000, 13500, 0, 4000, 4000),
+                new ScoringParticipant(100, null, true, 15, 7, 14, 52000, 30000, 15500, 0, 2500, 2500),
+                new ScoringParticipant(100, null, true, 3, 9, 30, 12000, 30000, 11000, 0, 500, 500),
+                new ScoringParticipant(200, null, false, 8, 12, 10, 40000, 42000, 12800, 0, 2000, 2000),
+                new ScoringParticipant(200, null, false, 5, 14, 12, 25000, 60000, 11500, 0, 800, 800),
+                new ScoringParticipant(200, null, false, 7, 11, 9, 36000, 28000, 12000, 0, 1200, 1200),
+                new ScoringParticipant(200, null, false, 10, 13, 6, 48000, 26000, 13200, 0, 1800, 1800),
+                new ScoringParticipant(200, null, false, 1, 20, 15, 9000, 35000, 9500, 0, 0, 0)));
+    }
+
+    @Test
+    @DisplayName("칼바람(450)을 담당한다")
+    void supports_WhenAramQueue_ReturnTrue() {
+        // when
+        boolean supported = scorer.supports(450);
+
+        // then
+        assertThat(supported).isTrue();
+    }
+
+    @Test
+    @DisplayName("협곡은 담당하지 않는다")
+    void supports_WhenSummonersRiftQueue_ReturnFalse() {
+        // when
+        boolean supported = scorer.supports(420);
+
+        // then
+        assertThat(supported).isFalse();
+    }
+
+    @Test
+    @DisplayName("8분(480초) 이상이면 채점한다")
+    void isLongEnough_WhenEightMinutes_ReturnTrue() {
+        // when
+        boolean longEnough = scorer.isLongEnough(new GameDuration(480));
+
+        // then
+        assertThat(longEnough).isTrue();
+    }
+
+    @Test
+    @DisplayName("8분 미만이면 채점하지 않는다")
+    void isLongEnough_WhenShorterThanEightMinutes_ReturnFalse() {
+        // when
+        boolean longEnough = scorer.isLongEnough(new GameDuration(479));
+
+        // then
+        assertThat(longEnough).isFalse();
+    }
+
+    @Test
+    @DisplayName("포지션이 없어도 통과한다(칼바람은 포지션이 없다)")
+    void validate_WhenPositionsAreMissing_Pass() {
+        // when & then
+        assertThatCode(() -> scorer.validate(referenceMatch()))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("데스 페널티와 표준화가 없다")
+    void score_WhenReferenceMatch_EqualReferenceScores() {
+        // when
+        List<DfScore> scores = scorer.score(referenceMatch(), new GameDuration(1080));
+
+        // then
+        assertThat(scores).extracting(DfScore::value)
+                .containsExactly(71.5, 56.4, 67.1, 69.4, 38.0, 51.3, 36.0, 38.2, 43.5, 11.2);
+    }
+}
