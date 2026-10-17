@@ -25,6 +25,30 @@ public interface RawMatchRepository extends JpaRepository<RawMatch, String> {
             """)
     List<String> findMatchIdsWithTimeline();
 
+    /** 구매 적재 대상 중 참가자 정규화로 패치가 확인된 경기만 커서 이후부터 고른다. */
+    @Query("""
+            SELECT rawMatch.matchId
+            FROM RawMatch rawMatch
+            WHERE rawMatch.matchId > :cursor
+              AND EXISTS (
+                  SELECT timeline.matchId
+                  FROM RawMatchTimeline timeline
+                  WHERE timeline.matchId = rawMatch.matchId
+              )
+              AND EXISTS (
+                  SELECT participant.matchId
+                  FROM NormalizedMatchParticipant participant
+                  WHERE participant.matchId = rawMatch.matchId
+                    AND participant.patch = :patch
+              )
+            ORDER BY rawMatch.matchId
+            """)
+    List<String> findMatchIdsWithTimelineForPatchAfter(
+            @Param("cursor") String cursor,
+            @Param("patch") String patch,
+            Pageable pageable
+    );
+
     @Query("""
             SELECT rawMatch.matchId
             FROM RawMatch rawMatch
