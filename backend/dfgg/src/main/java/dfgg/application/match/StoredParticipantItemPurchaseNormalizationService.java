@@ -53,27 +53,37 @@ public class StoredParticipantItemPurchaseNormalizationService {
         int savedPurchases = 0;
         List<String> matchIds = rawMatchRepository.findMatchIdsWithTimeline();
         for (String matchId : matchIds) {
-            MatchContext context;
-            try {
-                RawMatch rawMatch = rawMatchRepository.findById(matchId)
-                        .orElseThrow(() -> new IllegalStateException("저장된 Raw Match가 없습니다."));
-                context = contextOf(rawMatch);
-            } catch (RuntimeException exception) {
-                recordFailure(matchId, exception, failures);
-                continue;
-            }
-            ClassifiedCatalog catalog = catalogsByPatch.computeIfAbsent(context.patch(), this::loadCatalog);
-            try {
-                int purchasesForMatch = normalizationService.normalize(matchId, context.patch(), catalog.purchaseTypes(),
-                        catalog.response(), context.positionsByParticipant());
+            Integer purchasesForMatch = normalizeMatch(matchId, catalogsByPatch, failures);
+            if (purchasesForMatch != null) {
                 savedPurchases += purchasesForMatch;
                 succeeded++;
-                log.info("구매 정규화 완료: matchId={}, savedPurchases={}", matchId, purchasesForMatch);
-            } catch (RuntimeException exception) {
-                recordFailure(matchId, exception, failures);
             }
         }
         return new PurchaseNormalizationResult(matchIds.size(), succeeded, failures.size(), savedPurchases, failures);
+    }
+
+    /** 한 경기를 정규화하고 저장한 구매 수를 반환한다. 실패하면 기록하고 null을 반환한다. */
+    private Integer normalizeMatch(String matchId, Map<String, ClassifiedCatalog> catalogsByPatch,
+                                   List<String> failures) {
+        MatchContext context;
+        try {
+            RawMatch rawMatch = rawMatchRepository.findById(matchId)
+                    .orElseThrow(() -> new IllegalStateException("저장된 Raw Match가 없습니다."));
+            context = contextOf(rawMatch);
+        } catch (RuntimeException exception) {
+            recordFailure(matchId, exception, failures);
+            return null;
+        }
+        ClassifiedCatalog catalog = catalogsByPatch.computeIfAbsent(context.patch(), this::loadCatalog);
+        try {
+            int purchasesForMatch = normalizationService.normalize(matchId, context.patch(), catalog.purchaseTypes(),
+                    catalog.response(), context.positionsByParticipant());
+            log.info("구매 정규화 완료: matchId={}, savedPurchases={}", matchId, purchasesForMatch);
+            return purchasesForMatch;
+        } catch (RuntimeException exception) {
+            recordFailure(matchId, exception, failures);
+            return null;
+        }
     }
 
     /** 원천 데이터가 잘못된 경기는 기록하고 다음 경기로 넘어간다. */
