@@ -94,6 +94,26 @@ class RiotMatchControllerTest {
     }
 
     @Test
+    void 관리자_구매_정규화를_패치와_커서로_배치_실행한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches/purchases/normalize/patch")
+                        .param("patch", "16.19")
+                        .param("afterMatchId", "KR_1")
+                        .param("limit", "500"))
+                .andExpect(status().isOk());
+
+        verify(purchaseNormalizationService).normalizePatch("16.19", "KR_1", 500);
+    }
+
+    @Test
+    void 패치_구매_정규화는_limit이_없으면_거부한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches/purchases/normalize/patch")
+                        .param("patch", "16.19"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(purchaseNormalizationService);
+    }
+
+    @Test
     void 지정한_티어로_신규_매치를_즉시_집계하고_미완료_통계를_백필한다() throws Exception {
         mockMvc.perform(post("/admin/riot/matches/stats")
                         .param("tier", "PLATINUM"))
