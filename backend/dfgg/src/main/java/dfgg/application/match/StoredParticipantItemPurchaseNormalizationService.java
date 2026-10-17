@@ -9,15 +9,17 @@ import dfgg.domain.match.RawMatch;
 import dfgg.domain.match.RawMatchRepository;
 import dfgg.infrastructure.external.client.DataDragonClient;
 import dfgg.infrastructure.external.dto.ItemResponse;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 /** 저장된 Raw Match와 Timeline의 모든 구매를 경기 패치에 맞춰 정규화한다. */
@@ -26,6 +28,7 @@ public class StoredParticipantItemPurchaseNormalizationService {
 
     private static final Logger log = LoggerFactory.getLogger(StoredParticipantItemPurchaseNormalizationService.class);
     private static final Pattern GAME_VERSION = Pattern.compile("^([0-9]+\\.[0-9]+)\\.[0-9]+(?:\\..*)?$");
+    private static final Predicate<String> ANY_PATCH = patch -> true;
 
     private final RawMatchRepository rawMatchRepository;
     private final DataDragonClient dataDragonClient;
@@ -48,39 +51,82 @@ public class StoredParticipantItemPurchaseNormalizationService {
     /** Raw와 Timeline이 모두 저장된 경기를 조회하고, 한 경기씩 독립적으로 정규화한다. */
     public PurchaseNormalizationResult normalizeAll() {
         Map<String, ClassifiedCatalog> catalogsByPatch = new HashMap<>();
-        List<String> failures = new ArrayList<>();
-        int succeeded = 0;
-        int savedPurchases = 0;
+        PurchaseNormalizationSummary summary = new PurchaseNormalizationSummary();
         List<String> matchIds = rawMatchRepository.findMatchIdsWithTimeline();
-        for (String matchId : matchIds) {
-            MatchContext context;
-            try {
-                RawMatch rawMatch = rawMatchRepository.findById(matchId)
-                        .orElseThrow(() -> new IllegalStateException("저장된 Raw Match가 없습니다."));
-                context = contextOf(rawMatch);
-            } catch (RuntimeException exception) {
-                recordFailure(matchId, exception, failures);
-                continue;
-            }
-            ClassifiedCatalog catalog = catalogsByPatch.computeIfAbsent(context.patch(), this::loadCatalog);
-            try {
-                int purchasesForMatch = normalizationService.normalize(matchId, context.patch(), catalog.purchaseTypes(),
-                        catalog.response(), context.positionsByParticipant());
-                savedPurchases += purchasesForMatch;
-                succeeded++;
-                log.info("구매 정규화 완료: matchId={}, savedPurchases={}", matchId, purchasesForMatch);
-            } catch (RuntimeException exception) {
-                recordFailure(matchId, exception, failures);
-            }
+        matchIds.forEach(matchId -> normalizeMatch(matchId, ANY_PATCH, catalogsByPatch, summary));
+        return summary.toResult(matchIds.size());
+    }
+
+    /**
+     * 지정한 패치의 경기만 커서 이후부터 limit개 정규화한다.
+     * 응답의 nextCursor를 afterMatchId로 넘겨 이어서 돌린다.
+     */
+    public PurchaseNormalizationBatchResult normalizePatch(String patch, String afterMatchId, int limit) {
+        Map<String, ClassifiedCatalog> catalogsByPatch = new HashMap<>();
+        PurchaseNormalizationSummary summary = new PurchaseNormalizationSummary();
+        List<String> matchIds = rawMatchRepository.findMatchIdsWithTimelineForPatchAfter(
+                afterMatchId, patch, PageRequest.of(0, limit));
+        matchIds.forEach(matchId -> normalizeMatch(matchId, patch::equals, catalogsByPatch, summary));
+        PurchaseNormalizationBatchResult result = summary.toBatchResult(matchIds.size(),
+                nextCursor(matchIds, afterMatchId), matchIds.size() == limit);
+        log.info("패치 구매 정규화 배치 완료: patch={}, processed={}, failed={}, nextCursor={}",
+                patch, result.processed(), result.failed(), result.nextCursor());
+        return result;
+    }
+
+    /** 실패한 경기가 있어도 이번 배치의 마지막 경기 다음부터 이어간다. */
+    private String nextCursor(List<String> matchIds, String afterMatchId) {
+        if (matchIds.isEmpty()) {
+            return afterMatchId;
         }
-        return new PurchaseNormalizationResult(matchIds.size(), succeeded, failures.size(), savedPurchases, failures);
+        return matchIds.getLast();
+    }
+
+    /** 원천을 읽지 못했거나 허용하지 않는 패치의 경기는 정규화하지 않고 실패로 기록한다. */
+    private void normalizeMatch(String matchId, Predicate<String> acceptsPatch,
+                                Map<String, ClassifiedCatalog> catalogsByPatch, PurchaseNormalizationSummary summary) {
+        readContext(matchId, acceptsPatch, summary)
+                .ifPresent(context -> normalize(matchId, context, catalogsByPatch, summary));
+    }
+
+    private Optional<MatchContext> readContext(String matchId, Predicate<String> acceptsPatch,
+                                               PurchaseNormalizationSummary summary) {
+        try {
+            return Optional.of(acceptedContext(matchId, acceptsPatch));
+        } catch (RuntimeException exception) {
+            recordFailure(matchId, exception, summary);
+            return Optional.empty();
+        }
+    }
+
+    private MatchContext acceptedContext(String matchId, Predicate<String> acceptsPatch) {
+        RawMatch rawMatch = rawMatchRepository.findById(matchId)
+                .orElseThrow(() -> new IllegalStateException("저장된 Raw Match가 없습니다."));
+        MatchContext context = contextOf(rawMatch);
+        if (acceptsPatch.test(context.patch())) {
+            return context;
+        }
+        throw new IllegalStateException("Raw Match 패치 " + context.patch() + "가 요청 패치와 다릅니다.");
+    }
+
+    /** 카탈로그 장애는 모든 경기에 영향을 주므로 경기 실패로 기록하지 않고 즉시 전달한다. */
+    private void normalize(String matchId, MatchContext context, Map<String, ClassifiedCatalog> catalogsByPatch,
+                           PurchaseNormalizationSummary summary) {
+        ClassifiedCatalog catalog = catalogsByPatch.computeIfAbsent(context.patch(), this::loadCatalog);
+        try {
+            int savedPurchases = normalizationService.normalize(matchId, context.patch(), catalog.purchaseTypes(),
+                    catalog.response(), context.positionsByParticipant());
+            log.info("구매 정규화 완료: matchId={}, savedPurchases={}", matchId, savedPurchases);
+            summary.succeed(savedPurchases);
+        } catch (RuntimeException exception) {
+            recordFailure(matchId, exception, summary);
+        }
     }
 
     /** 원천 데이터가 잘못된 경기는 기록하고 다음 경기로 넘어간다. */
-    private void recordFailure(String matchId, RuntimeException exception, List<String> failures) {
-        String failure = matchId + ": " + exception.getMessage();
-        failures.add(failure);
-        log.warn("구매 정규화 실패: {}", failure, exception);
+    private void recordFailure(String matchId, RuntimeException exception, PurchaseNormalizationSummary summary) {
+        summary.fail(matchId, exception.getMessage());
+        log.warn("구매 정규화 실패: {}: {}", matchId, exception.getMessage(), exception);
     }
 
     /** 해당 패치의 빌드·아이템 분류를 한 번만 준비해 모든 경기에서 공유한다. */

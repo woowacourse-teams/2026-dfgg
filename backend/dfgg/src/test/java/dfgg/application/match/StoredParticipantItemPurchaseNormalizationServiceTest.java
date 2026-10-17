@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
 
 class StoredParticipantItemPurchaseNormalizationServiceTest {
 
@@ -104,6 +105,60 @@ class StoredParticipantItemPurchaseNormalizationServiceTest {
         assertThatThrownBy(service::normalizeAll)
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("Data Dragon");
         verifyNoInteractions(normalizationService);
+    }
+
+    @Test
+    void 패치_배치는_커서_이후_경기만_정규화하고_다음_커서를_반환한다() {
+        when(rawMatchRepository.findMatchIdsWithTimelineForPatchAfter("KR_0", "16.18", PageRequest.of(0, 2)))
+                .thenReturn(List.of("KR_1", "KR_2"));
+        when(rawMatchRepository.findById("KR_1"))
+                .thenReturn(Optional.of(rawMatch("KR_1", "16.18.815.9717")));
+        when(rawMatchRepository.findById("KR_2"))
+                .thenReturn(Optional.of(rawMatch("KR_2", "16.18.815.9717")));
+        ItemResponse catalog = catalog("16.18", "16.18.1");
+        when(dataDragonClient.resolveItemDataVersionForPatch("16.18")).thenReturn("16.18.1");
+        when(dataDragonClient.getItems("16.18.1")).thenReturn(catalog);
+        Map<Integer, ItemPurchaseType> types = Map.of(1001, ItemPurchaseType.BOOTS);
+        when(classifier.classify(catalog.data())).thenReturn(types);
+        when(normalizationService.normalize("KR_1", "16.18", types, catalog, positions())).thenReturn(2);
+        when(normalizationService.normalize("KR_2", "16.18", types, catalog, positions())).thenReturn(3);
+
+        PurchaseNormalizationBatchResult result = service.normalizePatch("16.18", "KR_0", 2);
+
+        assertThat(result.processed()).isEqualTo(2);
+        assertThat(result.succeeded()).isEqualTo(2);
+        assertThat(result.savedPurchases()).isEqualTo(5);
+        assertThat(result.nextCursor()).isEqualTo("KR_2");
+        assertThat(result.hasMore()).isTrue();
+        verify(dataDragonClient).getItems("16.18.1");
+    }
+
+    @Test
+    void 패치_배치에서_Raw_패치가_다른_경기는_실패로_기록한다() {
+        when(rawMatchRepository.findMatchIdsWithTimelineForPatchAfter("", "16.18", PageRequest.of(0, 5)))
+                .thenReturn(List.of("KR_1"));
+        when(rawMatchRepository.findById("KR_1"))
+                .thenReturn(Optional.of(rawMatch("KR_1", "16.19.1.123")));
+
+        PurchaseNormalizationBatchResult result = service.normalizePatch("16.18", "", 5);
+
+        assertThat(result.processed()).isEqualTo(1);
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.nextCursor()).isEqualTo("KR_1");
+        assertThat(result.hasMore()).isFalse();
+        verifyNoInteractions(dataDragonClient, normalizationService);
+    }
+
+    @Test
+    void 패치_배치에_남은_경기가_없으면_커서를_유지한다() {
+        when(rawMatchRepository.findMatchIdsWithTimelineForPatchAfter("KR_9", "16.18", PageRequest.of(0, 5)))
+                .thenReturn(List.of());
+
+        PurchaseNormalizationBatchResult result = service.normalizePatch("16.18", "KR_9", 5);
+
+        assertThat(result.processed()).isZero();
+        assertThat(result.nextCursor()).isEqualTo("KR_9");
+        assertThat(result.hasMore()).isFalse();
     }
 
     private ItemResponse catalog(String patch, String dataVersion) {

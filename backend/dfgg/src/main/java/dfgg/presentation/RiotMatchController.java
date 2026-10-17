@@ -3,6 +3,7 @@ package dfgg.presentation;
 import dfgg.application.RiotCollectionOrchestrator;
 import dfgg.application.match.MatchRenormalizationService;
 import dfgg.application.match.StoredParticipantItemPurchaseNormalizationService;
+import dfgg.application.match.PurchaseNormalizationBatchResult;
 import dfgg.application.match.PurchaseNormalizationResult;
 import dfgg.application.match.RenormalizationResult;
 import dfgg.application.match.RiotMatchSyncService;
@@ -52,6 +53,20 @@ public class RiotMatchController {
     @PostMapping("/riot/matches/purchases/normalize")
     public ResponseEntity<PurchaseNormalizationResult> normalizePurchases() {
         return ResponseEntity.ok(purchaseNormalizationService.normalizeAll());
+    }
+
+    /**
+     * 지정한 패치의 구매만 커서 기반 배치로 정규화한다.
+     * 전체 정규화는 끊기면 처음부터 다시 돌아야 하므로, 학습에 필요한 패치만 이어서 돌릴 때 쓴다.
+     * 응답의 {@code nextCursor}를 {@code afterMatchId}로 넘겨 {@code hasMore}가 false가 될 때까지 반복한다.
+     */
+    @PostMapping("/riot/matches/purchases/normalize/patch")
+    public ResponseEntity<PurchaseNormalizationBatchResult> normalizePurchasesForPatch(
+            @RequestParam @Pattern(regexp = "[0-9]+\\.[0-9]+") String patch,
+            @RequestParam(defaultValue = "") String afterMatchId,
+            @RequestParam @Min(1) @Max(1000) int limit
+    ) {
+        return ResponseEntity.ok(purchaseNormalizationService.normalizePatch(patch, afterMatchId, limit));
     }
 
     /**
