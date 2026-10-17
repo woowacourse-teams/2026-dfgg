@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import dfgg.domain.item.trait.ItemTraitCatalog;
 import dfgg.domain.language.Language;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.champion.ChampionService;
@@ -216,11 +217,11 @@ class NextItemRecommendationV4ServiceTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', quoteCharacter = '"', textBlock = """
-            KO_KR | 처형인의 대검 | 워윅
-            EN_US | "Executioner's Calling" | Warwick
+            KO_KR | 처형인의 대검 | 워윅 | 치유 감소 부여
+            EN_US | "Executioner's Calling" | Warwick | Applies Healing Reduction
             """)
     void 상대_조합_근거가_있으면_효과당_하나의_상황_대응_아이템을_요청_언어로_함께_반환한다(
-            Language language, String itemName, String championName) {
+            Language language, String itemName, String championName, String trait) {
         prepareCore(List.of(coreItem(3133)));
         Champion warwick = mock(Champion.class);
         when(warwick.getChampionId()).thenReturn(7L);
@@ -242,10 +243,11 @@ class NextItemRecommendationV4ServiceTest {
 
         assertThat(response.recommendedItems()).hasSize(1);
         assertThat(response.situationalItems()).singleElement().satisfies(item -> {
-            assertThat(item.itemId()).isEqualTo(3123L);
+            assertThat(item.id()).isEqualTo(3123L);
             assertThat(item.name()).isEqualTo(itemName);
-            assertThat(item.effect()).isEqualTo("GRIEVOUS_WOUNDS");
-            assertThat(item.reasonChampions()).extracting(ChampionRefDto::name).containsExactly(championName);
+            assertThat(item.description().counter()).extracting(ChampionRefDto::name).containsExactly(championName);
+            assertThat(item.description().ally()).isEmpty();
+            assertThat(item.description().traits()).containsExactly(trait);
             assertThat(item.additionalCost()).isEqualTo(800);
             assertThat(item.affordable()).isTrue();
         });
@@ -303,7 +305,7 @@ class NextItemRecommendationV4ServiceTest {
             dfgg.application.recommend.situational.SituationalComponentRuntime situational) {
         return new NextItemRecommendationV4Service(core, runtime, champions, compositions,
                 new ComponentPurchaseBundleMapper(images), new LeagueOfLegendsVersionProperties("16.18"),
-                situational, new dfgg.application.recommend.situational.SituationalItemMapper(images));
+                situational, new dfgg.application.recommend.situational.SituationalItemMapper(images, new ItemTraitCatalog()));
     }
 
     private NextItemRecommendationV4Request request(String patch, List<InventoryItemRequest> inventory) {

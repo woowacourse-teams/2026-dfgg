@@ -19,6 +19,7 @@ import static dfgg.domain.item.trait.ItemTrait.MALIGNANCE;
 import static dfgg.domain.item.trait.ItemTrait.MEJAI_SOULSTEALER;
 import static dfgg.domain.item.trait.ItemTrait.MORELLONOMICON;
 import static dfgg.domain.item.trait.ItemTrait.NASHOR_TOOTH;
+import static dfgg.domain.item.trait.ItemTrait.OBLIVION_ORB;
 import static dfgg.domain.item.trait.ItemTrait.RABADON_DEATHCAP;
 import static dfgg.domain.item.trait.ItemTrait.RIFTMAKER;
 import static dfgg.domain.item.trait.ItemTrait.ROD_OF_AGES;
@@ -60,6 +61,7 @@ final class MageTraits {
             Map.entry(3152L, self(HEXTECH_ROCKETBELT)),  // 마법공학 로켓 벨트
             Map.entry(3157L, self(ZHONYA_HOURGLASS)),  // 존야의 모래시계
             Map.entry(3165L, self(MORELLONOMICON)),  // 모렐로노미콘
+            Map.entry(3916L, self(OBLIVION_ORB)),  // 망각의 구
             Map.entry(4628L, self(HORIZON_FOCUS)),  // 지평선의 초점
             Map.entry(4629L, self(COSMIC_DRIVE)),  // 우주의 추진력
             Map.entry(4633L, self(RIFTMAKER)),  // 균열 생성기

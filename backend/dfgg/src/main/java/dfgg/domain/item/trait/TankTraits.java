@@ -2,6 +2,7 @@ package dfgg.domain.item.trait;
 
 import static dfgg.domain.item.trait.ItemProfile.self;
 import static dfgg.domain.item.trait.ItemTrait.ABYSSAL_MASK;
+import static dfgg.domain.item.trait.ItemTrait.BRAMBLE_VEST;
 import static dfgg.domain.item.trait.ItemTrait.DEAD_MAN_PLATE;
 import static dfgg.domain.item.trait.ItemTrait.ENGAGE;
 import static dfgg.domain.item.trait.ItemTrait.FORCE_OF_NATURE;
@@ -11,6 +12,7 @@ import static dfgg.domain.item.trait.ItemTrait.HOLLOW_RADIANCE;
 import static dfgg.domain.item.trait.ItemTrait.ICEBORN_GAUNTLET;
 import static dfgg.domain.item.trait.ItemTrait.JAKSHO_THE_PROTEAN;
 import static dfgg.domain.item.trait.ItemTrait.KAENIC_ROOKERN;
+import static dfgg.domain.item.trait.ItemTrait.NULL_MAGIC_MANTLE;
 import static dfgg.domain.item.trait.ItemTrait.PROTOPLASM_HARNESS;
 import static dfgg.domain.item.trait.ItemTrait.RANDUIN_OMEN;
 import static dfgg.domain.item.trait.ItemTrait.SPIRIT_VISAGE;
@@ -36,6 +38,7 @@ final class TankTraits {
     static final Set<ItemTrait> CATEGORY = EnumSet.noneOf(ItemTrait.class);
 
     static final Map<Long, ItemProfile> BY_ITEM_ID = Map.ofEntries(
+            Map.entry(1033L, self(NULL_MAGIC_MANTLE)),  // 마법무효화의 망토
             Map.entry(2502L, self(UNENDING_DESPAIR)),  // 끝없는 절망
             Map.entry(2504L, self(KAENIC_ROOKERN)),  // 케이닉 루컨
             Map.entry(2525L, self(PROTOPLASM_HARNESS)),  // 원형질 안전벨트
@@ -43,6 +46,7 @@ final class TankTraits {
             Map.entry(3065L, self(SPIRIT_VISAGE)),  // 정령의 형상
             Map.entry(3068L, self(SUNFIRE_AEGIS)),  // 태양불꽃 방패
             Map.entry(3075L, self(THORNMAIL)),  // 가시 갑옷
+            Map.entry(3076L, self(BRAMBLE_VEST)),  // 덤불 조끼
             Map.entry(3083L, self(WARMOG_ARMOR)),  // 워모그의 갑옷
             Map.entry(3084L, self(HEARTSTEEL)),  // 강철심장
             Map.entry(3110L, self(FROZEN_HEART)),  // 얼어붙은 심장
