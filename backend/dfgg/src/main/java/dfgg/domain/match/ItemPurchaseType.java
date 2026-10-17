@@ -30,6 +30,6 @@ public enum ItemPurchaseType {
 
     /** Component LTR의 다음 구매 정답으로 저장할 수 있는 아이템 분류다. */
     public boolean isComponentRecommendationTarget() {
-        return this == COMPONENT || this == CORE;
+        return this == COMPONENT || this == CORE || this == BOOTS;
     }
 }

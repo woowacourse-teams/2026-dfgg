@@ -1,11 +1,9 @@
 package dfgg.application.recommend.v3.feature;
 
 import dfgg.application.recommend.v3.RecommendationQuery;
-import dfgg.domain.champion.Champion;
+import dfgg.application.recommend.context.CompositionFeatureCalculator;
+import dfgg.application.recommend.context.CompositionFeatures;
 import dfgg.domain.champion.ChampionPosition;
-import dfgg.domain.champion.ChampionRepository;
-import dfgg.domain.champion.ChampionTag;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.springframework.stereotype.Component;
@@ -38,10 +36,10 @@ public class QueryFeatureExtractor {
             ChampionPosition.SUPPORT, FeatureName.POSITION_SUPPORT
     );
 
-    private final ChampionRepository championRepository;
+    private final CompositionFeatureCalculator compositions;
 
-    public QueryFeatureExtractor(ChampionRepository championRepository) {
-        this.championRepository = championRepository;
+    public QueryFeatureExtractor(CompositionFeatureCalculator compositions) {
+        this.compositions = compositions;
     }
 
     public void extract(RecommendationQuery query, FeatureVector vector) {
@@ -49,23 +47,13 @@ public class QueryFeatureExtractor {
         setGameState(query, vector);
     }
 
-    /**
-     * 태그를 모르는 챔피언은 어느 칸에도 세지 않아 결과적으로 0이 된다. 0으로 두는 게 맞다 —
-     * "그 태그의 챔피언이 없다"는 관측이지 결측이 아니다.
-     */
     private void setTeamComposition(RecommendationQuery query, FeatureVector vector) {
-        Map<ChampionTag, Long> enemyTags = countTags(query.enemyChampionIds());
-        vector.set(FeatureName.ENEMY_TANK_COUNT, count(enemyTags, ChampionTag.TANK));
-        vector.set(FeatureName.ENEMY_MAGE_COUNT, count(enemyTags, ChampionTag.MAGE));
-        vector.set(FeatureName.ENEMY_MARKSMAN_COUNT, count(enemyTags, ChampionTag.MARKSMAN));
-        vector.set(FeatureName.ENEMY_ASSASSIN_COUNT, count(enemyTags, ChampionTag.ASSASSIN));
-        vector.set(FeatureName.ENEMY_FIGHTER_COUNT, count(enemyTags, ChampionTag.FIGHTER));
-
-        Map<ChampionTag, Long> allyTags = countTags(query.allyChampionIds());
-        vector.set(FeatureName.ALLY_TANK_COUNT, count(allyTags, ChampionTag.TANK));
-        vector.set(FeatureName.ALLY_MAGE_COUNT, count(allyTags, ChampionTag.MAGE));
-        vector.set(FeatureName.ALLY_MARKSMAN_COUNT, count(allyTags, ChampionTag.MARKSMAN));
-        vector.set(FeatureName.ALLY_SUPPORT_COUNT, count(allyTags, ChampionTag.SUPPORT));
+        var composition = compositions.calculate(query.allyChampionIds(), query.enemyChampionIds());
+        var values = composition.values();
+        for (int i = 0; i < CompositionFeatures.FEATURE_NAMES.size(); i++) {
+            var name = CompositionFeatures.FEATURE_NAMES.get(i);
+            vector.set(FeatureName.valueOf(name.toUpperCase(Locale.ROOT)), values.get(i));
+        }
     }
 
     private void setGameState(RecommendationQuery query, FeatureVector vector) {
@@ -83,17 +71,4 @@ public class QueryFeatureExtractor {
         }
     }
 
-    private Map<ChampionTag, Long> countTags(List<Long> championIds) {
-        if (championIds.isEmpty()) {
-            return Map.of();
-        }
-        return championRepository.findAllWithTagsByChampionIdIn(championIds).stream()
-                .map(Champion::getChampionTags)
-                .flatMap(List::stream)
-                .collect(java.util.stream.Collectors.groupingBy(tag -> tag, java.util.stream.Collectors.counting()));
-    }
-
-    private double count(Map<ChampionTag, Long> tagCounts, ChampionTag tag) {
-        return tagCounts.getOrDefault(tag, 0L);
-    }
 }

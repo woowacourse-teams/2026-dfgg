@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({TierScopeConfiguration.class, ItemStatsAggregationService.class, FeatureExtractionPipeline.class,
-        CandidateFeatureExtractor.class, StatsFeatureExtractor.class, QueryFeatureExtractor.class,
+        CandidateFeatureExtractor.class, StatsFeatureExtractor.class, QueryFeatureExtractor.class, dfgg.application.recommend.context.CompositionFeatureCalculator.class,
         dfgg.application.recommend.v3.generator.PairSynergyRetriever.class, dfgg.application.recommend.v3.generator.ChampionBaselineReader.class,
         dfgg.application.recommend.v3.generator.PairLiftCalculator.class,
         dfgg.application.utils.WilsonScoreCalculator.class})

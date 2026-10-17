@@ -149,15 +149,23 @@ class ItemServiceTest {
     void 코어_아이템_ID를_조회한다() {
         // given
         when(itemRepository.findAll()).thenReturn(List.of(
-                new Item(3071L, Map.of("ko-KR", "아이템 A")),
-                new Item(6610L, Map.of("ko-KR", "아이템 B"))
+                new Item(1055L, Map.of("ko-KR", "시작 아이템"), null, null, null, List.of()),
+                new Item(1036L, Map.of("ko-KR", "기본 재료"), null, null, List.of("3133"), List.of()),
+                new Item(3133L, Map.of("ko-KR", "중간 재료"), null, List.of("1036"), List.of("3071"), List.of()),
+                new Item(3071L, Map.of("ko-KR", "완성 아이템"), null, List.of("3133"), null, List.of()),
+                new Item(6610L, Map.of("ko-KR", "미저장 상위만 있는 완성 아이템"), null,
+                        List.of("3133"), List.of("7000"), List.of()),
+                new Item(1001L, Map.of("ko-KR", "기본 신발"), null, null, List.of("3006"), List.of("Boots")),
+                new Item(3006L, Map.of("ko-KR", "2단계 신발"), null, List.of("1001"), List.of("3172"),
+                        List.of("Boots")),
+                new Item(3172L, Map.of("ko-KR", "3단계 신발"), null, List.of("3006"), null, List.of("Boots"))
         ));
 
         // when
         Set<Integer> coreItemIds = itemService.findCoreItemIds();
 
         // then
-        assertThat(coreItemIds).containsExactlyInAnyOrder(3071, 6610);
+        assertThat(coreItemIds).containsExactlyInAnyOrder(3071, 6610, 3006, 3172);
     }
     @Test
     void 영문_이름_누락시_이미지와_DB를_저장하지_않는다() {

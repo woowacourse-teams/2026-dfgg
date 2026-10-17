@@ -31,6 +31,16 @@ class SnapshotQueryBuilderTest {
     }
 
     @Test
+    @DisplayName("구매 시점 입력은 사후 Core summary와 무관하게 전달받은 과거 구매만 사용한다")
+    void purchaseQueryUsesOnlySuppliedPastItems() {
+        var me = participant("me", 157, 100, "MIDDLE", List.of(6673, 3031, 3036), false);
+        var query = builder.buildAtPurchase(List.of(me), 1, "16.18", List.of(6673L));
+        assertThat(query.purchasedItemIds()).containsExactly(6673L);
+        assertThat(query.position()).isEqualTo(ChampionPosition.MID);
+        assertThat(query.myChampionId()).isEqualTo(157L);
+    }
+
+    @Test
     @DisplayName("구매 단계마다 스냅샷 하나씩 만든다 — 코어 3개면 query 3개")
     void build_WhenParticipantBoughtThreeItems_ProducesThreeSnapshots() {
         // when

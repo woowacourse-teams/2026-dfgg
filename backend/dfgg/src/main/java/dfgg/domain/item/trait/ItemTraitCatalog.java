@@ -91,7 +91,12 @@ public final class ItemTraitCatalog {
 
     public Set<ItemTrait> traitsOf(Item item) {
         Objects.requireNonNull(item, "아이템은 null일 수 없습니다.");
-        return traitsByItemId.getOrDefault(item.getItemId(), Set.of());
+        return traitsOf(item.getItemId());
+    }
+
+    /** 저장된 Item 없이 운영 카탈로그의 아이템 ID로 조회할 때 쓴다. */
+    public Set<ItemTrait> traitsOf(long itemId) {
+        return traitsByItemId.getOrDefault(itemId, Set.of());
     }
 
     /** 선언하지 않은 아이템은 SELF다. 아군 이름을 잘못 붙이는 것보다 비워 두는 편이 낫다. */

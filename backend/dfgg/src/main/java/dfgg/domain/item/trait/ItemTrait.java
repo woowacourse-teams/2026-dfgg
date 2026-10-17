@@ -153,6 +153,12 @@ public enum ItemTrait {
     PLATED_STEELCAPS("평타 피해 감소", "Basic Attack Damage Reduction"), // 판금 장화
     MERCURY_TREADS("강인함", "Tenacity"), // 헤르메스의 발걸음
     IONIAN_BOOTS_OF_LUCIDITY("소환사 주문/스킬 가속", "Summoner Spell/Ability Haste"), // 명석함의 아이오니아 장화
+
+    // 상황 대응 하위 아이템 traits. 상위 완성품의 표현을 따른다.
+    EXECUTIONER_CALLING("치유 감소 부여", "Applies Healing Reduction"), // 처형인의 대검
+    OBLIVION_ORB("치유 감소 부여", "Applies Healing Reduction"), // 망각의 구
+    BRAMBLE_VEST("회복 감소/피해 반사", "Healing Reduction/Damage Reflection"), // 덤불 조끼
+    NULL_MAGIC_MANTLE("마법 피해 방어", "Magic Damage Reduction"), // 마법무효화의 망토
     ;
 
     private final Map<String, String> displayName;

@@ -86,9 +86,10 @@ class PurchaseGoldRangeCalculatorTest {
 
         var ranges = calculator.calculate("KR_TEST", raw, events, catalog());
 
-        assertThat(events.getFirst().sourceEventIndex()).isEqualTo(1);
-        assertThat(ranges.get(events.getFirst())).isEqualTo(new GoldRange(425, 1200));
-        assertThat(ranges.get(events.getLast())).isEqualTo(new GoldRange(500, 1275));
+        assertThat(events.getFirst().sourceEventIndex()).isZero();
+        assertThat(events.getFirst().itemId()).isEqualTo(2055);
+        assertThat(ranges.get(events.getFirst())).isEqualTo(new GoldRange(500, 1275));
+        assertThat(ranges.get(events.getLast())).isEqualTo(new GoldRange(425, 1200));
     }
 
     @Test

@@ -11,9 +11,18 @@ import java.util.Map;
  */
 final class RemainingPurchaseMaterials {
     private final Map<Integer, Integer> counts = new HashMap<>();
+    private final java.util.ArrayList<Integer> consumed = new java.util.ArrayList<>();
 
     RemainingPurchaseMaterials(List<Integer> ids) {
         ids.forEach(id -> counts.merge(id, 1, Integer::sum));
+    }
+
+    RemainingPurchaseMaterials(ItemInventory inventory) {
+        counts.putAll(inventory.quantities());
+    }
+
+    PurchaseMaterials consumedMaterials() {
+        return new PurchaseMaterials(consumed);
     }
 
     /** 해당 ID의 미배정 제거 이벤트가 있으면 한 개를 조합 위치에 배정한다. */
@@ -23,6 +32,7 @@ final class RemainingPurchaseMaterials {
             return false;
         }
         counts.put(itemId, count - 1);
+        consumed.add(itemId);
         return true;
     }
 

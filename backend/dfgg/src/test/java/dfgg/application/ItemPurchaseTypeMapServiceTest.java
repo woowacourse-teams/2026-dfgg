@@ -13,7 +13,7 @@ import dfgg.application.item.ItemPurchaseTypeMapService;
 import dfgg.application.match.ParticipantItemEventExtractor;
 import dfgg.application.match.ParticipantItemPurchaseExtractor;
 import dfgg.domain.match.ItemPurchaseType;
-import dfgg.domain.match.ParticipantItemPurchase;
+import dfgg.domain.match.NormalizedMatchParticipantItemEvent;
 import dfgg.infrastructure.external.client.DataDragonClient;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class ItemPurchaseTypeMapServiceTest {
         var extractor = new ParticipantItemPurchaseExtractor(new ParticipantItemEventExtractor(new ObjectMapper()));
         var purchases = extractor.extract("KR_TEST", ParticipantItemPurchaseExtractorTest.timeline(), "16.18",
                 types, ParticipantItemPurchaseExtractorTest.positions());
-        assertThat(purchases).extracting(ParticipantItemPurchase::getPurchaseType).containsExactly(
+        assertThat(purchases).extracting(NormalizedMatchParticipantItemEvent::getPurchaseType).containsExactly(
                 ItemPurchaseType.COMPONENT, ItemPurchaseType.COMPONENT, ItemPurchaseType.CONSUMABLE,
                 ItemPurchaseType.OTHER, ItemPurchaseType.CORE, ItemPurchaseType.BOOTS);
         verify(client).getItems("16.18.1");

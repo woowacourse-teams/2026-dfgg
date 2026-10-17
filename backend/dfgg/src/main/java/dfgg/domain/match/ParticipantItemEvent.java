@@ -1,7 +1,7 @@
 package dfgg.domain.match;
 
 /**
- * Raw Timeline에서 추출한 내부 원천 이벤트. 별도 이벤트 테이블에는 저장하지 않는다.
+ * Raw Timeline에서 추출하거나 정규화 이벤트 테이블에서 읽은 내부 원천 이벤트.
  * 구매 레코드 생성과 후속 인벤토리 복원에서 재사용한다.
  * sourcePayload는 미지원 필드도 보존하는 원본 이벤트의 JSON이다.
  *

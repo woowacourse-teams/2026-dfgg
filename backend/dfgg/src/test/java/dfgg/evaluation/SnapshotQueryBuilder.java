@@ -22,6 +22,16 @@ public final class SnapshotQueryBuilder {
 
     private final ChampionPositionNormalizer positionNormalizer = new ChampionPositionNormalizer();
 
+    /** 구매 시점 검증용: 경기 종료 후 Core summary 대신 호출자가 복원한 과거 구매만 받는다. */
+    public RecommendationQuery buildAtPurchase(List<NormalizedMatchParticipant> participants,
+            int participantId, String patch, List<Long> purchasedCoreIds) {
+        var me = participants.stream().filter(p -> p.getParticipantId() == participantId).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("매치에 없는 참가자입니다: " + participantId));
+        var position = positionNormalizer.normalize(me.getPosition())
+                .orElseThrow(() -> new IllegalArgumentException("참가자 포지션을 확인할 수 없습니다."));
+        return queryOf(participants, me, patch, purchasedCoreIds, position);
+    }
+
     public List<SnapshotQuery> build(
             List<NormalizedMatchParticipant> matchParticipants, String puuid, String patch
     ) {
@@ -38,23 +48,23 @@ public final class SnapshotQueryBuilder {
             return List.of();
         }
 
-        List<Long> allyChampionIds = championIdsOf(matchParticipants, me, true);
-        List<Long> enemyChampionIds = championIdsOf(matchParticipants, me, false);
         List<Long> purchaseOrder = me.getCoreItemPurchaseOrder().stream()
                 .map(Long::valueOf)
                 .toList();
 
         List<SnapshotQuery> snapshots = new ArrayList<>();
         for (int step = 0; step < purchaseOrder.size(); step++) {
-            RecommendationQuery query = new RecommendationQuery(
-                    Long.valueOf(me.getChampionId()), position.get(),
-                    purchaseOrder.subList(0, step),
-                    allyChampionIds, enemyChampionIds,
-                    me.getTier(), patch
-            );
+            RecommendationQuery query = queryOf(matchParticipants, me, patch,
+                    purchaseOrder.subList(0, step), position.get());
             snapshots.add(new SnapshotQuery(me.getMatchId(), step, query, purchaseOrder.get(step)));
         }
         return snapshots;
+    }
+
+    private RecommendationQuery queryOf(List<NormalizedMatchParticipant> participants,
+            NormalizedMatchParticipant me, String patch, List<Long> purchasedIds, ChampionPosition position) {
+        return new RecommendationQuery(Long.valueOf(me.getChampionId()), position, purchasedIds,
+                championIdsOf(participants, me, true), championIdsOf(participants, me, false), me.getTier(), patch);
     }
 
     private List<Long> championIdsOf(

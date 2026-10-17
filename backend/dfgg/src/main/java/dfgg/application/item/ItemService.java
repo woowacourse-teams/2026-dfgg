@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ItemService {
 
+    private static final String BOOTS_TAG = "Boots";
     private static final String CONSUMABLE_TAG = "Consumable";
     private static final String TRINKET_TAG = "Trinket";
 
@@ -71,10 +72,29 @@ public class ItemService {
     }
 
     public Set<Integer> findCoreItemIds() {
-        return itemRepository.findAll().stream()
+        List<Item> items = itemRepository.findAll();
+        Set<String> storedItemIds = items.stream()
+                .map(item -> String.valueOf(item.getItemId()))
+                .collect(Collectors.toUnmodifiableSet());
+        return items.stream()
+                .filter(item -> isCompletedItem(item, storedItemIds))
                 .map(Item::getItemId)
                 .map(Math::toIntExact)
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    // 조합식이 없는 시작 아이템과 저장된 상위 아이템이 남은 재료는 제외한다. 신발은 상위 단계가 있어도 Core로 본다.
+    private boolean isCompletedItem(Item item, Set<String> storedItemIds) {
+        List<String> from = item.getFromItemIds();
+        if (from == null || from.isEmpty()) {
+            return false;
+        }
+        return item.hasTag(BOOTS_TAG) || !hasStoredUpgrade(item, storedItemIds);
+    }
+
+    private boolean hasStoredUpgrade(Item item, Set<String> storedItemIds) {
+        List<String> into = item.getIntoItemIds();
+        return into != null && into.stream().anyMatch(storedItemIds::contains);
     }
 
     private boolean isSummonersRiftItem(ItemData data) {

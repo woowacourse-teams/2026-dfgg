@@ -7,6 +7,7 @@ import static dfgg.domain.item.trait.ItemTrait.SHURELYA_BATTLESONG;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.domain.item.Item;
+import dfgg.domain.match.SituationalComponentPolicy;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,5 +44,12 @@ class ItemTraitCatalogTest {
 
         // then
         assertThat(traits).isEmpty();
+    }
+
+    @Test
+    @DisplayName("상황 대응 화이트리스트 아이템은 모두 화면에 낼 trait를 갖는다 — 빠뜨리면 v4 응답의 traits가 조용히 빈다")
+    void traitsOf_CoversEverySituationalWhitelistItem() {
+        assertThat(SituationalComponentPolicy.items()).allSatisfy(itemId ->
+                assertThat(catalog.traitsOf(itemId)).as("아이템 %d", itemId).isNotEmpty());
     }
 }

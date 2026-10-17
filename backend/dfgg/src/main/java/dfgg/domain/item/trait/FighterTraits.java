@@ -7,6 +7,7 @@ import static dfgg.domain.item.trait.ItemTrait.CHEMPUNK_CHAINSWORD;
 import static dfgg.domain.item.trait.ItemTrait.DEATH_DANCE;
 import static dfgg.domain.item.trait.ItemTrait.ECLIPSE;
 import static dfgg.domain.item.trait.ItemTrait.ENDLESS_HUNGER;
+import static dfgg.domain.item.trait.ItemTrait.EXECUTIONER_CALLING;
 import static dfgg.domain.item.trait.ItemTrait.EXPERIMENTAL_HEXPLATE;
 import static dfgg.domain.item.trait.ItemTrait.GUARDIAN_ANGEL;
 import static dfgg.domain.item.trait.ItemTrait.HULLBREAKER;
@@ -47,6 +48,7 @@ final class FighterTraits {
             Map.entry(3074L, self(RAVENOUS_HYDRA)),  // 굶주린 히드라
             Map.entry(3078L, self(TRINITY_FORCE)),  // 삼위일체
             Map.entry(3091L, self(WIT_END)),  // 마법사의 최후
+            Map.entry(3123L, self(EXECUTIONER_CALLING)),  // 처형인의 대검
             Map.entry(3153L, self(BLADE_OF_THE_RUINED_KING)),  // 몰락한 왕의 검
             Map.entry(3156L, self(MAW_OF_MALMORTIUS)),  // 맬모셔스의 아귀
             Map.entry(3161L, self(SPEAR_OF_SHOJIN)),  // 쇼진의 창
