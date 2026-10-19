@@ -12,13 +12,17 @@ const windows = fs
   .map((entry) => entry.name)
   .filter((name) => fs.existsSync(path.join(RENDERER_DIR, name, 'index.tsx')));
 
+// 디자인 시안처럼 개발 서버에서만 여는 창. 실제 앱 빌드에는 넣지 않는다.
+const DEV_ONLY_WINDOWS = ['proposals'];
+
 module.exports = (_env, argv) => {
   const isProduction = argv.mode === 'production';
+  const pages = isProduction ? windows.filter((name) => !DEV_ONLY_WINDOWS.includes(name)) : windows;
 
   return {
     context: __dirname,
     entry: Object.fromEntries(
-      windows.map((name) => {
+      pages.map((name) => {
         const entry = `./src/renderer/${name}/index.tsx`;
         const devMock = `./src/renderer/${name}/devMock.ts`;
         // 개발 서버에서만 가짜 preload API 를 먼저 싣는다. 브라우저로 창을 바로 열어 볼 수 있게 한다.
@@ -80,7 +84,7 @@ module.exports = (_env, argv) => {
       },
     },
     plugins: [
-      ...windows.map(
+      ...pages.map(
         (name) =>
           new HtmlWebpackPlugin({
             template: `./src/renderer/${name}/public/index.html`,
@@ -91,7 +95,7 @@ module.exports = (_env, argv) => {
       ),
       new CopyPlugin({
         patterns: [
-          ...windows.map((name) => ({
+          ...pages.map((name) => ({
             from: `src/renderer/${name}/public`,
             to: name,
             globOptions: { ignore: ['**/index.html'] },
@@ -99,7 +103,7 @@ module.exports = (_env, argv) => {
           })),
           // 트레이·설치 파일과 같은 아이콘을 창 폴더에도 넣는다.
           // 원본을 복사해 쓰므로 두 벌로 갈라질 일이 없다.
-          ...windows.map((name) => ({ from: 'resources/icons/icon.png', to: `${name}/icon.png` })),
+          ...pages.map((name) => ({ from: 'resources/icons/icon.png', to: `${name}/icon.png` })),
         ],
       }),
     ],
