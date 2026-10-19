@@ -71,7 +71,9 @@ class NextItemRecommendationV4ServiceTest {
                   "3071":{"name":"목표 B","from":["1036","1036"],"gold":{"total":1100,"purchasable":true}},
                   "2055":{"name":"제어 와드","stacks":2,"gold":{"total":75,"purchasable":true}},
                   "3123":{"name":"처형인의 대검","gold":{"total":800,"purchasable":true}},
-                  "3076":{"name":"덤불 조끼","gold":{"total":800,"purchasable":true}}
+                  "3076":{"name":"덤불 조끼","gold":{"total":800,"purchasable":true}},
+                  "3031":{"name":"무한의 대검","gold":{"total":3450,"purchasable":true}},
+                  "3094":{"name":"고속 연사포","gold":{"total":2650,"purchasable":true}}
                 },"englishNames":{"3123":"Executioner's Calling","3076":"Bramble Vest"}}
                 """, ItemResponse.class);
         service = service(ComponentRecommendationRuntime.available(component, catalog));
@@ -152,6 +154,27 @@ class NextItemRecommendationV4ServiceTest {
             assertThat(item.purchaseBundle()).isNotNull();
             assertThat(item.purchaseBundle().additionalCost()).isEqualTo(750);
             assertThat(item.purchaseBundle().purchaseOrder()).containsExactly(item.id());
+        });
+    }
+
+    @Test
+    void 원딜이_코어_다섯개와_신발로_일반_6슬롯을_채워도_7번째_코어의_구매_묶음을_만든다() {
+        prepareCore(List.of(coreItem(3133)));
+        champion("Jinx", 222);
+        var model = new GradientBoostedTrees(List.of(new DecisionTree(new int[]{5}, new double[]{0.5},
+                new boolean[]{true}, new int[]{-1}, new int[]{-2}, new double[]{0, 10},
+                new double[]{2}, new double[]{1, 1})));
+        var connected = service(ComponentRecommendationRuntime.available(new ComponentRecommendationService(model), catalog));
+        var inventory = List.of(new InventoryItemRequest(3031L, 1), new InventoryItemRequest(3094L, 1),
+                new InventoryItemRequest(3071L, 1), new InventoryItemRequest(3123L, 1),
+                new InventoryItemRequest(3076L, 1), new InventoryItemRequest(1001L, 1));
+
+        var response = connected.recommendNextItem(bottomRequest(inventory, 2000L), Language.KO_KR);
+
+        assertThat(response.recommendedItems()).singleElement().satisfies(item -> {
+            assertThat(item.purchaseBundle()).isNotNull();
+            assertThat(item.purchaseBundle().purchaseOrder()).containsExactly(3133L);
+            assertThat(item.purchaseBundle().additionalCost()).isEqualTo(1100);
         });
     }
 
@@ -313,5 +336,13 @@ class NextItemRecommendationV4ServiceTest {
         var enemies = java.util.stream.IntStream.rangeClosed(5, 9).mapToObj(i -> new ChampionDto("champion" + i, "TOP")).toList();
         return new NextItemRecommendationV4Request(new ChampionDto("Garen", "TOP"), List.of(3031L), allies,
                 enemies, "EMERALD", patch, inventory, 1000L, 600_000L);
+    }
+
+    private NextItemRecommendationV4Request bottomRequest(List<InventoryItemRequest> inventory, long availableGold) {
+        var allies = java.util.stream.IntStream.rangeClosed(1, 4).mapToObj(i -> new ChampionDto("champion" + i, "TOP")).toList();
+        var enemies = java.util.stream.IntStream.rangeClosed(5, 9).mapToObj(i -> new ChampionDto("champion" + i, "TOP")).toList();
+        return new NextItemRecommendationV4Request(new ChampionDto("Jinx", "BOTTOM"),
+                List.of(3031L, 3094L, 3071L, 3123L, 3076L, 1001L), allies, enemies, "EMERALD", null,
+                inventory, availableGold, 1_800_000L);
     }
 }

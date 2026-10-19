@@ -112,7 +112,12 @@ public class NextItemRecommendationV4Service {
                 throw new InvalidRecommendationRequestException("보유 아이템을 운영 카탈로그에서 확인할 수 없습니다: " + id);
             }
         }
-        return ItemInventory.fromQuantities(quantities);
+        ItemInventory inventory = ItemInventory.fromQuantities(quantities);
+        // Core가 BOTTOM에 7개를 허용하는 근거와 같다 — 신발은 전용 슬롯에 있다고 본다.
+        if (ChampionPosition.valueOf(request.myChampion().position()) == ChampionPosition.BOTTOM) {
+            return inventory.moveBootsToQuestSlot();
+        }
+        return inventory;
     }
 
     private ComponentRecommendationQuery query(NextItemRecommendationV4Request request,
