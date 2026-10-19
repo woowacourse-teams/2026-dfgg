@@ -18,8 +18,10 @@ import type {
   Summoner,
   MatchDetail,
   EndedGame,
+  DfScores,
 } from '../../shared/types';
 import { toMatchSummaries, toMatchDetail } from './matchHistory';
+import { fetchDfScores } from '../api/dfScore';
 import { getQueueNames } from './gameQueues';
 import { reportError } from '../sentry';
 
@@ -97,6 +99,15 @@ export function fetchMatchDetail(gameId: number) {
     if (!raw) return null;
 
     return toMatchDetail(raw);
+  });
+}
+
+// 한 판의 DF 스코어 가져오기. 경기 상세를 받아 백엔드에 넘긴다.
+export function fetchMatchDfScores(gameId: number) {
+  return withLockfile<DfScores | null>('DF 스코어 요청 실패', async (lockfile) => {
+    const raw = await getMatchDetail(lockfile, gameId);
+    if (!raw) return null;
+    return fetchDfScores(raw);
   });
 }
 

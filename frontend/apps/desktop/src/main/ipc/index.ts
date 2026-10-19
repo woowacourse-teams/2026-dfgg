@@ -6,6 +6,7 @@ import {
   fetchMatchDetail,
   fetchEndedGame,
   fetchProfileBackground,
+  fetchMatchDfScores,
 } from '../lcu/service';
 import { launchLeagueClient } from '../lcu/launch';
 import { getLcuState } from '../lcu/state';
@@ -45,6 +46,10 @@ export function registerIpcHandlers() {
   ipcMain.handle('lcu:launch-client', launchLeagueClient);
   ipcMain.handle('lcu:match-history', fetchMatchHistory);
   ipcMain.handle('lcu:match-detail', (_event, gameId: number) => fetchMatchDetail(gameId));
+  // gameId 는 LCU 요청 주소에 그대로 들어가므로 정수인지 확인한다.
+  ipcMain.handle('lcu:df-score', (_event, gameId: unknown) =>
+    Number.isInteger(gameId) ? fetchMatchDfScores(gameId as number) : null,
+  );
 
   ipcMain.on('window:set-collapsed', (event, collapsed: boolean) => {
     const win = BrowserWindow.fromWebContents(event.sender);

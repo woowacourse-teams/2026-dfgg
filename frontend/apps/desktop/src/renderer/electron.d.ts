@@ -1,4 +1,5 @@
 import type {
+  DfScores,
   EndedGame,
   FeedbackRating,
   GameflowPhase,
@@ -35,6 +36,8 @@ declare global {
       getState: () => Promise<LcuState>;
       getMatchHistoryInfo: () => Promise<MatchSummary[] | null>;
       getMatchDetail: (gameId: number) => Promise<MatchDetail | null>;
+      /** 한 판의 DF 스코어 (참가자 번호별). 응답을 알아볼 수 없으면 null. */
+      getDfScores: (gameId: number) => Promise<DfScores | null>;
       onStatusChange: (callback: StatusListener) => Unsubscribe;
       onPhaseChange: (callback: PhaseListener) => Unsubscribe;
       /** 클라이언트에서 프로필 아이콘·이름·레벨이 바뀌면 불린다. */
