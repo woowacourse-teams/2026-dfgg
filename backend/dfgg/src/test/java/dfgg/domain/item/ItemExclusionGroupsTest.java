@@ -164,6 +164,33 @@ class ItemExclusionGroupsTest {
     }
 
     @Test
+    @DisplayName("여신의 눈물 계열끼리는 변신 후에도 배타다 — 무라마나와 마나무네")
+    void isExclusiveWith_WhenBothAreTear_AreExclusive() {
+        Item muramana = item(3042L, "무라마나", List.of());
+        Item manamune = item(3004L, "마나무네", List.of());
+        assertThat(exclusionGroups.isExclusiveWith(muramana, manamune)).isTrue();
+    }
+
+    @Test
+    @DisplayName("여신의 눈물은 재료라 눈물 계열 완성 아이템과 배타가 아니다 — 눈물을 들고 마나무네를 산다")
+    void isExclusiveWith_WhenTearAndItsUpgrade_AreNotExclusive() {
+        Item tear = item(3070L, "여신의 눈물", List.of());
+        Item manamune = item(3004L, "마나무네", List.of());
+        assertThat(exclusionGroups.isExclusiveWith(tear, manamune)).isFalse();
+    }
+
+    @Test
+    @DisplayName("대천사의 포옹은 생명선·여신의 눈물 두 그룹 모두와 배타다")
+    void isExclusiveWith_WhenItemIsSeraphsEmbrace_IsExclusiveWithBothGroups() {
+        Item seraphs = item(3040L, "대천사의 포옹", List.of());
+        Item steraks = item(3053L, "스테락의 도전", List.of());   // 생명선
+        Item manamune = item(3004L, "마나무네", List.of());       // 여신의 눈물
+
+        assertThat(exclusionGroups.isExclusiveWith(seraphs, steraks)).isTrue();
+        assertThat(exclusionGroups.isExclusiveWith(seraphs, manamune)).isTrue();
+    }
+
+    @Test
     @DisplayName("경계는 방어구 관통력·마법 관통력 두 그룹 모두와 배타다")
     void isExclusiveWith_WhenItemIsBoundary_IsExclusiveWithBothPenetrationGroups() {
         Item boundary = item(3302L, "경계", List.of());

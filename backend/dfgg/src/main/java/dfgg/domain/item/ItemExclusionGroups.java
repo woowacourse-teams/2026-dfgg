@@ -60,6 +60,19 @@ public final class ItemExclusionGroups {
         return !Collections.disjoint(groupsOf(one), groupsOf(other));
     }
 
+    /**
+     * 메타데이터가 없는 보유 아이템용. 무라마나 같은 변신 아이템은 직접 살 수 없어 저장되지 않으므로,
+     * 태그는 모르더라도 ID로 등록된 그룹으로 배타 여부를 판단한다.
+     */
+    public boolean isExclusiveWith(Long ownedItemId, Item other) {
+        Objects.requireNonNull(ownedItemId, "아이템 ID는 null일 수 없습니다.");
+        Objects.requireNonNull(other, "아이템은 null일 수 없습니다.");
+        if (Objects.equals(ownedItemId, other.getItemId())) {
+            return false;
+        }
+        return !Collections.disjoint(groupsByItemId.getOrDefault(ownedItemId, Set.of()), groupsOf(other));
+    }
+
     public Set<String> groupsOf(Item item) {
         Objects.requireNonNull(item, "아이템은 null일 수 없습니다.");
         if (item.hasTag(BOOTS_TAG)) {
@@ -134,6 +147,17 @@ public final class ItemExclusionGroups {
                 3876L, // 태양의 썰매
                 3870L, // 꿈 생성기
                 3869L  // 천상의 이의
+        );
+
+        // 여신의 눈물(Tear) 계열 — 마나 충전 고유 효과라 완성 아이템은 하나만 보유한다. 변신 후 아이템도 같은 계열이다.
+        // 여신의 눈물 자체는 이들의 재료라 넣지 않는다. 대천사의 포옹은 생명선 그룹과 겹친다.
+        addToGroup(groups, "TEAR",
+                3003L, // 대천사의 지팡이
+                3040L, // 대천사의 포옹
+                3004L, // 마나무네
+                3042L, // 무라마나
+                3119L, // 혹한의 손길
+                3121L  // 종말의 겨울
         );
 
         return groups;
