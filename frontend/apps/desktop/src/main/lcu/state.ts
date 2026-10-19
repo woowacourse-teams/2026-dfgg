@@ -4,7 +4,7 @@ import type {
   GameflowPhase,
   LcuState,
   LcuStatus,
-  RecommendedItem,
+  RecommendationUpdate,
 } from '../../shared/types';
 import { broadcastToAllWindows } from '../ipc/broadcast';
 import { reportError } from '../sentry';
@@ -13,6 +13,8 @@ const state: LcuState = {
   status: 'disconnected',
   phase: null,
   recommendations: null,
+  situationalItems: [],
+  availableGold: null,
   purchasedCount: 0,
 };
 const phaseListeners = new Set<PhaseListener>();
@@ -39,7 +41,7 @@ export function setLcuPhase(phase: GameflowPhase | null) {
   state.phase = phase;
   broadcastToAllWindows('lcu:phase', phase);
 
-  if (phase !== 'InProgress') setRecommendations(null, 0);
+  if (phase !== 'InProgress') setRecommendations(null);
 
   for (const listener of phaseListeners) {
     try {
@@ -69,8 +71,16 @@ export function setLcuStatus(status: LcuStatus) {
   }
 }
 
-export function setRecommendations(result: RecommendedItem[] | null, count = 0) {
-  state.recommendations = result;
-  state.purchasedCount = count;
-  broadcastToAllWindows('lcu:items-recommendation', { items: result, purchasedCount: count });
+export function setRecommendations(update: RecommendationUpdate | null) {
+  const next: RecommendationUpdate = update ?? {
+    items: null,
+    situationalItems: [],
+    purchasedCount: 0,
+    availableGold: null,
+  };
+  state.recommendations = next.items;
+  state.situationalItems = next.situationalItems;
+  state.purchasedCount = next.purchasedCount;
+  state.availableGold = next.availableGold;
+  broadcastToAllWindows('lcu:items-recommendation', next);
 }

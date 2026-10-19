@@ -195,3 +195,13 @@ export interface LivePlayer {
   };
   team: 'ORDER' | 'CHAOS'; // ORDER=블루, CHAOS=레드
 }
+
+// ---------- /liveclientdata/gamestats ----------
+export interface GameStats {
+  gameMode: string;
+  /** 경과 시간(초). 소수점까지 온다 */
+  gameTime: number;
+  mapName: string;
+  mapNumber: number;
+  mapTerrain: string;
+}

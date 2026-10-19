@@ -9,7 +9,7 @@ const RECOMMENDATION_TIMEOUT_MS = 60_000;
 export async function fetchItemRecommendations(body: RecommendationBody) {
   try {
     const result = await apiPost<RecommendationResponse>(
-      '/api/recommendations/v3',
+      '/api/recommendations/v4',
       body,
       RECOMMENDATION_TIMEOUT_MS,
     );
