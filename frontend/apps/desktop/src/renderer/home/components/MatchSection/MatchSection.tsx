@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/electron/renderer';
 import { useEffect, useState } from 'react';
 
 import type {
+  DfScore,
   HighlightGame,
   HighlightSummary,
   MatchDetail as Detail,
@@ -11,7 +12,9 @@ import type {
 } from '../../../../shared/types';
 import { ChevronIcon, ClockIcon } from '../../../icons';
 import { championTileUrl } from '../../lib/ddragon';
+import { rankTone } from '../../lib/dfRank';
 import { formatMinutes, formatWhen, queueLabel } from '../../lib/format';
+import DfRankCard from '../DfRankCard/DfRankCard';
 import HighlightPlayer from '../HighlightSection/HighlightPlayer';
 import MatchDetail from './MatchDetail';
 import { ItemRow, KdaLine, RatioChip } from './parts';
@@ -26,10 +29,13 @@ export function MatchCard({
   match,
   version,
   highlight,
+  dfRank,
 }: {
   match: MatchSummary;
   version: string | null;
   highlight?: HighlightSummary;
+  /** 방금 끝난 판이면 가운데에 DF 등수를 크게 놓고 KDA 를 오른쪽으로 민다 */
+  dfRank?: { score: DfScore; total: number };
 }) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -73,42 +79,59 @@ export function MatchCard({
       });
   };
 
+  const summaryRow = (
+    <>
+      {/* 챔피언 그림을 카드 왼쪽에 비스듬히 잘라 건다 */}
+      <span className='match-art'>
+        <img src={championTileUrl(match.championId)} alt='' loading='lazy' />
+      </span>
+
+      {dfRank && <DfRankCard score={dfRank.score} total={dfRank.total} />}
+
+      <span className={`match-info ${dfRank ? 'match-df-side' : ''}`}>
+        <span className='match-top'>
+          <b className='match-result'>{match.win ? '승리' : '패배'}</b>
+          <span className='match-queue'>{queueLabel(match)}</span>
+          <span className='match-when'>{formatWhen(match.gameCreationDate)}</span>
+        </span>
+
+        <KdaLine stats={stats} />
+
+        {/* 숫자만 던지지 않고 무슨 숫자인지 이름표를 붙인다 */}
+        <span className='chips'>
+          <RatioChip stats={stats} />
+          <span className='chip'>
+            CS <b>{stats.cs}</b>
+          </span>
+          <span className='chip'>
+            <ClockIcon />
+            <b>{formatMinutes(match.gameDuration)}</b>
+          </span>
+        </span>
+      </span>
+
+      {/* 방금 끝난 판은 KDA 를 오른쪽에 크게 두고 아이템은 상세에서 본다 */}
+      {!dfRank && <ItemRow items={stats.items} version={version} />}
+    </>
+  );
+
   return (
-    <li className={`match ${match.win ? 'match-win' : 'match-loss'}`}>
-      <button type='button' className='match-card' onClick={toggle} aria-expanded={expanded}>
-        {/* 챔피언 그림을 카드 왼쪽에 비스듬히 잘라 건다 */}
-        <span className='match-art'>
-          <img src={championTileUrl(match.championId)} alt='' loading='lazy' />
-        </span>
-
-        <span className='match-info'>
-          <span className='match-top'>
-            <b className='match-result'>{match.win ? '승리' : '패배'}</b>
-            <span className='match-queue'>{queueLabel(match)}</span>
-            <span className='match-when'>{formatWhen(match.gameCreationDate)}</span>
+    <li
+      className={`match ${match.win ? 'match-win' : 'match-loss'} ${
+        dfRank ? `match-df df-tone-${rankTone(dfRank.score.rank)}` : ''
+      }`}
+    >
+      {dfRank ? (
+        // 방금 끝난 판은 요약만 보여 준다. 세부는 아래 전적 목록에서 펼친다.
+        <div className='match-card match-card-static'>{summaryRow}</div>
+      ) : (
+        <button type='button' className='match-card' onClick={toggle} aria-expanded={expanded}>
+          {summaryRow}
+          <span className='match-arrow' aria-hidden='true'>
+            <ChevronIcon />
           </span>
-
-          <KdaLine stats={stats} />
-
-          {/* 숫자만 던지지 않고 무슨 숫자인지 이름표를 붙인다 */}
-          <span className='chips'>
-            <RatioChip stats={stats} />
-            <span className='chip'>
-              CS <b>{stats.cs}</b>
-            </span>
-            <span className='chip'>
-              <ClockIcon />
-              <b>{formatMinutes(match.gameDuration)}</b>
-            </span>
-          </span>
-        </span>
-
-        <ItemRow items={stats.items} version={version} />
-
-        <span className='match-arrow' aria-hidden='true'>
-          <ChevronIcon />
-        </span>
-      </button>
+        </button>
+      )}
 
       {highlight && (
         <button

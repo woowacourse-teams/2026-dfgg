@@ -1,8 +1,11 @@
 import './MatchDetail.css';
 
-import { useState } from 'react';
+import * as Sentry from '@sentry/electron/renderer';
+import { useEffect, useState } from 'react';
 
 import type {
+  DfScore,
+  DfScores,
   MatchDetail as Detail,
   MatchParticipant,
   MatchStats,
@@ -10,6 +13,7 @@ import type {
   MatchTeam,
 } from '../../../../shared/types';
 import { championIconUrl } from '../../lib/ddragon';
+import { rankTone } from '../../lib/dfRank';
 import { csPerMin, formatNumber, percentOf, perMinute } from '../../lib/format';
 import { Hatch, ItemRow, KdaLine } from './parts';
 
@@ -21,11 +25,12 @@ const RING_STROKE = 5;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 
-type BoardView = 'damage' | 'items';
+type BoardView = 'damage' | 'items' | 'rank';
 
 const BOARD_VIEWS: { key: BoardView; label: string }[] = [
   { key: 'damage', label: '피해량' },
   { key: 'items', label: '아이템' },
+  { key: 'rank', label: 'DF 순위' },
 ];
 
 const sum = (members: MatchParticipant[], pick: (stats: MatchStats) => number) =>
@@ -86,10 +91,12 @@ function MyPlay({
   me,
   team,
   duration,
+  dfScore,
 }: {
   me: MatchStats;
   team: MatchParticipant[];
   duration: number;
+  dfScore: DfScore | undefined;
 }) {
   // 어시스트 집계가 팀 킬 합계와 어긋나는 경우가 있어 100 을 넘지 않게 막는다.
   const killShare = Math.min(
@@ -103,6 +110,16 @@ function MyPlay({
 
   return (
     <section className='my-play' aria-label='내 플레이'>
+      {dfScore && (
+        <div className={`my-df df-tone-${rankTone(dfScore.rank)}`}>
+          <strong>
+            {dfScore.rank}
+            <small>등</small>
+          </strong>
+          <span>DF {dfScore.score.toFixed(1)}</span>
+        </div>
+      )}
+
       <div className='my-ring'>
         <svg
           width={RING_SIZE}
@@ -160,11 +177,13 @@ function Fighter({
   view,
   maxDealt,
   version,
+  dfRank,
 }: {
   player: MatchParticipant | undefined;
   side: 'left' | 'right';
   isMe: boolean;
-  view: BoardView;
+  view: Exclude<BoardView, 'rank'>;
+  dfRank: number | undefined;
   maxDealt: number;
   version: string | null;
 }) {
@@ -178,6 +197,9 @@ function Fighter({
     <div className={`fighter fighter-${side} ${isMe ? 'fighter-me' : ''}`}>
       <span className='fighter-portrait'>
         <img src={championIconUrl(player.championId)} alt='' />
+        {dfRank !== undefined && (
+          <b className={`df-badge fighter-df df-tone-${rankTone(dfRank)}`}>{dfRank}</b>
+        )}
         {/* 이 판에서 피해를 가장 많이 넣은 한 명. 이름 줄에 두면 긴 이름을 밀어내서 그림에 얹는다. */}
         {isTopDamage && <em>최다 딜</em>}
       </span>
@@ -207,6 +229,51 @@ function Fighter({
   );
 }
 
+/** DF 순위 보기. 두 팀을 섞어 1등부터 줄 세운다. 왼쪽 띠 색으로 우리 팀인지 가른다. */
+function Ranking({
+  players,
+  scores,
+  myTeamId,
+  myId,
+}: {
+  players: MatchParticipant[];
+  scores: DfScores;
+  myTeamId: number;
+  myId: number;
+}) {
+  const ranked = players
+    .filter((player) => scores[player.participantId])
+    .sort((a, b) => scores[a.participantId].rank - scores[b.participantId].rank);
+  const topScore = Math.max(...ranked.map((player) => scores[player.participantId].score), 1);
+
+  return (
+    <ol className='ranking'>
+      {ranked.map((player) => {
+        const { rank, score } = scores[player.participantId];
+        const isMine = player.teamId === myTeamId;
+        return (
+          <li
+            key={player.participantId}
+            className={`ranking-row ${isMine ? 'ranking-mine' : ''} ${
+              player.participantId === myId ? 'ranking-me' : ''
+            }`}
+          >
+            <b className={`df-badge df-tone-${rankTone(rank)}`}>{rank}</b>
+            <img src={championIconUrl(player.championId)} alt='' />
+            <span className='ranking-name' title={`${player.gameName}#${player.tagLine}`}>
+              {player.gameName}
+            </span>
+            <span className='ranking-bar'>
+              <Hatch percent={percentOf(score, topScore)} from='left' />
+            </span>
+            <span className='ranking-score'>{score.toFixed(1)}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 type Props = {
   detail: Detail;
   summary: MatchSummary;
@@ -216,6 +283,22 @@ type Props = {
 /** 펼쳤을 때 보이는 상세: 점수판 → 내 플레이 → 다섯 줄 맞대결. */
 function MatchDetail({ detail, summary, version }: Props) {
   const [view, setView] = useState<BoardView>('damage');
+  const [dfScores, setDfScores] = useState<DfScores | null>(null);
+
+  // 못 받으면 순위 탭과 딱지만 빠지고 나머지 상세는 그대로 보인다.
+  const { gameId } = detail;
+  useEffect(() => {
+    let cancelled = false;
+    window.lcu
+      .getDfScores(gameId)
+      .then((scores) => {
+        if (!cancelled) setDfScores(scores);
+      })
+      .catch((error) => Sentry.captureException(error));
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId]);
 
   const me = detail.participants.find((player) => player.participantId === summary.participantId);
   const myTeamId = me?.teamId ?? detail.teams[0]?.teamId ?? BLUE_TEAM_ID;
@@ -231,19 +314,25 @@ function MatchDetail({ detail, summary, version }: Props) {
 
   // 막대는 경기 전체에서 가장 높은 값을 기준으로 삼아야 팀끼리도 비교된다.
   const maxDealt = Math.max(...detail.participants.map((player) => player.stats.damageDealt), 1);
+  const views = dfScores ? BOARD_VIEWS : BOARD_VIEWS.filter(({ key }) => key !== 'rank');
   const rows = Array.from({ length: Math.max(mine.length, theirs.length) }, (_, index) => index);
 
   return (
     <div className='detail'>
       <Scoreline mine={mine} theirs={theirs} myTeam={myTeam} theirTeam={theirTeam} />
 
-      <MyPlay me={summary.stats} team={mine} duration={summary.gameDuration} />
+      <MyPlay
+        me={summary.stats}
+        team={mine}
+        duration={summary.gameDuration}
+        dfScore={dfScores?.[summary.participantId]}
+      />
 
       <section className='board'>
         <div className='board-head'>
           {/* 줄마다 피해량과 아이템을 다 넣으면 난잡하다. 하나씩 골라 본다. */}
           <div className='board-views' role='tablist' aria-label='보기'>
-            {BOARD_VIEWS.map(({ key, label }) => (
+            {views.map(({ key, label }) => (
               <button
                 key={key}
                 type='button'
@@ -257,28 +346,39 @@ function MatchDetail({ detail, summary, version }: Props) {
           </div>
         </div>
 
-        <ol className='board-rows'>
-          {rows.map((index) => (
-            <li key={index} className='board-row'>
-              <Fighter
-                player={mine[index]}
-                side='left'
-                isMe={mine[index]?.participantId === summary.participantId}
-                view={view}
-                maxDealt={maxDealt}
-                version={version}
-              />
-              <Fighter
-                player={theirs[index]}
-                side='right'
-                isMe={false}
-                view={view}
-                maxDealt={maxDealt}
-                version={version}
-              />
-            </li>
-          ))}
-        </ol>
+        {view === 'rank' && dfScores ? (
+          <Ranking
+            players={detail.participants}
+            scores={dfScores}
+            myTeamId={myTeamId}
+            myId={summary.participantId}
+          />
+        ) : (
+          <ol className='board-rows'>
+            {rows.map((index) => (
+              <li key={index} className='board-row'>
+                <Fighter
+                  player={mine[index]}
+                  side='left'
+                  isMe={mine[index]?.participantId === summary.participantId}
+                  view={view === 'items' ? 'items' : 'damage'}
+                  maxDealt={maxDealt}
+                  version={version}
+                  dfRank={dfScores?.[mine[index]?.participantId]?.rank}
+                />
+                <Fighter
+                  player={theirs[index]}
+                  side='right'
+                  isMe={false}
+                  view={view === 'items' ? 'items' : 'damage'}
+                  maxDealt={maxDealt}
+                  version={version}
+                  dfRank={dfScores?.[theirs[index]?.participantId]?.rank}
+                />
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
     </div>
   );
