@@ -10,8 +10,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.champion.ChampionService;
+import dfgg.application.recommend.MultiBuildRecommendationService;
 import dfgg.application.recommend.NextItemRecommendationService;
 import dfgg.application.recommend.NextItemRecommendationV4Service;
+import dfgg.application.recommend.RecommendationService;
 import dfgg.application.recommend.component.ComponentPurchaseBundleMapper;
 import dfgg.application.recommend.component.ComponentRecommendationRuntime;
 import dfgg.application.recommend.context.CompositionFeatureCalculator;
@@ -26,7 +28,7 @@ import dfgg.infrastructure.config.ComponentLtrConfiguration;
 import dfgg.infrastructure.config.ComponentRuntimeConfiguration;
 import dfgg.infrastructure.config.LeagueOfLegendsVersionProperties;
 import dfgg.infrastructure.external.catalog.DataDragonPurchaseItemCatalog;
-import dfgg.presentation.NextItemRecommendationV4Controller;
+import dfgg.presentation.RecommendationController;
 import dfgg.presentation.dto.ChampionDto;
 import dfgg.presentation.dto.RecommendedItemDto;
 import dfgg.presentation.dto.request.InventoryItemRequest;
@@ -94,7 +96,8 @@ class ComponentV4ServingSmokeTest {
                             dfgg.application.recommend.situational.SituationalComponentRuntime.disabled(),
                             new dfgg.application.recommend.situational.SituationalItemMapper(new ImageUrls("smoke-test", "ap-northeast-2", patch),
                                     new dfgg.domain.item.trait.ItemTraitCatalog()));
-                    var mvc = MockMvcBuilders.standaloneSetup(new NextItemRecommendationV4Controller(service))
+                    var mvc = MockMvcBuilders.standaloneSetup(new RecommendationController(
+                            mock(RecommendationService.class), mock(MultiBuildRecommendationService.class), core, service))
                             .setControllerAdvice(new GlobalExceptionHandler()).build();
                     var cases = new ArrayList<Map<String, Object>>();
                     for (long gold : List.of(0L, 350L, 1000L, 1500L)) {

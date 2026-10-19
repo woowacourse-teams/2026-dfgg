@@ -2,12 +2,15 @@ package dfgg.presentation;
 
 import dfgg.application.recommend.MultiBuildRecommendationService;
 import dfgg.application.recommend.NextItemRecommendationService;
+import dfgg.application.recommend.NextItemRecommendationV4Service;
 import dfgg.application.recommend.RecommendationService;
 import dfgg.domain.language.Language;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
+import dfgg.presentation.dto.request.NextItemRecommendationV4Request;
 import dfgg.presentation.dto.request.RecommendationRequest;
 import dfgg.presentation.dto.response.MultiBuildRecommendationResponse;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
+import dfgg.presentation.dto.response.NextItemRecommendationV4Response;
 import dfgg.presentation.dto.response.RecommendationResponse;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -29,15 +32,18 @@ public class RecommendationController {
     private final RecommendationService recommendationService;
     private final MultiBuildRecommendationService multiBuildRecommendationService;
     private final NextItemRecommendationService nextItemRecommendationService;
+    private final NextItemRecommendationV4Service nextItemRecommendationV4Service;
 
     public RecommendationController(
             RecommendationService recommendationService,
             MultiBuildRecommendationService multiBuildRecommendationService,
-            NextItemRecommendationService nextItemRecommendationService
+            NextItemRecommendationService nextItemRecommendationService,
+            NextItemRecommendationV4Service nextItemRecommendationV4Service
     ) {
         this.recommendationService = recommendationService;
         this.multiBuildRecommendationService = multiBuildRecommendationService;
         this.nextItemRecommendationService = nextItemRecommendationService;
+        this.nextItemRecommendationV4Service = nextItemRecommendationV4Service;
     }
 
     @PostMapping("/v1")
@@ -71,7 +77,17 @@ public class RecommendationController {
                 request.myChampion().position(),
                 request.purchasedItemIds(),
                 response.recommendedItems().stream().map(item -> item.id() + ":" + item.name()).toList());
-        
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/v4")
+    public ResponseEntity<NextItemRecommendationV4Response> recommendV4(
+            @Valid @RequestBody NextItemRecommendationV4Request request,
+            @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage
+    ) {
+        NextItemRecommendationV4Response response = nextItemRecommendationV4Service.recommendNextItem(
+                request, Language.fromAcceptLanguage(acceptLanguage));
         return ResponseEntity.ok(response);
     }
 }
