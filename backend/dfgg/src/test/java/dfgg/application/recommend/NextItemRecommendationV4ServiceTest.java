@@ -67,6 +67,7 @@ class NextItemRecommendationV4ServiceTest {
                   "1036":{"name":"롱소드","gold":{"total":350,"purchasable":true}},
                   "1052":{"name":"증폭의 고서","gold":{"total":400,"purchasable":true}},
                   "1001":{"name":"장화","tags":["Boots"],"gold":{"total":300,"purchasable":true}},
+                  "1033":{"name":"마법무효화의 망토","gold":{"total":400,"purchasable":true}},
                   "3133":{"name":"목표 A","from":["1036","1036"],"gold":{"total":1100,"purchasable":true}},
                   "3071":{"name":"목표 B","from":["1036","1036"],"gold":{"total":1100,"purchasable":true}},
                   "2055":{"name":"제어 와드","stacks":2,"gold":{"total":75,"purchasable":true}},
@@ -74,7 +75,7 @@ class NextItemRecommendationV4ServiceTest {
                   "3076":{"name":"덤불 조끼","gold":{"total":800,"purchasable":true}},
                   "3031":{"name":"무한의 대검","gold":{"total":3450,"purchasable":true}},
                   "3094":{"name":"고속 연사포","gold":{"total":2650,"purchasable":true}}
-                },"englishNames":{"3123":"Executioner's Calling","3076":"Bramble Vest"}}
+                },"englishNames":{"3123":"Executioner's Calling","3076":"Bramble Vest","1033":"Null-Magic Mantle"}}
                 """, ItemResponse.class);
         service = service(ComponentRecommendationRuntime.available(component, catalog));
     }
@@ -175,6 +176,60 @@ class NextItemRecommendationV4ServiceTest {
             assertThat(item.purchaseBundle()).isNotNull();
             assertThat(item.purchaseBundle().purchaseOrder()).containsExactly(3133L);
             assertThat(item.purchaseBundle().additionalCost()).isEqualTo(1100);
+        });
+    }
+
+    @Test
+    void 원딜이_하위_재료까지_들어_일반_슬롯이_6칸을_넘어도_예외_없이_구매_묶음을_만든다() {
+        prepareCore(List.of(coreItem(3133)));
+        champion("Jinx", 222);
+        var model = new GradientBoostedTrees(List.of(new DecisionTree(new int[]{5}, new double[]{0.5},
+                new boolean[]{true}, new int[]{-1}, new int[]{-2}, new double[]{0, 10},
+                new double[]{2}, new double[]{1, 1})));
+        var connected = service(ComponentRecommendationRuntime.available(new ComponentRecommendationService(model), catalog));
+        // 신발까지 일반 슬롯으로 세면 7칸이다.
+        var inventory = List.of(new InventoryItemRequest(3031L, 1), new InventoryItemRequest(3094L, 1),
+                new InventoryItemRequest(3071L, 1), new InventoryItemRequest(3123L, 1),
+                new InventoryItemRequest(3076L, 1), new InventoryItemRequest(1001L, 1),
+                new InventoryItemRequest(1036L, 1));
+
+        var response = connected.recommendNextItem(bottomRequest(inventory, 2000L), Language.KO_KR);
+
+        assertThat(response.recommendedItems()).singleElement().satisfies(item -> {
+            assertThat(item.purchaseBundle()).isNotNull();
+            assertThat(item.purchaseBundle().purchaseOrder()).containsExactly(3133L);
+            assertThat(item.purchaseBundle().additionalCost()).isEqualTo(750);
+        });
+    }
+
+    @Test
+    void 원딜이_코어_다섯개와_신발로_일반_6슬롯을_채워도_상황_대응_아이템을_추천한다() {
+        prepareCore(List.of(coreItem(3133)));
+        champion("Jinx", 222);
+        Champion kennen = mock(Champion.class);
+        when(kennen.getChampionId()).thenReturn(7L);
+        when(kennen.getName()).thenReturn(Map.of("ko-KR", "케넨"));
+        when(kennen.getRiotKey()).thenReturn("Kennen");
+        when(champions.findChampionByName("champion7")).thenReturn(kennen);
+        when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
+                new TargetRecommendation(3133, Status.OK, List.of(purchase(1036, 1)), null)));
+        var lookup = new dfgg.domain.match.SituationalComponentLookup("16.18",
+                Map.of(new dfgg.domain.match.SituationalComponentLookup.LiftKey(1033, 7, "BOTTOM"),
+                        new dfgg.domain.match.SituationalComponentLookup.Lift(40, 3.0)),
+                Map.of(new dfgg.domain.match.SituationalComponentLookup.BaseKey(222, "BOTTOM", 1033), .10));
+        var situational = dfgg.application.recommend.situational.SituationalComponentRuntime.available(
+                lookup, new dfgg.domain.match.SituationalThresholds(2.0, .01));
+        var inventory = List.of(new InventoryItemRequest(3031L, 1), new InventoryItemRequest(3094L, 1),
+                new InventoryItemRequest(3071L, 1), new InventoryItemRequest(3123L, 1),
+                new InventoryItemRequest(3076L, 1), new InventoryItemRequest(1001L, 1));
+
+        var response = service(ComponentRecommendationRuntime.available(component, catalog), situational)
+                .recommendNextItem(bottomRequest(inventory, 2000L), Language.KO_KR);
+
+        assertThat(response.situationalItems()).singleElement().satisfies(item -> {
+            assertThat(item.id()).isEqualTo(1033L);
+            assertThat(item.additionalCost()).isEqualTo(400);
+            assertThat(item.affordable()).isTrue();
         });
     }
 
