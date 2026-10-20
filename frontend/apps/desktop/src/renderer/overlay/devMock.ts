@@ -7,13 +7,17 @@
  *   /overlay/index.html?state=waiting   게임 중 · 추천을 기다리는 중
  *   /overlay/index.html?state=idle      게임 밖
  *   /overlay/index.html?bought=4        산 아이템 수 (0~5)
+ *   /overlay/index.html?situ=0          상황템 개수 (0~2, 기본 2). 코어와 합쳐 5줄이 되는지 볼 때
  */
-import type { NamedEntry, RecommendedItem } from '../../shared/types';
+import type { NamedEntry, RecommendedItem, SituationalItem } from '../../shared/types';
 
 const params = new URLSearchParams(window.location.search);
 const state = params.get('state') ?? 'ready';
 const DEFAULT_BOUGHT = 2;
 const bought = Number(params.get('bought') ?? DEFAULT_BOUGHT);
+const MAX_SITUATIONAL = 2;
+const situCount = Math.min(MAX_SITUATIONAL, Number(params.get('situ') ?? MAX_SITUATIONAL));
+const MOCK_GOLD = 1200;
 
 const championIcon = (id: number) =>
   `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${id}.png`;
@@ -47,12 +51,22 @@ const itemIcons: Promise<Map<number, string>> = fetch(`${CDRAGON_DATA}/v1/items.
   // 목록을 못 받아도 화면은 떠야 한다. 그림만 빈 채로 둔다.
   .catch(() => new Map<number, string>());
 
-type Seed = Pick<RecommendedItem, 'id' | 'name' | 'description'>;
+type Seed = Pick<RecommendedItem, 'id' | 'name' | 'description'> & {
+  /** [재료 id, 이름, 수량] 을 사는 순서대로. 없으면 지금 살 묶음이 없는 코어 */
+  bundle?: { items: [number, string, number][]; cost: number };
+};
 
 const SEEDS: Seed[] = [
   {
     id: 3157,
     name: '존야의 모래시계',
+    bundle: {
+      items: [
+        [2420, '파수꾼의 갑옷', 1],
+        [1052, '증폭의 고서', 2],
+      ],
+      cost: 1100,
+    },
     description: {
       traits: ['방어력', '생존'],
       ally: [champion(412, '쓰레쉬')],
@@ -62,11 +76,13 @@ const SEEDS: Seed[] = [
   {
     id: 3089,
     name: '라바돈의 죽음모자',
+    bundle: { items: [[1058, '쓸데없이 큰 지팡이', 1]], cost: 1200 },
     description: { traits: ['주문력'], ally: [champion(117, '룰루')], counter: [] },
   },
   {
     id: 3135,
     name: '공허의 지팡이',
+    bundle: { items: [[4630, '마법 부적', 1]], cost: 900 },
     description: {
       traits: ['마법 관통력'],
       ally: [],
@@ -74,9 +90,9 @@ const SEEDS: Seed[] = [
     },
   },
   {
-    id: 3165,
-    name: '모렐로노미콘',
-    description: { traits: ['회복 및 보호막 감소'], ally: [], counter: [champion(16, '소라카')] },
+    id: 3116,
+    name: '라일라이의 수정홀',
+    description: { traits: ['둔화'], ally: [], counter: [champion(16, '소라카')] },
   },
   {
     id: 4645,
@@ -87,7 +103,50 @@ const SEEDS: Seed[] = [
 
 async function recommendations(): Promise<RecommendedItem[]> {
   const icons = await itemIcons;
-  return SEEDS.map((seed) => ({ ...seed, imageUrl: icons.get(seed.id) ?? '' }));
+  return SEEDS.map(({ bundle, ...seed }) => ({
+    ...seed,
+    imageUrl: icons.get(seed.id) ?? '',
+    purchaseBundle: bundle
+      ? {
+          items: bundle.items.map(([itemId, name, quantity]) => ({
+            itemId,
+            name,
+            quantity,
+            imageUrl: icons.get(itemId) ?? '',
+          })),
+          additionalCost: bundle.cost,
+          purchaseOrder: bundle.items.map(([itemId]) => itemId),
+        }
+      : null,
+  }));
+}
+
+/** 상대 조합 대응 아이템. 하나는 지금 살 수 있고, 하나는 골드가 모자란 경우다. */
+async function situationalItems(): Promise<SituationalItem[]> {
+  const icons = await itemIcons;
+  const all: SituationalItem[] = [
+    {
+      id: 3165,
+      name: '모렐로노미콘',
+      imageUrl: icons.get(3165) ?? '',
+      description: {
+        traits: ['치유 감소 부여'],
+        ally: [],
+        counter: [champion(16, '소라카'), champion(19, '워윅')],
+      },
+      additionalCost: 800,
+      affordable: true,
+    },
+    {
+      id: 3102,
+      name: '밴시의 장막',
+      imageUrl: icons.get(3102) ?? '',
+      description: { traits: ['주문 보호막'], ally: [], counter: [champion(238, '제드')] },
+      additionalCost: 1500,
+      affordable: false,
+    },
+  ];
+  return all.slice(0, situCount);
 }
 
 const log =
@@ -134,11 +193,14 @@ if (!window.lcu) {
     getRankInfo: async () => null,
     getProfileBackground: async () => null,
     launchClient: async () => false,
+    getDfScores: async () => null,
     getState: async () => ({
       status: 'connected',
       phase: state === 'idle' ? 'None' : 'InProgress',
       recommendations: state === 'ready' ? await recommendations() : null,
+      situationalItems: state === 'ready' ? await situationalItems() : [],
       purchasedCount: bought,
+      availableGold: MOCK_GOLD,
     }),
     getMatchHistoryInfo: async () => null,
     getMatchDetail: async () => null,

@@ -1,6 +1,6 @@
 import type { LcuEventMap } from '../main/lcu/events';
 
-export type OverlayClickTarget = 'item' | 'collapse' | 'expand' | 'empty' | 'other';
+export type OverlayClickTarget = 'item' | 'situational' | 'collapse' | 'expand' | 'empty' | 'other';
 
 // 전적 카드에 하이라이트 보기 버튼을 그릴 때 필요
 export interface HighlightSummary {
@@ -105,7 +105,11 @@ export type GameflowPhase =
 
 export type RecommendationUpdate = {
   items: RecommendedItem[] | null;
+  /** 상대 조합 때문에 고려할 아이템. 최대 2개, 없으면 빈 배열 */
+  situationalItems: SituationalItem[];
   purchasedCount: number;
+  /** 추천을 받을 때의 보유 골드. 모르면 null */
+  availableGold: number | null;
 };
 
 export type LcuStatus = 'disconnected' | 'connecting' | 'connected';
@@ -113,7 +117,9 @@ export type LcuState = {
   status: LcuStatus;
   phase: GameflowPhase | null;
   recommendations: RecommendedItem[] | null;
+  situationalItems?: SituationalItem[];
   purchasedCount?: number;
+  availableGold?: number | null;
 };
 
 // ---------- 랭크 정보 (/lol-ranked/v1/current-ranked-stats) ----------
@@ -297,10 +303,35 @@ export interface RecommendedItemDescription {
   traits: string[];
 }
 
+/** 코어 하나를 향해 지금 살 하위 아이템 묶음 (추천 v4) */
+export interface PurchaseBundle {
+  items: { itemId: number; name: string; imageUrl: string; quantity: number }[];
+  /** 보유 재료로 조합되는 만큼 뺀 실제 지불 골드. 항상 보유 골드 이하 */
+  additionalCost: number;
+  /** 실제로 살 수 있는 순서 (선호 순위가 아님) */
+  purchaseOrder: number[];
+}
+
 export interface RecommendedItem extends NamedEntry {
   description: RecommendedItemDescription;
+  /** 살 수 있는 묶음이 없으면 null. v3 응답에는 없다. */
+  purchaseBundle?: PurchaseBundle | null;
+}
+
+/** 상대 조합 때문에 고려할 아이템 (추천 v4). description.ally 는 항상 빈 배열이다. */
+export interface SituationalItem extends NamedEntry {
+  description: RecommendedItemDescription;
+  additionalCost: number;
+  affordable: boolean;
 }
 
 export interface RecommendationResponse {
   recommendedItems: RecommendedItem[];
+  situationalItems?: SituationalItem[];
 }
+
+/** 한 판에서 한 사람의 DF 스코어와 10명 중 순위 */
+export type DfScore = { score: number; rank: number };
+
+/** 참가자 번호(participantId) → DF 스코어 */
+export type DfScores = Record<number, DfScore>;

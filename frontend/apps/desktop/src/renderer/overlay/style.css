@@ -299,6 +299,174 @@
   outline-offset: 0;
 }
 
+/* ---------- 1순위: 지금 살 것 ---------- */
+/* 1순위 카드는 위에 코어, 아래에 '지금 살 것' 줄을 쌓는다 */
+.pick-best {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.pick-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.now-buy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 28%);
+}
+
+.now-buy-label {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+/* ---------- 하위 아이템 묶음 ---------- */
+.bundle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bundle-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bundle-step i {
+  font-style: normal;
+  color: var(--ink-3);
+}
+
+.bundle-step b {
+  font-size: 10px;
+  color: var(--ink-2);
+}
+
+.bundle img {
+  border-radius: 5px;
+  outline: 1px solid rgb(255 255 255 / 14%);
+  outline-offset: -1px;
+}
+
+.bundle-large {
+  flex: 1;
+}
+
+.bundle-large img {
+  width: 22px;
+  height: 22px;
+}
+
+.bundle-large .cost {
+  margin-left: auto;
+}
+
+.bundle-small {
+  margin-top: 2px;
+}
+
+.bundle-small img {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+}
+
+.bundle-small .cost {
+  margin-left: 4px;
+  font-size: 10px;
+}
+
+/* 골드는 금색 칩으로 통일한다 */
+.cost {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: none;
+  white-space: nowrap;
+}
+
+.cost-short {
+  background: rgb(255 255 255 / 7%);
+  color: var(--ink-3);
+}
+
+.bar-gold {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+/* 골드가 접기 버튼을 오른쪽 끝으로 밀어 준다 */
+.bar-gold + .bar-button {
+  margin-left: 0;
+}
+
+/* ---------- 상대 조합 대응 (상황템) ---------- */
+.situ-section {
+  flex: none;
+  padding: 4px 6px 8px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+
+.situ-section h3 {
+  margin: 4px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.situ-section ul {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.situ {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border: 1px solid rgb(230 57 80 / 22%);
+  border-radius: 9px;
+  background: rgb(230 57 80 / 7%);
+  animation: pick-in 380ms var(--ease-out) backwards;
+}
+
+/* 지금 골드로 못 사는 상황템은 흐리게 둔다 */
+.situ-locked {
+  border-color: rgb(255 255 255 / 6%);
+  background: transparent;
+  opacity: 0.6;
+}
+
+.situ-art {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  outline: 1px solid rgb(255 255 255 / 14%);
+  outline-offset: -1px;
+}
+
 /* ---------- 추천이 없을 때 ---------- */
 .overlay-empty {
   display: flex;
@@ -382,6 +550,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pick,
+  .situ,
   .pick-best .pick-art img,
   .progress .progress-next,
   .overlay-loader {

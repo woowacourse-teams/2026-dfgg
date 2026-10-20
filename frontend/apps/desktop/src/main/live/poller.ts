@@ -2,8 +2,8 @@ import type { GameflowPhase } from '../../shared/types';
 import { fetchItemRecommendations } from '../api/recommendations';
 import { getLcuState, onPhaseChange, setRecommendations } from '../lcu/state';
 import { getDDragonData } from './ddragon';
-import { getActivePlayer, getPlayerList } from './endpoints';
-import { buildRecommendationBody, extractItemIds } from './payload';
+import { getActivePlayer, getGameStats, getPlayerList } from './endpoints';
+import { buildRecommendationBody, extractItemIds, toInventory } from './payload';
 import { fetchGameVersion } from '../lcu/service';
 import { recordChampion, recordLiveError, recordPurchases } from '../analytics/gameTracker';
 import { reportError } from '../sentry';
@@ -12,7 +12,18 @@ const POLL_INTERVAL_MS = 2000;
 // 추천 요청이 실패하면 서버 부하를 줄이려고 재시도 간격을 늘린다. (2초 → 4초 → … → 30초)
 const MAX_RETRY_INTERVAL_MS = 30_000;
 
+// 하위 아이템 묶음은 골드에 따라 달라진다. 다만 골드는 매초 오르므로 오를 때마다 묻지 않는다.
+// 마지막 요청보다 이만큼 더 모였고, 이 시간이 지났을 때만 다시 묻는다.
+// ponytail: 고정 기준이라 귀환 직후처럼 꼭 필요한 순간을 놓칠 수 있다. 상점 열림을 알 수 있으면 그때 묻는 게 낫다.
+const GOLD_REFRESH_STEP = 300;
+const GOLD_REFRESH_MIN_MS = 10_000;
+const SECOND_MS = 1000;
+
 let recommendFailures = 0;
+// 마지막으로 추천을 받은 상태. 인벤토리가 바뀌거나 골드가 충분히 모이면 다시 묻는다.
+let lastRequestKey: string | null = null;
+let lastRequestGold = 0;
+let lastRequestAt = 0;
 
 function nextPollInterval() {
   if (recommendFailures === 0) return POLL_INTERVAL_MS;
@@ -58,13 +69,19 @@ function updatePurchaseOrder(itemIds: number[], bootsItemIds: Set<number>, isBot
   for (const id of current) purchasedItemIds.add(id);
 }
 
+/** 인벤토리나 산 코어가 바뀌었거나, 골드가 충분히 모였으면 다시 묻는다. */
+function shouldRequest(key: string, gold: number, now: number) {
+  if (key !== lastRequestKey) return true;
+  return gold - lastRequestGold >= GOLD_REFRESH_STEP && now - lastRequestAt >= GOLD_REFRESH_MIN_MS;
+}
+
 // 인게임 정보와 소환사 id 정보를 가져와서 필요하면 백엔드에 아이템 요청 보내기
 async function tick() {
   try {
-    if (myRiotId === null) {
-      const me = await getActivePlayer();
-      myRiotId = me?.riotId ?? me?.summonerName ?? null;
-    }
+    // 골드는 매번 새로 읽어야 해서 내 정보도 매번 받는다.
+    const active = await getActivePlayer();
+    if (myRiotId === null) myRiotId = active?.riotId ?? active?.summonerName ?? null;
+    const gold = active?.currentGold ?? 0;
 
     if (patch === null) {
       const currentPatch = await fetchGameVersion();
@@ -77,42 +94,56 @@ async function tick() {
     const myPlayers = players?.find(
       (player) => player.riotId === myRiotId || player.summonerName === myRiotId,
     );
+    if (!myPlayers || !players || !myRiotId || !patch || !championNames || !componentItemIds)
+      return;
 
-    if (myPlayers) {
-      const itemIds = extractItemIds(myPlayers, componentItemIds);
-
-      if (lastItemIds === null || !sameItems(itemIds, lastItemIds)) {
-        if (!players || !myRiotId || !patch || !championNames || !componentItemIds) return;
-
-        if (lastItemIds !== null) {
-          const newItemIds = itemIds.filter((id) => !purchasedItemIds.has(id));
-          recordPurchases(newItemIds, getLcuState().recommendations);
-        }
-        updatePurchaseOrder(itemIds, bootsItemIds, myPlayers.position === 'BOTTOM');
-
-        console.log('아이템 변경', itemIds);
-
-        const liveInfo = { players, myRiotId, patch, championNames, purchasedItemIds };
-
-        // 백엔드에 전달
-        const body = buildRecommendationBody(liveInfo);
-        if (!body) return;
-        console.log(body);
-        recordChampion(body.myChampion);
-        let result;
-        try {
-          result = await fetchItemRecommendations(body);
-        } catch (error) {
-          // live API 실패(게임 로딩 중 등)와 구분해서 추천 실패에만 간격을 늘린다.
-          recommendFailures++;
-          throw error;
-        }
-        recommendFailures = 0;
-        setRecommendations(result.recommendedItems, purchasedItemIds.size);
-
-        lastItemIds = itemIds;
+    // 완성 아이템이 바뀌면 구매 순서를 갱신한다 (v3 와 같다)
+    const itemIds = extractItemIds(myPlayers, componentItemIds);
+    if (lastItemIds === null || !sameItems(itemIds, lastItemIds)) {
+      if (lastItemIds !== null) {
+        const newItemIds = itemIds.filter((id) => !purchasedItemIds.has(id));
+        recordPurchases(newItemIds, getLcuState().recommendations);
       }
+      updatePurchaseOrder(itemIds, bootsItemIds, myPlayers.position === 'BOTTOM');
+      lastItemIds = itemIds;
     }
+
+    const now = Date.now();
+    const key = JSON.stringify([toInventory(myPlayers), [...purchasedItemIds]]);
+    if (!shouldRequest(key, gold, now)) return;
+
+    const stats = await getGameStats();
+    const body = buildRecommendationBody({
+      players,
+      myRiotId,
+      patch,
+      championNames,
+      purchasedItemIds,
+      availableGold: gold,
+      gameTimeMs: (stats?.gameTime ?? 0) * SECOND_MS,
+    });
+    if (!body) return;
+    recordChampion(body.myChampion);
+
+    let result;
+    try {
+      result = await fetchItemRecommendations(body);
+    } catch (error) {
+      // live API 실패(게임 로딩 중 등)와 구분해서 추천 실패에만 간격을 늘린다.
+      recommendFailures++;
+      throw error;
+    }
+    recommendFailures = 0;
+    lastRequestKey = key;
+    lastRequestGold = gold;
+    lastRequestAt = now;
+
+    setRecommendations({
+      items: result.recommendedItems,
+      situationalItems: result.situationalItems ?? [],
+      purchasedCount: purchasedItemIds.size,
+      availableGold: body.availableGold,
+    });
   } catch (error) {
     console.debug('live 조회 실패', error);
     reportError('live-poll', error);
@@ -139,6 +170,9 @@ export function stopLivePolling() {
   }
 
   lastItemIds = null;
+  lastRequestKey = null;
+  lastRequestGold = 0;
+  lastRequestAt = 0;
   recommendFailures = 0;
   myRiotId = null;
   patch = null;

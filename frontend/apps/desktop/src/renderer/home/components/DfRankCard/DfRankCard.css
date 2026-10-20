@@ -1,0 +1,101 @@
+/* 방금 끝난 판 카드. 등수 색으로 테두리와 빛을 바꾼다 */
+.match-df {
+  border-color: color-mix(in srgb, var(--tone) 32%, transparent);
+  animation: rise 420ms var(--ease-out) backwards;
+}
+
+.match-df.df-tone-plain {
+  border-color: var(--line);
+}
+
+.match.match-df .match-card {
+  grid-template-columns: 132px 1fr auto;
+  box-sizing: border-box; /* button 이 아닌 div 라 기본값이 content-box 다 */
+  padding-right: 18px;
+  cursor: default;
+  min-height: 116px;
+}
+
+.match.match-df .match-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--tone) 12%, transparent),
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+/* 오른쪽: 승패와 큰 KDA */
+.match-df-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.match-df .match-card:active {
+  transform: none;
+}
+
+.match-df-side .chips {
+  justify-content: flex-end;
+}
+
+.match-df-side .kda-line {
+  font-size: 26px;
+}
+
+.df-card-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 0;
+}
+
+.df-card-label {
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.df-card-title {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--tone);
+}
+
+.df-card-meta {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.df-card-ladder {
+  display: flex;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+/* 홈 화면의 빗금 막대와 같은 기울기 */
+.df-card-ladder i {
+  width: 12px;
+  height: 7px;
+  background: rgb(255 255 255 / 12%);
+  transform: skewX(-25deg);
+}
+
+.df-card-ladder .df-card-here {
+  background: var(--tone);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--tone) 80%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-df {
+    animation: none;
+  }
+}

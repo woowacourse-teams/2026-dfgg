@@ -5,6 +5,11 @@ export interface ChampionEntry {
   position: string;
 }
 
+export interface InventoryItem {
+  itemId: number;
+  quantity: number;
+}
+
 export interface RecommendationBody {
   myChampion: ChampionEntry;
   purchasedItemIds: number[];
@@ -13,6 +18,10 @@ export interface RecommendationBody {
   tier: string;
   patch: string;
   riotId: string;
+  /** 지금 인벤토리의 모든 아이템과 수량 (시작 아이템, 재료, 완성 아이템, 장신구 포함) */
+  inventoryItems: InventoryItem[];
+  availableGold: number;
+  gameTimeMs: number;
 }
 
 interface BuildParams {
@@ -21,6 +30,8 @@ interface BuildParams {
   patch: string;
   purchasedItemIds: Set<number>;
   championNames?: Record<string, string>;
+  availableGold: number;
+  gameTimeMs: number;
 }
 
 // Live API 는 MIDDLE/UTILITY, 백엔드는 MID/SUPPORT 를 쓴다.
@@ -84,6 +95,20 @@ export function extractItemIds(player: LivePlayer, componentItemIds: Set<number>
     .map((item) => item.itemID);
 }
 
+/**
+ * 인벤토리를 백엔드 형식으로 바꾼다. 같은 아이템이 여러 칸에 있으면 수량으로 합친다.
+ * 같은 itemId 가 두 번 나가면 백엔드가 400 을 돌려준다.
+ */
+export function toInventory(player: LivePlayer): InventoryItem[] {
+  const quantities = new Map<number, number>();
+  for (const { itemID, count } of player.items) {
+    quantities.set(itemID, (quantities.get(itemID) ?? 0) + Math.max(1, count));
+  }
+  return [...quantities.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([itemId, quantity]) => ({ itemId, quantity }));
+}
+
 // '15.19.700.1234' -> '15.19'
 function toPatchVersion(gameVersion: string) {
   return gameVersion.split('.').slice(0, 2).join('.');
@@ -101,6 +126,8 @@ export function buildRecommendationBody({
   patch,
   championNames,
   purchasedItemIds,
+  availableGold,
+  gameTimeMs,
 }: BuildParams): RecommendationBody | null {
   const me = players.find((player) => isMe(player, myRiotId));
   if (!me) return null;
@@ -116,5 +143,9 @@ export function buildRecommendationBody({
     tier: 'PLATINUM',
     patch: toPatchVersion(patch),
     riotId: myRiotId,
+    inventoryItems: toInventory(me),
+    // 백엔드는 0 이상의 정수만 받는다. Live API 골드는 소수점까지 온다.
+    availableGold: Math.max(0, Math.floor(availableGold)),
+    gameTimeMs: Math.max(0, Math.round(gameTimeMs)),
   };
 }
