@@ -44,6 +44,10 @@ const KO = {
     coreTitle: (n: number) => `${n}코어 추천`,
     calculating: '추천을 계산하는 중이에요',
     waiting: '게임에 들어가면 추천이 시작돼요',
+    gold: '보유 골드',
+    nowBuy: '지금 살 것',
+    shortage: (gold: string) => `${gold} 부족`,
+    situational: '상대 조합 대응',
   },
   empty: {
     disconnected: '롤 클라이언트를 실행해 주세요',
@@ -91,6 +95,13 @@ const KO = {
     csTotal: (n: number) => `총 ${n}개`,
     perMinute: (value: string) => `분당 ${value}`,
     topDamage: '최다 딜',
+    dfRankTab: 'DF 순위',
+  },
+  df: {
+    cardLabel: '이번 판 DF 스코어',
+    meta: (score: string, total: number) => `${score}점 · ${total}명 중`,
+    rank: (n: number) => `${n}등`,
+    rankSuffix: (_n: number) => '등',
   },
   highlight: {
     title: '하이라이트',
@@ -143,6 +154,10 @@ const EN: typeof KO = {
     coreTitle: (n) => `Core item ${n}`,
     calculating: 'Calculating recommendations',
     waiting: 'Recommendations start when the game begins',
+    gold: 'Your gold',
+    nowBuy: 'Buy now',
+    shortage: (gold) => `${gold} short`,
+    situational: 'Vs. enemy comp',
   },
   empty: {
     disconnected: 'Please launch the League client',
@@ -190,6 +205,17 @@ const EN: typeof KO = {
     csTotal: (n) => `${n} total`,
     perMinute: (value) => `${value} / min`,
     topDamage: 'Top dmg',
+    dfRankTab: 'DF rank',
+  },
+  df: {
+    cardLabel: 'DF score this game',
+    meta: (score, total) => `${score} pts · of ${total}`,
+    rank: (n) => `#${n}`,
+    rankSuffix: (n) => {
+      const tens = n % 100;
+      if (tens >= 11 && tens <= 13) return 'th';
+      return ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th';
+    },
   },
   highlight: {
     title: 'Highlights',

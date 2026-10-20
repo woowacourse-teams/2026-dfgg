@@ -78,7 +78,7 @@ function SituationalRow({ item, gold }: { item: SituationalItem; gold: number | 
       <span className={`cost ${item.affordable ? '' : 'cost-short'}`}>
         {item.affordable || shortage === null || shortage <= 0
           ? formatGold(item.additionalCost)
-          : `${formatGold(shortage)} 부족`}
+          : t.overlay.shortage(formatGold(shortage))}
       </span>
     </li>
   );
@@ -159,7 +159,7 @@ function Pick({ item, rank }: { item: RecommendedItem; rank: number }) {
         {/* 이 코어를 향해 지금 상점에서 살 것 */}
         {item.purchaseBundle && (
           <span className='now-buy'>
-            <span className='now-buy-label'>지금 살 것</span>
+            <span className='now-buy-label'>{t.overlay.nowBuy}</span>
             <Bundle item={item} size='large' />
           </span>
         )}
@@ -313,7 +313,7 @@ function App() {
         </span>
         {purchasedCount !== null && <BuildProgress purchased={purchasedCount} />}
         {availableGold !== null && (
-          <span className='bar-gold' title='보유 골드'>
+          <span className='bar-gold' title={t.overlay.gold}>
             {formatGold(availableGold)}
           </span>
         )}
@@ -339,8 +339,8 @@ function App() {
           </ol>
 
           {situational.length > 0 && (
-            <section className='situ-section' aria-label='상대 조합 대응'>
-              <h3>상대 조합 대응</h3>
+            <section className='situ-section' aria-label={t.overlay.situational}>
+              <h3>{t.overlay.situational}</h3>
               <ul>
                 {situational.map((item) => (
                   <SituationalRow key={item.id} item={item} gold={availableGold} />

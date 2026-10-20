@@ -29,9 +29,9 @@ const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 type BoardView = 'damage' | 'items' | 'rank';
 
 const BOARD_VIEWS: { key: BoardView; label: string }[] = [
-  { key: 'damage', label: '피해량' },
-  { key: 'items', label: '아이템' },
-  { key: 'rank', label: 'DF 순위' },
+  { key: 'damage', label: t.match.damage },
+  { key: 'items', label: t.match.items },
+  { key: 'rank', label: t.match.dfRankTab },
 ];
 
 const sum = (members: MatchParticipant[], pick: (stats: MatchStats) => number) =>
@@ -115,7 +115,7 @@ function MyPlay({
         <div className={`my-df df-tone-${rankTone(dfScore.rank)}`}>
           <strong>
             {dfScore.rank}
-            <small>등</small>
+            <small>{t.df.rankSuffix(dfScore.rank)}</small>
           </strong>
           <span>DF {dfScore.score.toFixed(1)}</span>
         </div>
