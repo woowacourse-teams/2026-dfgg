@@ -40,6 +40,8 @@ export type LcuParticipant = {
   spell1Id: number;
   spell2Id: number;
   stats: LcuParticipantStats;
+  /** 라인 정보. 상세(/games/{gameId}) 응답에만 있고, 칼바람 같은 모드에선 'NONE' 이다. */
+  timeline?: { lane?: string; role?: string };
 };
 
 export type LcuParticipantStats = {
@@ -67,6 +69,9 @@ export type LcuParticipantStats = {
   item5: number;
   /** 장신구 */
   item6: number;
+  /** DF 스코어 계산에 쓴다. 응답에 빠져 오는 경우를 대비해 없을 수 있다고 둔다. */
+  damageDealtToObjectives?: number;
+  damageDealtToTurrets?: number;
 };
 
 export type LcuParticipantIdentity = {

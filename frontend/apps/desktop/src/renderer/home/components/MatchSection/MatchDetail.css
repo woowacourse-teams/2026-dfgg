@@ -544,3 +544,139 @@
     transition: none;
   }
 }
+
+/* ---------- DF 순위 ---------- */
+/* 등수 딱지. 1등 금색, 2·3등 레드, 나머지는 옅은 회색 */
+.df-badge {
+  min-width: 18px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--tone);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  color: var(--tone-ink);
+  transform: skewX(-12deg);
+}
+
+.df-badge.df-tone-plain {
+  background: rgb(255 255 255 / 10%);
+  color: var(--ink-2);
+}
+
+/* 그림 위쪽 모서리. 아래쪽 '최다 딜' 띠와 겹치지 않는다 */
+.fighter-df {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  min-width: 15px;
+  font-size: 10px;
+  line-height: 15px;
+}
+
+/* 그림 위에서는 반투명이면 안 읽혀서 막힌 바탕을 깐다 */
+.fighter-df.df-tone-plain {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+.fighter-right .fighter-df {
+  right: -4px;
+  left: auto;
+}
+
+/* 내 플레이 맨 앞에 내 등수 */
+.my-df {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  width: 56px;
+  padding-right: 10px;
+  border-right: 1px solid var(--line);
+}
+
+.my-df strong {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--tone);
+}
+
+.my-df small {
+  font-size: 13px;
+}
+
+.my-df span {
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 왼쪽 띠: 우리 팀은 레드, 상대 팀은 옅은 흰색 */
+.ranking-row {
+  --team-ring: rgb(255 255 255 / 16%);
+
+  display: grid;
+  grid-template-columns: 22px 30px minmax(0, 1fr) 120px 36px;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 10px 0 8px;
+  border-radius: 10px;
+  box-shadow: inset 3px 0 0 var(--team-ring);
+}
+
+.ranking-mine {
+  --team-ring: rgb(230 57 80 / 55%);
+}
+
+.ranking-me {
+  background: rgb(255 255 255 / 7%);
+}
+
+.ranking-row .df-badge {
+  justify-self: center;
+}
+
+.ranking-row img {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.ranking-name {
+  overflow: hidden;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-me .ranking-name {
+  font-weight: 700;
+}
+
+.ranking-bar {
+  display: flex;
+}
+
+.ranking-row:not(.ranking-mine) .hatch {
+  --hatch-color: #b4b9c4;
+}
+
+.ranking-score {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}

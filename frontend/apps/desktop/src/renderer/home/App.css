@@ -59,3 +59,19 @@
     animation: none;
   }
 }
+
+/* DF 등수 색. 1등 금색, 2·3등 브랜드 레드, 나머지는 무채색. 방금 판 카드와 전적 상세가 같이 쓴다 */
+.df-tone-gold {
+  --tone: var(--gold);
+  --tone-ink: #1a1305;
+}
+
+.df-tone-top {
+  --tone: var(--accent);
+  --tone-ink: #fff;
+}
+
+.df-tone-plain {
+  --tone: var(--ink);
+  --tone-ink: var(--ground);
+}

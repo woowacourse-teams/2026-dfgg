@@ -1,0 +1,910 @@
+/* ---------- 시안 페이지 틀 ---------- */
+.pp-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 32px 80px;
+}
+
+.pp-page-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pp-page-head img {
+  width: 32px;
+  height: 32px;
+}
+
+.pp-page-head h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.pp-page-head p {
+  margin: 2px 0 0;
+  color: var(--ink-2);
+}
+
+.pp-page-head nav {
+  display: flex;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.pp-page-head a {
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.pp-page-head a:hover {
+  color: var(--ink);
+}
+
+.pp-section {
+  padding-top: 40px;
+}
+
+.pp-section-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.pp-section-head p {
+  max-width: 780px;
+  margin: 6px 0 20px;
+  color: var(--ink-2);
+}
+
+.pp-variants {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 28px;
+}
+
+.pp-variant h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pp-variant h3 b {
+  margin-right: 4px;
+  color: var(--accent);
+}
+
+.pp-points {
+  max-width: 448px;
+  margin: 0 0 12px;
+  padding-left: 16px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+/* 시안 하나가 들어가는 판. 실제 창 바탕색 위에 그린다. */
+.pp-frame {
+  flex: none;
+  padding: 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 14px;
+  background: var(--ground);
+  box-sizing: content-box;
+}
+
+/* ---------- 공통 ---------- */
+.pp-label {
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.pp-cost {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: none;
+  white-space: nowrap;
+}
+
+.pp-cost-short {
+  background: rgb(255 255 255 / 7%);
+  color: var(--ink-3);
+}
+
+.pp-medal-gold {
+  --medal: var(--gold);
+  --medal-ink: #1a1305;
+}
+
+.pp-medal-silver {
+  --medal: #e9ecf2;
+  --medal-ink: #0a0b0d;
+}
+
+.pp-medal-plain {
+  --medal: var(--surface-3);
+  --medal-ink: var(--ink-2);
+}
+
+/* ---------- 오버레이 ---------- */
+/* 시안에서는 마우스를 올린 상태(진한 바탕)로 고정해 읽기 쉽게 둔다 */
+.pp-overlay {
+  --glass: 92%;
+}
+
+.pp-gold {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.pp-gold + .bar-button {
+  margin-left: 0;
+}
+
+.pp-best {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.pp-best-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.pp-now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 28%);
+}
+
+.pp-now-label {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.pp-bundle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pp-bundle-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pp-bundle-step i {
+  font-style: normal;
+  color: var(--ink-3);
+}
+
+.pp-bundle-step b {
+  font-size: 10px;
+  color: var(--ink-2);
+}
+
+.pp-bundle img {
+  border-radius: 5px;
+  outline: 1px solid rgb(255 255 255 / 14%);
+  outline-offset: -1px;
+}
+
+.pp-bundle-large img {
+  width: 22px;
+  height: 22px;
+}
+
+.pp-bundle-small {
+  margin-top: 2px;
+}
+
+.pp-bundle-small img {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+}
+
+.pp-bundle .pp-cost {
+  margin-left: auto;
+}
+
+.pp-bundle-small .pp-cost {
+  margin-left: 4px;
+  font-size: 10px;
+}
+
+.pp-bundle-none {
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+.pp-situ-section {
+  padding: 4px 6px 8px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+
+.pp-situ-section h3 {
+  margin: 4px 4px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.pp-situ-section ul,
+.pp-situ-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-situ-list {
+  padding: 0 6px 6px;
+}
+
+.pp-situ {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 9px;
+  border: 1px solid rgb(230 57 80 / 22%);
+  background: rgb(230 57 80 / 7%);
+}
+
+.pp-situ-locked {
+  border-color: rgb(255 255 255 / 6%);
+  background: transparent;
+  opacity: 0.6;
+}
+
+.pp-situ-art {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+
+/* B안 */
+.pp-shop {
+  margin: 0 6px 6px;
+  padding: 10px;
+  border: 1px solid rgb(230 57 80 / 38%);
+  border-radius: 10px;
+  background: linear-gradient(120deg, rgb(230 57 80 / 26%), rgb(230 57 80 / 6%) 62%);
+}
+
+.pp-shop-steps {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-shop-steps li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.pp-shop-art {
+  position: relative;
+}
+
+.pp-shop-art img {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  outline: 1px solid rgb(255 255 255 / 22%);
+  outline-offset: -1px;
+}
+
+.pp-shop-art b {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  min-width: 15px;
+  border-radius: 2px;
+  background: var(--accent);
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+  text-shadow: none;
+  transform: skewX(-12deg);
+}
+
+.pp-shop-name {
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pp-shop-total {
+  margin-left: auto;
+  align-items: flex-end !important;
+}
+
+.pp-shop-total span {
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+
+.pp-shop-total strong {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.pp-shop-goal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid rgb(255 255 255 / 10%);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.pp-shop-goal img {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+
+.pp-shop-goal b {
+  color: var(--ink);
+}
+
+.pp-next-label {
+  padding: 2px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+.pp-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0 6px 6px;
+  list-style: none;
+}
+
+.pp-alerts li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgb(230 57 80 / 12%);
+  font-size: 11px;
+}
+
+.pp-alerts li > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-alerts b {
+  color: var(--accent);
+}
+
+.pp-alert-locked {
+  opacity: 0.55;
+}
+
+/* C안 */
+.pp-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 6px 6px;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 6%);
+}
+
+.pp-tabs button {
+  flex: 1;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  text-shadow: none;
+}
+
+.pp-tabs button[aria-selected='true'] {
+  background: var(--surface-3);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pp-tabs b {
+  margin-left: 2px;
+  color: var(--accent);
+}
+
+.pp-fold {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+}
+
+.pp-fold-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 5px 8px 5px 5px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pp-fold-best {
+  border: 1px solid rgb(230 57 80 / 38%);
+  background: linear-gradient(120deg, rgb(230 57 80 / 22%), rgb(230 57 80 / 4%) 62%);
+}
+
+.pp-fold-best .pick-rank {
+  background: var(--accent);
+  color: #fff;
+}
+
+.pp-fold-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 8px 8px 44px;
+}
+
+/* ---------- 방금 끝난 판 ---------- */
+.pp-postgame .section-head {
+  margin-top: 0;
+}
+
+.pp-video {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  aspect-ratio: 16 / 9;
+  margin-top: 10px;
+  border-radius: 12px;
+  background: repeating-linear-gradient(135deg, var(--surface) 0 12px, var(--surface-2) 12px 24px);
+  color: var(--ink-3);
+}
+
+.pp-video span {
+  font-size: 26px;
+}
+
+/* A안 */
+.pp-rank-a {
+  display: grid;
+  grid-template-columns: auto 1fr 120px;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-top-color: var(--line-strong);
+  border-radius: 14px;
+  background:
+    radial-gradient(90% 120% at 0% 100%, rgb(230 57 80 / 24%), transparent 70%),
+    linear-gradient(180deg, var(--surface-2), var(--surface));
+}
+
+.pp-rank-a-number {
+  display: flex;
+  align-items: baseline;
+  margin: 0;
+  font-size: 54px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.pp-rank-a-number small {
+  margin-left: 2px;
+  font-size: 20px;
+  letter-spacing: 0;
+}
+
+.pp-rank-a-number span {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink-3);
+}
+
+.pp-rank-a-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pp-rank-a-body strong {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.pp-rank-a-body small {
+  margin-left: 2px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.pp-rank-a-note {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.pp-rank-a-note b {
+  color: var(--accent);
+}
+
+.pp-rank-a-gauge {
+  display: flex;
+}
+
+/* B안 */
+.pp-rank-b {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+}
+
+.pp-rank-b-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.pp-rank-b-head b {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.pp-rank-b-score {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pp-rank-b-line {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-rank-b-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+.pp-rank-b-player img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  outline: 2px solid var(--team-ring);
+  outline-offset: 1px;
+}
+
+.pp-team-mine {
+  --team-ring: rgb(230 57 80 / 55%);
+}
+
+.pp-team-theirs {
+  --team-ring: rgb(255 255 255 / 16%);
+}
+
+.pp-rank-b-player.pp-me img {
+  width: 40px;
+  height: 40px;
+  outline: 2.5px solid var(--accent);
+  box-shadow: 0 0 14px rgb(230 57 80 / 60%);
+}
+
+.pp-rank-b-player.pp-me span {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.pp-rank-b-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.pp-dot {
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 50%;
+}
+
+.pp-dot-mine {
+  margin-left: 0;
+  background: rgb(230 57 80 / 70%);
+}
+
+.pp-dot-theirs {
+  background: rgb(255 255 255 / 30%);
+}
+
+/* C안 */
+.pp-rank-c {
+  display: flex;
+  min-height: 116px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--medal) 40%, transparent);
+  border-radius: 14px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--medal) 14%, transparent), transparent 60%),
+    var(--surface);
+}
+
+.pp-rank-c.pp-medal-plain {
+  --medal: var(--accent);
+}
+
+.pp-rank-c.pp-medal-silver {
+  --medal: var(--accent);
+}
+
+.pp-rank-c-art {
+  flex: none;
+  width: 132px;
+  object-fit: cover;
+  object-position: 50% 22%;
+  clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%);
+}
+
+.pp-rank-c-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px 16px 14px 8px;
+}
+
+.pp-rank-c-title {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--medal);
+}
+
+.pp-rank-c-meta {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.pp-rank-c-ladder {
+  display: flex;
+  gap: 3px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-rank-c-ladder li {
+  width: 12px;
+  height: 7px;
+  background: rgb(255 255 255 / 12%);
+  transform: skewX(-25deg);
+}
+
+.pp-rank-c-ladder .pp-here {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgb(230 57 80 / 80%);
+}
+
+/* ---------- 전적 상세 ---------- */
+.pp-frame .detail {
+  margin: -16px;
+  padding: 18px 14px 16px;
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.pp-my-play {
+  gap: 12px;
+}
+
+.pp-my-rank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+  width: 56px;
+  padding-right: 10px;
+  border-right: 1px solid var(--line);
+}
+
+.pp-my-rank strong {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.pp-my-rank small {
+  font-size: 13px;
+}
+
+.pp-my-rank span {
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* A안: 그림 모서리 딱지 */
+.pp-rank-tag {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  min-width: 15px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--medal);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+  color: var(--medal-ink);
+  transform: skewX(-12deg);
+}
+
+.fighter-right .pp-rank-tag {
+  right: -4px;
+  left: auto;
+}
+
+/* B안: 이름 옆 점수 */
+.pp-name-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.fighter-right .pp-name-line {
+  flex-direction: row-reverse;
+}
+
+.pp-score-pill {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--medal) 22%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  color: var(--medal);
+}
+
+.pp-score-pill.pp-medal-plain {
+  background: rgb(255 255 255 / 7%);
+  color: var(--ink-2);
+}
+
+/* C안: 등수 목록 */
+.pp-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-ranking-row {
+  display: grid;
+  grid-template-columns: 22px 30px minmax(0, 1fr) 120px 36px;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 10px 0 8px;
+  border-radius: 10px;
+  box-shadow: inset 3px 0 0 var(--team-ring);
+}
+
+.pp-ranking-row.pp-me {
+  background: rgb(255 255 255 / 7%);
+}
+
+.pp-ranking-no {
+  justify-self: center;
+  min-width: 18px;
+  border-radius: 3px;
+  background: var(--medal);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  color: var(--medal-ink);
+  transform: skewX(-12deg);
+}
+
+.pp-ranking-row img {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.pp-ranking-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+.pp-ranking-row.pp-me .pp-ranking-name {
+  font-weight: 700;
+}
+
+.pp-ranking-bar {
+  display: flex;
+}
+
+.pp-ranking-row.pp-team-theirs .hatch {
+  --hatch-color: #b4b9c4;
+}
+
+.pp-ranking-score {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}

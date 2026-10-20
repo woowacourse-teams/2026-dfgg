@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('lcu', {
 
   getMatchDetail: (gameId: number) => ipcRenderer.invoke('lcu:match-detail', gameId),
 
+  getDfScores: (gameId: number) => ipcRenderer.invoke('lcu:df-score', gameId),
+
   onStatusChange: (callback: (status: LcuStatus) => void) => {
     const listener = (_: IpcRendererEvent, status: LcuStatus) => callback(status);
     ipcRenderer.on('lcu:status', listener);

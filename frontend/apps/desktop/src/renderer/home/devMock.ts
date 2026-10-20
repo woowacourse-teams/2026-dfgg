@@ -10,7 +10,9 @@
  *   /home/index.html?status=disconnected&nolaunch=1   클라이언트 실행 실패
  */
 import type {
+  DfScores,
   GameflowPhase,
+  HighlightGame,
   LcuCurrentRankedStats,
   LcuStatus,
   MatchDetail,
@@ -259,6 +261,41 @@ const log =
     console.debug(`[mock] ${name}`, ...args);
 const unsubscribe = () => {};
 
+// ?df=4 처럼 내 DF 순위를 고른다. 나머지는 참가자 순서대로 남은 순위를 채운다.
+const myDfRank = Math.min(10, Math.max(1, Number(params.get('df')) || 1));
+const DF_TOP_SCORE = 92.4;
+const DF_SCORE_STEP = 6.3;
+
+function dfScores(gameId: number): DfScores | null {
+  const detail = matchDetail(gameId);
+  if (!detail || params.has('nodf')) return null;
+  const others = detail.participants
+    .map((player) => player.participantId)
+    .filter((id) => id !== MY_PARTICIPANT_ID);
+  const order = [
+    ...others.slice(0, myDfRank - 1),
+    MY_PARTICIPANT_ID,
+    ...others.slice(myDfRank - 1),
+  ];
+  return Object.fromEntries(
+    order.map((id, index) => [
+      id,
+      { rank: index + 1, score: Math.round((DF_TOP_SCORE - index * DF_SCORE_STEP) * 10) / 10 },
+    ]),
+  );
+}
+
+// ?postgame=1 이면 첫 전적이 방금 끝난 판인 것처럼 하이라이트 완료 알림을 한 번 보낸다.
+const POSTGAME_SESSION_ID = 'mock-postgame';
+const postgame: HighlightGame | null = params.has('postgame')
+  ? {
+      id: POSTGAME_SESSION_ID,
+      gameId: matches[0].gameId,
+      startAt: Date.now(),
+      clips: [{ file: 'mock.mp4', start: 0, end: 12, events: [] }],
+    }
+  : null;
+
 // Electron 안에서는 진짜 preload 가 이미 있으므로 건드리지 않는다.
 if (!window.lcu) {
   window.lcu = {
@@ -286,6 +323,21 @@ if (!window.lcu) {
     },
     onItemsRecommendationChange: () => unsubscribe,
     getEndedGame: async () => null,
+    getDfScores: async (gameId) => dfScores(gameId),
+  };
+  window.highlight = {
+    list: async () => (postgame ? [postgame] : []),
+    summary: async () => ({}),
+    get: async (gameId) => (postgame?.gameId === gameId ? postgame : null),
+    onProgress: (callback) => {
+      const timer = postgame
+        ? setTimeout(
+            () => callback({ id: postgame.id, done: 0, total: 0, finished: true }),
+            PHASE_DELAY_MS,
+          )
+        : undefined;
+      return () => clearTimeout(timer);
+    },
   };
   window.windowControls = {
     setCollapsed: log('windowControls.setCollapsed'),
