@@ -130,12 +130,15 @@ class NextItemRecommendationV4ServiceTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    @ValueSource(strings = {" ", "16.18"})
-    void 패치가_비었으면_운영_패치를_Core와_Component에_동일하게_전달한다(String patch) {
+    @ValueSource(strings = {" ", "16.18", "16.17", "16.18.1", "invalid"})
+    void 요청_패치와_무관하게_운영_패치를_Core와_Component에_동일하게_전달한다(String patch) {
         prepareCore(List.of(coreItem(3133)));
         when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
                 new TargetRecommendation(3133, Status.NO_CANDIDATE, List.of(), null)));
         service.recommendNextItem(request(patch, List.of()), Language.KO_KR);
+        var coreRequest = ArgumentCaptor.forClass(NextItemRecommendationRequest.class);
+        verify(core).recommendNextItem(coreRequest.capture(), eq(Language.KO_KR));
+        assertThat(coreRequest.getValue().patch()).isEqualTo("16.18");
         var captured = ArgumentCaptor.forClass(ComponentRecommendationQuery.class);
         verify(component).recommend(captured.capture(), eq(catalog));
         assertThat(captured.getValue().patch()).isEqualTo("16.18");
@@ -231,14 +234,6 @@ class NextItemRecommendationV4ServiceTest {
             assertThat(item.additionalCost()).isEqualTo(400);
             assertThat(item.affordable()).isTrue();
         });
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"16.17", "16.18.1", "invalid"})
-    void 운영_패치와_다르면_추천을_호출하지_않는다(String patch) {
-        assertThatThrownBy(() -> service.recommendNextItem(request(patch, List.of()), Language.KO_KR))
-                .isInstanceOf(InvalidRecommendationRequestException.class);
-        verifyNoInteractions(core, component, champions, compositions);
     }
 
     @Test

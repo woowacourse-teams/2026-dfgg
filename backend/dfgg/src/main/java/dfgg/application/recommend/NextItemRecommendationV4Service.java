@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 public class NextItemRecommendationV4Service {
+    private static final Logger log = LoggerFactory.getLogger(NextItemRecommendationV4Service.class);
+
     private final NextItemRecommendationService coreRecommendations;
     private final ComponentRecommendationRuntime components;
     private final ChampionService champions;
@@ -96,11 +100,16 @@ public class NextItemRecommendationV4Service {
         return situationalItems.toDtos(recommendations, catalog, enemies, language);
     }
 
+    /**
+     * Component 모델·조회표·카탈로그가 운영 패치 하나에 묶여 있으므로 요청 패치와 무관하게 운영 패치로 추천한다.
+     * 새 패치 출시 직후처럼 클라이언트가 다른 패치를 보내도 거부하지 않고, 차이는 로그로만 남긴다.
+     */
     private String operatingPatch(String requested) {
-        if (requested != null && !requested.isBlank() && !version.version().equals(requested)) {
-            throw new InvalidRecommendationRequestException("현재 운영 패치만 추천할 수 있습니다: " + version.version());
+        String operating = version.version();
+        if (requested != null && !requested.isBlank() && !operating.equals(requested)) {
+            log.warn("v4 요청 패치가 운영 패치와 달라 운영 패치로 추천합니다: requested={}, operating={}", requested, operating);
         }
-        return version.version();
+        return operating;
     }
 
     private ItemInventory inventory(NextItemRecommendationV4Request request, ItemResponse catalog) {
