@@ -6,6 +6,7 @@ import type {
   RankedEntry,
   Tier,
 } from '../../../../shared/types';
+import { t } from '../../../i18n';
 import { StarIcon } from '../../../icons';
 import { championIconUrl, championTileUrl } from '../../lib/ddragon';
 import { formatWhen, queueLabel } from '../../lib/format';
@@ -39,7 +40,7 @@ const tierLabel = (tier: string) => tier.charAt(0) + tier.slice(1).toLowerCase()
 
 function streakText(streak: number) {
   if (Math.abs(streak) < 2) return null;
-  return streak > 0 ? `${streak}연승 중` : `${-streak}연패 중`;
+  return t.streak(streak);
 }
 
 function WinRateTile({ summary }: { summary: RecentSummary }) {
@@ -47,7 +48,7 @@ function WinRateTile({ summary }: { summary: RecentSummary }) {
 
   return (
     <div className='tile tile-rate'>
-      <span className='tile-label'>승률</span>
+      <span className='tile-label'>{t.summary.winRate}</span>
 
       <p className='rate-value'>
         {/* 0 에서 세어 올라간다. 읽는 사람용 값은 aria-label 에 따로 둔다. */}
@@ -58,14 +59,16 @@ function WinRateTile({ summary }: { summary: RecentSummary }) {
         />
         <small>%</small>
       </p>
-      <p className='rate-record'>
-        {summary.wins}승 {summary.losses}패
-      </p>
+      <p className='rate-record'>{t.record(summary.wins, summary.losses)}</p>
 
       {/* 승패 흐름. 최근 판이 왼쪽 위다. 이긴 판은 채운 점, 진 판은 빈 고리. */}
-      <ol className='dots' aria-label='최근 승패, 최근 판부터'>
+      <ol className='dots' aria-label={t.summary.formLabel}>
         {summary.form.map((win, index) => (
-          <li key={index} className={win ? 'dot-win' : 'dot-loss'} aria-label={win ? '승' : '패'} />
+          <li
+            key={index}
+            className={win ? 'dot-win' : 'dot-loss'}
+            aria-label={win ? t.result.winShort : t.result.lossShort}
+          />
         ))}
       </ol>
       {streak && <p className={`streak ${summary.streak > 0 ? 'streak-win' : ''}`}>{streak}</p>}
@@ -77,28 +80,28 @@ function RankTile({ label, entry }: { label: string; entry: RankedEntry | undefi
   const tier = entry?.tier ?? '';
   const played = (entry?.wins ?? 0) + (entry?.losses ?? 0);
 
-  let title = '언랭크';
+  let title = t.summary.unranked;
   let detail: string | null = null;
   if (entry?.isProvisional) {
     const done = entry.provisionalGameThreshold - entry.provisionalGamesRemaining;
-    title = `배치 ${done}/${entry.provisionalGameThreshold}`;
-    detail = `${entry.provisionalGamesRemaining}판 남음`;
+    title = t.summary.placement(done, entry.provisionalGameThreshold);
+    detail = t.summary.gamesLeft(entry.provisionalGamesRemaining);
   } else if (entry?.tier) {
     title = `${tierLabel(entry.tier)}${entry.division === 'NA' ? '' : ` ${entry.division}`}`;
     const winRate = played > 0 ? Math.round((entry.wins / played) * PERCENT) : 0;
-    detail = `${entry.leaguePoints} LP · 승률 ${winRate}%`;
+    detail = t.summary.lpDetail(entry.leaguePoints, winRate);
   }
 
   return (
     <div
       className='tile tile-rank'
       style={{ '--tier': TIER_GLOW[tier] } as React.CSSProperties}
-      title={played > 0 ? `${entry?.wins}승 ${entry?.losses}패` : undefined}
+      title={played > 0 ? t.record(entry?.wins ?? 0, entry?.losses ?? 0) : undefined}
     >
       <span className='tile-label'>{label}</span>
       <span className='rank-title'>
         {title}
-        {entry?.miniSeriesProgress && <em className='rank-series'>승급전</em>}
+        {entry?.miniSeriesProgress && <em className='rank-series'>{t.summary.promo}</em>}
       </span>
       {detail && <span className='rank-detail'>{detail}</span>}
 
@@ -122,10 +125,10 @@ function KdaTile({ summary }: { summary: RecentSummary }) {
 function ChampionsTile({ summary }: { summary: RecentSummary }) {
   return (
     <div className='tile'>
-      <span className='tile-label'>모스트 챔피언</span>
+      <span className='tile-label'>{t.summary.mostChampions}</span>
       <ul className='champions'>
         {summary.champions.map(({ championId, games, winRate }) => (
-          <li key={championId} title={`${games}판`}>
+          <li key={championId} title={t.summary.games(games)}>
             <img src={championIconUrl(championId)} alt='' />
             <span>{winRate}%</span>
           </li>
@@ -147,13 +150,13 @@ function BestTile({ match }: { match: MatchSummary }) {
       <div className='best-body'>
         <span className='best-label'>
           <StarIcon />
-          최고의 한 판
+          {t.summary.best}
         </span>
         <span className='best-kda'>
           {stats.kills} <i>/</i> {stats.deaths} <i>/</i> {stats.assists}
         </span>
         <span className='tile-sub'>
-          평점 <b>{formatRatio(ratio)}</b> · {queueLabel(match)} ·{' '}
+          {t.summary.rating} <b>{formatRatio(ratio)}</b> · {queueLabel(match)} ·{' '}
           {formatWhen(match.gameCreationDate)}
         </span>
       </div>
@@ -182,10 +185,10 @@ function followPointer(event: React.PointerEvent<HTMLElement>) {
 /** 크기가 다른 칸을 짜 맞춘 통계 판. 가장 궁금한 승률이 가장 큰 칸을 쓴다. */
 function Bento({ summary, rankInfo }: Props) {
   return (
-    <section className='bento' aria-label='요약' onPointerMove={followPointer}>
+    <section className='bento' aria-label={t.summary.label} onPointerMove={followPointer}>
       {summary && <WinRateTile summary={summary} />}
-      <RankTile label='솔로랭크' entry={rankInfo?.queueMap.RANKED_SOLO_5x5} />
-      <RankTile label='자유랭크' entry={rankInfo?.queueMap.RANKED_FLEX_SR} />
+      <RankTile label={t.queue.solo} entry={rankInfo?.queueMap.RANKED_SOLO_5x5} />
+      <RankTile label={t.queue.flex} entry={rankInfo?.queueMap.RANKED_FLEX_SR} />
       {summary && (
         <>
           <KdaTile summary={summary} />

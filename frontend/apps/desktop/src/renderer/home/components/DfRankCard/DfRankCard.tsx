@@ -1,6 +1,7 @@
 import './DfRankCard.css';
 
 import type { DfScore } from '../../../../shared/types';
+import { t } from '../../../i18n';
 import { rankTitle } from '../../lib/dfRank';
 
 const TOP_RANKS = 3;
@@ -15,12 +16,12 @@ type Props = {
 function DfRankCard({ score, total }: Props) {
   return (
     <span className='df-card-body'>
-      <span className='df-card-label'>이번 판 DF 스코어</span>
+      <span className='df-card-label'>{t.df.cardLabel}</span>
       <strong className='df-card-title'>{rankTitle(score.rank)}</strong>
       <span className='df-card-meta'>
-        {score.score.toFixed(1)}점 · {total}명 중
+        {t.df.meta(score.score.toFixed(1), total)}
         {/* 4등부터는 제목이 이미 'N등'이라 다시 적지 않는다 */}
-        {score.rank <= TOP_RANKS && ` ${score.rank}등`}
+        {score.rank <= TOP_RANKS && ` ${t.df.rank(score.rank)}`}
       </span>
 
       {/* 1등부터 꼴찌까지 칸을 늘어놓고 내 칸만 칠한다 */}

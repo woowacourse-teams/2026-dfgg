@@ -1,6 +1,7 @@
 import { BrowserWindow, Menu, Tray, app, nativeImage, shell } from 'electron';
 import path from 'node:path';
 import { setQuitSource } from '../analytics/sessionTracker';
+import { mainStrings } from '../locale';
 
 let tray: Tray | null = null;
 
@@ -19,6 +20,9 @@ function noticePath() {
 
 // 트레이 설정하기
 export function setTray(home: BrowserWindow) {
+  // app ready 이후에 불리므로 여기서 언어를 정한다.
+  const t = mainStrings();
+
   const iconPath = resolveTrayIconPath();
   const trayIcon = nativeImage.createFromPath(iconPath);
 
@@ -30,13 +34,13 @@ export function setTray(home: BrowserWindow) {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: '열기',
+      label: t.tray.open,
       click: () => home.show(),
     },
-    { label: '오픈소스 라이선스', click: () => void shell.openPath(noticePath()) },
+    { label: t.tray.licenses, click: () => void shell.openPath(noticePath()) },
     { type: 'separator' },
     {
-      label: '종료',
+      label: t.tray.quit,
       click: () => {
         setQuitSource('tray');
         app.quit();

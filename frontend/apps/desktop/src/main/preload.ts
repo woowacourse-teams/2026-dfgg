@@ -10,6 +10,13 @@ import {
   Summoner,
 } from '../shared/types';
 
+// main 이 additionalArguments 로 넘긴 언어. 샌드박스 preload 라 다른 파일을 불러올 수 없어 값만 꺼낸다.
+const LOCALE_ARG = '--dfgg-locale=';
+contextBridge.exposeInMainWorld(
+  'appLocale',
+  process.argv.find((arg) => arg.startsWith(LOCALE_ARG))?.slice(LOCALE_ARG.length) ?? null,
+);
+
 contextBridge.exposeInMainWorld('lcu', {
   currentSummoner: () => ipcRenderer.invoke('lcu:current-summoner'),
 

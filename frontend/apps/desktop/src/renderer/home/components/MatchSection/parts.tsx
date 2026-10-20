@@ -1,4 +1,5 @@
 import type { MatchStats } from '../../../../shared/types';
+import { t } from '../../../i18n';
 import { itemIconUrl } from '../../lib/ddragon';
 import { formatRatio, kdaGrade, kdaValue } from '../../lib/kda';
 
@@ -31,7 +32,7 @@ export function RatioChip({ stats }: { stats: MatchStats }) {
 
   return (
     <span className={`chip chip-ratio ${kdaGrade(ratio)}`}>
-      평점 <b>{formatRatio(ratio)}</b>
+      {t.summary.rating} <b>{formatRatio(ratio)}</b>
     </span>
   );
 }

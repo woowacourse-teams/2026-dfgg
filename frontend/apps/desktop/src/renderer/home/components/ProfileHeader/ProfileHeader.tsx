@@ -1,6 +1,7 @@
 import './ProfileHeader.css';
 
 import type { Summoner } from '../../../../shared/types';
+import { t } from '../../../i18n';
 import { CloseIcon, MinimizeIcon } from '../../../icons';
 
 const profileIconUrl = (id: number) =>
@@ -29,7 +30,7 @@ function ProfileHeader({ summoner, backdropUrl }: Props) {
           <button
             type='button'
             className='title-bar-button'
-            aria-label='최소화'
+            aria-label={t.common.minimize}
             onClick={() => window.windowControls.minimize()}
           >
             <MinimizeIcon />
@@ -37,7 +38,7 @@ function ProfileHeader({ summoner, backdropUrl }: Props) {
           <button
             type='button'
             className='title-bar-button title-bar-close'
-            aria-label='닫기'
+            aria-label={t.common.close}
             onClick={() => window.windowControls.close()}
           >
             <CloseIcon />
@@ -66,7 +67,7 @@ function ProfileHeader({ summoner, backdropUrl }: Props) {
               aria-valuenow={summoner.percentCompleteForNextLevel}
               aria-valuemin={0}
               aria-valuemax={PERCENT}
-              aria-label='다음 레벨까지 경험치'
+              aria-label={t.profile.expLabel}
               title={`${summoner.xpSinceLastLevel} / ${summoner.xpUntilNextLevel} XP`}
             >
               {/* 경험치는 프로필 둘레 고리로 보여 준다 */}
