@@ -22,7 +22,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     open-in-view: false
 
 riot:
@@ -33,6 +33,13 @@ riot:
     regional-base-url: "${RIOT_REGIONAL_BASE_URL:https://asia.api.riotgames.com}"
     requests-per-second: "${RIOT_RATE_LIMIT_REQUESTS_PER_SECOND:18}"
     requests-per-two-minutes: "${RIOT_RATE_LIMIT_REQUESTS_PER_2_MINUTES:95}"
+
+gemini:
+  # 키나 모델이 비어 있어도 기동한다. 픽 추천은 호출 시점에 폴백으로 넘어간다.
+  api-key: "${GEMINI_API_KEY:}"
+  model: "${GEMINI_MODEL:}"
+  base-url: "${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}"
+  timeout: "${GEMINI_TIMEOUT:5s}"
 
 mining:
   batch:
