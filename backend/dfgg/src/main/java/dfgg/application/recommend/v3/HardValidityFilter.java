@@ -4,7 +4,6 @@ import dfgg.domain.item.Item;
 import dfgg.domain.item.ItemExclusionGroups;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 
@@ -33,13 +32,9 @@ public class HardValidityFilter {
             Map<Long, Item> itemById
     ) {
         Set<Long> purchased = Set.copyOf(purchasedItemIds);
-        List<Item> ownedItems = purchasedItemIds.stream()
-                .map(itemById::get)
-                .filter(Objects::nonNull)
-                .toList();
 
         List<ItemCandidate> valid = union.candidates().stream()
-                .filter(candidate -> isPurchasable(candidate, purchased, ownedItems, itemById))
+                .filter(candidate -> isPurchasable(candidate, purchased, itemById))
                 .toList();
         return new CandidateUnion(valid);
     }
@@ -47,7 +42,6 @@ public class HardValidityFilter {
     private boolean isPurchasable(
             ItemCandidate candidate,
             Set<Long> purchasedItemIds,
-            List<Item> ownedItems,
             Map<Long, Item> itemById
     ) {
         Item item = itemById.get(candidate.itemId());
@@ -57,6 +51,14 @@ public class HardValidityFilter {
         if (purchasedItemIds.contains(candidate.itemId())) {
             return false;
         }
-        return ownedItems.stream().noneMatch(owned -> exclusionGroups.isExclusiveWith(owned, item));
+        return purchasedItemIds.stream().noneMatch(ownedItemId -> isExclusive(ownedItemId, item, itemById));
+    }
+
+    private boolean isExclusive(Long ownedItemId, Item candidate, Map<Long, Item> itemById) {
+        Item owned = itemById.get(ownedItemId);
+        if (owned == null) {
+            return exclusionGroups.isExclusiveWith(ownedItemId, candidate);
+        }
+        return exclusionGroups.isExclusiveWith(owned, candidate);
     }
 }

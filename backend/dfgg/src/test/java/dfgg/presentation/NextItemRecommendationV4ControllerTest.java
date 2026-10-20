@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -142,12 +143,12 @@ class NextItemRecommendationV4ControllerTest {
     }
 
     @Test
-    void 운영_패치_불일치는_400이다() throws Exception {
+    void 운영_패치와_다른_요청도_운영_패치로_추천한다() throws Exception {
         mvc.perform(post(ENDPOINT).contentType(MediaType.APPLICATION_JSON)
                         .content(body().replace("\"patch\":null", "\"patch\":\"99.0\"")))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail", containsString("현재 운영 패치")));
-        verifyNoInteractions(core, runtime, champions, compositions);
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendedItems.length()").value(2));
+        verify(core).recommendNextItem(argThat(request -> "99.1".equals(request.patch())), any());
     }
 
     @Test

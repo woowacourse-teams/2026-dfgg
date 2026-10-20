@@ -97,6 +97,23 @@ class HardValidityFilterTest {
     }
 
     @Test
+    @DisplayName("메타데이터가 없는 보유 아이템도 ID로 배타 관계를 확인한다 — 무라마나를 들고 있으면 마나무네를 못 산다")
+    void filter_WhenOwnedItemMetadataMissing_StillRemovesExclusiveCandidate() {
+        // given: 무라마나는 직접 살 수 없는 변신 아이템이라 itemById에 없다
+        long muramana = 3042L;
+        long manamune = 3004L;
+        Map<Long, Item> items = new java.util.HashMap<>(itemById);
+        items.put(manamune, new Item(manamune, Map.of("ko-KR", "마나무네"), List.of("Damage", "Mana")));
+        CandidateUnion union = unionOf(manamune, INFINITY_EDGE);
+
+        // when
+        CandidateUnion filtered = filter.filter(union, List.of(muramana), items);
+
+        // then
+        assertThat(itemIdsOf(filtered)).containsExactly(INFINITY_EDGE);
+    }
+
+    @Test
     @DisplayName("배타 관계가 아니면 남긴다")
     void filter_WhenCandidateIsNotExclusiveWithOwnedItem_KeepsIt() {
         // given

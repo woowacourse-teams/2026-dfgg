@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.match.ComponentTrainingDataService;
 import dfgg.application.recommend.MultiBuildRecommendationService;
 import dfgg.application.recommend.NextItemRecommendationService;
+import dfgg.application.recommend.NextItemRecommendationV4Service;
 import dfgg.application.recommend.RecommendationService;
 import dfgg.application.recommend.component.ComponentCandidateFeatures;
 import dfgg.application.recommend.component.ComponentRecommendationQuery;
@@ -76,7 +77,8 @@ class ComponentRuntimeConfigurationTest {
                 .withBean(LeagueOfLegendsVersionProperties.class, () -> new LeagueOfLegendsVersionProperties("16.18"))
                 .withBean(NextItemRecommendationService.class, () -> core)
                 .withBean(RecommendationService.class, () -> mock(RecommendationService.class))
-                .withBean(MultiBuildRecommendationService.class, () -> mock(MultiBuildRecommendationService.class));
+                .withBean(MultiBuildRecommendationService.class, () -> mock(MultiBuildRecommendationService.class))
+                .withBean(NextItemRecommendationV4Service.class, () -> mock(NextItemRecommendationV4Service.class));
     }
 
     @Test
