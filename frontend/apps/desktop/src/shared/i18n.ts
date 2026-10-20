@@ -101,7 +101,7 @@ const KO = {
     cardLabel: '이번 판 DF 스코어',
     meta: (score: string, total: number) => `${score}점 · ${total}명 중`,
     rank: (n: number) => `${n}등`,
-    rankSuffix: (_n: number) => '등',
+    rankSuffix: (() => '등') as (n: number) => string,
   },
   highlight: {
     title: '하이라이트',
