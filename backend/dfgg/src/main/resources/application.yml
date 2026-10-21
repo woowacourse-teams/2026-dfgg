@@ -38,14 +38,6 @@ counter:
   # 적마다 보여줄 카운터 수. 데이터는 (적, 라인)마다 7개까지라 픽·밴으로 빠져도 채울 여유가 있다.
   picks-per-enemy: "${COUNTER_PICKS_PER_ENEMY:5}"
 
-gemini:
-  # 키가 비어 있어도 기동한다. 카운터 이유는 호출 시점에 null로 응답한다.
-  api-key: "${GEMINI_API_KEY:}"
-  model: "${GEMINI_MODEL:gemini-3.5-flash}"
-  base-url: "${GEMINI_BASE_URL:https://aiplatform.googleapis.com}"
-  timeout: "${GEMINI_TIMEOUT:8s}"
-  thinking-level: "${GEMINI_THINKING_LEVEL:minimal}"
-
 mining:
   batch:
     match-page-size: "${MINING_BATCH_MATCH_PAGE_SIZE:200}"
