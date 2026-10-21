@@ -1,6 +1,7 @@
 package dfgg.application.counter;
 
-import dfgg.domain.champion.Champion;
+import dfgg.common.exception.ChampionNotFoundException;
+import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.counter.ChampionCounter;
@@ -54,6 +55,7 @@ public class CounterService {
 
     @Transactional(readOnly = true)
     public CounterResponse recommend(CounterRequest request, Language language) {
+        validateChampions(request);
         Optional<PatchVersion> patch = PatchVersion.latest(positionStatsRepository.findDistinctPatches());
         Map<Integer, Map<ChampionPosition, Integer>> gamesByEnemy = gamesByEnemy(patch, request.enemies());
         Map<Integer, List<Integer>> countersByEnemy = countersByEnemy(request);
@@ -67,6 +69,30 @@ public class CounterService {
                         countersOf(countersByEnemy.get(enemyId), names)))
                 .toList();
         return new CounterResponse(patch.map(PatchVersion::value).orElse(null), request.myPosition(), enemies);
+    }
+
+    /** 같은 챔피언이 아군·적·밴에 두 번 나오거나, 등록되지 않은 챔피언이 있으면 거부한다. */
+    private void validateChampions(CounterRequest request) {
+        List<Integer> requested = Stream.of(request.enemies(), request.allies(), request.bans())
+                .flatMap(Collection::stream)
+                .toList();
+        Set<Integer> distinct = new HashSet<>(requested);
+        if (distinct.size() != requested.size()) {
+            throw new InvalidRecommendationRequestException("같은 챔피언이 아군·적·밴에 두 번 이상 있습니다: " + duplicatesOf(requested));
+        }
+        Set<Integer> known = championRepository.findAllById(distinct.stream().map(Integer::longValue).toList())
+                .stream()
+                .map(champion -> champion.getChampionId().intValue())
+                .collect(Collectors.toSet());
+        List<Integer> unknown = requested.stream().filter(championId -> !known.contains(championId)).toList();
+        if (!unknown.isEmpty()) {
+            throw new ChampionNotFoundException(unknown.toString());
+        }
+    }
+
+    private List<Integer> duplicatesOf(List<Integer> championIds) {
+        Set<Integer> seen = new HashSet<>();
+        return championIds.stream().filter(championId -> !seen.add(championId)).distinct().toList();
     }
 
     private Map<Integer, Map<ChampionPosition, Integer>> gamesByEnemy(

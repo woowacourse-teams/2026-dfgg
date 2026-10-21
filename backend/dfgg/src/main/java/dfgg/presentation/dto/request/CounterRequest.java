@@ -1,16 +1,18 @@
 package dfgg.presentation.dto.request;
 
 import dfgg.domain.champion.ChampionPosition;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 
 /**
- * 상대 픽 분석 요청. {@code allies}·{@code bans}는 생략할 수 있다.
+ * 상대 픽 분석 요청. 목록은 모두 생략할 수 있고, 상대 픽이 없어도(블루 1픽) 거부하지 않는다. 아군은 나를 뺀 최대 4명이다.
  */
 public record CounterRequest(
-        ChampionPosition myPosition,
-        List<Integer> enemies,
-        List<Integer> allies,
-        List<Integer> bans
+        @NotNull ChampionPosition myPosition,
+        @Size(max = 5) List<@NotNull Integer> enemies,
+        @Size(max = 4) List<@NotNull Integer> allies,
+        @Size(max = 10) List<@NotNull Integer> bans
 ) {
 
     public CounterRequest {
