@@ -7,6 +7,8 @@ import dfgg.application.match.PurchaseNormalizationBatchResult;
 import dfgg.application.match.PurchaseNormalizationResult;
 import dfgg.application.match.RenormalizationResult;
 import dfgg.application.match.RiotMatchSyncService;
+import dfgg.application.rune.ParticipantRuneNormalizationBatchService;
+import dfgg.application.rune.RuneNormalizationBatchResult;
 import dfgg.application.stats.ChampionBuildStatsRebuildMatchService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -31,19 +33,22 @@ public class RiotMatchController {
     private final ChampionBuildStatsRebuildMatchService statsRebuildService;
     private final MatchRenormalizationService renormalizationService;
     private final StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService;
+    private final ParticipantRuneNormalizationBatchService runeNormalizationService;
 
     public RiotMatchController(
             RiotMatchSyncService riotMatchSyncService,
             RiotCollectionOrchestrator collectionOrchestrator,
             ChampionBuildStatsRebuildMatchService statsRebuildService,
             MatchRenormalizationService renormalizationService,
-            StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService
+            StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService,
+            ParticipantRuneNormalizationBatchService runeNormalizationService
     ) {
         this.riotMatchSyncService = riotMatchSyncService;
         this.collectionOrchestrator = collectionOrchestrator;
         this.statsRebuildService = statsRebuildService;
         this.renormalizationService = renormalizationService;
         this.purchaseNormalizationService = purchaseNormalizationService;
+        this.runeNormalizationService = runeNormalizationService;
     }
 
     /**
@@ -67,6 +72,19 @@ public class RiotMatchController {
             @RequestParam @Min(1) @Max(1000) int limit
     ) {
         return ResponseEntity.ok(purchaseNormalizationService.normalizePatch(patch, afterMatchId, limit));
+    }
+
+    /**
+     * 지정한 패치의 참가자 룬을 저장된 Raw Match에서 커서 기반 배치로 채운다.
+     * 응답의 {@code nextCursor}를 {@code afterMatchId}로 넘겨 {@code hasMore}가 false가 될 때까지 반복한다.
+     */
+    @PostMapping("/riot/matches/runes/normalize/patch")
+    public ResponseEntity<RuneNormalizationBatchResult> normalizeRunesForPatch(
+            @RequestParam @Pattern(regexp = "[0-9]+\\.[0-9]+") String patch,
+            @RequestParam(defaultValue = "") String afterMatchId,
+            @RequestParam @Min(1) @Max(1000) int limit
+    ) {
+        return ResponseEntity.ok(runeNormalizationService.normalizePatch(patch, afterMatchId, limit));
     }
 
     /**

@@ -132,6 +132,31 @@ class RawMatchRepositoryTest {
     }
 
     @Test
+    void 룬_정규화는_Timeline_없이_요청_패치로_정규화된_경기를_cursor_다음부터_조회한다() {
+        rawMatchRepository.save(new RawMatch("KR_1", RAW_DATA));
+        rawMatchRepository.save(new RawMatch("KR_2", RAW_DATA));
+        rawMatchRepository.save(new RawMatch("KR_3", RAW_DATA));
+        rawMatchRepository.save(new RawMatch("KR_4", RAW_DATA));
+        normalizedRepository.save(participantOf("KR_1", "16.19"));
+        normalizedRepository.save(participantOf("KR_2", "16.18"));
+        normalizedRepository.save(participantOf("KR_3", "16.19"));
+        normalizedRepository.save(participantOf("KR_4", "16.19"));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(rawMatchRepository.findMatchIdsForPatchAfter("", "16.19", PageRequest.of(0, 2)))
+                .containsExactly("KR_1", "KR_3");
+        assertThat(rawMatchRepository.findMatchIdsForPatchAfter("KR_3", "16.19", PageRequest.of(0, 2)))
+                .containsExactly("KR_4");
+    }
+
+    private NormalizedMatchParticipant participantOf(String matchId, String patch) {
+        NormalizedMatch normalized = new NormalizedMatch(matchId, patch, 420, List.of(new NormalizedMatchParticipant(
+                "puuid-" + matchId, 1, 1, 100, "TOP", "PLATINUM", true, List.of(), List.of(), false)));
+        return normalized.participants().getFirst();
+    }
+
+    @Test
     void Raw와_Timeline은_있지만_아직_정규화하지_않은_매치만_조회한다() {
         rawMatchRepository.save(new RawMatch("KR_1", RAW_DATA));
         rawMatchRepository.save(new RawMatch("KR_2", RAW_DATA));

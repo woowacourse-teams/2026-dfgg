@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import dfgg.application.RiotCollectionOrchestrator;
 import dfgg.application.match.RiotMatchSyncService;
 import dfgg.application.match.StoredParticipantItemPurchaseNormalizationService;
+import dfgg.application.rune.ParticipantRuneNormalizationBatchService;
 import dfgg.application.stats.ChampionBuildStatsRebuildMatchService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +28,7 @@ class RiotMatchControllerTest {
     private ChampionBuildStatsRebuildMatchService statsRebuildService;
     private MockMvc mockMvc;
     private StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService;
+    private ParticipantRuneNormalizationBatchService runeNormalizationService;
 
     @BeforeEach
     void setUp() {
@@ -34,11 +36,12 @@ class RiotMatchControllerTest {
         collectionOrchestrator = mock(RiotCollectionOrchestrator.class);
         statsRebuildService = mock(ChampionBuildStatsRebuildMatchService.class);
         purchaseNormalizationService = mock(StoredParticipantItemPurchaseNormalizationService.class);
+        runeNormalizationService = mock(ParticipantRuneNormalizationBatchService.class);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new RiotMatchController(riotMatchSyncService,
                         collectionOrchestrator,
                         statsRebuildService, mock(dfgg.application.match.MatchRenormalizationService.class),
-                        purchaseNormalizationService))
+                        purchaseNormalizationService, runeNormalizationService))
                 .build();
     }
 
@@ -114,6 +117,26 @@ class RiotMatchControllerTest {
     }
 
     @Test
+    void 관리자_룬_정규화를_패치와_커서로_배치_실행한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches/runes/normalize/patch")
+                        .param("patch", "16.19")
+                        .param("afterMatchId", "KR_1")
+                        .param("limit", "500"))
+                .andExpect(status().isOk());
+
+        verify(runeNormalizationService).normalizePatch("16.19", "KR_1", 500);
+    }
+
+    @Test
+    void 패치_룬_정규화는_limit이_없으면_거부한다() throws Exception {
+        mockMvc.perform(post("/admin/riot/matches/runes/normalize/patch")
+                        .param("patch", "16.19"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(runeNormalizationService);
+    }
+
+    @Test
     void 지정한_티어로_신규_매치를_즉시_집계하고_미완료_통계를_백필한다() throws Exception {
         mockMvc.perform(post("/admin/riot/matches/stats")
                         .param("tier", "PLATINUM"))
@@ -132,7 +155,7 @@ class RiotMatchControllerTest {
         RiotMatchController controller = new RiotMatchController(riotMatchSyncService,
                 collectionOrchestrator,
                 statsRebuildService, mock(dfgg.application.match.MatchRenormalizationService.class),
-                purchaseNormalizationService);
+                purchaseNormalizationService, runeNormalizationService);
 
         assertThatThrownBy(() -> controller.rebuildStats("PLATINUM"))
                 .isInstanceOf(IllegalStateException.class);

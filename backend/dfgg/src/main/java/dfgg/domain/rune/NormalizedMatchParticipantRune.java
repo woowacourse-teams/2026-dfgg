@@ -129,4 +129,32 @@ public class NormalizedMatchParticipantRune {
                 new StatShards(statOffenseId, statFlexId, statDefenseId)
         );
     }
+
+    String matchId() {
+        return matchId;
+    }
+
+    int participantId() {
+        return participantId;
+    }
+
+    String patch() {
+        return patch;
+    }
+
+    int championId() {
+        return championId;
+    }
+
+    int teamId() {
+        return teamId;
+    }
+
+    String position() {
+        return position;
+    }
+
+    boolean win() {
+        return win;
+    }
 }
