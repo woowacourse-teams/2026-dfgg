@@ -87,6 +87,28 @@ class CounterControllerTest {
     }
 
     @Test
+    @DisplayName("카운터 데이터가 바뀌면 재시작 없이 다음 요청부터 반영된다")
+    void recommend_WhenCountersChangedBySql_ReflectOnNextRequest() {
+        // given
+        String body = """
+                {"myPosition": "MID", "enemies": [103]}
+                """;
+        given().contentType(ContentType.JSON).body(body)
+                .when().post("/api/counters")
+                .then().statusCode(200)
+                .body("enemies[0].counters.championId", contains(90, 64, 1));
+        jdbcTemplate.update("DELETE FROM champion_counters WHERE enemy_champion_id = 103 AND counter_champion_id = 90");
+        jdbcTemplate.update(
+                "INSERT INTO champion_counters (enemy_champion_id, position, counter_champion_id, rank) VALUES (103, 'MID', 86, 4)");
+
+        // when & then
+        given().contentType(ContentType.JSON).body(body)
+                .when().post("/api/counters")
+                .then().statusCode(200)
+                .body("enemies[0].counters.championId", contains(64, 1, 86));
+    }
+
+    @Test
     @DisplayName("내 포지션이 없으면 400이다")
     void recommend_WhenMyPositionMissing_Respond400() {
         badRequest("""
