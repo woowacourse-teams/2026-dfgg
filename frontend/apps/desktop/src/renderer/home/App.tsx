@@ -18,6 +18,7 @@ import FeedbackModal from './components/feedback/FeedbackModal';
 import MatchSection from './components/MatchSection/MatchSection';
 import PostGameSection from './components/PostGameSection/PostGameSection';
 import ProfileHeader from './components/ProfileHeader/ProfileHeader';
+import Setting from './components/ProfileHeader/Setting';
 import QueueTabs from './components/QueueTabs/QueueTabs';
 import { championSplashUrl, skinSplashUrl, useDdragonVersion } from './lib/ddragon';
 import { filterMatches, QUEUE_FILTERS, type QueueFilter } from './lib/queues';
@@ -32,6 +33,7 @@ function App() {
   const [matches, setMatches] = useState<MatchSummary[] | null>(null);
   const [endedGame, setEndedGame] = useState<EndedGame | null>(null);
   const [queue, setQueue] = useState<QueueFilter>('all');
+  const [isSettingOpen, setIsSettingOpen] = useState(false);
   const version = useDdragonVersion();
 
   const playedGame = useRef(false); // 앱을 켠 뒤 한 게임을 한 판이라도 했는지 확인
@@ -202,7 +204,12 @@ function App() {
 
   return (
     <div className='app'>
-      <ProfileHeader summoner={currentSummoner} backdropUrl={backdropUrl} />
+      <ProfileHeader
+        summoner={currentSummoner}
+        backdropUrl={backdropUrl}
+        onOpenSetting={() => setIsSettingOpen(true)}
+      />
+      {isSettingOpen && <Setting onCloseSetting={() => setIsSettingOpen(false)} />}
 
       {currentSummoner ? (
         <main className='content'>
