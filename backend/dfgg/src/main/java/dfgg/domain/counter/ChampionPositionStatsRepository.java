@@ -1,11 +1,19 @@
 package dfgg.domain.counter;
 
+import java.util.Collection;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ChampionPositionStatsRepository extends JpaRepository<ChampionPositionStats, Long> {
+
+    /** 집계된 패치 목록. 조회 기준 패치는 이 중 최고 패치다 (참가자 테이블을 스캔하지 않는다). */
+    @Query("SELECT DISTINCT stats.patch FROM ChampionPositionStats stats")
+    List<String> findDistinctPatches();
+
+    List<ChampionPositionStats> findByPatchAndChampionIdIn(String patch, Collection<Integer> championIds);
 
     /** 다시 집계할 패치의 행만 지운다. 이전 패치 행은 남긴다. */
     @Modifying
