@@ -106,6 +106,40 @@ class GeminiClientTest {
     }
 
     @Test
+    @DisplayName("텍스트가 여러 조각으로 나뉘어 오면 이어 붙여 돌려준다")
+    void generateJson_WhenTextSplitIntoParts_JoinParts() {
+        // given
+        GeminiClient client = clientWithKey("test-key");
+        server.expect(requestTo(ENDPOINT))
+                .andRespond(withSuccess("""
+                        {"candidates":[{"content":{"parts":[{"text":"{\\"reasons\\":"},{"text":"[]}"}]}}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        // when
+        String text = client.generateJson("추천해줘", SCHEMA);
+
+        // then
+        assertThat(text).isEqualTo("{\"reasons\":[]}");
+    }
+
+    @Test
+    @DisplayName("thinking 조각은 빼고 답변 조각만 돌려준다")
+    void generateJson_WhenThoughtPartIncluded_SkipThoughtPart() {
+        // given
+        GeminiClient client = clientWithKey("test-key");
+        server.expect(requestTo(ENDPOINT))
+                .andRespond(withSuccess("""
+                        {"candidates":[{"content":{"parts":[{"text":"먼저 생각해 보면","thought":true},{"text":"{}"}]}}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        // when
+        String text = client.generateJson("추천해줘", SCHEMA);
+
+        // then
+        assertThat(text).isEqualTo("{}");
+    }
+
+    @Test
     @DisplayName("요청 한도 초과는 사용 불가 예외로 바꾼다")
     void generateJson_WhenTooManyRequests_ThrowUnavailable() {
         // given
