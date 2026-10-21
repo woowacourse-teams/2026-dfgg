@@ -108,7 +108,7 @@ public class CounterService {
 
     private List<PositionShareResponse> positionsOf(Map<ChampionPosition, Integer> games) {
         return PositionDistribution.of(games).shares().stream()
-                .map(share -> new PositionShareResponse(share.position(), share.rate(), share.games()))
+                .map(share -> new PositionShareResponse(share.position(), share.rate()))
                 .toList();
     }
 
@@ -134,7 +134,7 @@ public class CounterService {
 
     private List<CounterPickResponse> countersOf(List<Integer> counterIds, Map<Integer, String> names) {
         return counterIds.stream()
-                .map(counterId -> new CounterPickResponse(counterId, names.get(counterId), null))
+                .map(counterId -> new CounterPickResponse(counterId, names.get(counterId)))
                 .toList();
     }
 

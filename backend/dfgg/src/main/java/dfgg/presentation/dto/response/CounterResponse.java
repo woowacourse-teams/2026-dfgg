@@ -25,10 +25,10 @@ public record CounterResponse(String patch, ChampionPosition myPosition, List<En
         }
     }
 
-    public record PositionShareResponse(ChampionPosition position, double rate, int games) {
+    /** {@code rate}는 소수 첫째 자리 %다. */
+    public record PositionShareResponse(ChampionPosition position, double rate) {
     }
 
-    /** {@code reason}은 이유를 만들지 못했으면 null이다. */
-    public record CounterPickResponse(Integer championId, String name, String reason) {
+    public record CounterPickResponse(Integer championId, String name) {
     }
 }

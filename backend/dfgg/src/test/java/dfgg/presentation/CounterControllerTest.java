@@ -5,9 +5,9 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
-import static org.hamcrest.Matchers.nullValue;
 
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
@@ -66,9 +66,10 @@ class CounterControllerTest {
                 .body("enemies[0].positions", hasSize(5))
                 .body("enemies[0].positions[0].position", equalTo("MID"))
                 .body("enemies[0].positions[0].rate", equalTo(90.0f))
+                .body("enemies[0].positions[0]", not(hasKey("games")))
                 .body("enemies[0].counters.championId", contains(90, 1))
                 .body("enemies[0].counters[0].name", equalTo("말자하"))
-                .body("enemies[0].counters[0].reason", nullValue())
+                .body("enemies[0].counters[0]", not(hasKey("reason")))
                 .body("enemies[1].counters", empty());
     }
 

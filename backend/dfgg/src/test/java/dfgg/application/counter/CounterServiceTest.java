@@ -182,8 +182,8 @@ class CounterServiceTest {
     }
 
     @Test
-    @DisplayName("챔피언 이름은 요청 언어로 담고, 이 단계의 이유는 비어 있다")
-    void recommend_WhenLanguageGiven_UseLocalizedNamesWithoutReason() {
+    @DisplayName("챔피언 이름은 요청 언어로 담는다")
+    void recommend_WhenLanguageGiven_UseLocalizedNames() {
         // given
         List<ChampionCounter> stored = counters(AHRI, ChampionPosition.MID, 90);
         given(counterRepository.findByEnemyChampionIdAndPositionOrderByRankAsc(AHRI, ChampionPosition.MID))
@@ -197,7 +197,6 @@ class CounterServiceTest {
         EnemyCounterResponse ahri = response.enemies().getFirst();
         assertThat(ahri.name()).isEqualTo("Champion103");
         assertThat(ahri.counters().getFirst().name()).isEqualTo("Champion90");
-        assertThat(ahri.counters().getFirst().reason()).isNull();
     }
 
     private static ChampionPositionStats positionStats(int championId, ChampionPosition position, int games) {
