@@ -37,9 +37,9 @@ riot:
 gemini:
   # 키가 비어 있어도 기동한다. 카운터 이유는 호출 시점에 null로 응답한다.
   api-key: "${GEMINI_API_KEY:}"
-  model: "${GEMINI_MODEL:}"
+  model: "${GEMINI_MODEL:gemini-3.5-flash}"
   base-url: "${GEMINI_BASE_URL:https://aiplatform.googleapis.com}"
-  timeout: "${GEMINI_TIMEOUT:5s}"
+  timeout: "${GEMINI_TIMEOUT:8s}"
   thinking-level: "${GEMINI_THINKING_LEVEL:minimal}"
 
 mining:
