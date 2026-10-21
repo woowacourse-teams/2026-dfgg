@@ -1,5 +1,7 @@
 package dfgg.presentation;
 
+import dfgg.application.counter.ChampionPositionAggregationResult;
+import dfgg.application.counter.ChampionPositionAggregationService;
 import dfgg.application.itemstats.ItemStatsAggregationResult;
 import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.mining.EmbeddingTrainingResult;
@@ -23,13 +25,16 @@ public class MiningController {
 
     private final MiningTriggerService miningTriggerService;
     private final ItemStatsAggregationService itemStatsAggregationService;
+    private final ChampionPositionAggregationService championPositionAggregationService;
 
     public MiningController(
             MiningTriggerService miningTriggerService,
-            ItemStatsAggregationService itemStatsAggregationService
+            ItemStatsAggregationService itemStatsAggregationService,
+            ChampionPositionAggregationService championPositionAggregationService
     ) {
         this.miningTriggerService = miningTriggerService;
         this.itemStatsAggregationService = itemStatsAggregationService;
+        this.championPositionAggregationService = championPositionAggregationService;
     }
 
     /**
@@ -44,6 +49,12 @@ public class MiningController {
             @RequestParam(defaultValue = "3") @Min(1) @Max(20) int recentPatchWindowSize
     ) {
         return ResponseEntity.ok(itemStatsAggregationService.aggregate(recentPatchWindowSize));
+    }
+
+    /** 현재 패치의 챔피언별 라인 분포를 집계한다. 상대 픽 분석 응답의 라인 분포 %가 이 값을 쓴다. */
+    @PostMapping("/champion-positions")
+    public ResponseEntity<ChampionPositionAggregationResult> aggregateChampionPositions() {
+        return ResponseEntity.ok(championPositionAggregationService.aggregate());
     }
 
     @PostMapping("/embeddings")
