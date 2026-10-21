@@ -71,14 +71,16 @@ public class CounterService {
         return new CounterResponse(patch.map(PatchVersion::value).orElse(null), request.myPosition(), enemies);
     }
 
-    /** 같은 챔피언이 아군·적·밴에 두 번 나오거나, 등록되지 않은 챔피언이 있으면 거부한다. */
+    /**
+     * 같은 챔피언이 아군·적·밴에 두 번 나오거나, 등록되지 않은 챔피언이 있으면 거부한다.
+     * 양 팀이 같은 챔피언을 밴할 수 있어서 밴 안의 중복은 한 번으로 센다.
+     */
     private void validateChampions(CounterRequest request) {
-        List<Integer> requested = Stream.of(request.enemies(), request.allies(), request.bans())
-                .flatMap(Collection::stream)
-                .toList();
+        List<Integer> requested = requestedChampions(request);
         Set<Integer> distinct = new HashSet<>(requested);
         if (distinct.size() != requested.size()) {
-            throw new InvalidRecommendationRequestException("같은 챔피언이 아군·적·밴에 두 번 이상 있습니다: " + duplicatesOf(requested));
+            throw new InvalidRecommendationRequestException(
+                    "같은 챔피언이 아군·적·밴에 두 번 이상 있습니다: " + duplicatesOf(requested));
         }
         Set<Integer> known = championRepository.findAllById(distinct.stream().map(Integer::longValue).toList())
                 .stream()
@@ -88,6 +90,13 @@ public class CounterService {
         if (!unknown.isEmpty()) {
             throw new ChampionNotFoundException(unknown.toString());
         }
+    }
+
+    private List<Integer> requestedChampions(CounterRequest request) {
+        List<Integer> distinctBans = request.bans().stream().distinct().toList();
+        return Stream.of(request.enemies(), request.allies(), distinctBans)
+                .flatMap(Collection::stream)
+                .toList();
     }
 
     private List<Integer> duplicatesOf(List<Integer> championIds) {

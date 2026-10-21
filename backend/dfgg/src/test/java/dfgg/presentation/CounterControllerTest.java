@@ -173,6 +173,19 @@ class CounterControllerTest {
                 .body("detail", containsString("99999"));
     }
 
+    @Test
+    @DisplayName("양 팀이 같은 챔피언을 밴하면 밴 목록에 두 번 나와도 받고, 카운터에서는 뺀다")
+    void recommend_WhenBothTeamsBanSameChampion_Respond200AndExcludeIt() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"myPosition": "MID", "enemies": [103], "bans": [90, 90]}
+                        """)
+                .when().post("/api/counters")
+                .then().statusCode(200)
+                .body("enemies[0].counters.championId", contains(64, 1));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
             "{\"myPosition\": \"MID\", \"enemies\": [103], \"allies\": [103]}",
