@@ -1,6 +1,9 @@
 package dfgg.domain.match;
 
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * `major.minor` 형식의 패치(예: {@code 16.15}). DB에는 문자열로 저장되지만 순서를 다룰 때는
@@ -28,6 +31,13 @@ public record PatchVersion(int major, int minor) implements Comparable<PatchVers
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("패치의 major/minor는 숫자여야 합니다: " + patch, exception);
         }
+    }
+
+    /** 관측된 패치 중 가장 높은 패치. 관측된 패치가 없으면 비어 있다. */
+    public static Optional<PatchVersion> latest(Collection<String> observedPatches) {
+        return observedPatches.stream()
+                .map(PatchVersion::of)
+                .max(Comparator.naturalOrder());
     }
 
     /** DB에 저장된 형태 그대로의 문자열. */
