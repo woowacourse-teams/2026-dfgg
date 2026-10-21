@@ -1,4 +1,4 @@
-package dfgg.domain.match;
+package dfgg.domain.rune;
 
 /** 룬 페이지 아래의 능력치 파편 3줄. 게임 화면 순서대로 공격, 유연, 방어 줄이다. */
 public record StatShards(int offenseId, int flexId, int defenseId) {

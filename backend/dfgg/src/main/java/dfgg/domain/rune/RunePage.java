@@ -1,4 +1,4 @@
-package dfgg.domain.match;
+package dfgg.domain.rune;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package dfgg.domain.match;
+package dfgg.domain.rune;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
