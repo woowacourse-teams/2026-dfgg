@@ -7,6 +7,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface ChampionPositionStatsRepository extends JpaRepository<ChampionPositionStats, Long> {
 
+    /** 다시 집계할 패치의 행만 지운다. 이전 패치 행은 남긴다. */
+    @Modifying
+    @Query(value = "DELETE FROM champion_position_stats WHERE patch = :patch", nativeQuery = true)
+    int deleteByPatch(@Param("patch") String patch);
+
     /**
      * 주어진 패치의 챔피언×포지션 등장 수를 저장하고, 저장한 행 수를 돌려준다.
      * 수집 데이터의 MIDDLE·UTILITY는 MID·SUPPORT로 맞추고, 포지션이 없는 참가자는 뺀다.
