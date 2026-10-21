@@ -26,6 +26,8 @@ riot:
     key: "test-riot-api-key"
     platform-base-url: "https://kr.api.riotgames.com"
     regional-base-url: "https://asia.api.riotgames.com"
+gemini:
+  api-key: " "
 mining:
   batch:
     match-page-size: 5
