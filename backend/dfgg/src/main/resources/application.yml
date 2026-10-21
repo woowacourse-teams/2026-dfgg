@@ -35,11 +35,12 @@ riot:
     requests-per-two-minutes: "${RIOT_RATE_LIMIT_REQUESTS_PER_2_MINUTES:95}"
 
 gemini:
-  # 키나 모델이 비어 있어도 기동한다. 픽 추천은 호출 시점에 폴백으로 넘어간다.
+  # 키가 비어 있어도 기동한다. 카운터 이유는 호출 시점에 null로 응답한다.
   api-key: "${GEMINI_API_KEY:}"
   model: "${GEMINI_MODEL:}"
-  base-url: "${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}"
+  base-url: "${GEMINI_BASE_URL:https://aiplatform.googleapis.com}"
   timeout: "${GEMINI_TIMEOUT:5s}"
+  thinking-level: "${GEMINI_THINKING_LEVEL:minimal}"
 
 mining:
   batch:
