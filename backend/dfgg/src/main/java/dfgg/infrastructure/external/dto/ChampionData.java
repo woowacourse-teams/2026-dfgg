@@ -7,6 +7,14 @@ import java.util.List;
 public record ChampionData(
         String key,
         String name,
-        List<String> tags
+        List<String> tags,
+        Image image
 ) {
+    public ChampionData(String key, String name, List<String> tags) {
+        this(key, name, tags, null);
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Image(String full) {
+    }
 }

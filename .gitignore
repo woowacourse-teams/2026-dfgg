@@ -9,6 +9,15 @@ Thumbs.db
 !.vscode/extensions.json
 *.swp
 
+# AI tools
+.omc/
+.omx/
+
+# Docs
+*.md
+!/README.md
+!.github/*.md
+
 # Env
 .env
 .env.*
