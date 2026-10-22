@@ -18,8 +18,8 @@ import FeedbackModal from './components/feedback/FeedbackModal';
 import MatchSection from './components/MatchSection/MatchSection';
 import PostGameSection from './components/PostGameSection/PostGameSection';
 import ProfileHeader from './components/ProfileHeader/ProfileHeader';
-import Setting from './components/ProfileHeader/Setting';
 import QueueTabs from './components/QueueTabs/QueueTabs';
+import Setting from './components/Settings/Setting';
 import { championSplashUrl, skinSplashUrl, useDdragonVersion } from './lib/ddragon';
 import { filterMatches, QUEUE_FILTERS, type QueueFilter } from './lib/queues';
 import { summarizeMatches } from './lib/recentSummary';
@@ -33,7 +33,9 @@ function App() {
   const [matches, setMatches] = useState<MatchSummary[] | null>(null);
   const [endedGame, setEndedGame] = useState<EndedGame | null>(null);
   const [queue, setQueue] = useState<QueueFilter>('all');
-  const [isSettingOpen, setIsSettingOpen] = useState(false);
+  const [isSettingOpen, setIsSettingOpen] = useState(
+    () => sessionStorage.getItem('reopenSetting') === '1',
+  );
   const version = useDdragonVersion();
 
   const playedGame = useRef(false); // 앱을 켠 뒤 한 게임을 한 판이라도 했는지 확인
@@ -200,6 +202,10 @@ function App() {
         .then(setMatches)
         .catch((error) => Sentry.captureException(error));
     });
+  }, []);
+
+  useEffect(() => {
+    sessionStorage.removeItem('reopenSetting');
   }, []);
 
   return (

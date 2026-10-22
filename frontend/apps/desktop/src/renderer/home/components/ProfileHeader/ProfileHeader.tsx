@@ -3,7 +3,7 @@ import './ProfileHeader.css';
 import type { Summoner } from '../../../../shared/types';
 import { t } from '../../../i18n';
 import { CloseIcon, MinimizeIcon } from '../../../icons';
-import { SettingsIcon } from './SettingsIcon';
+import { SettingsIcon } from '../Settings/SettingsIcon';
 
 const profileIconUrl = (id: number) =>
   `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/${id}.jpg`;

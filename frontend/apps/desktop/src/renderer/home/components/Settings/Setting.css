@@ -1,0 +1,228 @@
+.setting {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  width: 100%;
+  top: 40px;
+  left: 0;
+  bottom: 0;
+  z-index: 999;
+  background: rgba(11, 12, 15, 0.7);
+  -webkit-app-region: no-drag;
+  overflow-y: auto;
+}
+
+.setting::-webkit-scrollbar {
+  width: 6px;
+}
+
+.setting::-webkit-scrollbar-thumb {
+  background: #2c3038;
+  border-radius: 3px;
+}
+
+.setting::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.setting-save-button {
+  width: 100%;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: #e63950;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    transform 0.1s;
+}
+
+.setting-save-button:hover {
+  background: #f04a60;
+}
+
+.setting-save-button:active {
+  transform: scale(0.98);
+}
+
+.setting-save-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(230, 57, 80, 0.35);
+}
+
+.setting-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0;
+}
+
+.setting-back {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #c9ccd3;
+  cursor: pointer;
+}
+
+.setting-title {
+  font-size: 24px;
+}
+
+.setting-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 8px 20px 20px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #e9eaee;
+}
+
+.setting-column {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-select {
+  appearance: none;
+  min-width: 112px;
+  height: 32px;
+  padding: 0 32px 0 12px;
+  border: 1px solid #2c3038;
+  border-radius: 6px;
+  background-color: #1d2027;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a9ea8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  color: #e9eaee;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.setting-select:hover {
+  border-color: #3a3f49;
+  background-color: #23262e;
+}
+
+.setting-select:focus-visible {
+  outline: none;
+  border-color: #e63950;
+  box-shadow: 0 0 0 2px rgba(230, 57, 80, 0.25);
+}
+
+/* 펼쳤을 때 목록 */
+.setting-select option {
+  background: #1d2027;
+  color: #e9eaee;
+}
+
+.setting-description {
+  font-size: 12px;
+  color: #9a9ea8;
+}
+
+.setting-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-section-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #9a9ea8;
+}
+
+.setting-card {
+  display: flex;
+  flex-direction: column;
+  background: #14161b;
+  border: 1px solid #22252c;
+  border-radius: 10px;
+}
+
+.setting-card > * + * {
+  border-top: 1px solid #22252c;
+}
+
+/* 체크박스 */
+.setting-toggle {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  margin: 0;
+  border-radius: 999px;
+  background: #2c3038;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+/* 동그라미 */
+.setting-toggle::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #9a9ea8;
+  transition:
+    transform 0.2s,
+    background-color 0.2s;
+}
+
+.setting-toggle:checked {
+  background: #e63950;
+}
+
+.setting-toggle:checked::before {
+  transform: translateX(18px);
+  background: #fff;
+}
+
+.setting-toggle:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.setting-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(230, 57, 80, 0.35);
+}
+
+.setting-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.setting-footer {
+  flex-shrink: 0;
+  padding: 12px 20px 20px;
+  border-top: 1px solid #1a1c21;
+}
