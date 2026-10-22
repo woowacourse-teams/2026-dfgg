@@ -47,6 +47,9 @@ recommendation:
     min-lift: "${SITUATIONAL_MIN_LIFT:2.0}"
     min-base-rate: "${SITUATIONAL_MIN_BASE_RATE:0.01}"
   recent-patch-window-size: "${RECOMMENDATION_RECENT_PATCH_WINDOW_SIZE:3}"
+  rune:
+    # 비우면 룬 기록의 최신 패치를 쓰고, 값을 넣으면 그 패치로 고정한다. 통계와 룬 이미지가 함께 따른다.
+    patch: "${RUNE_RECOMMENDATION_PATCH:}"
   counter:
     minimum-base-rate: "${RECOMMENDATION_COUNTER_MINIMUM_BASE_RATE:0.01}"
   pair-lift:
