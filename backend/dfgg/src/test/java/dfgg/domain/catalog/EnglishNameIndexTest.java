@@ -113,6 +113,20 @@ class EnglishNameIndexTest {
         assertThat(items.idOf("Dorans Ring")).hasValue(1056);
     }
 
+    @Test
+    @DisplayName("영어 이름이 없는 행(한국어 이름만 있던 예전 아이템)은 색인에서 뺀다")
+    void ofItems_WhenEnglishNameMissing_SkipEntry() {
+        // given
+        EnglishNameIndex items = EnglishNameIndex.ofItems(List.of(
+                new Item(1001L, Map.of("ko-KR", "장화")),
+                new Item(1002L, Map.of("ko-KR", "망토", "en-US", " ")),
+                new Item(1056L, Map.of("ko-KR", "도란의 반지", "en-US", "Doran's Ring"))));
+
+        // when & then
+        assertThat(items.idOf("Doran's Ring")).hasValue(1056);
+        assertThat(items.idOf("")).isEmpty();
+    }
+
     private static Rune rune(int runeId, Integer treeId, int slot, String englishName) {
         return new Rune(runeId, treeId, slot, Map.of("ko-KR", "룬" + runeId, "en-US", englishName), "icon.png");
     }

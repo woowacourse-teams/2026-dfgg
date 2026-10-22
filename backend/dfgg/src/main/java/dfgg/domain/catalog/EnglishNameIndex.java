@@ -44,8 +44,13 @@ public final class EnglishNameIndex {
                                            Function<T, Map<String, String>> namesOf) {
         Map<String, Integer> idsByName = new HashMap<>();
         for (T entry : entries) {
+            String englishName = namesOf.apply(entry).get(ENGLISH);
+            // 한국어 이름만 있던 예전 행은 영어로 찾을 수 없다.
+            if (englishName == null || englishName.isBlank()) {
+                continue;
+            }
             Integer id = idOf.apply(entry);
-            String name = normalize(namesOf.apply(entry).get(ENGLISH));
+            String name = normalize(englishName);
             Integer previous = idsByName.putIfAbsent(name, id);
             if (previous != null) {
                 throw new IllegalStateException("[Error] 영어 이름이 겹칩니다: " + previous + ", " + id);
