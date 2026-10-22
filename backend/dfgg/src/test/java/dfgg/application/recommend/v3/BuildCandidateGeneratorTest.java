@@ -6,6 +6,7 @@ import dfgg.application.ChampionPositionNormalizer;
 import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.recommend.v3.generator.BuildBackoffLevel;
 import dfgg.application.recommend.v3.generator.BuildCandidateGenerator;
+import dfgg.application.recommend.v3.generator.RecentPatchWindowCache;
 import dfgg.application.utils.WilsonScoreCalculator;
 import dfgg.domain.champion.ChampionPosition;
 import java.util.List;
@@ -23,7 +24,7 @@ import org.springframework.test.context.jdbc.Sql;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({TierScopeConfiguration.class, BuildCandidateGenerator.class, ItemStatsAggregationService.class,
+@Import({TierScopeConfiguration.class, BuildCandidateGenerator.class, RecentPatchWindowCache.class, ItemStatsAggregationService.class,
         ChampionPositionNormalizer.class, WilsonScoreCalculator.class})
 @Sql("/sql/build-generator-test-data.sql")
 class BuildCandidateGeneratorTest {

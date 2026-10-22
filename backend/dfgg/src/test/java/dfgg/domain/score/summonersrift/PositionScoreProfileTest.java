@@ -1,9 +1,12 @@
-package dfgg.domain.score;
+package dfgg.domain.score.summonersrift;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 import dfgg.domain.champion.ChampionPosition;
+import dfgg.domain.score.DfScore;
+import dfgg.domain.score.ScoringParticipant;
+import dfgg.domain.score.ScoringParticipants;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -87,6 +87,11 @@ public class ScoringParticipants {
                 .sum();
     }
 
+    public boolean everyoneHasVisionAndObjectiveStats() {
+        return participants.stream()
+                .allMatch(ScoringParticipant::hasVisionAndObjectiveStats);
+    }
+
     public boolean everyoneHasPosition() {
         return participants.stream()
                 .allMatch(ScoringParticipant::hasPosition);

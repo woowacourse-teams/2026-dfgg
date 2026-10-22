@@ -1,9 +1,11 @@
-package dfgg.domain.score;
+package dfgg.domain.score.summonersrift;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 import dfgg.domain.champion.ChampionPosition;
+import dfgg.domain.score.GameDuration;
+import dfgg.domain.score.ScoringParticipant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
