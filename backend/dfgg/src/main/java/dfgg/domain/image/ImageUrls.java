@@ -35,6 +35,10 @@ public record ImageUrls(
         return origin() + ImageKeys.rune(patch, runeId);
     }
 
+    public String summonerSpellOf(String riotKey) {
+        return origin() + ImageKeys.summonerSpell(version, riotKey);
+    }
+
     private String origin() {
         return "https://" + bucket + ".s3." + region + ".amazonaws.com/";
     }
