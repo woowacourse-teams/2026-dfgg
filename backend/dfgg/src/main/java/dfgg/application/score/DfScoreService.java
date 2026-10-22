@@ -1,12 +1,12 @@
 package dfgg.application.score;
 
-import dfgg.domain.score.AramScorer;
 import dfgg.domain.score.GameDuration;
 import dfgg.domain.score.MatchScorer;
 import dfgg.domain.score.MatchScorers;
 import dfgg.domain.score.MatchScores;
 import dfgg.domain.score.ScoringParticipants;
-import dfgg.domain.score.SummonersRiftScorer;
+import dfgg.domain.score.aram.AramScorer;
+import dfgg.domain.score.summonersrift.SummonersRiftScorer;
 import dfgg.presentation.dto.request.DfScoreRequest;
 import dfgg.presentation.dto.response.DfScoreResponse;
 import java.util.List;

@@ -1,4 +1,4 @@
-package dfgg.domain.score;
+package dfgg.domain.score.summonersrift;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -6,6 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dfgg.common.exception.InvalidDfScoreRequestException;
 import dfgg.domain.champion.ChampionPosition;
+import dfgg.domain.score.DfScore;
+import dfgg.domain.score.GameDuration;
+import dfgg.domain.score.ScoringParticipant;
+import dfgg.domain.score.ScoringParticipants;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -136,5 +140,20 @@ class SummonersRiftScorerTest {
 
         // then
         assertThat(longEnough).isFalse();
+    }
+
+    @Test
+    @DisplayName("시야 점수나 오브젝트 피해가 없는 참가자가 있으면 예외가 발생한다 — 협곡은 둘 다로 채점한다")
+    void validate_WhenVisionOrObjectiveIsMissing_ThrowInvalidDfScoreRequestException() {
+        // given
+        List<ScoringParticipant> game = validGame();
+        game.set(0, new ScoringParticipant(100, ChampionPosition.TOP, true,
+                2, 4, 3, 20000, 18000, 11000, null, 3000, null));
+        ScoringParticipants participants = new ScoringParticipants(game);
+
+        // when & then
+        assertThatThrownBy(() -> scorer.validate(participants))
+                .isInstanceOf(InvalidDfScoreRequestException.class)
+                .hasMessageContaining("시야 점수");
     }
 }

@@ -123,4 +123,13 @@ class ScoringParticipantTest {
         // then
         assertThat(excess).isZero();
     }
+
+    @Test
+    @DisplayName("시야 점수와 오브젝트 피해가 없어도 만들어진다 — 칼바람에는 둘 다 없다")
+    void constructor_WhenVisionAndObjectiveAreMissing_Created() {
+        // when & then
+        assertThatCode(() -> new ScoringParticipant(100, null, true,
+                3, 4, 5, 20000, 18000, 11000, null, 3000, null))
+                .doesNotThrowAnyException();
+    }
 }

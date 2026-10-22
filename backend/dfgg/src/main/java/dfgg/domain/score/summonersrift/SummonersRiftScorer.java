@@ -1,6 +1,12 @@
-package dfgg.domain.score;
+package dfgg.domain.score.summonersrift;
 
 import dfgg.common.exception.InvalidDfScoreRequestException;
+import dfgg.domain.score.BaseScore;
+import dfgg.domain.score.DfScore;
+import dfgg.domain.score.GameDuration;
+import dfgg.domain.score.MatchScorer;
+import dfgg.domain.score.ScoringParticipant;
+import dfgg.domain.score.ScoringParticipants;
 import java.util.List;
 import java.util.Set;
 
@@ -33,6 +39,9 @@ public class SummonersRiftScorer implements MatchScorer {
         }
         if (!participants.eachTeamHasDistinctPositions()) {
             throw new InvalidDfScoreRequestException("한 팀 안에 같은 포지션이 둘 이상입니다");
+        }
+        if (!participants.everyoneHasVisionAndObjectiveStats()) {
+            throw new InvalidDfScoreRequestException("협곡 경기는 참가자마다 시야 점수와 오브젝트 피해가 필요합니다");
         }
     }
 
