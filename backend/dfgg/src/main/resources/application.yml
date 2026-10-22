@@ -44,6 +44,11 @@ leaguepedia:
   retry-backoff: "${LEAGUEPEDIA_RETRY_BACKOFF:30s}"
   max-retries: "${LEAGUEPEDIA_MAX_RETRIES:3}"
 
+pro-picks:
+  # Leaguepedia OverviewPage 접두사(쉼표 구분). 국제전은 연도가 들어 있어 해마다 갱신한다.
+  leagues: "${PRO_PICK_LEAGUES:2026 Season World Championship/,2026 Mid-Season Invitational,2026 First Stand,LCK/,LPL/,LEC/,LCS/,LCP/,CBLOL/}"
+  lookback-days: "${PRO_PICK_LOOKBACK_DAYS:30}"
+
 counter:
   # 적마다 보여줄 카운터 수. 데이터는 (적, 라인)마다 7개까지라 픽·밴으로 빠져도 채울 여유가 있다.
   picks-per-enemy: "${COUNTER_PICKS_PER_ENEMY:5}"
