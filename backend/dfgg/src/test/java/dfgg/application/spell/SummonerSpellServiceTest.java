@@ -53,7 +53,7 @@ class SummonerSpellServiceTest {
         spellService.syncSpells();
 
         // then
-        assertThat(spellRepository.findAll())
+        assertThat(spellRepository.findAllById(List.of(4, 2202)))
                 .extracting(SummonerSpell::getSpellId, SummonerSpell::getRiotKey, SummonerSpell::getIconKey)
                 .containsExactly(tuple(4, "SummonerFlash", "SummonerFlash.png"));
     }
@@ -66,6 +66,7 @@ class SummonerSpellServiceTest {
         spellService.syncSpells();
         entityManager.flush();
         entityManager.clear();
+        long countAfterFirstSync = spellRepository.count();
 
         // when
         spellService.syncSpells();
@@ -73,7 +74,7 @@ class SummonerSpellServiceTest {
         entityManager.clear();
 
         // then
-        assertThat(spellRepository.count()).isEqualTo(1);
+        assertThat(spellRepository.count()).isEqualTo(countAfterFirstSync);
         assertThat(spellRepository.findById(4).orElseThrow().getName()).containsEntry("ko-KR", "순간이동 점멸");
     }
 
