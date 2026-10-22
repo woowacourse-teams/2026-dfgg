@@ -94,21 +94,21 @@ class NormalizedMatchParticipantRuneRepositoryTest {
 
     @Test
     @DisplayName("패치·챔피언·포지션이 모두 같은 룬 기록만 조회한다")
-    void findByChampionIdAndPositionAndPatch_ReturnsOnlyMatchingRecords() {
+    void findByChampionIdAndPositionInAndPatch_ReturnsOnlyMatchingRecords() {
         // given
         repository.upsertAll(List.of(
                 jayce(JAYCE_PAGE),
                 jax(JAX_PAGE),
-                new NormalizedMatchParticipantRune("KR_2", 1, "16.20", 126, 100, "TOP", true, JAYCE_PHASE_RUSH_PAGE),
+                new NormalizedMatchParticipantRune("KR_2", 1, "16.20", 126, 100, "MIDDLE", true, JAYCE_PAGE),
                 new NormalizedMatchParticipantRune("KR_3", 2, "16.19", 126, 100, "MIDDLE", true, JAYCE_PHASE_RUSH_PAGE)
         ));
 
         // when
         List<NormalizedMatchParticipantRune> found =
-                repository.findByChampionIdAndPositionAndPatch(126, "TOP", "16.19");
+                repository.findByChampionIdAndPositionInAndPatch(126, List.of("MID", "MIDDLE"), "16.19");
 
         // then
-        assertThat(found).extracting(NormalizedMatchParticipantRune::runePage).containsExactly(JAYCE_PAGE);
+        assertThat(found).extracting(NormalizedMatchParticipantRune::runePage).containsExactly(JAYCE_PHASE_RUSH_PAGE);
     }
 
     private NormalizedMatchParticipantRune jayce(RunePage runePage) {

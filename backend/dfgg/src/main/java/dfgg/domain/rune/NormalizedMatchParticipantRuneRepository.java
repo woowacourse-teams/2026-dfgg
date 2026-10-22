@@ -15,9 +15,12 @@ public interface NormalizedMatchParticipantRuneRepository
     @Query("SELECT DISTINCT rune.patch FROM NormalizedMatchParticipantRune rune")
     List<String> findDistinctPatches();
 
-    /** {@code (champion_id, position, patch)} 인덱스로 한 챔피언·포지션의 한 패치 기록을 읽는다. */
-    List<NormalizedMatchParticipantRune> findByChampionIdAndPositionAndPatch(int championId, String position,
-                                                                            String patch);
+    /**
+     * {@code (champion_id, position, patch)} 인덱스로 한 챔피언·포지션의 한 패치 기록을 읽는다.
+     * 포지션은 Riot 값(MIDDLE, UTILITY)으로 저장되므로 {@code ChampionPositionNormalizer.riotValuesOf(...)}로 넘긴다.
+     */
+    List<NormalizedMatchParticipantRune> findByChampionIdAndPositionInAndPatch(int championId,
+                                                                              List<String> positions, String patch);
 
     /**
      * 참가자 룬을 한 문장으로 저장한다. 같은 경기·참가자가 이미 있으면 새 행을 만들지 않고 룬을 덮어쓴다.
