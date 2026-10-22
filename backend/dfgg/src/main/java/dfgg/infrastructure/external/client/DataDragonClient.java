@@ -3,9 +3,11 @@ package dfgg.infrastructure.external.client;
 import dfgg.infrastructure.external.dto.ChampionResponse;
 import dfgg.infrastructure.external.dto.ItemData;
 import dfgg.infrastructure.external.dto.ItemResponse;
+import dfgg.infrastructure.external.dto.RuneResponse;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -134,6 +136,49 @@ public class DataDragonClient {
         if (image == null || image.length < signature.length
                 || !java.util.Arrays.equals(signature, java.util.Arrays.copyOf(image, signature.length))) {
             throw new IllegalStateException("[Error] 아이템 이미지가 PNG 형식이 아닙니다: " + filename);
+        }
+        return image;
+    }
+
+    /** 룬 동기화에 사용할 최신 Data Dragon 빌드의 룬을 한글 이름으로 조회하고, 같은 빌드의 영문 이름을 붙인다. */
+    public RuneResponse getRunes() {
+        String version = getLatestDataVersion();
+        List<RuneResponse.Style> korean = getRuneStyles(version, "ko_KR");
+        Map<Integer, String> englishNames = new HashMap<>();
+        for (RuneResponse.Style style : getRuneStyles(version, "en_US")) {
+            englishNames.put(style.id(), style.name());
+            style.perks().forEach(perk -> englishNames.put(perk.id(), perk.name()));
+        }
+        return new RuneResponse(normalizePatch(version), version, korean, englishNames);
+    }
+
+    private List<RuneResponse.Style> getRuneStyles(String version, String locale) {
+        RuneResponse.Style[] styles = restClient.get()
+                .uri("/cdn/{version}/data/{locale}/runesReforged.json", version, locale)
+                .retrieve()
+                .body(RuneResponse.Style[].class);
+        if (styles == null || styles.length == 0) {
+            throw new IllegalStateException("[Error] 룬 응답이 비어 있습니다: " + locale);
+        }
+        return List.of(styles);
+    }
+
+    /**
+     * 룬 아이콘은 빌드 버전 없는 {@code /cdn/img/perk-images/...} 아래에 있다.
+     * 경로를 그대로 URL에 붙이므로 {@code perk-images} 밖이나 상위 경로를 가리키는 값은 거부한다.
+     */
+    public byte[] getRuneImage(String iconPath) {
+        if (iconPath == null || !iconPath.matches("perk-images(/[A-Za-z0-9_-]+)+\\.png")) {
+            throw new IllegalArgumentException("[Error] 룬 이미지 경로가 올바르지 않습니다: " + iconPath);
+        }
+        byte[] image = restClient.get()
+                .uri("/cdn/img/" + iconPath)
+                .retrieve()
+                .body(byte[].class);
+        byte[] signature = {(byte) 137, 80, 78, 71, 13, 10, 26, 10};
+        if (image == null || image.length < signature.length
+                || !Arrays.equals(signature, Arrays.copyOf(image, signature.length))) {
+            throw new IllegalStateException("[Error] 룬 이미지가 PNG 형식이 아닙니다: " + iconPath);
         }
         return image;
     }

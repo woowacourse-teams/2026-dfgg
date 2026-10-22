@@ -9,6 +9,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import dfgg.infrastructure.external.dto.ChampionResponse;
 import dfgg.infrastructure.external.dto.ItemResponse;
+import dfgg.infrastructure.external.dto.RuneResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -381,5 +382,64 @@ public class DataDragonClientTest {
                 .andRespond(withNoContent());
         assertThatThrownBy(client::getItems).hasMessageContaining("영문 아이템 응답이 비어 있습니다");
         server.verify();
+    }
+
+    @Test
+    void 최신_빌드의_룬을_한글_이름으로_조회하고_영문_이름을_붙인다() {
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.21.1\",\"16.20.1\"]", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/cdn/16.21.1/data/ko_KR/runesReforged.json"))
+                .andRespond(withSuccess("""
+                        [{"id":8400,"key":"Resolve","icon":"perk-images/Styles/7204_Resolve.png","name":"결의",
+                          "slots":[{"runes":[{"id":8437,"key":"GraspOfTheUndying",
+                            "icon":"perk-images/Styles/Resolve/GraspOfTheUndying/GraspOfTheUndying.png",
+                            "name":"착취의 손아귀"}]}]}]
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/cdn/16.21.1/data/en_US/runesReforged.json"))
+                .andRespond(withSuccess("""
+                        [{"id":8400,"icon":"perk-images/Styles/7204_Resolve.png","name":"Resolve",
+                          "slots":[{"runes":[{"id":8437,"icon":"x.png","name":"Grasp of the Undying"}]}]}]
+                        """, MediaType.APPLICATION_JSON));
+
+        RuneResponse response = client.getRunes();
+
+        assertThat(response.version()).isEqualTo("16.21");
+        assertThat(response.dataVersion()).isEqualTo("16.21.1");
+        RuneResponse.Style resolve = response.styles().getFirst();
+        assertThat(response.localizedName(resolve.id(), resolve.name()))
+                .containsEntry("ko-KR", "결의").containsEntry("en-US", "Resolve");
+        RuneResponse.Perk grasp = resolve.perks().getFirst();
+        assertThat(grasp.icon()).isEqualTo("perk-images/Styles/Resolve/GraspOfTheUndying/GraspOfTheUndying.png");
+        assertThat(response.localizedName(grasp.id(), grasp.name()))
+                .containsEntry("ko-KR", "착취의 손아귀").containsEntry("en-US", "Grasp of the Undying");
+        server.verify();
+    }
+
+    @Test
+    void 룬_응답이_비어_있으면_거부한다() {
+        server.expect(requestTo(BASE_URL + "/api/versions.json"))
+                .andRespond(withSuccess("[\"16.21.1\"]", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/cdn/16.21.1/data/ko_KR/runesReforged.json"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(client::getRunes).hasMessageContaining("룬 응답이 비어 있습니다");
+    }
+
+    @Test
+    void 룬_이미지는_버전_없는_이미지_경로에서_PNG로_받는다() {
+        byte[] png = {(byte) 137, 80, 78, 71, 13, 10, 26, 10, 1};
+        server.expect(requestTo(BASE_URL + "/cdn/img/perk-images/StatMods/StatModsAdaptiveForceIcon.png"))
+                .andRespond(withSuccess(png, MediaType.IMAGE_PNG));
+
+        assertThat(client.getRuneImage("perk-images/StatMods/StatModsAdaptiveForceIcon.png")).isEqualTo(png);
+        server.verify();
+    }
+
+    @Test
+    void perk_images_밖이나_상위_경로를_가리키는_룬_이미지_경로는_거부한다() {
+        assertThatThrownBy(() -> client.getRuneImage("../champion/Aatrox.png"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> client.getRuneImage("perk-images/../x.png"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

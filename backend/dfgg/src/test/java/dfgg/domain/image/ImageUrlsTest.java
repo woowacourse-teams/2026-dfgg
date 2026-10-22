@@ -48,4 +48,18 @@ class ImageUrlsTest {
         assertThat(url).isEqualTo(
                 "https://test-bucket.s3.region.amazonaws.com/" + ImageKeys.champion("99.1", "Aatrox"));
     }
+
+    @Test
+    @DisplayName("룬 이미지 URL은 설정 버전이 아니라 추천에 쓴 패치 폴더를 가리킨다")
+    void runeOf_WhenPatchGiven_BuildUrlUnderThatPatchNotConfiguredVersion() {
+        // given
+        ImageUrls imageUrls = new ImageUrls("bucket", "region", "16.18");
+
+        // when
+        String url = imageUrls.runeOf("16.21", 8437);
+
+        // then
+        assertThat(url).isEqualTo(
+                "https://bucket.s3.region.amazonaws.com/" + ImageKeys.rune("16.21", 8437));
+    }
 }

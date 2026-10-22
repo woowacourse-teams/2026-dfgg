@@ -47,6 +47,13 @@ recommendation:
     min-lift: "${SITUATIONAL_MIN_LIFT:2.0}"
     min-base-rate: "${SITUATIONAL_MIN_BASE_RATE:0.01}"
   recent-patch-window-size: "${RECOMMENDATION_RECENT_PATCH_WINDOW_SIZE:3}"
+  rune:
+    # 비우면 룬 기록의 최신 패치를 쓰고, 값을 넣으면 그 패치로 고정한다. 통계와 룬 이미지가 함께 따른다.
+    patch: "${RUNE_RECOMMENDATION_PATCH:}"
+    # 챔피언·포지션 판 수가 minimum-games보다 적으면 추천하지 않고, (핵심 룬, 보조 계열) 묶음이 minimum-path-games보다 적으면 고르지 않는다.
+    minimum-games: "${RUNE_RECOMMENDATION_MINIMUM_GAMES:100}"
+    minimum-path-games: "${RUNE_RECOMMENDATION_MINIMUM_PATH_GAMES:5}"
+    page-count: "${RUNE_RECOMMENDATION_PAGE_COUNT:3}"
   counter:
     minimum-base-rate: "${RECOMMENDATION_COUNTER_MINIMUM_BASE_RATE:0.01}"
   pair-lift:

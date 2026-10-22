@@ -16,7 +16,8 @@ public record MatchParticipant(
         Integer item5,
         Boolean win,
         Integer participantId,
-        Integer roleBoundItem
+        Integer roleBoundItem,
+        MatchPerks perks
 ) {
 
 }

@@ -49,6 +49,25 @@ public interface RawMatchRepository extends JpaRepository<RawMatch, String> {
             Pageable pageable
     );
 
+    /** 룬 적재 대상 중 참가자 정규화로 패치가 확인된 경기만 커서 이후부터 고른다. 룬은 Timeline이 필요 없다. */
+    @Query("""
+            SELECT rawMatch.matchId
+            FROM RawMatch rawMatch
+            WHERE rawMatch.matchId > :cursor
+              AND EXISTS (
+                  SELECT participant.matchId
+                  FROM NormalizedMatchParticipant participant
+                  WHERE participant.matchId = rawMatch.matchId
+                    AND participant.patch = :patch
+              )
+            ORDER BY rawMatch.matchId
+            """)
+    List<String> findMatchIdsForPatchAfter(
+            @Param("cursor") String cursor,
+            @Param("patch") String patch,
+            Pageable pageable
+    );
+
     @Query("""
             SELECT rawMatch.matchId
             FROM RawMatch rawMatch
