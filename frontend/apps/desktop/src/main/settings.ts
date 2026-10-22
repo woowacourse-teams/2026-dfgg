@@ -7,6 +7,7 @@ import type { Locale } from '../shared/i18n';
 export type Settings = {
   locale?: Locale;
   docking?: boolean;
+  showOverlay?: boolean;
 };
 
 const file = path.join(app.getPath('userData'), 'setting.json');

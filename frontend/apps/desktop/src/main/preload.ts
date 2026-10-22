@@ -101,4 +101,6 @@ contextBridge.exposeInMainWorld('settings', {
   setAutoLaunch: (enabled: boolean) => ipcRenderer.invoke('autoLaunch:set', enabled),
   getAutoDocking: () => ipcRenderer.invoke('docking:get'),
   setAutoDocking: (enabled: boolean) => ipcRenderer.invoke('docking:set', enabled),
+  getOverlayShow: () => ipcRenderer.invoke('overlay:get-enabled'),
+  setOverlayShow: (enabled: boolean) => ipcRenderer.invoke('overlay:set-enabled', enabled),
 });

@@ -32,6 +32,7 @@ import { endHighlight, initHighlight } from './highlight/highlight';
 import { handleMediaProtocol, registerMediaScheme } from './highlight/mediaProtocol';
 import { cleanupOrphans } from './highlight/storage';
 import { readSettings } from './settings';
+import { initOverlayVisibility, updateOverlayPhase } from './overlay/visibility';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
@@ -48,17 +49,6 @@ function loadRenderer(win: BrowserWindow, name: string) {
   } else {
     win.loadURL(`${DEV_SERVER_URL}/${name}/index.html`);
   }
-}
-
-// InProgress일 때만 오버레이 창을 표시하기
-function overlayWithPhase(overlay: BrowserWindow) {
-  onPhaseChange((phase) => {
-    if (phase === 'InProgress') {
-      overlay.showInactive();
-    } else {
-      overlay.hide();
-    }
-  });
 }
 
 // 연결 감지하면서 connected일 때, 앱 실행해서 home 화면 보이게 하기
@@ -107,7 +97,9 @@ function createWindow() {
   startSessionTracking(home);
 
   overlay.hide();
-  overlayWithPhase(overlay);
+  initOverlayVisibility(overlay, readSettings().showOverlay ?? true);
+  onPhaseChange((phase) => updateOverlayPhase(phase));
+
   detectClientStatus(home);
 
   // 앱 실행 시, 전체 화면 모드 수정하는 구독 설정

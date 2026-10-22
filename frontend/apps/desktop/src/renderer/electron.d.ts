@@ -77,6 +77,8 @@ declare global {
       setAutoLaunch: (enabled: boolean) => Promise<void>;
       getAutoDocking: () => Promise<boolean>;
       setAutoDocking: (enabled: boolean) => Promise<void>;
+      getOverlayShow: () => Promise<boolean>;
+      setOverlayShow: (enabled: boolean) => Promise<void>;
     };
   }
 }

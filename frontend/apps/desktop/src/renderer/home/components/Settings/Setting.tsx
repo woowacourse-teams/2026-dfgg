@@ -10,10 +10,12 @@ import { SettingRow, SettingSection } from './SettingSection';
 export default function Setting({ onCloseSetting }: { onCloseSetting: () => void }) {
   const [autoLaunch, setAutoLaunch] = useState(false);
   const [autoDocking, setAutoDocking] = useState(false);
+  const [overlayShow, setOverlayShow] = useState(false);
 
   useEffect(() => {
     window.settings.getAutoLaunch().then(setAutoLaunch);
     window.settings.getAutoDocking().then(setAutoDocking);
+    window.settings.getOverlayShow().then(setOverlayShow);
   }, []);
 
   return (
@@ -67,7 +69,15 @@ export default function Setting({ onCloseSetting }: { onCloseSetting: () => void
         </SettingSection>
         <SettingSection title={t.setting.overlay}>
           <SettingRow label={t.setting.showOverlay}>
-            <input type='checkbox' />
+            <input
+              type='checkbox'
+              className='setting-toggle'
+              checked={overlayShow}
+              onChange={(e) => {
+                setOverlayShow(e.target.checked);
+                window.settings.setOverlayShow(e.target.checked);
+              }}
+            />
           </SettingRow>
         </SettingSection>
         <SettingSection title={t.setting.highlight}>

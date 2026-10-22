@@ -3,11 +3,11 @@
   flex-direction: column;
   position: fixed;
   width: 100%;
-  top: 40px;
+  top: 36px;
   left: 0;
   bottom: 0;
   z-index: 999;
-  background: rgba(11, 12, 15, 0.7);
+  background: rgb(0, 0, 0);
   -webkit-app-region: no-drag;
   overflow-y: auto;
 }

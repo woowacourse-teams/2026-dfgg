@@ -27,6 +27,7 @@ import { getHighlight, highlightSummary, listHighlights } from '../highlight/lib
 import { getLocale, updateSettings } from '../settings';
 import { isAutoLaunchEnabled, setAutoLaunch } from '../autoLaunch/autoLaunch';
 import { getDockingEnabled, setDockingEnabled } from '../docking/docking';
+import { isOverlayEnabled, setOverlayEnabled } from '../overlay/visibility';
 
 // 오버레이가 마지막으로 알려 준 펼친 높이. 접었다 펼 때 이 높이로 돌아간다.
 let overlayHeight = EXPANDED_HEIGHT;
@@ -115,7 +116,7 @@ export function registerIpcHandlers() {
     updateSettings({ locale });
     for (const win of BrowserWindow.getAllWindows()) win.webContents.reload();
   });
-  ipcMain.handle('autoLaunch:get', () => isAutoLaunchEnabled());
+  ipcMain.handle('autoLaunch:get', isAutoLaunchEnabled);
   ipcMain.handle('autoLaunch:set', (_event, enabled: boolean) => {
     if (typeof enabled !== 'boolean') return;
     setAutoLaunch(enabled);
@@ -125,5 +126,11 @@ export function registerIpcHandlers() {
     if (typeof enabled !== 'boolean') return;
     setDockingEnabled(enabled);
     updateSettings({ docking: enabled });
+  });
+  ipcMain.handle('overlay:get-enabled', isOverlayEnabled);
+  ipcMain.handle('overlay:set-enabled', (_event, enabled: boolean) => {
+    if (typeof enabled !== 'boolean') return;
+    setOverlayEnabled(enabled);
+    updateSettings({ showOverlay: enabled });
   });
 }
