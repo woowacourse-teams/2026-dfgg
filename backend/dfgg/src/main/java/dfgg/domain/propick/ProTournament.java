@@ -39,6 +39,20 @@ public class ProTournament {
     protected ProTournament() {
     }
 
+    public ProTournament(String overviewPage, String name, String league, String region,
+                         LocalDate startDate, LocalDate endDate) {
+        this.overviewPage = overviewPage;
+        update(name, league, region, startDate, endDate);
+    }
+
+    public void update(String name, String league, String region, LocalDate startDate, LocalDate endDate) {
+        this.name = name;
+        this.league = league;
+        this.region = region;
+        this.startDate = startDate;
+        this.endDate = endDate;
+    }
+
     public Long getId() {
         return id;
     }
