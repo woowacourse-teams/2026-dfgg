@@ -36,6 +36,10 @@ public record RunePage(
         return primaryPerkIds.getFirst();
     }
 
+    public RunePath path() {
+        return new RunePath(keystoneId(), subStyleId);
+    }
+
     private static void validatePositive(int primaryStyleId, int subStyleId,
                                          List<Integer> primaryPerkIds, List<Integer> subPerkIds) {
         boolean hasNonPositivePerk = primaryPerkIds.stream().anyMatch(id -> id <= 0)
