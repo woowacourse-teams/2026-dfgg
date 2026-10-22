@@ -4,6 +4,7 @@ import dfgg.infrastructure.external.dto.ChampionResponse;
 import dfgg.infrastructure.external.dto.ItemData;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import dfgg.infrastructure.external.dto.RuneResponse;
+import dfgg.infrastructure.external.dto.SummonerSpellResponse;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -270,5 +271,42 @@ public class DataDragonClient {
             throw new IllegalStateException("Data Dragon 응답 버전이 요청한 빌드와 다릅니다.");
         }
         return new ItemResponse(normalizePatch(dataVersion), dataVersion, response.data());
+    }
+    /** 최신 빌드의 한글 소환사 주문과 같은 빌드의 영문 이름을 조회한다. */
+    public SummonerSpellResponse getSummonerSpells() {
+        String version = getLatestDataVersion();
+        SummonerSpellResponse korean = getSummonerSpells(version, "ko_KR");
+        SummonerSpellResponse english = getSummonerSpells(version, "en_US");
+        Map<String, String> englishNames = new HashMap<>();
+        english.data().forEach((riotKey, spell) -> englishNames.put(riotKey, spell.name()));
+        return new SummonerSpellResponse(normalizePatch(version), version, korean.data(), Map.copyOf(englishNames));
+    }
+
+    private SummonerSpellResponse getSummonerSpells(String version, String locale) {
+        SummonerSpellResponse response = restClient.get()
+                .uri("/cdn/{version}/data/{locale}/summoner.json", version, locale)
+                .retrieve()
+                .body(SummonerSpellResponse.class);
+        if (response == null || response.data() == null || response.data().isEmpty()) {
+            throw new IllegalStateException("[Error] 소환사 주문 응답이 비어 있습니다: " + locale);
+        }
+        return response;
+    }
+
+    public byte[] getSummonerSpellImage(String version, String filename) {
+        byte[] image = restClient.get()
+                .uri("/cdn/{version}/img/spell/{filename}", version, filename)
+                .retrieve()
+                .body(byte[].class);
+        return requirePng(image, filename);
+    }
+
+    private byte[] requirePng(byte[] image, String name) {
+        byte[] signature = {(byte) 137, 80, 78, 71, 13, 10, 26, 10};
+        if (image == null || image.length < signature.length
+                || !Arrays.equals(signature, Arrays.copyOf(image, signature.length))) {
+            throw new IllegalStateException("[Error] 이미지가 PNG 형식이 아닙니다: " + name);
+        }
+        return image;
     }
 }
