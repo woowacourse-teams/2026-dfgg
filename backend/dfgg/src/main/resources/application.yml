@@ -39,6 +39,10 @@ leaguepedia:
   bot-username: "${LEAGUEPEDIA_BOT_USERNAME:}"
   bot-password: "${LEAGUEPEDIA_BOT_PASSWORD:}"
   user-agent: "${LEAGUEPEDIA_USER_AGENT:dfgg-pro-picks/1.0 (https://github.com/woowacourse-teams/2026-dfgg)}"
+  # IP당 분당 5회 제한(실측)이라 요청 사이 12초를 둔다. ratelimited·maxlag는 30초부터 두 배씩 3번까지 다시 시도한다.
+  request-interval: "${LEAGUEPEDIA_REQUEST_INTERVAL:12s}"
+  retry-backoff: "${LEAGUEPEDIA_RETRY_BACKOFF:30s}"
+  max-retries: "${LEAGUEPEDIA_MAX_RETRIES:3}"
 
 counter:
   # 적마다 보여줄 카운터 수. 데이터는 (적, 라인)마다 7개까지라 픽·밴으로 빠져도 채울 여유가 있다.

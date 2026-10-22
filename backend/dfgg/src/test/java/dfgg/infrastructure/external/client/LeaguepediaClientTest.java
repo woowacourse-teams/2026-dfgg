@@ -11,6 +11,12 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import dfgg.infrastructure.external.config.LeaguepediaProperties;
 import java.net.URI;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -37,6 +43,9 @@ class LeaguepediaClientTest {
     private static final String USERNAME = "Account@dfgg";
     private static final String PASSWORD = "test-bot-password";
     private static final String USER_AGENT = "dfgg-test/1.0";
+    private static final Duration INTERVAL = Duration.ofSeconds(12);
+    private static final Duration BACKOFF = Duration.ofSeconds(30);
+    private static final int MAX_RETRIES = 3;
 
     private static final CargoQuery SCOREBOARD = new CargoQuery(
             "ScoreboardPlayers=SP",
@@ -46,11 +55,13 @@ class LeaguepediaClientTest {
 
     private RestClient.Builder builder;
     private MockRestServiceServer server;
+    private FakeTime time;
 
     @BeforeEach
     void setUp() {
         builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
+        time = new FakeTime();
     }
 
     @Test
@@ -108,14 +119,14 @@ class LeaguepediaClientTest {
         server.expect(ExpectedCount.once(), requestTo(Matchers.startsWith(API)))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("""
-                        {"error":{"code":"maxlag","info":"Waiting for a database server"}}
+                        {"error":{"code":"readapidenied","info":"You need read permission"}}
                         """, MediaType.APPLICATION_JSON));
         LeaguepediaClient client = client(USERNAME, PASSWORD);
 
         // when & then
         assertThatThrownBy(client::login)
                 .isInstanceOf(LeaguepediaException.class)
-                .hasMessageContaining("maxlag");
+                .hasMessageContaining("readapidenied");
         server.verify();
     }
 
@@ -230,6 +241,98 @@ class LeaguepediaClientTest {
                 .hasMessageContaining("internal_api_error_MWException");
     }
 
+    @Test
+    @DisplayName("첫 요청은 바로 보내고, 다음 요청은 직전 요청에서 12초가 지날 때까지 기다린다")
+    void cargoQuery_WhenSeveralPages_WaitIntervalBetweenRequests() {
+        // given
+        expectCargoPage(0, cargoPage(0, 500));
+        expectCargoPage(500, cargoPage(500, 500));
+        expectCargoPage(1000, cargoPage(1000, 1));
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+
+        // when
+        client.cargoQuery(SCOREBOARD);
+
+        // then
+        assertThat(time.sleeps).containsExactly(INTERVAL, INTERVAL);
+    }
+
+    @Test
+    @DisplayName("직전 요청 뒤 이미 흐른 시간만큼은 덜 기다린다")
+    void cargoQuery_WhenTimePassedSinceLastRequest_WaitOnlyRemainder() {
+        // given
+        expectCargoPage(0, cargoPage(0, 1));
+        expectCargoPage(0, cargoPage(0, 1));
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+        client.cargoQuery(SCOREBOARD);
+        time.advance(Duration.ofSeconds(5));
+
+        // when
+        client.cargoQuery(SCOREBOARD);
+
+        // then
+        assertThat(time.sleeps).containsExactly(Duration.ofSeconds(7));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ratelimited", "maxlag"})
+    @DisplayName("ratelimited·maxlag면 백오프만큼 쉬고 같은 페이지를 다시 요청한다")
+    void cargoQuery_WhenThrottledOnce_BackOffAndRetrySamePage(String code) {
+        // given
+        expectCargoPage(0, errorBody(code));
+        expectCargoPage(0, cargoPage(0, 2));
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+
+        // when
+        List<Map<String, String>> rows = client.cargoQuery(SCOREBOARD);
+
+        // then
+        assertThat(rows).hasSize(2);
+        assertThat(time.sleeps).containsExactly(BACKOFF);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("백오프는 재시도마다 두 배로 늘고, 최대 횟수를 넘기면 예외를 던진다")
+    void cargoQuery_WhenThrottledBeyondMaxRetries_DoubleBackOffThenThrow() {
+        // given
+        server.expect(ExpectedCount.times(MAX_RETRIES + 1), requestTo(Matchers.startsWith(API)))
+                .andRespond(withSuccess(errorBody("ratelimited"), MediaType.APPLICATION_JSON));
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+
+        // when & then
+        assertThatThrownBy(() -> client.cargoQuery(SCOREBOARD))
+                .isInstanceOf(LeaguepediaException.class)
+                .hasMessageContaining("ratelimited");
+        assertThat(time.sleeps).containsExactly(BACKOFF, BACKOFF.multipliedBy(2), BACKOFF.multipliedBy(4));
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("로그인 요청도 간격을 지킨다")
+    void login_WhenTokenThenLogin_WaitIntervalBeforePost() {
+        // given
+        expectLoginToken();
+        server.expect(requestTo(API))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {"login":{"result":"Success"}}
+                        """, MediaType.APPLICATION_JSON));
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+
+        // when
+        client.login();
+
+        // then
+        assertThat(time.sleeps).containsExactly(INTERVAL);
+    }
+
+    private static String errorBody(String code) {
+        return """
+                {"error":{"code":"%s","info":"slow down"}}
+                """.formatted(code);
+    }
+
     private void expectCargoPage(int offset, String body) {
         server.expect(requestTo(Matchers.startsWith(API)))
                 .andExpect(queryParam("action", "cargoquery"))
@@ -261,10 +364,42 @@ class LeaguepediaClientTest {
     }
 
     private LeaguepediaClient client(String username, String password) {
-        return new LeaguepediaClient(builder, properties(username, password));
+        return new LeaguepediaClient(builder, properties(username, password), time, time::sleep);
     }
 
     private static LeaguepediaProperties properties(String username, String password) {
-        return new LeaguepediaProperties(URI.create(BASE_URL), username, password, USER_AGENT);
+        return new LeaguepediaProperties(URI.create(BASE_URL), username, password, USER_AGENT,
+                INTERVAL, BACKOFF, MAX_RETRIES);
+    }
+
+    /** 잠들면 그만큼 시간이 흐르는 가짜 시계. 기다린 시간을 기록한다. */
+    private static class FakeTime extends Clock {
+
+        private Instant now = Instant.parse("2026-10-22T00:00:00Z");
+        private final List<Duration> sleeps = new ArrayList<>();
+
+        void sleep(Duration duration) {
+            sleeps.add(duration);
+            advance(duration);
+        }
+
+        void advance(Duration duration) {
+            now = now.plus(duration);
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
     }
 }
