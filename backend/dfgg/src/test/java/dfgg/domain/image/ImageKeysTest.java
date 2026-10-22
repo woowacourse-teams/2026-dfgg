@@ -26,4 +26,14 @@ class ImageKeysTest {
         // then
         assertThat(key).isEqualTo("dfgg/images/16.18/items/3031.png");
     }
+
+    @Test
+    @DisplayName("룬 이미지 키는 패치 폴더 아래 룬 id로 만든다")
+    void rune_WhenPatchAndRuneIdGiven_BuildKeyUnderPatchFolder() {
+        // when
+        String key = ImageKeys.rune("16.21", 8437);
+
+        // then
+        assertThat(key).isEqualTo("dfgg/images/16.21/runes/8437.png");
+    }
 }

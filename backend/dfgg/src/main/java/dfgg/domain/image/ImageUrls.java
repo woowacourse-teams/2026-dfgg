@@ -27,6 +27,14 @@ public record ImageUrls(
         return origin() + ImageKeys.item(version, itemId);
     }
 
+    /**
+     * 룬은 설정 버전({@code version})이 아니라 추천 통계를 계산한 패치 폴더를 가리킨다.
+     * 그래야 추천 내용과 이미지가 같은 패치를 본다.
+     */
+    public String runeOf(String patch, int runeId) {
+        return origin() + ImageKeys.rune(patch, runeId);
+    }
+
     private String origin() {
         return "https://" + bucket + ".s3." + region + ".amazonaws.com/";
     }

@@ -20,4 +20,9 @@ public final class ImageKeys {
     public static String item(String version, long itemId) {
         return ROOT + "/" + version + "/items/" + itemId + ".png";
     }
+
+    /** 룬은 추천에 쓴 패치 폴더 아래 룬 id로 저장한다. 룬 추천은 통계와 이미지를 같은 패치로 맞춘다. */
+    public static String rune(String patch, int runeId) {
+        return ROOT + "/" + patch + "/runes/" + runeId + ".png";
+    }
 }
