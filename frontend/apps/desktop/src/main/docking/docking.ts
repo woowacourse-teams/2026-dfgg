@@ -64,11 +64,21 @@ function throttle(ms: number, fn: (rect: Rect) => void) {
   };
 }
 
+let dockingEnabled = true;
+export function getDockingEnabled() {
+  return dockingEnabled;
+}
+export function setDockingEnabled(enabled: boolean) {
+  dockingEnabled = enabled;
+}
+
 /**
  * 롤 창 오른쪽에 붙인다. 오른쪽 공간이 모자라면 왼쪽으로 넘긴다.
  * 인자로 받는 clientRect 는 물리 픽셀이므로 DIP 로 바꿔서 계산한다.
  */
 function dockBeside(home: BrowserWindow, clientRect: Rect) {
+  if (!dockingEnabled) return;
+
   // Win32 는 물리 픽셀, Electron 은 DIP 를 쓴다. 배율 100% 가 아니면 이 변환이 없으면 엉뚱한 곳으로 간다.
   const client = screen.screenToDipRect(home, clientRect);
   const width = home.getBounds().width;
@@ -114,7 +124,8 @@ function followClientUntilAttached(home: BrowserWindow, isLibraryAttached: () =>
 let isAttached = false;
 
 /** 홈 창을 롤 클라이언트 창에 붙여 함께 움직이게 한다. */
-export function attachHomeToClient(home: BrowserWindow) {
+export function attachHomeToClient(home: BrowserWindow, enabled: boolean) {
+  dockingEnabled = enabled;
   // 라이브러리가 두 번 초기화되면 예외를 던진다 (activate 로 창을 다시 만드는 경우 대비).
   if (isAttached) return;
 

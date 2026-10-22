@@ -9,9 +9,11 @@ import { SettingRow, SettingSection } from './SettingSection';
 
 export default function Setting({ onCloseSetting }: { onCloseSetting: () => void }) {
   const [autoLaunch, setAutoLaunch] = useState(false);
+  const [autoDocking, setAutoDocking] = useState(false);
 
   useEffect(() => {
     window.settings.getAutoLaunch().then(setAutoLaunch);
+    window.settings.getAutoDocking().then(setAutoDocking);
   }, []);
 
   return (
@@ -46,6 +48,19 @@ export default function Setting({ onCloseSetting }: { onCloseSetting: () => void
               onChange={(e) => {
                 setAutoLaunch(e.target.checked);
                 window.settings.setAutoLaunch(e.target.checked);
+              }}
+            />
+          </SettingRow>
+        </SettingSection>
+        <SettingSection title={t.setting.window}>
+          <SettingRow label={t.setting.dockToClient} description={t.setting.dockToClientDesc}>
+            <input
+              type='checkbox'
+              className='setting-toggle'
+              checked={autoDocking}
+              onChange={(e) => {
+                setAutoDocking(e.target.checked);
+                window.settings.setAutoDocking(e.target.checked);
               }}
             />
           </SettingRow>

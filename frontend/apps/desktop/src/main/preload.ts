@@ -99,4 +99,6 @@ contextBridge.exposeInMainWorld('settings', {
   setLocale: (locale: Locale) => ipcRenderer.invoke('locale:set', locale),
   getAutoLaunch: () => ipcRenderer.invoke('autoLaunch:get'),
   setAutoLaunch: (enabled: boolean) => ipcRenderer.invoke('autoLaunch:set', enabled),
+  getAutoDocking: () => ipcRenderer.invoke('docking:get'),
+  setAutoDocking: (enabled: boolean) => ipcRenderer.invoke('docking:set', enabled),
 });

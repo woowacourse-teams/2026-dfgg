@@ -31,6 +31,7 @@ import { initAutoUpdate } from './autoUpdate';
 import { endHighlight, initHighlight } from './highlight/highlight';
 import { handleMediaProtocol, registerMediaScheme } from './highlight/mediaProtocol';
 import { cleanupOrphans } from './highlight/storage';
+import { readSettings } from './settings';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
@@ -102,7 +103,7 @@ function createWindow() {
   setOverlayWindow(overlay);
 
   // home 창을 롤 클라이언트 옆에 붙인다. 네이티브 모듈이 없으면 조용히 건너뛴다.
-  attachHomeToClient(home);
+  attachHomeToClient(home, readSettings().docking ?? true);
   startSessionTracking(home);
 
   overlay.hide();

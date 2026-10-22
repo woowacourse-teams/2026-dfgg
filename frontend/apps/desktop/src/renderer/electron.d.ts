@@ -75,6 +75,8 @@ declare global {
       setLocale: (locale: Locale) => Promise<void>;
       getAutoLaunch: () => Promise<boolean>;
       setAutoLaunch: (enabled: boolean) => Promise<void>;
+      getAutoDocking: () => Promise<boolean>;
+      setAutoDocking: (enabled: boolean) => Promise<void>;
     };
   }
 }
