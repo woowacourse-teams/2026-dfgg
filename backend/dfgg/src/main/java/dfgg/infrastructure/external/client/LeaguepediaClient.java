@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.infrastructure.external.config.LeaguepediaProperties;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,6 +27,9 @@ public class LeaguepediaClient {
 
     private static final String API_PATH = "/api.php";
     private static final String LOGIN_SUCCESS = "Success";
+    // apihighlimits가 없는 봇 계정의 최대 행 수
+    private static final int PAGE_SIZE = 500;
+    private static final String MAX_LAG_SECONDS = "5";
 
     private final RestClient restClient;
     private final LeaguepediaProperties properties;
@@ -55,6 +60,42 @@ public class LeaguepediaClient {
             throw new LeaguepediaException("Leaguepedia 로그인 실패: " + result.path("result").asText()
                     + " (" + result.path("reason").asText() + ")");
         }
+    }
+
+    /** 조건에 맞는 행을 모두 받는다. 한 페이지가 꽉 차면(500행) offset을 늘려 다음 페이지를 이어 받는다. */
+    public List<Map<String, String>> cargoQuery(CargoQuery query) {
+        List<Map<String, String>> rows = new ArrayList<>();
+        List<Map<String, String>> page;
+        do {
+            page = cargoPage(query, rows.size());
+            rows.addAll(page);
+        } while (page.size() == PAGE_SIZE);
+        return rows;
+    }
+
+    private List<Map<String, String>> cargoPage(CargoQuery query, int offset) {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("action", "cargoquery");
+        params.put("tables", query.tables());
+        params.put("fields", query.fields());
+        params.put("where", query.where());
+        params.put("order_by", query.orderBy());
+        params.put("limit", String.valueOf(PAGE_SIZE));
+        params.put("offset", String.valueOf(offset));
+        params.put("maxlag", MAX_LAG_SECONDS);
+        JsonNode body = get(params);
+        if (body.has("error")) {
+            throw new LeaguepediaException("Leaguepedia cargoquery 실패: " + errorCodeOf(body));
+        }
+        List<Map<String, String>> rows = new ArrayList<>();
+        body.path("cargoquery").forEach(row -> rows.add(fieldsOf(row.path("title"))));
+        return rows;
+    }
+
+    private Map<String, String> fieldsOf(JsonNode title) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        title.properties().forEach(field -> fields.put(field.getKey(), field.getValue().asText()));
+        return fields;
     }
 
     private String loginToken() {

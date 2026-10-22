@@ -11,6 +11,10 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import dfgg.infrastructure.external.config.LeaguepediaProperties;
 import java.net.URI;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +37,12 @@ class LeaguepediaClientTest {
     private static final String USERNAME = "Account@dfgg";
     private static final String PASSWORD = "test-bot-password";
     private static final String USER_AGENT = "dfgg-test/1.0";
+
+    private static final CargoQuery SCOREBOARD = new CargoQuery(
+            "ScoreboardPlayers=SP",
+            "SP.GameId, SP.Link, SP.Champion",
+            "SP.OverviewPage LIKE 'LCK/%' AND SP.DateTime_UTC >= '2026-09-22'",
+            "SP.DateTime_UTC DESC");
 
     private RestClient.Builder builder;
     private MockRestServiceServer server;
@@ -131,6 +141,109 @@ class LeaguepediaClientTest {
 
         // when & then
         assertThat(properties.toString()).doesNotContain(PASSWORD).contains(USERNAME);
+    }
+
+    @Test
+    @DisplayName("cargoquery에 테이블·필드·조건·정렬·500행·offset·maxlag를 보내고, 로그인 쿠키를 싣는다")
+    void cargoQuery_WhenLoggedIn_SendQueryParamsWithLoginCookies() {
+        // given
+        expectLoginToken();
+        server.expect(requestTo(API))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {"login":{"result":"Success"}}
+                        """, MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.SET_COOKIE, "lolwikiUserID=42; path=/"));
+        server.expect(requestTo(Matchers.startsWith(API)))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(queryParam("action", "cargoquery"))
+                .andExpect(queryParam("tables", "ScoreboardPlayers%3DSP"))
+                .andExpect(queryParam("fields", "SP.GameId,%20SP.Link,%20SP.Champion"))
+                .andExpect(queryParam("where",
+                        "SP.OverviewPage%20LIKE%20'LCK/%25'%20AND%20SP.DateTime_UTC%20%3E%3D%20'2026-09-22'"))
+                .andExpect(queryParam("order_by", "SP.DateTime_UTC%20DESC"))
+                .andExpect(queryParam("limit", "500"))
+                .andExpect(queryParam("offset", "0"))
+                .andExpect(queryParam("maxlag", "5"))
+                .andExpect(queryParam("format", "json"))
+                .andExpect(header(HttpHeaders.COOKIE, Matchers.allOf(
+                        Matchers.containsString("lolwiki_session=abc"),
+                        Matchers.containsString("lolwikiUserID=42"))))
+                .andRespond(withSuccess(cargoPage(0, 2), MediaType.APPLICATION_JSON));
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+        client.login();
+
+        // when
+        List<Map<String, String>> rows = client.cargoQuery(SCOREBOARD);
+
+        // then
+        assertThat(rows).extracting(row -> row.get("GameId")).containsExactly("game-0", "game-1");
+        assertThat(rows.getFirst()).containsEntry("DateTime UTC", "2026-10-18 19:48:00");
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("500행이 오면 offset을 500 늘려 다음 페이지를 이어 받는다")
+    void cargoQuery_WhenFullPage_FetchNextPage() {
+        // given
+        expectCargoPage(0, cargoPage(0, 500));
+        expectCargoPage(500, cargoPage(500, 3));
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+
+        // when
+        List<Map<String, String>> rows = client.cargoQuery(SCOREBOARD);
+
+        // then
+        assertThat(rows).hasSize(503);
+        assertThat(rows.getLast()).containsEntry("GameId", "game-502");
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("마지막 페이지가 딱 500행이면 빈 페이지를 받고 멈춘다")
+    void cargoQuery_WhenLastPageExactlyFull_StopAtEmptyPage() {
+        // given
+        expectCargoPage(0, cargoPage(0, 500));
+        expectCargoPage(500, cargoPage(500, 0));
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+
+        // when
+        List<Map<String, String>> rows = client.cargoQuery(SCOREBOARD);
+
+        // then
+        assertThat(rows).hasSize(500);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("cargoquery가 오류를 돌려주면 오류 코드를 담은 예외를 던진다")
+    void cargoQuery_WhenErrorResponse_ThrowWithCode() {
+        // given
+        expectCargoPage(0, """
+                {"error":{"code":"internal_api_error_MWException","info":"Field does not exist"}}
+                """);
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+
+        // when & then
+        assertThatThrownBy(() -> client.cargoQuery(SCOREBOARD))
+                .isInstanceOf(LeaguepediaException.class)
+                .hasMessageContaining("internal_api_error_MWException");
+    }
+
+    private void expectCargoPage(int offset, String body) {
+        server.expect(requestTo(Matchers.startsWith(API)))
+                .andExpect(queryParam("action", "cargoquery"))
+                .andExpect(queryParam("offset", String.valueOf(offset)))
+                .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+    }
+
+    private static String cargoPage(int firstIndex, int size) {
+        String rows = IntStream.range(firstIndex, firstIndex + size)
+                .mapToObj(index -> """
+                        {"title":{"GameId":"game-%d","Link":"Faker","Champion":"Ahri","DateTime UTC":"2026-10-18 19:48:00"}}
+                        """.formatted(index).strip())
+                .collect(Collectors.joining(","));
+        return "{\"cargoquery\":[" + rows + "]}";
     }
 
     private void expectLoginToken() {
