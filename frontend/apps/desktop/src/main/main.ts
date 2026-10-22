@@ -159,6 +159,7 @@ if (!gotTheLock) {
     if (!readStore().installed) {
       trackEvent('desktop-install');
       updateStore({ installed: true });
+      setAutoLaunch(true);
     }
 
     // 앱 시작 시에만 직접 앱 클릭했을 때 화면에 보여주기
@@ -167,7 +168,6 @@ if (!gotTheLock) {
     trackEvent('desktop-launch', { startup: startupLaunch });
 
     setTray(homeWindow);
-    setAutoLaunch(true);
 
     startLcuConnection();
     initLivePolling();

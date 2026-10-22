@@ -73,6 +73,8 @@ declare global {
     settings: {
       getLocale: Locale;
       setLocale: (locale: Locale) => Promise<void>;
+      getAutoLaunch: () => Promise<boolean>;
+      setAutoLaunch: (enabled: boolean) => Promise<void>;
     };
   }
 }

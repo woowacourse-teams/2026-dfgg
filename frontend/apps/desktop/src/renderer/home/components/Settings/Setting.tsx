@@ -1,11 +1,19 @@
 import './Setting.css';
 
+import { useEffect, useState } from 'react';
+
 import { Locale } from '../../../../shared/i18n';
 import { LOCALE, setLocale, t } from '../../../i18n';
 import { BackIcon } from './BackIcon';
 import { SettingRow, SettingSection } from './SettingSection';
 
 export default function Setting({ onCloseSetting }: { onCloseSetting: () => void }) {
+  const [autoLaunch, setAutoLaunch] = useState(false);
+
+  useEffect(() => {
+    window.settings.getAutoLaunch().then(setAutoLaunch);
+  }, []);
+
   return (
     <div className='setting'>
       <div className='setting-header'>
@@ -31,7 +39,15 @@ export default function Setting({ onCloseSetting }: { onCloseSetting: () => void
             </select>
           </SettingRow>
           <SettingRow label={t.setting.autoLaunch}>
-            <input type='checkbox' className='setting-toggle' />
+            <input
+              type='checkbox'
+              className='setting-toggle'
+              checked={autoLaunch}
+              onChange={(e) => {
+                setAutoLaunch(e.target.checked);
+                window.settings.setAutoLaunch(e.target.checked);
+              }}
+            />
           </SettingRow>
         </SettingSection>
         <SettingSection title={t.setting.overlay}>

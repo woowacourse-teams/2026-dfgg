@@ -97,4 +97,6 @@ contextBridge.exposeInMainWorld('appLocale', ipcRenderer.sendSync('locale:get'))
 
 contextBridge.exposeInMainWorld('settings', {
   setLocale: (locale: Locale) => ipcRenderer.invoke('locale:set', locale),
+  getAutoLaunch: () => ipcRenderer.invoke('autoLaunch:get'),
+  setAutoLaunch: (enabled: boolean) => ipcRenderer.invoke('autoLaunch:set', enabled),
 });
