@@ -7,6 +7,8 @@ import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.mining.EmbeddingTrainingResult;
 import dfgg.application.mining.MiningTriggerService;
 import dfgg.application.mining.SequentialPatternMiningResult;
+import dfgg.application.propick.ProPickCollectionResult;
+import dfgg.application.propick.ProPickCollectionService;
 import dfgg.domain.embedding.TrainingConfig;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -26,15 +28,18 @@ public class MiningController {
     private final MiningTriggerService miningTriggerService;
     private final ItemStatsAggregationService itemStatsAggregationService;
     private final ChampionPositionAggregationService championPositionAggregationService;
+    private final ProPickCollectionService proPickCollectionService;
 
     public MiningController(
             MiningTriggerService miningTriggerService,
             ItemStatsAggregationService itemStatsAggregationService,
-            ChampionPositionAggregationService championPositionAggregationService
+            ChampionPositionAggregationService championPositionAggregationService,
+            ProPickCollectionService proPickCollectionService
     ) {
         this.miningTriggerService = miningTriggerService;
         this.itemStatsAggregationService = itemStatsAggregationService;
         this.championPositionAggregationService = championPositionAggregationService;
+        this.proPickCollectionService = proPickCollectionService;
     }
 
     /**
@@ -55,6 +60,12 @@ public class MiningController {
     @PostMapping("/champion-positions")
     public ResponseEntity<ChampionPositionAggregationResult> aggregateChampionPositions() {
         return ResponseEntity.ok(championPositionAggregationService.aggregate());
+    }
+
+    /** 주요 리그의 최근 대회 픽을 Leaguepedia에서 받아 저장한다. 요청 사이 12초라 수 분 걸린다. 멱등하다. */
+    @PostMapping("/pro-picks")
+    public ResponseEntity<ProPickCollectionResult> collectProPicks() {
+        return ResponseEntity.ok(proPickCollectionService.collect());
     }
 
     @PostMapping("/embeddings")
