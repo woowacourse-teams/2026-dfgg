@@ -349,4 +349,36 @@ class DfScoreControllerTest {
                 .then().statusCode(200)
                 .body("participants.score", everyItem(notNullValue()));
     }
+
+    @Test
+    @DisplayName("아수라장(2400) 경기도 칼바람처럼 채점하고 MVP·ACE를 정한다")
+    void score_WhenMayhemMatch_ReturnScoresAndBadges() {
+        // given
+        List<String> participants = tenParticipants().stream()
+                .map(participant -> participant.replaceAll("\"position\": \"[A-Z]+\"", "\"position\": null"))
+                .toList();
+
+        // when & then
+        given().contentType(ContentType.JSON)
+                .body(body(2400, 900, participants))
+                .when().post("/api/df-score")
+                .then().statusCode(200)
+                .body("participants.score", everyItem(notNullValue()))
+                .body("participants.badge", hasItems("MVP", "ACE"));
+    }
+
+    @Test
+    @DisplayName("협곡 경기에서 포지션이 빈 문자열이면 포지션이 없는 것으로 보고 400으로 응답한다")
+    void score_WhenSummonersRiftPositionIsBlank_ReturnBadRequest() {
+        // given
+        List<String> participants = tenParticipants();
+        participants.set(0, participant(0).replace("\"TOP\"", "\"\""));
+
+        // when & then
+        given().contentType(ContentType.JSON)
+                .body(body(420, 1800, participants))
+                .when().post("/api/df-score")
+                .then().statusCode(400)
+                .body("detail", containsString("포지션이 필요합니다"));
+    }
 }

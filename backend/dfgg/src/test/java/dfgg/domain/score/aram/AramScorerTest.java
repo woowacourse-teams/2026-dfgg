@@ -44,6 +44,16 @@ class AramScorerTest {
     }
 
     @Test
+    @DisplayName("아수라장(2400)도 담당한다")
+    void supports_WhenMayhemQueue_ReturnTrue() {
+        // when
+        boolean supported = scorer.supports(2400);
+
+        // then
+        assertThat(supported).isTrue();
+    }
+
+    @Test
     @DisplayName("협곡은 담당하지 않는다")
     void supports_WhenSummonersRiftQueue_ReturnFalse() {
         // when

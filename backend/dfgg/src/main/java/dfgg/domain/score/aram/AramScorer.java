@@ -14,19 +14,21 @@ import dfgg.domain.score.ScoreFeature;
 import dfgg.domain.score.ScoringParticipant;
 import dfgg.domain.score.ScoringParticipants;
 import java.util.List;
+import java.util.Set;
 
 /**
- * 칼바람 채점기. 포지션 없이 10명 평균과 견주고, 항목 가중치는 모두 같다. 데스 페널티와 표준화는 없다.
+ * 칼바람(아수라장 포함) 채점기. 포지션 없이 10명 평균과 견주고, 항목 가중치는 모두 같다. 데스 페널티와 표준화는 없다.
  */
 public class AramScorer implements MatchScorer {
 
-    private static final int QUEUE_ID = 450;
+    /** 무작위 총력전(450), 아수라장(2400). */
+    private static final Set<Integer> QUEUE_IDS = Set.of(450, 2400);
     private static final int MINIMUM_DURATION_SECONDS = 480;
     private static final List<ScoreFeature> FEATURES = List.of(CHAMPION_DAMAGE, GOLD, DAMAGE_TAKEN_PER_LIFE, TURRET_DAMAGE);
 
     @Override
     public boolean supports(int queueId) {
-        return queueId == QUEUE_ID;
+        return QUEUE_IDS.contains(queueId);
     }
 
     @Override
