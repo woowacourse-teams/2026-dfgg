@@ -8,6 +8,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +39,9 @@ public class LeaguepediaClient {
     private static final int PAGE_SIZE = 500;
     private static final String MAX_LAG_SECONDS = "5";
     private static final Set<String> THROTTLED_CODES = Set.of("ratelimited", "maxlag");
+    // apihighlimits가 없으면 titles는 한 번에 50개까지다.
+    private static final int TITLES_PER_REQUEST = 50;
+    private static final String FILE_PREFIX = "File:";
 
     private final RestClient restClient;
     private final LeaguepediaProperties properties;
@@ -97,6 +102,9 @@ public class LeaguepediaClient {
         params.put("fields", query.fields());
         params.put("where", query.where());
         params.put("order_by", query.orderBy());
+        if (query.hasJoin()) {
+            params.put("join_on", query.joinOn());
+        }
         params.put("limit", String.valueOf(PAGE_SIZE));
         params.put("offset", String.valueOf(offset));
         params.put("maxlag", MAX_LAG_SECONDS);
@@ -107,6 +115,40 @@ public class LeaguepediaClient {
         List<Map<String, String>> rows = new ArrayList<>();
         body.path("cargoquery").forEach(row -> rows.add(fieldsOf(row.path("title"))));
         return rows;
+    }
+
+    /** 파일 이름(접두사 {@code File:} 없이)별 실제 이미지 URL. 없는 파일은 결과에 없다. */
+    public Map<String, String> imageUrls(Collection<String> fileNames) {
+        List<String> names = List.copyOf(fileNames);
+        Map<String, String> urls = new LinkedHashMap<>();
+        for (int start = 0; start < names.size(); start += TITLES_PER_REQUEST) {
+            urls.putAll(imageUrlBatch(names.subList(start, Math.min(start + TITLES_PER_REQUEST, names.size()))));
+        }
+        return urls;
+    }
+
+    private Map<String, String> imageUrlBatch(List<String> fileNames) {
+        String titles = fileNames.stream().map(name -> FILE_PREFIX + name).collect(Collectors.joining("|"));
+        JsonNode query = getWithRetry(Map.of("action", "query", "prop", "imageinfo", "iiprop", "url", "titles", titles))
+                .path("query");
+        // 위키는 제목을 정규화해서 돌려준다(밑줄 → 공백). 요청한 이름으로 되돌려 찾는다.
+        Map<String, String> normalized = new HashMap<>();
+        query.path("normalized").forEach(entry -> normalized.put(entry.path("from").asText(), entry.path("to").asText()));
+        Map<String, String> urlsByTitle = new HashMap<>();
+        query.path("pages").forEach(page -> {
+            String url = page.path("imageinfo").path(0).path("url").asText();
+            if (!url.isEmpty()) {
+                urlsByTitle.put(page.path("title").asText(), url);
+            }
+        });
+        Map<String, String> urls = new LinkedHashMap<>();
+        for (String fileName : fileNames) {
+            String title = normalized.getOrDefault(FILE_PREFIX + fileName, FILE_PREFIX + fileName);
+            if (urlsByTitle.containsKey(title)) {
+                urls.put(fileName, urlsByTitle.get(title));
+            }
+        }
+        return urls;
     }
 
     private Map<String, String> fieldsOf(JsonNode title) {

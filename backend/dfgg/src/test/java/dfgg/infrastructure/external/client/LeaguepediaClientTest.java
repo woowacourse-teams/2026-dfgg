@@ -327,6 +327,95 @@ class LeaguepediaClientTest {
         assertThat(time.sleeps).containsExactly(INTERVAL);
     }
 
+    @Test
+    @DisplayName("조인이 있는 cargoquery는 join_on을 함께 보낸다")
+    void cargoQuery_WhenJoinGiven_SendJoinOn() {
+        // given
+        server.expect(requestTo(Matchers.startsWith(API)))
+                .andExpect(queryParam("tables", "PlayerImages%3DPI,%20Tournaments%3DT"))
+                .andExpect(queryParam("join_on", "PI.Tournament%3DT.OverviewPage"))
+                .andRespond(withSuccess(cargoPage(0, 1), MediaType.APPLICATION_JSON));
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+
+        // when
+        client.cargoQuery(new CargoQuery("PlayerImages=PI, Tournaments=T", "PI.Link", "PI.IsProfileImage = '1'",
+                "T.DateStart DESC", "PI.Tournament=T.OverviewPage"));
+
+        // then
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("조인이 없으면 join_on을 보내지 않는다")
+    void cargoQuery_WhenNoJoin_OmitJoinOn() {
+        // given
+        server.expect(requestTo(Matchers.not(Matchers.containsString("join_on"))))
+                .andRespond(withSuccess(cargoPage(0, 1), MediaType.APPLICATION_JSON));
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+
+        // when
+        client.cargoQuery(SCOREBOARD);
+
+        // then
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("사진 파일 URL을 imageinfo로 받고, 위키가 정규화한 제목을 요청한 파일 이름에 맞춰 돌려준다")
+    void imageUrls_WhenFilesExist_MapRequestedNameToUrl() {
+        // given
+        server.expect(requestTo(Matchers.startsWith(API)))
+                .andExpect(queryParam("action", "query"))
+                .andExpect(queryParam("prop", "imageinfo"))
+                .andExpect(queryParam("iiprop", "url"))
+                .andExpect(queryParam("titles", "File:T1_Faker_2026.png%7CFile:Missing.png"))
+                .andRespond(withSuccess("""
+                        {"query":{
+                          "normalized":[{"from":"File:T1_Faker_2026.png","to":"File:T1 Faker 2026.png"}],
+                          "pages":{
+                            "123":{"title":"File:T1 Faker 2026.png","imageinfo":[{"url":"https://static.wikia.nocookie.net/lolesports_gamepedia_en/images/a/ab/T1_Faker_2026.png"}]},
+                            "-1":{"title":"File:Missing.png","missing":""}
+                          }}}
+                        """, MediaType.APPLICATION_JSON));
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+
+        // when
+        Map<String, String> urls = client.imageUrls(List.of("T1_Faker_2026.png", "Missing.png"));
+
+        // then
+        assertThat(urls).containsExactly(Map.entry("T1_Faker_2026.png",
+                "https://static.wikia.nocookie.net/lolesports_gamepedia_en/images/a/ab/T1_Faker_2026.png"));
+    }
+
+    @Test
+    @DisplayName("사진 파일은 한 번에 50개씩 나눠 요청한다")
+    void imageUrls_WhenMoreThanFiftyFiles_RequestInBatches() {
+        // given
+        List<String> files = IntStream.range(0, 51).mapToObj(index -> "P" + index + ".png").toList();
+        server.expect(ExpectedCount.times(2), requestTo(Matchers.startsWith(API)))
+                .andRespond(withSuccess("""
+                        {"query":{"pages":{}}}
+                        """, MediaType.APPLICATION_JSON));
+        LeaguepediaClient client = client(USERNAME, PASSWORD);
+
+        // when
+        client.imageUrls(files);
+
+        // then
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("요청할 사진이 없으면 요청하지 않는다")
+    void imageUrls_WhenNoFile_SendNothing() {
+        // when
+        Map<String, String> urls = client(USERNAME, PASSWORD).imageUrls(List.of());
+
+        // then
+        assertThat(urls).isEmpty();
+        server.verify();
+    }
+
     private static String errorBody(String code) {
         return """
                 {"error":{"code":"%s","info":"slow down"}}
