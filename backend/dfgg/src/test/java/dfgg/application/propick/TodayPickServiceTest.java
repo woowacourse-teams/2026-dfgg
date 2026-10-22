@@ -1,8 +1,11 @@
 package dfgg.application.propick;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
+import dfgg.common.exception.ChampionNotFoundException;
+import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.image.ImageUrls;
@@ -18,6 +21,7 @@ import dfgg.presentation.dto.response.TodayPickResponse.PickResponse;
 import dfgg.presentation.dto.response.TodayPickResponse.RunesResponse;
 import dfgg.presentation.dto.response.TodayPickResponse.TreeResponse;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.junit.jupiter.api.BeforeEach;
@@ -190,6 +194,27 @@ class TodayPickServiceTest {
         assertThat(response.tournament()).isNull();
         assertThat(response.position()).isEqualTo(ChampionPosition.MID);
         assertThat(response.picks()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("밴이 11개 이상이면 거부한다 — 양 팀이 같은 챔피언을 밴한 중복도 개수에 든다")
+    void recommend_WhenElevenBans_Throw() {
+        // given
+        List<Integer> bans = Collections.nCopies(11, 9001);
+
+        // when & then
+        assertThatThrownBy(() -> todayPickService.recommend(ChampionPosition.MID, bans, Language.KO_KR))
+                .isInstanceOf(InvalidRecommendationRequestException.class)
+                .hasMessageContaining("11");
+    }
+
+    @Test
+    @DisplayName("등록되지 않은 챔피언을 밴하면 그 id를 담아 거부한다")
+    void recommend_WhenUnknownChampionBanned_Throw() {
+        assertThatThrownBy(() -> todayPickService.recommend(ChampionPosition.MID, List.of(9001, 99999),
+                Language.KO_KR))
+                .isInstanceOf(ChampionNotFoundException.class)
+                .hasMessageContaining("99999");
     }
 
     private PickResponse fakerPick(Language language) {
