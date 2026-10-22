@@ -1,6 +1,7 @@
 package dfgg.domain.propick;
 
 import dfgg.domain.champion.ChampionPosition;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -18,4 +19,6 @@ public interface ProPickRepository extends JpaRepository<ProPick, Long> {
             """)
     List<ProPick> findByTournamentAndPosition(@Param("tournamentId") Long tournamentId,
                                               @Param("position") ChampionPosition position);
+
+    List<ProPick> findBySourceGameIdIn(Collection<String> sourceGameIds);
 }

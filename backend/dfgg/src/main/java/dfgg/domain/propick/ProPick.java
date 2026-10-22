@@ -86,6 +86,31 @@ public class ProPick {
     protected ProPick() {
     }
 
+    public ProPick(ProTournament tournament, ProPlayer player, String sourceGameId) {
+        this.tournament = tournament;
+        this.player = player;
+        this.sourceGameId = sourceGameId;
+    }
+
+    /** 다시 수집하면 경기 정보를 덮어쓰고 주문·아이템·룬 자식 행은 지우고 다시 넣는다. */
+    public void update(ProTournament tournament, OffsetDateTime playedAt, String team, ProPickSide side,
+                       ChampionPosition position, Long championId, boolean win,
+                       List<ProPickSpell> spells, List<ProPickItem> items, List<ProPickRune> runes) {
+        this.tournament = tournament;
+        this.playedAt = playedAt;
+        this.team = team;
+        this.side = side;
+        this.position = position;
+        this.championId = championId;
+        this.win = win;
+        this.spells.clear();
+        this.spells.addAll(spells);
+        this.items.clear();
+        this.items.addAll(items);
+        this.runes.clear();
+        this.runes.addAll(runes);
+    }
+
     public Long getId() {
         return id;
     }
