@@ -1,6 +1,12 @@
-package dfgg.domain.score;
+package dfgg.domain.score.summonersrift;
 
 import dfgg.common.exception.InvalidDfScoreRequestException;
+import dfgg.domain.score.BaseScore;
+import dfgg.domain.score.DfScore;
+import dfgg.domain.score.GameDuration;
+import dfgg.domain.score.MatchScorer;
+import dfgg.domain.score.ScoringParticipant;
+import dfgg.domain.score.ScoringParticipants;
 import java.util.List;
 import java.util.Set;
 

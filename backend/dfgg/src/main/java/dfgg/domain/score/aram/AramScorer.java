@@ -1,10 +1,18 @@
-package dfgg.domain.score;
+package dfgg.domain.score.aram;
 
 import static dfgg.domain.score.ScoreFeature.CHAMPION_DAMAGE;
 import static dfgg.domain.score.ScoreFeature.DAMAGE_TAKEN_PER_LIFE;
 import static dfgg.domain.score.ScoreFeature.GOLD;
 import static dfgg.domain.score.ScoreFeature.TURRET_DAMAGE;
 
+import dfgg.domain.score.BaseScore;
+import dfgg.domain.score.DfScore;
+import dfgg.domain.score.GameDuration;
+import dfgg.domain.score.MatchScorer;
+import dfgg.domain.score.ScoreCurve;
+import dfgg.domain.score.ScoreFeature;
+import dfgg.domain.score.ScoringParticipant;
+import dfgg.domain.score.ScoringParticipants;
 import java.util.List;
 
 /**

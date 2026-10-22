@@ -1,4 +1,7 @@
-package dfgg.domain.score;
+package dfgg.domain.score.summonersrift;
+
+import dfgg.domain.score.GameDuration;
+import dfgg.domain.score.ScoringParticipant;
 
 /**
  * 데스 페널티 = min(30, 5 × 허용 데스를 넘은 데스). 허용 데스 = 분당 허용 데스 × 게임 시간(분).

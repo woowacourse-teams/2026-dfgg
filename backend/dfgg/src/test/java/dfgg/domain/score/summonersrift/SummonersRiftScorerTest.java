@@ -1,4 +1,4 @@
-package dfgg.domain.score;
+package dfgg.domain.score.summonersrift;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -6,6 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dfgg.common.exception.InvalidDfScoreRequestException;
 import dfgg.domain.champion.ChampionPosition;
+import dfgg.domain.score.DfScore;
+import dfgg.domain.score.GameDuration;
+import dfgg.domain.score.ScoringParticipant;
+import dfgg.domain.score.ScoringParticipants;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
