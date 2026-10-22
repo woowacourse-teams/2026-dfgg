@@ -1,5 +1,7 @@
 package dfgg.domain.catalog;
 
+import dfgg.domain.champion.Champion;
+import dfgg.domain.item.Item;
 import dfgg.domain.rune.Rune;
 import dfgg.domain.spell.SummonerSpell;
 import java.util.Collection;
@@ -20,6 +22,14 @@ public final class EnglishNameIndex {
 
     private EnglishNameIndex(Map<String, Integer> idsByName) {
         this.idsByName = Map.copyOf(idsByName);
+    }
+
+    public static EnglishNameIndex ofChampions(Collection<Champion> champions) {
+        return of(champions, champion -> Math.toIntExact(champion.getChampionId()), Champion::getName);
+    }
+
+    public static EnglishNameIndex ofItems(Collection<Item> items) {
+        return of(items, item -> Math.toIntExact(item.getItemId()), Item::getName);
     }
 
     public static EnglishNameIndex ofRunes(Collection<Rune> runes) {

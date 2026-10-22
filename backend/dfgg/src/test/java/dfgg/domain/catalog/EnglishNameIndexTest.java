@@ -3,6 +3,8 @@ package dfgg.domain.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dfgg.domain.champion.Champion;
+import dfgg.domain.item.Item;
 import dfgg.domain.rune.Rune;
 import dfgg.domain.spell.SummonerSpell;
 import java.util.List;
@@ -85,6 +87,30 @@ class EnglishNameIndexTest {
 
         // when & then
         assertThat(spells.idOf("ignite")).hasValue(14);
+    }
+
+    @Test
+    @DisplayName("챔피언도 영어 이름으로 id를 찾는다 — 기호가 든 이름도 맞춘다")
+    void ofChampions_WhenEnglishName_FindChampionId() {
+        // given
+        EnglishNameIndex champions = EnglishNameIndex.ofChampions(List.of(
+                new Champion(20L, "Nunu", Map.of("ko-KR", "누누와 윌럼프", "en-US", "Nunu & Willump"), List.of()),
+                new Champion(62L, "MonkeyKing", Map.of("ko-KR", "오공", "en-US", "Wukong"), List.of())));
+
+        // when & then
+        assertThat(champions.idOf("nunu & willump")).hasValue(20);
+        assertThat(champions.idOf("Wukong")).hasValue(62);
+    }
+
+    @Test
+    @DisplayName("아이템도 영어 이름으로 id를 찾는다 — 작은따옴표는 무시한다")
+    void ofItems_WhenEnglishName_FindItemId() {
+        // given
+        EnglishNameIndex items = EnglishNameIndex.ofItems(List.of(
+                new Item(1056L, Map.of("ko-KR", "도란의 반지", "en-US", "Doran's Ring"))));
+
+        // when & then
+        assertThat(items.idOf("Dorans Ring")).hasValue(1056);
     }
 
     private static Rune rune(int runeId, Integer treeId, int slot, String englishName) {
