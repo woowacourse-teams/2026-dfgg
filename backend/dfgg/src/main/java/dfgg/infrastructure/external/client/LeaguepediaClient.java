@@ -1,0 +1,125 @@
+package dfgg.infrastructure.external.client;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dfgg.infrastructure.external.config.LeaguepediaProperties;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestClient;
+
+/**
+ * Leaguepedia(MediaWiki) API 클라이언트. 봇 비밀번호로 로그인하고, 받은 세션 쿠키를 이후 요청에 싣는다.
+ * 비밀번호·쿠키는 로그나 예외 메시지에 넣지 않는다.
+ */
+@Component
+public class LeaguepediaClient {
+
+    private static final String API_PATH = "/api.php";
+    private static final String LOGIN_SUCCESS = "Success";
+
+    private final RestClient restClient;
+    private final LeaguepediaProperties properties;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Map<String, String> cookies = new ConcurrentHashMap<>();
+
+    public LeaguepediaClient(RestClient.Builder builder, LeaguepediaProperties properties) {
+        this.restClient = builder
+                .baseUrl(properties.baseUrl().toString())
+                .defaultHeader(HttpHeaders.USER_AGENT, properties.userAgent())
+                .build();
+        this.properties = properties;
+    }
+
+    public void login() {
+        if (!properties.hasCredentials()) {
+            throw new LeaguepediaException("LEAGUEPEDIA_BOT_USERNAME·LEAGUEPEDIA_BOT_PASSWORD가 설정되지 않았습니다.");
+        }
+        String token = loginToken();
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("action", "login");
+        form.add("lgname", properties.botUsername());
+        form.add("lgpassword", properties.botPassword());
+        form.add("lgtoken", token);
+        form.add("format", "json");
+        JsonNode result = post(form).path("login");
+        if (!LOGIN_SUCCESS.equals(result.path("result").asText())) {
+            throw new LeaguepediaException("Leaguepedia 로그인 실패: " + result.path("result").asText()
+                    + " (" + result.path("reason").asText() + ")");
+        }
+    }
+
+    private String loginToken() {
+        JsonNode body = get(Map.of("action", "query", "meta", "tokens", "type", "login"));
+        String token = body.path("query").path("tokens").path("logintoken").asText();
+        if (token.isEmpty()) {
+            throw new LeaguepediaException("Leaguepedia 로그인 토큰을 받지 못했습니다: " + errorCodeOf(body));
+        }
+        return token;
+    }
+
+    private JsonNode get(Map<String, String> params) {
+        ResponseEntity<String> response = restClient.get()
+                .uri(uriBuilder -> {
+                    uriBuilder.path(API_PATH);
+                    params.forEach(uriBuilder::queryParam);
+                    return uriBuilder.queryParam("format", "json").build();
+                })
+                .headers(this::addCookies)
+                .retrieve()
+                .toEntity(String.class);
+        return read(response);
+    }
+
+    private JsonNode post(MultiValueMap<String, String> form) {
+        ResponseEntity<String> response = restClient.post()
+                .uri(API_PATH)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .headers(this::addCookies)
+                .body(form)
+                .retrieve()
+                .toEntity(String.class);
+        return read(response);
+    }
+
+    private void addCookies(HttpHeaders headers) {
+        if (cookies.isEmpty()) {
+            return;
+        }
+        headers.set(HttpHeaders.COOKIE, cookies.entrySet().stream()
+                .map(cookie -> cookie.getKey() + "=" + cookie.getValue())
+                .collect(Collectors.joining("; ")));
+    }
+
+    private JsonNode read(ResponseEntity<String> response) {
+        storeCookies(response.getHeaders().getOrEmpty(HttpHeaders.SET_COOKIE));
+        try {
+            return objectMapper.readTree(response.getBody());
+        } catch (JsonProcessingException exception) {
+            throw new LeaguepediaException("Leaguepedia 응답이 JSON이 아닙니다.");
+        }
+    }
+
+    // "이름=값; path=/; ..."에서 이름과 값만 남긴다.
+    private void storeCookies(List<String> setCookies) {
+        for (String setCookie : setCookies) {
+            String pair = setCookie.split(";", 2)[0];
+            int separator = pair.indexOf('=');
+            if (separator > 0) {
+                cookies.put(pair.substring(0, separator).trim(), pair.substring(separator + 1).trim());
+            }
+        }
+    }
+
+    private String errorCodeOf(JsonNode body) {
+        return body.path("error").path("code").asText("응답에 토큰 없음");
+    }
+}
