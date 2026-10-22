@@ -24,6 +24,7 @@ import { trackEvent, type EventData } from '../analytics/umami';
 import type { FeedbackRating, EndedGame, OverlayClickTarget } from '../../shared/types';
 import { submitFeedback } from '../api/feedback';
 import { getHighlight, highlightSummary, listHighlights } from '../highlight/library';
+import { getLocale, setLocale } from '../settings';
 
 // 오버레이가 마지막으로 알려 준 펼친 높이. 접었다 펼 때 이 높이로 돌아간다.
 let overlayHeight = EXPANDED_HEIGHT;
@@ -103,5 +104,13 @@ export function registerIpcHandlers() {
     if (typeof target === 'string' && CLICK_TARGETS.has(target)) {
       recordOverlayClick(target as OverlayClickTarget);
     }
+  });
+  ipcMain.on('locale:get', (event) => {
+    event.returnValue = getLocale();
+  });
+  ipcMain.handle('locale:set', (_event, locale) => {
+    if (locale !== 'ko' && locale !== 'en') return;
+    setLocale(locale);
+    for (const win of BrowserWindow.getAllWindows()) win.webContents.reload();
   });
 }

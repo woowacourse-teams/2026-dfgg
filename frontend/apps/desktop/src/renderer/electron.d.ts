@@ -1,3 +1,4 @@
+import { Locale } from '../shared/i18n';
 import type {
   DfScores,
   EndedGame,
@@ -68,6 +69,10 @@ declare global {
       summary: (gameIds: number[]) => Promise<Record<number, HighlightSummary>>;
       get: (gameId: number) => Promise<HighlightGame | null>;
       onProgress: (callback: HighlightProgressListener) => Unsubscribe;
+    };
+    settings: {
+      getLocale: Locale;
+      setLocale: (locale: Locale) => Promise<void>;
     };
   }
 }

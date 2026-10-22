@@ -30,7 +30,6 @@ import {
 import { initAutoUpdate } from './autoUpdate';
 import { endHighlight, initHighlight } from './highlight/highlight';
 import { handleMediaProtocol, registerMediaScheme } from './highlight/mediaProtocol';
-import { mainLocale } from './locale';
 import { cleanupOrphans } from './highlight/storage';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
@@ -75,10 +74,6 @@ function detectClientStatus(home: BrowserWindow) {
 }
 
 function createWindow() {
-  // renderer 의 navigator.languages 는 --lang 을 따르지 않고 OS 언어를 그대로 줄 때가 있다.
-  // main 이 정한 언어를 넘겨 화면과 서버 응답의 언어를 한 기준으로 맞춘다.
-  const localeArg = `--dfgg-locale=${mainLocale()}`;
-
   const home = new BrowserWindow({
     width: 480,
     height: 600,
@@ -86,7 +81,6 @@ function createWindow() {
     titleBarStyle: 'hidden',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      additionalArguments: [localeArg],
     },
   });
 
@@ -102,7 +96,6 @@ function createWindow() {
     alwaysOnTop: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      additionalArguments: [localeArg],
     },
   });
 
