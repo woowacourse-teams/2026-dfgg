@@ -11,6 +11,14 @@ import org.springframework.data.repository.query.Param;
 public interface NormalizedMatchParticipantRuneRepository
         extends JpaRepository<NormalizedMatchParticipantRune, Long> {
 
+    /** 테이블 전체를 훑으므로 요청마다 부르지 않는다. 추천은 {@code RuneRecommendationPatch}를 거친다. */
+    @Query("SELECT DISTINCT rune.patch FROM NormalizedMatchParticipantRune rune")
+    List<String> findDistinctPatches();
+
+    /** {@code (champion_id, position, patch)} 인덱스로 한 챔피언·포지션의 한 패치 기록을 읽는다. */
+    List<NormalizedMatchParticipantRune> findByChampionIdAndPositionAndPatch(int championId, String position,
+                                                                            String patch);
+
     /**
      * 참가자 룬을 한 문장으로 저장한다. 같은 경기·참가자가 이미 있으면 새 행을 만들지 않고 룬을 덮어쓴다.
      * JPA 저장은 IDENTITY 키 때문에 행마다 DB를 왕복하므로, 칸별 배열로 넘겨 unnest로 행을 펼친다.
