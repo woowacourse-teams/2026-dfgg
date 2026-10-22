@@ -25,4 +25,8 @@ public final class ImageKeys {
     public static String rune(String patch, int runeId) {
         return ROOT + "/" + patch + "/runes/" + runeId + ".png";
     }
+
+    public static String summonerSpell(String version, String riotKey) {
+        return ROOT + "/" + version + "/summoner-spells/" + riotKey + ".png";
+    }
 }
