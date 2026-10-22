@@ -333,4 +333,20 @@ class DfScoreControllerTest {
                 .then().statusCode(400)
                 .body("detail", containsString("승패"));
     }
+
+    @Test
+    @DisplayName("Riot 원본처럼 포지션이 빈 문자열인 칼바람 경기도 채점한다")
+    void score_WhenAramPositionIsBlank_ReturnScores() {
+        // given
+        List<String> participants = tenParticipants().stream()
+                .map(participant -> participant.replaceAll("\"position\": \"[A-Z]+\"", "\"position\": \"\""))
+                .toList();
+
+        // when & then
+        given().contentType(ContentType.JSON)
+                .body(body(450, 600, participants))
+                .when().post("/api/df-score")
+                .then().statusCode(200)
+                .body("participants.score", everyItem(notNullValue()));
+    }
 }
