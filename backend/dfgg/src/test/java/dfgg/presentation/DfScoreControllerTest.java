@@ -381,4 +381,38 @@ class DfScoreControllerTest {
                 .then().statusCode(400)
                 .body("detail", containsString("포지션이 필요합니다"));
     }
+
+    @Test
+    @DisplayName("칼바람은 시야 점수와 오브젝트 피해 없이도 채점한다")
+    void score_WhenAramHasNoVisionAndObjective_ReturnScores() {
+        // given
+        List<String> participants = tenParticipants().stream()
+                .map(participant -> participant
+                        .replaceAll("\"position\": \"[A-Z]+\"", "\"position\": null")
+                        .replace("\"visionScore\": 20, ", "")
+                        .replace(", \"damageDealtToObjectives\": 5000", ""))
+                .toList();
+
+        // when & then
+        given().contentType(ContentType.JSON)
+                .body(body(450, 600, participants))
+                .when().post("/api/df-score")
+                .then().statusCode(200)
+                .body("participants.score", everyItem(notNullValue()));
+    }
+
+    @Test
+    @DisplayName("협곡에서 시야 점수가 빠지면 400으로 응답한다")
+    void score_WhenSummonersRiftHasNoVisionScore_ReturnBadRequest() {
+        // given
+        List<String> participants = tenParticipants();
+        participants.set(0, participant(0).replace("\"visionScore\": 20, ", ""));
+
+        // when & then
+        given().contentType(ContentType.JSON)
+                .body(body(420, 1800, participants))
+                .when().post("/api/df-score")
+                .then().statusCode(400)
+                .body("detail", containsString("시야 점수"));
+    }
 }

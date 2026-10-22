@@ -18,19 +18,19 @@ class AramScorerTest {
 
     private final AramScorer scorer = new AramScorer();
 
-    /** 100팀이 이긴 칼바람 경기. 포지션이 없다. 팀 킬은 45:31이고 p10은 20데스다. */
+    /** 100팀이 이긴 칼바람 경기. 포지션이 없다. 팀 킬은 45:31이고 p10은 20데스다. 시야 점수와 오브젝트 피해는 없다. */
     private ScoringParticipants referenceMatch() {
         return new ScoringParticipants(List.of(
-                new ScoringParticipant(100, null, true, 12, 8, 20, 45000, 38000, 14000, 0, 3000, 3000),
-                new ScoringParticipant(100, null, true, 6, 10, 25, 28000, 52000, 12500, 0, 1500, 1500),
-                new ScoringParticipant(100, null, true, 9, 6, 18, 38000, 25000, 13500, 0, 4000, 4000),
-                new ScoringParticipant(100, null, true, 15, 7, 14, 52000, 30000, 15500, 0, 2500, 2500),
-                new ScoringParticipant(100, null, true, 3, 9, 30, 12000, 30000, 11000, 0, 500, 500),
-                new ScoringParticipant(200, null, false, 8, 12, 10, 40000, 42000, 12800, 0, 2000, 2000),
-                new ScoringParticipant(200, null, false, 5, 14, 12, 25000, 60000, 11500, 0, 800, 800),
-                new ScoringParticipant(200, null, false, 7, 11, 9, 36000, 28000, 12000, 0, 1200, 1200),
-                new ScoringParticipant(200, null, false, 10, 13, 6, 48000, 26000, 13200, 0, 1800, 1800),
-                new ScoringParticipant(200, null, false, 1, 20, 15, 9000, 35000, 9500, 0, 0, 0)));
+                new ScoringParticipant(100, null, true, 12, 8, 20, 45000, 38000, 14000, null, 3000, null),
+                new ScoringParticipant(100, null, true, 6, 10, 25, 28000, 52000, 12500, null, 1500, null),
+                new ScoringParticipant(100, null, true, 9, 6, 18, 38000, 25000, 13500, null, 4000, null),
+                new ScoringParticipant(100, null, true, 15, 7, 14, 52000, 30000, 15500, null, 2500, null),
+                new ScoringParticipant(100, null, true, 3, 9, 30, 12000, 30000, 11000, null, 500, null),
+                new ScoringParticipant(200, null, false, 8, 12, 10, 40000, 42000, 12800, null, 2000, null),
+                new ScoringParticipant(200, null, false, 5, 14, 12, 25000, 60000, 11500, null, 800, null),
+                new ScoringParticipant(200, null, false, 7, 11, 9, 36000, 28000, 12000, null, 1200, null),
+                new ScoringParticipant(200, null, false, 10, 13, 6, 48000, 26000, 13200, null, 1800, null),
+                new ScoringParticipant(200, null, false, 1, 20, 15, 9000, 35000, 9500, null, 0, null)));
     }
 
     @Test

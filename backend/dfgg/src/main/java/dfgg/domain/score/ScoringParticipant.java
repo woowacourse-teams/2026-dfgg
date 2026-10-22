@@ -4,7 +4,7 @@ import dfgg.common.exception.InvalidDfScoreRequestException;
 import dfgg.domain.champion.ChampionPosition;
 
 /**
- * 채점할 참가자 한 명의 원시 값. 포지션은 없을 수 있다 — 칼바람처럼 포지션이 없는 모드가 있다.
+ * 채점할 참가자 한 명의 원시 값. 포지션·시야 점수·오브젝트 피해는 없을 수 있다 — 칼바람에는 셋 다 없다.
  */
 public class ScoringParticipant {
 
@@ -17,14 +17,14 @@ public class ScoringParticipant {
     private final int championDamage;
     private final int damageTaken;
     private final int gold;
-    private final int visionScore;
+    private final Integer visionScore;
     private final int turretDamage;
-    private final int objectiveDamage;
+    private final Integer objectiveDamage;
 
     public ScoringParticipant(int teamId, ChampionPosition position, boolean win,
                               int kills, int deaths, int assists,
-                              int championDamage, int damageTaken, int gold, int visionScore,
-                              int turretDamage, int objectiveDamage) {
+                              int championDamage, int damageTaken, int gold, Integer visionScore,
+                              int turretDamage, Integer objectiveDamage) {
         validateObjectiveDamage(turretDamage, objectiveDamage);
         this.teamId = teamId;
         this.position = position;
@@ -41,8 +41,8 @@ public class ScoringParticipant {
     }
 
     /** Riot의 오브젝트 피해는 포탑 피해를 포함한다. 작으면 두 값 중 하나가 잘못 들어왔다. */
-    private void validateObjectiveDamage(int turretDamage, int objectiveDamage) {
-        if (objectiveDamage < turretDamage) {
+    private void validateObjectiveDamage(int turretDamage, Integer objectiveDamage) {
+        if (objectiveDamage != null && objectiveDamage < turretDamage) {
             throw new InvalidDfScoreRequestException(
                     "오브젝트 피해(%d)가 포탑 피해(%d)보다 작을 수 없습니다".formatted(objectiveDamage, turretDamage));
         }
@@ -58,6 +58,10 @@ public class ScoringParticipant {
 
     public ChampionPosition position() {
         return position;
+    }
+
+    public boolean hasVisionAndObjectiveStats() {
+        return visionScore != null && objectiveDamage != null;
     }
 
     public boolean isWinner() {
@@ -93,9 +97,17 @@ public class ScoringParticipant {
             case CHAMPION_DAMAGE -> championDamage;
             case GOLD -> gold;
             case DAMAGE_TAKEN_PER_LIFE -> (double) damageTaken / (deaths + 1);
-            case VISION_SCORE -> visionScore;
+            case VISION_SCORE -> required(visionScore, feature);
             case TURRET_DAMAGE -> turretDamage;
-            case EPIC_MONSTER_DAMAGE -> objectiveDamage - turretDamage;
+            case EPIC_MONSTER_DAMAGE -> required(objectiveDamage, feature) - turretDamage;
         };
+    }
+
+    /** 값이 없는 항목은 그 값을 쓰지 않는 모드(칼바람)에서만 생긴다. 쓰려 했다면 채점기 검증이 빠진 것이다. */
+    private int required(Integer value, ScoreFeature feature) {
+        if (value == null) {
+            throw new IllegalStateException(feature + " 값이 없는 참가자를 채점하려 했습니다");
+        }
+        return value;
     }
 }
