@@ -5,20 +5,30 @@ import { useEffect, useState } from 'react';
 import { Locale } from '../../../../shared/i18n';
 import { LOCALE, setLocale, t } from '../../../i18n';
 import { BackIcon } from './BackIcon';
+import ConfirmModal from './ConfirmModal';
 import { SettingRow, SettingSection } from './SettingSection';
+
+const MAX_CLIPS_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 
 export default function Setting({ onCloseSetting }: { onCloseSetting: () => void }) {
   const [autoLaunch, setAutoLaunch] = useState(false);
   const [autoDocking, setAutoDocking] = useState(false);
   const [overlayShow, setOverlayShow] = useState(false);
   const [highlight, setHighlight] = useState(false);
+  const [maxClipCount, setMaxClipCount] = useState(5);
+  const [pendingMaxClipCount, setPendingMaxClipCount] = useState<number | null>(null);
+
+  const applyMaxClipCount = (n: number) => {
+    setMaxClipCount(n);
+    window.settings.setHighlightMaxClipCount(n);
+  };
 
   useEffect(() => {
     window.settings.getAutoLaunch().then(setAutoLaunch);
     window.settings.getAutoDocking().then(setAutoDocking);
     window.settings.getOverlayShow().then(setOverlayShow);
     window.settings.getHighlightEnabled().then(setHighlight);
-    console.log(window.settings.getHighlightRoot);
+    window.settings.getHighlightMaxClipCount().then(setMaxClipCount);
   }, []);
 
   return (
@@ -107,8 +117,20 @@ export default function Setting({ onCloseSetting }: { onCloseSetting: () => void
             </div>
           </SettingRow>
           <SettingRow label={t.setting.maxClips} description={t.setting.maxClipsDesc}>
-            <select>
-              <input />
+            <select
+              className='setting-select'
+              value={maxClipCount}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                if (next < maxClipCount) setPendingMaxClipCount(next);
+                else applyMaxClipCount(next);
+              }}
+            >
+              {MAX_CLIPS_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {t.setting.clips(n)}
+                </option>
+              ))}
             </select>
           </SettingRow>
         </SettingSection>
@@ -118,6 +140,20 @@ export default function Setting({ onCloseSetting }: { onCloseSetting: () => void
           {t.setting.save}
         </button>
       </footer>
+
+      {pendingMaxClipCount !== null && (
+        <ConfirmModal
+          title={t.setting.maxClipsConfirmTitle}
+          message={t.setting.maxClipsConfirmMessage(pendingMaxClipCount)}
+          confirmLabel={t.setting.maxClipsConfirmOk}
+          cancelLabel={t.setting.cancel}
+          onConfirm={() => {
+            applyMaxClipCount(pendingMaxClipCount);
+            setPendingMaxClipCount(null);
+          }}
+          onCancel={() => setPendingMaxClipCount(null)}
+        />
+      )}
     </div>
   );
 }

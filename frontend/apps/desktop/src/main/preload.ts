@@ -107,4 +107,6 @@ contextBridge.exposeInMainWorld('settings', {
   setHighlightEnabled: (enabled: boolean) => ipcRenderer.invoke('highlight:set-enabled', enabled),
   getHighlightRoot: () => ipcRenderer.sendSync('highlight:root'),
   openHighlightFolder: () => ipcRenderer.invoke('highlight:open-folder'),
+  getHighlightMaxClipCount: () => ipcRenderer.invoke('highlight:get-max-clip'),
+  setHighlightMaxClipCount: (count: number) => ipcRenderer.invoke('highlight:set-max-clip', count),
 });

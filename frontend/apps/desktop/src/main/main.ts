@@ -30,7 +30,7 @@ import {
 import { initAutoUpdate } from './autoUpdate';
 import { endHighlight, initHighlight } from './highlight/highlight';
 import { handleMediaProtocol, registerMediaScheme } from './highlight/mediaProtocol';
-import { cleanupOrphans } from './highlight/storage';
+import { cleanupOrphans, setMaxGames } from './highlight/storage';
 import { readSettings } from './settings';
 import { initOverlayVisibility, updateOverlayPhase } from './overlay/visibility';
 
@@ -144,6 +144,7 @@ if (!gotTheLock) {
 
     cleanupOrphans(); // 녹화 시작되기 전에 미사용 하이라이트 정리
     initHighlight(readSettings().highlight ?? true);
+    setMaxGames(readSettings().maxClipCount ?? 5);
 
     registerIpcHandlers();
     homeWindow = createWindow();

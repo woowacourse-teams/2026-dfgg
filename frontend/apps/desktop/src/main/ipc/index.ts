@@ -35,6 +35,7 @@ import { isAutoLaunchEnabled, setAutoLaunch } from '../autoLaunch/autoLaunch';
 import { getDockingEnabled, setDockingEnabled } from '../docking/docking';
 import { isOverlayEnabled, setOverlayEnabled } from '../overlay/visibility';
 import { getHighlightEnabled, setHighlightEnabled } from '../highlight/highlight';
+import { getMaxGames, setMaxGames } from '../highlight/storage';
 
 // 오버레이가 마지막으로 알려 준 펼친 높이. 접었다 펼 때 이 높이로 돌아간다.
 let overlayHeight = EXPANDED_HEIGHT;
@@ -153,5 +154,11 @@ export function registerIpcHandlers() {
     const root = highlightsRoot();
     fs.mkdirSync(root, { recursive: true });
     await shell.openPath(root);
+  });
+  ipcMain.handle('highlight:get-max-clip', getMaxGames);
+  ipcMain.handle('highlight:set-max-clip', (_event, count: number) => {
+    if (typeof count !== 'number') return;
+    setMaxGames(count);
+    updateSettings({ maxClipCount: count });
   });
 }

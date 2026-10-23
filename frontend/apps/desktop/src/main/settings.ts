@@ -9,6 +9,7 @@ export type Settings = {
   docking?: boolean;
   showOverlay?: boolean;
   highlight?: boolean;
+  maxClipCount?: number;
 };
 
 const file = path.join(app.getPath('userData'), 'setting.json');

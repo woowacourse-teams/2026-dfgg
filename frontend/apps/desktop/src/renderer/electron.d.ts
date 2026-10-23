@@ -83,6 +83,8 @@ declare global {
       setHighlightEnabled: (enabled: boolean) => Promise<void>;
       getHighlightRoot: () => string;
       openHighlightFolder: () => Promise<string>;
+      getHighlightMaxClipCount: () => Promise<number>;
+      setHighlightMaxClipCount: (count: number) => Promise<number>;
     };
   }
 }
