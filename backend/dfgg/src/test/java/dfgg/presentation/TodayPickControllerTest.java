@@ -10,6 +10,8 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 
 import io.restassured.RestAssured;
+import io.restassured.http.ContentType;
+import io.restassured.response.ValidatableResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -56,9 +58,12 @@ class TodayPickControllerTest {
     @DisplayName("최근 대회의 내 라인 픽을 대회·선수·챔피언·주문·아이템·룬과 함께 응답한다")
     void todayPicks_WhenPositionGiven_RespondPicksOfLatestTournament() {
         given()
+                .contentType(ContentType.JSON)
                 .header(HttpHeaders.ACCEPT_LANGUAGE, "ko")
-                .queryParam("position", "MID")
-                .when().get("/api/today-picks")
+                .body("""
+                        {"position": "MID"}
+                        """)
+                .when().post("/api/today-picks")
                 .then().statusCode(200)
                 .body("tournament.name", equalTo("2026 Worlds Main Event"))
                 .body("tournament.league", equalTo("World Championship"))
@@ -74,12 +79,14 @@ class TodayPickControllerTest {
     }
 
     @Test
-    @DisplayName("밴은 쉼표로 받고 중복을 허용하며, 밴된 챔피언의 픽은 빠진다")
+    @DisplayName("밴은 중복을 허용하고, 밴된 챔피언의 픽은 빠진다")
     void todayPicks_WhenBansGiven_ExcludeBannedChampions() {
         given()
-                .queryParam("position", "MID")
-                .queryParam("bans", "9002,9002")
-                .when().get("/api/today-picks")
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"position": "MID", "bans": [9002, 9002]}
+                        """)
+                .when().post("/api/today-picks")
                 .then().statusCode(200)
                 .body("picks.champion.id", contains(9001));
     }
@@ -92,8 +99,11 @@ class TodayPickControllerTest {
 
         // when & then
         given()
-                .queryParam("position", "MID")
-                .when().get("/api/today-picks")
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"position": "MID"}
+                        """)
+                .when().post("/api/today-picks")
                 .then().statusCode(200)
                 .body("tournament", nullValue())
                 .body("position", equalTo("MID"))
@@ -103,60 +113,73 @@ class TodayPickControllerTest {
     @Test
     @DisplayName("position이 없으면 400이다")
     void todayPicks_WhenPositionMissing_Respond400() {
-        given()
-                .when().get("/api/today-picks")
-                .then().statusCode(400);
+        badRequest("""
+                {"bans": [9001]}
+                """);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"MIDDLE", "mid", "ADC"})
     @DisplayName("position이 다섯 라인 이름이 아니면 400이다")
     void todayPicks_WhenPositionInvalid_Respond400(String position) {
-        given()
-                .queryParam("position", position)
-                .when().get("/api/today-picks")
-                .then().statusCode(400);
+        badRequest("""
+                {"position": "%s"}
+                """.formatted(position));
     }
 
     @Test
     @DisplayName("밴이 11개 이상이면 400이다 — 양 팀 5개씩 10개까지다")
     void todayPicks_WhenElevenBans_Respond400() {
-        given()
-                .queryParam("position", "MID")
-                .queryParam("bans", "9001,9001,9001,9001,9001,9001,9001,9001,9001,9001,9001")
-                .when().get("/api/today-picks")
-                .then().statusCode(400)
-                .body("detail", containsString("11"));
+        badRequest("""
+                {"position": "MID", "bans": [9001, 9001, 9001, 9001, 9001, 9001, 9001, 9001, 9001, 9001, 9001]}
+                """)
+                .body("detail", containsString("bans"));
     }
 
     @Test
     @DisplayName("알 수 없는 챔피언을 밴하면 400이고, 그 id를 알려준다")
     void todayPicks_WhenUnknownChampionBanned_Respond400WithId() {
-        given()
-                .queryParam("position", "MID")
-                .queryParam("bans", "9001,99999")
-                .when().get("/api/today-picks")
-                .then().statusCode(400)
+        badRequest("""
+                {"position": "MID", "bans": [9001, 99999]}
+                """)
                 .body("detail", containsString("99999"));
     }
 
     @Test
     @DisplayName("밴이 숫자가 아니면 400이다")
     void todayPicks_WhenBanNotNumber_Respond400() {
-        given()
-                .queryParam("position", "MID")
-                .queryParam("bans", "Ahri")
-                .when().get("/api/today-picks")
-                .then().statusCode(400);
+        badRequest("""
+                {"position": "MID", "bans": ["Ahri"]}
+                """);
     }
 
     @Test
     @DisplayName("밴을 생략할 수 있다")
     void todayPicks_WhenBansOmitted_Respond200() {
         given()
-                .queryParam("position", "MID")
-                .when().get("/api/today-picks")
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"position": "MID"}
+                        """)
+                .when().post("/api/today-picks")
                 .then().statusCode(200)
                 .body("picks", hasSize(2));
+    }
+
+    @Test
+    @DisplayName("GET으로는 더 이상 받지 않는다")
+    void todayPicks_WhenGet_Respond405() {
+        given()
+                .queryParam("position", "MID")
+                .when().get("/api/today-picks")
+                .then().statusCode(405);
+    }
+
+    private ValidatableResponse badRequest(String body) {
+        return given()
+                .contentType(ContentType.JSON)
+                .body(body)
+                .when().post("/api/today-picks")
+                .then().statusCode(400);
     }
 }
