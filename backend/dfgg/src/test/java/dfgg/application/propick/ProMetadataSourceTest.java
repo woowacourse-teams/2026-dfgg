@@ -118,6 +118,25 @@ class ProMetadataSourceTest {
     }
 
     @Test
+    @DisplayName("Players·PlayerImages가 소문자로 시작하는 페이지 이름(kyeahoo)을 돌려줘도 같은 선수로 맞춰 사진과 팀을 붙인다")
+    void players_WhenWikiReturnsLowercasePage_MatchCanonicalPage() {
+        // given
+        given(leaguepediaClient.cargoQuery(argThat(query -> query != null && query.tables().equals("Players=P"))))
+                .willReturn(List.of(Map.of("OverviewPage", "kyeahoo", "ID", "kyeahoo", "Team", "Karmine Corp")));
+        given(leaguepediaClient.cargoQuery(argThat(query -> query != null && query.tables().startsWith("PlayerImages"))))
+                .willReturn(List.of(Map.of("Link", "kyeahoo", "FileName", "KC kyeahoo 2026.png", "DateStart", "2026-07-01")));
+        given(leaguepediaClient.imageUrls(anyCollection()))
+                .willReturn(Map.of("KC kyeahoo 2026.png", "https://static.wikia.nocookie.net/kyeahoo.png"));
+
+        // when
+        List<ProPlayerInfo> players = source.players(List.of("Kyeahoo"));
+
+        // then
+        assertThat(players).containsExactly(
+                new ProPlayerInfo("Kyeahoo", "kyeahoo", "Karmine Corp", "https://static.wikia.nocookie.net/kyeahoo.png"));
+    }
+
+    @Test
     @DisplayName("사진은 대회 시작일이 가장 늦은 것으로 고르도록 조인·정렬해 요청한다")
     void players_WhenQueryingImages_JoinTournamentsOrderByLatestStart() {
         // given

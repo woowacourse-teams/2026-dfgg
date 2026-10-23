@@ -31,11 +31,12 @@ public class ProMetadataSource {
     }
 
     public List<ProTournamentInfo> tournaments(Collection<String> overviewPages) {
-        Map<String, Map<String, String>> rows = queryByPages(List.copyOf(overviewPages), pages -> new CargoQuery(
-                "Tournaments=T",
-                "T.OverviewPage, T.Name, T.League, T.Region, T.DateStart, T.Date",
-                "T.OverviewPage IN (" + inList(pages) + ")",
-                "T.OverviewPage"));
+        Map<String, Map<String, String>> rows = queryByPages(List.copyOf(overviewPages), Function.identity(),
+                pages -> new CargoQuery(
+                        "Tournaments=T",
+                        "T.OverviewPage, T.Name, T.League, T.Region, T.DateStart, T.Date",
+                        "T.OverviewPage IN (" + inList(pages) + ")",
+                        "T.OverviewPage"));
         return overviewPages.stream()
                 .map(page -> tournamentOf(page, rows.get(page)))
                 .toList();
@@ -51,11 +52,13 @@ public class ProMetadataSource {
 
     public List<ProPlayerInfo> players(Collection<String> playerPages) {
         List<String> pages = playerPages.stream().map(ProPlayer::canonicalPage).distinct().toList();
-        Map<String, Map<String, String>> profiles = queryByPages(pages, batch -> new CargoQuery(
-                "Players=P",
-                "P.OverviewPage, P.ID, P.Team",
-                "P.OverviewPage IN (" + inList(batch) + ")",
-                "P.OverviewPage"));
+        // 위키 비교는 대소문자를 가리지 않아 kyeahoo처럼 소문자 페이지가 돌아올 수 있다. 같은 규칙으로 맞춰 찾는다.
+        Map<String, Map<String, String>> profiles = queryByPages(pages, ProPlayer::canonicalPage,
+                batch -> new CargoQuery(
+                        "Players=P",
+                        "P.OverviewPage, P.ID, P.Team",
+                        "P.OverviewPage IN (" + inList(batch) + ")",
+                        "P.OverviewPage"));
         Map<String, String> imageFiles = latestProfileImages(pages);
         Map<String, String> imageUrls = leaguepediaClient.imageUrls(List.copyOf(imageFiles.values()));
         return pages.stream()
@@ -88,17 +91,17 @@ public class ProMetadataSource {
                             "PI.Link IN (" + inList(batch) + ") AND PI.IsProfileImage = '1'",
                             "T.DateStart DESC, PI.SortDate DESC",
                             "PI.Tournament=T.OverviewPage"))
-                    .forEach(row -> files.putIfAbsent(row.get("Link"), row.get("FileName")));
+                    .forEach(row -> files.putIfAbsent(ProPlayer.canonicalPage(row.get("Link")), row.get("FileName")));
         }
         return files;
     }
 
-    private Map<String, Map<String, String>> queryByPages(List<String> pages,
+    private Map<String, Map<String, String>> queryByPages(List<String> pages, Function<String, String> keyOf,
                                                          Function<List<String>, CargoQuery> queryOf) {
         Map<String, Map<String, String>> rows = new LinkedHashMap<>();
         for (List<String> batch : batches(pages)) {
             leaguepediaClient.cargoQuery(queryOf.apply(batch))
-                    .forEach(row -> rows.putIfAbsent(row.get("OverviewPage"), row));
+                    .forEach(row -> rows.putIfAbsent(keyOf.apply(row.get("OverviewPage")), row));
         }
         return rows;
     }
