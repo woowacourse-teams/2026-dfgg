@@ -49,12 +49,9 @@ public final class EnglishNameIndex {
             if (englishName == null || englishName.isBlank()) {
                 continue;
             }
-            Integer id = idOf.apply(entry);
-            String name = normalize(englishName);
-            Integer previous = idsByName.putIfAbsent(name, id);
-            if (previous != null) {
-                throw new IllegalStateException("[Error] 영어 이름이 겹칩니다: " + previous + ", " + id);
-            }
+            // 같은 이름이 여럿이면 가장 작은 id를 쓴다. 아이템은 접두사 없는 id(3075)가 협곡 랭크용이고,
+            // 접두사 붙은 id(323075)는 다른 모드용 변형이다.
+            idsByName.merge(normalize(englishName), idOf.apply(entry), Math::min);
         }
         return new EnglishNameIndex(idsByName);
     }

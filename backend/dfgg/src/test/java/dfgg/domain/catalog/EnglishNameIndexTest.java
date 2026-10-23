@@ -1,7 +1,6 @@
 package dfgg.domain.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dfgg.domain.champion.Champion;
 import dfgg.domain.item.Item;
@@ -12,6 +11,7 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -62,19 +62,20 @@ class EnglishNameIndexTest {
         assertThat(runes.idOf(englishName)).isEmpty();
     }
 
-    @Test
-    @DisplayName("정규화하면 같아지는 이름이 둘이면 색인을 만들 때 거부한다")
-    void ofRunes_WhenNormalizedNamesCollide_Throw() {
+    @ParameterizedTest
+    @CsvSource({"3075, 323075", "323075, 3075"})
+    @DisplayName("영어 이름이 같은 아이템이 여럿이면 넣은 순서와 상관없이 가장 작은 id를 쓴다 — 접두사 없는 협곡 랭크 id다")
+    void ofItems_WhenEnglishNamesCollide_UseSmallestId(long firstId, long secondId) {
         // given
-        List<Rune> colliding = List.of(
-                rune(GRASP, 8400, 0, "Grasp of the Undying"),
-                rune(9999, 8400, 1, "Grasp Of The-Undying"));
+        List<Item> items = List.of(
+                new Item(firstId, Map.of("ko-KR", "가시 갑옷", "en-US", "Thornmail")),
+                new Item(secondId, Map.of("ko-KR", "가시 갑옷", "en-US", "Thornmail")));
 
-        // when & then
-        assertThatThrownBy(() -> EnglishNameIndex.ofRunes(colliding))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("8437")
-                .hasMessageContaining("9999");
+        // when
+        EnglishNameIndex index = EnglishNameIndex.ofItems(items);
+
+        // then
+        assertThat(index.idOf("Thornmail")).hasValue(3075);
     }
 
     @Test
