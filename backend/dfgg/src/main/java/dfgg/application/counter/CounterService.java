@@ -121,7 +121,7 @@ public class CounterService {
                 .toList();
     }
 
-    /** 아군·적·밴에 있는 챔피언은 빼고 저장 순서대로 앞의 몇 개를 고른다. */
+    /** 아군·적·밴에 있는 챔피언을 뺀 카운터 후보를 저장 순서대로 모은다. 개수는 이름을 확인한 뒤 자른다. */
     private Map<Integer, List<Integer>> countersByEnemy(CounterRequest request) {
         Set<Integer> taken = takenChampions(request);
         return request.enemies().stream()
@@ -130,7 +130,6 @@ public class CounterService {
                         .findByEnemyChampionIdAndPositionOrderByRankAsc(enemyId, request.myPosition()).stream()
                         .map(ChampionCounter::getCounterChampionId)
                         .filter(counterId -> !taken.contains(counterId))
-                        .limit(picksPerEnemy)
                         .toList()));
     }
 
@@ -141,8 +140,11 @@ public class CounterService {
         return taken;
     }
 
+    // 카운터는 사용자가 SQL로 넣어 챔피언 목록에 없는 id가 섞일 수 있다. 그런 카운터는 빼고 다음 순위로 채운다.
     private List<CounterPickResponse> countersOf(List<Integer> counterIds, Map<Integer, String> names) {
         return counterIds.stream()
+                .filter(names::containsKey)
+                .limit(picksPerEnemy)
                 .map(counterId -> new CounterPickResponse(counterId, names.get(counterId)))
                 .toList();
     }

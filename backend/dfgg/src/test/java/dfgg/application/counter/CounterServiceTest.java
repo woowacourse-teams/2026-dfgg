@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.mock;
 
 import dfgg.domain.champion.Champion;
@@ -165,6 +166,34 @@ class CounterServiceTest {
         // then
         assertThat(response.enemies().getFirst().counters()).extracting(CounterPickResponse::championId)
                 .containsExactly(1, 2, 3, 4);
+    }
+
+    @Test
+    @DisplayName("챔피언 목록에 없는 카운터는 응답에서 빼고, 그 자리는 다음 순위로 채운다")
+    void recommend_WhenCounterChampionNotRegistered_SkipAndFillWithNext() {
+        // given
+        int unregistered = 777;
+        List<ChampionCounter> stored = counters(AHRI, ChampionPosition.MID, 1, unregistered, 2, 3, 4, 5, 6);
+        given(counterRepository.findByEnemyChampionIdAndPositionOrderByRankAsc(AHRI, ChampionPosition.MID))
+                .willReturn(stored);
+        willAnswer(invocation -> {
+            Iterable<Long> ids = invocation.getArgument(0);
+            return StreamSupport.stream(ids.spliterator(), false)
+                    .filter(id -> id != unregistered)
+                    .map(id -> new Champion(id, "Key" + id, Map.of("ko-KR", "챔피언" + id, "en-US", "Champion" + id),
+                            List.of()))
+                    .toList();
+        }).given(championRepository).findAllById(any());
+        CounterRequest request = new CounterRequest(ChampionPosition.MID, List.of(AHRI), List.of(), List.of());
+
+        // when
+        CounterResponse response = counterService.recommend(request, Language.KO_KR);
+
+        // then
+        assertThat(response.enemies().getFirst().counters()).extracting(CounterPickResponse::championId)
+                .containsExactly(1, 2, 3, 4, 5);
+        assertThat(response.enemies().getFirst().counters()).extracting(CounterPickResponse::name)
+                .doesNotContainNull();
     }
 
     @Test
