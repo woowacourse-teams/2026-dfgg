@@ -79,6 +79,10 @@ declare global {
       setAutoDocking: (enabled: boolean) => Promise<void>;
       getOverlayShow: () => Promise<boolean>;
       setOverlayShow: (enabled: boolean) => Promise<void>;
+      getHighlightEnabled: () => Promise<boolean>;
+      setHighlightEnabled: (enabled: boolean) => Promise<void>;
+      getHighlightRoot: () => string;
+      openHighlightFolder: () => Promise<string>;
     };
   }
 }

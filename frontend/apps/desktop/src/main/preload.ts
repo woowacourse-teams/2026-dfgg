@@ -103,4 +103,8 @@ contextBridge.exposeInMainWorld('settings', {
   setAutoDocking: (enabled: boolean) => ipcRenderer.invoke('docking:set', enabled),
   getOverlayShow: () => ipcRenderer.invoke('overlay:get-enabled'),
   setOverlayShow: (enabled: boolean) => ipcRenderer.invoke('overlay:set-enabled', enabled),
+  getHighlightEnabled: () => ipcRenderer.invoke('highlight:get-enabled'),
+  setHighlightEnabled: (enabled: boolean) => ipcRenderer.invoke('highlight:set-enabled', enabled),
+  getHighlightRoot: () => ipcRenderer.sendSync('highlight:root'),
+  openHighlightFolder: () => ipcRenderer.invoke('highlight:open-folder'),
 });

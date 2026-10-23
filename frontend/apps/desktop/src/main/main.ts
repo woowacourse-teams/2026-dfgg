@@ -143,7 +143,7 @@ if (!gotTheLock) {
     initGameTracking();
 
     cleanupOrphans(); // 녹화 시작되기 전에 미사용 하이라이트 정리
-    initHighlight();
+    initHighlight(readSettings().highlight ?? true);
 
     registerIpcHandlers();
     homeWindow = createWindow();

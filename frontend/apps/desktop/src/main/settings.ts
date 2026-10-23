@@ -8,6 +8,7 @@ export type Settings = {
   locale?: Locale;
   docking?: boolean;
   showOverlay?: boolean;
+  highlight?: boolean;
 };
 
 const file = path.join(app.getPath('userData'), 'setting.json');

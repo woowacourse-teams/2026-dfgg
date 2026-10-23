@@ -1,4 +1,5 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, ipcMain, shell } from 'electron';
+import fs from 'node:fs';
 import {
   fetchCurrentSummoner,
   fetchMatchHistory,
@@ -23,11 +24,17 @@ import { setQuitSource } from '../analytics/sessionTracker';
 import { trackEvent, type EventData } from '../analytics/umami';
 import type { FeedbackRating, EndedGame, OverlayClickTarget } from '../../shared/types';
 import { submitFeedback } from '../api/feedback';
-import { getHighlight, highlightSummary, listHighlights } from '../highlight/library';
+import {
+  getHighlight,
+  highlightsRoot,
+  highlightSummary,
+  listHighlights,
+} from '../highlight/library';
 import { getLocale, updateSettings } from '../settings';
 import { isAutoLaunchEnabled, setAutoLaunch } from '../autoLaunch/autoLaunch';
 import { getDockingEnabled, setDockingEnabled } from '../docking/docking';
 import { isOverlayEnabled, setOverlayEnabled } from '../overlay/visibility';
+import { getHighlightEnabled, setHighlightEnabled } from '../highlight/highlight';
 
 // 오버레이가 마지막으로 알려 준 펼친 높이. 접었다 펼 때 이 높이로 돌아간다.
 let overlayHeight = EXPANDED_HEIGHT;
@@ -132,5 +139,19 @@ export function registerIpcHandlers() {
     if (typeof enabled !== 'boolean') return;
     setOverlayEnabled(enabled);
     updateSettings({ showOverlay: enabled });
+  });
+  ipcMain.handle('highlight:get-enabled', getHighlightEnabled);
+  ipcMain.handle('highlight:set-enabled', (_event, enabled: boolean) => {
+    if (typeof enabled !== 'boolean') return;
+    setHighlightEnabled(enabled);
+    updateSettings({ highlight: enabled });
+  });
+  ipcMain.on('highlight:root', (event) => {
+    event.returnValue = highlightsRoot();
+  });
+  ipcMain.handle('highlight:open-folder', async () => {
+    const root = highlightsRoot();
+    fs.mkdirSync(root, { recursive: true });
+    await shell.openPath(root);
   });
 }

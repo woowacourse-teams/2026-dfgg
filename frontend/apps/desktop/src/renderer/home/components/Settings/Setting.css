@@ -226,3 +226,35 @@
   padding: 12px 20px 20px;
   border-top: 1px solid #1a1c21;
 }
+
+.setting-button {
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #2c3038;
+  border-radius: 6px;
+  background: #1d2027;
+  color: #e9eaee;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.setting-button:hover {
+  border-color: #3a3f49;
+  background: #23262e;
+}
+
+.setting-button:active {
+  background: #191b21;
+}
+
+.setting-button:focus-visible {
+  outline: none;
+  border-color: #e63950;
+  box-shadow: 0 0 0 2px rgba(230, 57, 80, 0.25);
+}

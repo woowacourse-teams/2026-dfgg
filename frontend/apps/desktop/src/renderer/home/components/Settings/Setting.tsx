@@ -11,11 +11,14 @@ export default function Setting({ onCloseSetting }: { onCloseSetting: () => void
   const [autoLaunch, setAutoLaunch] = useState(false);
   const [autoDocking, setAutoDocking] = useState(false);
   const [overlayShow, setOverlayShow] = useState(false);
+  const [highlight, setHighlight] = useState(false);
 
   useEffect(() => {
     window.settings.getAutoLaunch().then(setAutoLaunch);
     window.settings.getAutoDocking().then(setAutoDocking);
     window.settings.getOverlayShow().then(setOverlayShow);
+    window.settings.getHighlightEnabled().then(setHighlight);
+    console.log(window.settings.getHighlightRoot);
   }, []);
 
   return (
@@ -82,11 +85,25 @@ export default function Setting({ onCloseSetting }: { onCloseSetting: () => void
         </SettingSection>
         <SettingSection title={t.setting.highlight}>
           <SettingRow label={t.setting.autoSave} description={t.setting.autoSaveDesc}>
-            <input type='checkbox' />
+            <input
+              type='checkbox'
+              className='setting-toggle'
+              checked={highlight}
+              onChange={(e) => {
+                setHighlight(e.target.checked);
+                window.settings.setHighlightEnabled(e.target.checked);
+              }}
+            />
           </SettingRow>
-          <SettingRow label={t.setting.savePath} description='저장 위치 경로'>
+          <SettingRow label={t.setting.savePath} description={window.settings.getHighlightRoot()}>
             <div>
-              <button type='button'>{t.setting.openFolder}</button>
+              <button
+                type='button'
+                className='setting-button'
+                onClick={() => window.settings.openHighlightFolder()}
+              >
+                {t.setting.openFolder}
+              </button>
             </div>
           </SettingRow>
           <SettingRow label={t.setting.maxClips} description={t.setting.maxClipsDesc}>
