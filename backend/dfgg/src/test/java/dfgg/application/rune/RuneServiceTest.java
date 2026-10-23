@@ -73,6 +73,30 @@ class RuneServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    @DisplayName("계열은 자기 id, 계열 안의 룬은 그 계열 id를 tree_id로 갖고, 파편은 계열이 없다")
+    void syncRunes_WhenSaved_SetTreeIdByStyle() {
+        // given
+        when(dataDragonClient.getRunes()).thenReturn(new RuneResponse("16.21", "16.21.1",
+                List.of(new RuneResponse.Style(8400, "perk-images/Styles/7204_Resolve.png", "결의",
+                        List.of(new RuneResponse.Slot(List.of(new RuneResponse.Perk(8437,
+                                "perk-images/Styles/Resolve/GraspOfTheUndying/GraspOfTheUndying.png", "착취의 손아귀")))))),
+                Map.of(8400, "Resolve", 8437, "Grasp of the Undying")));
+
+        // when
+        runeService.syncRunes();
+
+        // then
+        ArgumentCaptor<List<Rune>> saved = ArgumentCaptor.forClass(List.class);
+        verify(runeRepository).saveAll(saved.capture());
+        Map<Integer, Rune> byId = saved.getValue().stream()
+                .collect(Collectors.toMap(Rune::runeId, rune -> rune));
+        assertThat(byId.get(8400).treeId()).isEqualTo(8400);
+        assertThat(byId.get(8437).treeId()).isEqualTo(8400);
+        assertThat(byId.get(5008).treeId()).isNull();
+    }
+
+    @Test
     @DisplayName("영문 이름이 없는 룬이 있으면 아무것도 저장하지 않는다")
     void syncRunes_WhenEnglishNameMissing_SavesNothing() {
         // given

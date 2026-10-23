@@ -31,9 +31,9 @@ public class RuneService {
         RuneResponse response = dataDragonClient.getRunes();
         List<Rune> runes = new ArrayList<>();
         for (RuneResponse.Style style : response.styles()) {
-            runes.add(store(response, style.id(), RuneKind.STYLE, style.name(), style.icon()));
+            runes.add(store(response, style.id(), RuneKind.STYLE, style.name(), style.icon(), style.id()));
             style.perks().forEach(perk ->
-                    runes.add(store(response, perk.id(), RuneKind.PERK, perk.name(), perk.icon())));
+                    runes.add(store(response, perk.id(), RuneKind.PERK, perk.name(), perk.icon(), style.id())));
         }
         for (StatShardCatalog shard : StatShardCatalog.values()) {
             runeImageService.store(response.version(), shard.runeId(), shard.iconPath());
@@ -42,8 +42,9 @@ public class RuneService {
         runeRepository.saveAll(runes);
     }
 
-    private Rune store(RuneResponse response, int runeId, RuneKind kind, String koreanName, String iconPath) {
-        Rune rune = new Rune(runeId, kind, response.localizedName(runeId, koreanName));
+    private Rune store(RuneResponse response, int runeId, RuneKind kind, String koreanName, String iconPath,
+                       int treeId) {
+        Rune rune = new Rune(runeId, kind, response.localizedName(runeId, koreanName), treeId);
         runeImageService.store(response.version(), runeId, iconPath);
         return rune;
     }
