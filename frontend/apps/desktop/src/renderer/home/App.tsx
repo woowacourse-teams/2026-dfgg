@@ -195,13 +195,34 @@ function App() {
   }, [lcuState, lcuPhase]);
 
   useEffect(() => {
-    return window.highlight.onProgress((p) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const unsubscribe = window.highlight.onProgress(async (p) => {
       if (!p.finished) return;
-      window.lcu
-        .getMatchHistoryInfo()
-        .then(setMatches)
-        .catch((error) => Sentry.captureException(error));
+      clearTimeout(timer); // 이전 판을 기다리던 중이면 그만둔다
+
+      // 방금 만든 하이라이트가 어느 판인지 (match.json 저장에 실패했으면 null)
+      const list = await window.highlight.list();
+      const gameId = list.find((g) => g.id === p.id)?.gameId ?? null;
+
+      const load = (tries: number) => {
+        window.lcu
+          .getMatchHistoryInfo()
+          .then((history) => {
+            setMatches(history);
+            // gameId가 없으면 기다려도 붙을 수 없으니 한 번만 받고 끝낸다
+            const synced = gameId === null || history?.some((m) => m.gameId === gameId);
+            if (!synced && tries < 10) timer = setTimeout(() => load(tries + 1), 3000);
+          })
+          .catch((error) => Sentry.captureException(error));
+      };
+      load(1);
     });
+
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
