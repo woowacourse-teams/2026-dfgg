@@ -19,7 +19,7 @@ CREATE TABLE pro_pick_runes (
     pick_id BIGINT NOT NULL REFERENCES pro_picks (id) ON DELETE CASCADE,
     -- 0 핵심, 1~3 주 트리, 4~5 보조 트리, 6~8 능력치 파편. 트리는 0번·4번 룬의 tree_id로 구한다.
     slot SMALLINT NOT NULL CHECK (slot BETWEEN 0 AND 8),
-    -- 파편도 runes 고정 행이라 FK를 건다.
+    -- 파편도 룬 동기화가 runes에 넣으므로 FK를 건다.
     rune_id INTEGER NOT NULL REFERENCES runes (rune_id),
     PRIMARY KEY (pick_id, slot)
 );
