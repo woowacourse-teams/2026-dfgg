@@ -117,25 +117,24 @@ public class TodayPickService {
         Map<Long, Champion> champions = byId(championRepository.findAllById(
                 picks.stream().map(ProPick::getChampionId).distinct().toList()), Champion::getChampionId);
         Map<Integer, SummonerSpell> spells = byId(spellRepository.findAllById(picks.stream()
-                .flatMap(pick -> pick.getSpells().stream()).map(ProPickSpell::getSpellId).distinct().toList()),
+                        .flatMap(pick -> pick.getSpells().stream()).map(ProPickSpell::getSpellId).distinct().toList()),
                 SummonerSpell::getSpellId);
         Map<Long, Item> items = byId(itemRepository.findAllById(picks.stream()
-                .flatMap(pick -> pick.getItems().stream()).map(ProPickItem::getItemId).distinct().toList()),
+                        .flatMap(pick -> pick.getItems().stream()).map(ProPickItem::getItemId).distinct().toList()),
                 Item::getItemId);
         return new TodayPickCatalog(champions, spells, items, runesWithTrees(picks), imageUrls, language);
     }
 
     private Map<Integer, Rune> runesWithTrees(List<ProPick> picks) {
         Map<Integer, Rune> runes = new HashMap<>(byId(runeRepository.findAllById(picks.stream()
-                .flatMap(pick -> pick.getRunes().stream()).map(ProPickRune::getRuneId).distinct().toList()),
-                Rune::getRuneId));
+                        .flatMap(pick -> pick.getRunes().stream()).map(ProPickRune::getRuneId).distinct().toList()),
+                Rune::runeId));
         List<Integer> treeIds = runes.values().stream()
-                .filter(rune -> !rune.isShard())
-                .map(Rune::getTreeId)
-                .filter(treeId -> !runes.containsKey(treeId))
+                .map(Rune::treeId)
+                .filter(treeId -> treeId != null && !runes.containsKey(treeId))
                 .distinct()
                 .toList();
-        runes.putAll(byId(runeRepository.findAllById(treeIds), Rune::getRuneId));
+        runes.putAll(byId(runeRepository.findAllById(treeIds), Rune::runeId));
         return runes;
     }
 

@@ -91,9 +91,9 @@ class TodayPickCatalog {
                 .filter(pickRune -> pickRune.getSlot() == slot)
                 .map(pickRune -> runes.get(pickRune.getRuneId()))
                 .filter(Objects::nonNull)
-                .map(rune -> runes.get(rune.getTreeId()))
+                .map(rune -> runes.get(rune.treeId()))
                 .filter(Objects::nonNull)
-                .map(tree -> new TreeResponse(tree.getRuneId().longValue(), language.pick(tree.getName())))
+                .map(tree -> new TreeResponse((long) tree.runeId(), tree.nameIn(language)))
                 .findFirst()
                 .orElse(null);
     }
@@ -103,8 +103,8 @@ class TodayPickCatalog {
                 .filter(pickRune -> pickRune.getSlot() >= fromSlot && pickRune.getSlot() <= toSlot)
                 .map(pickRune -> runes.get(pickRune.getRuneId()))
                 .filter(Objects::nonNull)
-                .map(rune -> new EntryResponse(rune.getRuneId().longValue(), language.pick(rune.getName()),
-                        imageUrls.runeOf(rune.getRuneId())))
+                .map(rune -> new EntryResponse((long) rune.runeId(), rune.nameIn(language),
+                        imageUrls.runeOf(imageUrls.version(), rune.runeId())))
                 .toList();
     }
 }

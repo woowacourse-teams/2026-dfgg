@@ -2,7 +2,7 @@
 --
 -- 대회 1 (최근: 마지막 경기 10-27)  MID 201 Faker 9001 · MID 202 Chovy 9002 · TOP 203 Zeus 9001
 -- 대회 2 (예전: 마지막 경기 10-20)  MID 204 Faker 9002            ← 최근 대회가 아니라 뽑히지 않는다
--- 픽 201: 주문 점멸·점화, 아이템 0번·장신구, 룬 핵심·주 1·보조 1·파편 2 (5008·5011은 V13 고정 행)
+-- 픽 201: 주문 점멸·점화, 아이템 0번·장신구, 룬 핵심·주 1·보조 1·파편 2 (5008·5011 파편은 아래에서 넣는다)
 DELETE FROM pro_picks;
 DELETE FROM pro_players;
 DELETE FROM pro_tournaments;
@@ -19,12 +19,14 @@ INSERT INTO summoner_spells (spell_id, riot_key, name, icon_key) VALUES
     (9001, 'ProTestFlash', jsonb_build_object('ko-KR', '점멸', 'en-US', 'Test Flash'), 'ProTestFlash.png'),
     (9002, 'ProTestIgnite', jsonb_build_object('ko-KR', '점화', 'en-US', 'Test Ignite'), 'ProTestIgnite.png')
 ON CONFLICT DO NOTHING;
-INSERT INTO runes (rune_id, tree_id, slot, name, icon_key) VALUES
-    (9000, 9000, -1, jsonb_build_object('ko-KR', '트리', 'en-US', 'Tree'), 'perk-images/Styles/T.png'),
-    (9001, 9000, 0, jsonb_build_object('ko-KR', '룬1', 'en-US', 'Rune 1'), 'perk-images/Styles/T/R1.png'),
-    (9002, 9000, 1, jsonb_build_object('ko-KR', '룬2', 'en-US', 'Rune 2'), 'perk-images/Styles/T/R2.png'),
-    (9100, 9100, -1, jsonb_build_object('ko-KR', '보조트리', 'en-US', 'Second Tree'), 'perk-images/Styles/S.png'),
-    (9101, 9100, 1, jsonb_build_object('ko-KR', '보조룬', 'en-US', 'Second Rune'), 'perk-images/Styles/S/R.png')
+INSERT INTO runes (rune_id, kind, name, tree_id) VALUES
+    (9000, 'STYLE', jsonb_build_object('ko-KR', '트리', 'en-US', 'Tree'), 9000),
+    (9001, 'PERK', jsonb_build_object('ko-KR', '룬1', 'en-US', 'Rune 1'), 9000),
+    (9002, 'PERK', jsonb_build_object('ko-KR', '룬2', 'en-US', 'Rune 2'), 9000),
+    (9100, 'STYLE', jsonb_build_object('ko-KR', '보조트리', 'en-US', 'Second Tree'), 9100),
+    (9101, 'PERK', jsonb_build_object('ko-KR', '보조룬', 'en-US', 'Second Rune'), 9100),
+    (5008, 'STAT_SHARD', jsonb_build_object('ko-KR', '적응형 능력치', 'en-US', 'Adaptive Force'), NULL),
+    (5011, 'STAT_SHARD', jsonb_build_object('ko-KR', '체력', 'en-US', 'Health'), NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO pro_tournaments (id, overview_page, name, league, region, start_date, end_date) VALUES

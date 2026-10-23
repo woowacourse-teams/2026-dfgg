@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.item.Item;
 import dfgg.domain.rune.Rune;
+import dfgg.domain.rune.RuneKind;
 import dfgg.domain.spell.SummonerSpell;
 import java.util.List;
 import java.util.Map;
@@ -23,10 +24,10 @@ class EnglishNameIndexTest {
     private static final int HEALTH_SCALING = 5001;
 
     private final EnglishNameIndex runes = EnglishNameIndex.ofRunes(List.of(
-            rune(PRECISION, PRECISION, Rune.TREE_SLOT, "Precision"),
-            rune(GRASP, 8400, 0, "Grasp of the Undying"),
-            rune(HEALTH, null, Rune.SHARD_SLOT, "Health"),
-            rune(HEALTH_SCALING, null, Rune.SHARD_SLOT, "Health Scaling")));
+            rune(PRECISION, RuneKind.STYLE, "Precision"),
+            rune(GRASP, RuneKind.PERK, "Grasp of the Undying"),
+            rune(HEALTH, RuneKind.STAT_SHARD, "Health"),
+            rune(HEALTH_SCALING, RuneKind.STAT_SHARD, "Health Scaling")));
 
     @ParameterizedTest
     @ValueSource(strings = {"Grasp of the Undying", "Grasp Of The Undying", "grasp-of-the-undying", " GraspoftheUndying "})
@@ -128,7 +129,7 @@ class EnglishNameIndexTest {
         assertThat(items.idOf("")).isEmpty();
     }
 
-    private static Rune rune(int runeId, Integer treeId, int slot, String englishName) {
-        return new Rune(runeId, treeId, slot, Map.of("ko-KR", "룬" + runeId, "en-US", englishName), "icon.png");
+    private static Rune rune(int runeId, RuneKind kind, String englishName) {
+        return new Rune(runeId, kind, Map.of("ko-KR", "룬" + runeId, "en-US", englishName));
     }
 }

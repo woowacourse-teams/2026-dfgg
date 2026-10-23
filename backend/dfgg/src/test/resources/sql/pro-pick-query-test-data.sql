@@ -20,10 +20,10 @@ INSERT INTO summoner_spells (spell_id, riot_key, name, icon_key) VALUES
     (9001, 'ProTestFlash', jsonb_build_object('ko-KR', '점멸', 'en-US', 'Test Flash'), 'ProTestFlash.png'),
     (9002, 'ProTestIgnite', jsonb_build_object('ko-KR', '점화', 'en-US', 'Test Ignite'), 'ProTestIgnite.png')
 ON CONFLICT DO NOTHING;
-INSERT INTO runes (rune_id, tree_id, slot, name, icon_key) VALUES
-    (9000, 9000, -1, jsonb_build_object('ko-KR', '트리', 'en-US', 'Tree'), 'perk-images/Styles/T.png'),
-    (9001, 9000, 0, jsonb_build_object('ko-KR', '룬1', 'en-US', 'Rune 1'), 'perk-images/Styles/T/R1.png'),
-    (9002, 9000, 1, jsonb_build_object('ko-KR', '룬2', 'en-US', 'Rune 2'), 'perk-images/Styles/T/R2.png')
+INSERT INTO runes (rune_id, kind, name, tree_id) VALUES
+    (9000, 'STYLE', jsonb_build_object('ko-KR', '트리', 'en-US', 'Tree'), 9000),
+    (9001, 'PERK', jsonb_build_object('ko-KR', '룬1', 'en-US', 'Rune 1'), 9000),
+    (9002, 'PERK', jsonb_build_object('ko-KR', '룬2', 'en-US', 'Rune 2'), 9000)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO pro_tournaments (id, overview_page, name, league, region, start_date, end_date) VALUES

@@ -12,6 +12,7 @@ import dfgg.domain.propick.ProPickRune;
 import dfgg.domain.propick.ProPickSide;
 import dfgg.domain.propick.ProPickSpell;
 import dfgg.domain.rune.Rune;
+import dfgg.domain.rune.RuneKind;
 import dfgg.domain.spell.SummonerSpell;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -44,8 +45,8 @@ class ProPickRowConverterTest {
             EnglishNameIndex.ofSpells(List.of(spell(FLASH, "Flash"), spell(IGNITE, "Ignite"))),
             EnglishNameIndex.ofItems(List.of(item(DORANS_RING, "Doran's Ring"), item(LUDENS, "Luden's Companion"),
                     item(STEALTH_WARD, "Stealth Ward"))),
-            EnglishNameIndex.ofRunes(List.of(rune(ELECTROCUTE, 0, "Electrocute"), rune(TASTE_OF_BLOOD, 1, "Taste of Blood"),
-                    rune(JACK_OF_ALL_TRADES, 2, "Jack of All Trades"), shard(ADAPTIVE_FORCE, "Adaptive Force"),
+            EnglishNameIndex.ofRunes(List.of(rune(ELECTROCUTE, "Electrocute"), rune(TASTE_OF_BLOOD, "Taste of Blood"),
+                    rune(JACK_OF_ALL_TRADES, "Jack of All Trades"), shard(ADAPTIVE_FORCE, "Adaptive Force"),
                     shard(HEALTH, "Health"), shard(HEALTH_SCALING, "Health Scaling"))));
 
     private final ProPickRowConverter converter = new ProPickRowConverter();
@@ -262,11 +263,11 @@ class ProPickRowConverterTest {
         return new Item(id, Map.of("ko-KR", "아이템" + id, "en-US", englishName));
     }
 
-    private static Rune rune(int id, int slot, String englishName) {
-        return new Rune(id, 8100, slot, Map.of("ko-KR", "룬" + id, "en-US", englishName), "icon.png");
+    private static Rune rune(int id, String englishName) {
+        return new Rune(id, RuneKind.PERK, Map.of("ko-KR", "룬" + id, "en-US", englishName), 8100);
     }
 
     private static Rune shard(int id, String englishName) {
-        return new Rune(id, null, Rune.SHARD_SLOT, Map.of("ko-KR", "파편" + id, "en-US", englishName), "icon.png");
+        return new Rune(id, RuneKind.STAT_SHARD, Map.of("ko-KR", "파편" + id, "en-US", englishName));
     }
 }

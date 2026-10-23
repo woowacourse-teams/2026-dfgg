@@ -48,7 +48,7 @@ class TodayPickControllerTest {
         jdbcTemplate.update("DELETE FROM pro_players");
         jdbcTemplate.update("DELETE FROM pro_tournaments");
         // 커밋되는 테스트라 픽스처의 9000번대 카탈로그 행도 지운다. 다른 테스트가 테이블 행 수를 센다.
-        jdbcTemplate.update("DELETE FROM runes WHERE rune_id BETWEEN 9000 AND 9999");
+        jdbcTemplate.update("DELETE FROM runes WHERE rune_id BETWEEN 9000 AND 9999 OR rune_id IN (5008, 5011)");
         jdbcTemplate.update("DELETE FROM summoner_spells WHERE spell_id BETWEEN 9000 AND 9999");
         jdbcTemplate.update("DELETE FROM items WHERE item_id BETWEEN 9000 AND 9999");
         jdbcTemplate.update("DELETE FROM champions WHERE champion_id BETWEEN 9000 AND 9999");

@@ -2,6 +2,7 @@ package dfgg.domain.catalog;
 
 import dfgg.domain.champion.Champion;
 import dfgg.domain.item.Item;
+import dfgg.domain.language.Language;
 import dfgg.domain.rune.Rune;
 import dfgg.domain.spell.SummonerSpell;
 import java.util.Collection;
@@ -33,7 +34,7 @@ public final class EnglishNameIndex {
     }
 
     public static EnglishNameIndex ofRunes(Collection<Rune> runes) {
-        return of(runes, Rune::getRuneId, Rune::getName);
+        return of(runes, Rune::runeId, rune -> Map.of(ENGLISH, rune.nameIn(Language.EN_US)));
     }
 
     public static EnglishNameIndex ofSpells(Collection<SummonerSpell> spells) {

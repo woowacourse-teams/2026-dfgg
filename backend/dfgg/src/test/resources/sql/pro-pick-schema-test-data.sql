@@ -12,9 +12,9 @@ ON CONFLICT DO NOTHING;
 INSERT INTO summoner_spells (spell_id, riot_key, name, icon_key) VALUES
     (9001, 'ProTestSpell', jsonb_build_object('ko-KR', '테스트주문', 'en-US', 'Test Spell'), 'ProTestSpell.png')
 ON CONFLICT DO NOTHING;
-INSERT INTO runes (rune_id, tree_id, slot, name, icon_key) VALUES
-    (9000, 9000, -1, jsonb_build_object('ko-KR', '테스트트리', 'en-US', 'Test Tree'), 'perk-images/Styles/Test.png'),
-    (9001, 9000, 0, jsonb_build_object('ko-KR', '테스트룬', 'en-US', 'Test Rune'), 'perk-images/Styles/Test/Rune.png')
+INSERT INTO runes (rune_id, kind, name, tree_id) VALUES
+    (9000, 'STYLE', jsonb_build_object('ko-KR', '테스트트리', 'en-US', 'Test Tree'), 9000),
+    (9001, 'PERK', jsonb_build_object('ko-KR', '테스트룬', 'en-US', 'Test Rune'), 9000)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO pro_tournaments (id, overview_page, name, league, region, start_date, end_date) VALUES
