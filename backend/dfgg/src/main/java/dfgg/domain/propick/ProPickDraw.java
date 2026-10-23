@@ -24,12 +24,12 @@ public class ProPickDraw {
     /** 밴은 양 팀이 같은 챔피언을 밴할 수 있어 중복을 허용한다. */
     public List<ProPick> draw(List<ProPick> candidates, Collection<Integer> bans, RandomGenerator random) {
         Set<Long> banned = bans.stream().map(Integer::longValue).collect(Collectors.toSet());
-        List<ProPick> shuffled = new ArrayList<>(candidates.stream()
+        List<ProPick> available = new ArrayList<>(candidates.stream()
                 .filter(pick -> !banned.contains(pick.getChampionId()))
                 .toList());
-        Collections.shuffle(shuffled, random);
+        Collections.shuffle(available, random);
         Map<Long, ProPick> onePerChampion = new LinkedHashMap<>();
-        shuffled.forEach(pick -> onePerChampion.putIfAbsent(pick.getChampionId(), pick));
+        available.forEach(pick -> onePerChampion.putIfAbsent(pick.getChampionId(), pick));
         return onePerChampion.values().stream()
                 .limit(size)
                 .toList();
