@@ -36,3 +36,11 @@ export function reportError(context: string, error: unknown) {
 
   Sentry.captureException(error, { tags: { context } });
 }
+
+/**
+ * 에러에 소환사를 붙인다. 연결이 끊기면 null 로 비운다.
+ * @sentry/electron 은 이 파일에만 번들되므로(bundle:sentry), 다른 파일은 Sentry 를 직접 import 하지 않고 여기를 거친다.
+ */
+export function setSentryUser(user: { puuid: string; riotId: string } | null) {
+  Sentry.setUser(user ? { id: user.puuid, username: user.riotId } : null);
+}

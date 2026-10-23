@@ -24,6 +24,9 @@ let highlightEnabled: boolean = true;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const isInGame = () => getLcuState().phase === 'InProgress';
 
+// 지금 녹화 중인지 (성능 측정용)
+export const isRecording = () => sessionDir !== null;
+
 // 롤 게임 창이 지금 떠 있는지 확인 (창 목록만 보고, 화면은 캡쳐 안 함)
 async function hasGameWindow() {
   const sources = await desktopCapturer.getSources({
