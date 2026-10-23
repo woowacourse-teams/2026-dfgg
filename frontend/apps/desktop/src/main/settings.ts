@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { mainLocale } from './locale';
 import type { Locale } from '../shared/i18n';
+import { reportError } from './sentry';
 
 export type Settings = {
   locale?: Locale;
@@ -27,5 +28,9 @@ export function getLocale(): Locale {
 }
 
 export function updateSettings(patch: Partial<Settings>) {
-  fs.writeFileSync(file, JSON.stringify({ ...readSettings(), ...patch }));
+  try {
+    fs.writeFileSync(file, JSON.stringify({ ...readSettings(), ...patch }));
+  } catch (error) {
+    reportError('settings-write', error);
+  }
 }

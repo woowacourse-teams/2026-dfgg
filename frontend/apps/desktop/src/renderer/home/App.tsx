@@ -234,7 +234,10 @@ function App() {
       <ProfileHeader
         summoner={currentSummoner}
         backdropUrl={backdropUrl}
-        onOpenSetting={() => setIsSettingOpen(true)}
+        onOpenSetting={() => {
+          setIsSettingOpen(true);
+          window.analytics.track('settings-open');
+        }}
       />
       {isSettingOpen && <Setting onCloseSetting={() => setIsSettingOpen(false)} />}
 

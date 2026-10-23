@@ -168,10 +168,22 @@ export default function Setting({ onCloseSetting }: { onCloseSetting: () => void
           confirmLabel={t.setting.maxClipsConfirmOk}
           cancelLabel={t.setting.cancel}
           onConfirm={() => {
+            window.analytics.track('settings-max-games-confirm', {
+              result: 'ok',
+              from: maxClipCount,
+              to: pendingMaxClipCount,
+            });
             applyMaxClipCount(pendingMaxClipCount);
             setPendingMaxClipCount(null);
           }}
-          onCancel={() => setPendingMaxClipCount(null)}
+          onCancel={() => {
+            window.analytics.track('settings-max-games-confirm', {
+              result: 'cancel',
+              from: maxClipCount,
+              to: pendingMaxClipCount,
+            });
+            setPendingMaxClipCount(null);
+          }}
         />
       )}
     </div>
