@@ -14,7 +14,11 @@ export async function fetchItemRecommendations(body: RecommendationBody) {
       body,
       RECOMMENDATION_TIMEOUT_MS,
     );
-    recordRecommendation({ ok: true, ms: Date.now() - startedAt, empty: !result.recommendedItems?.length });
+    recordRecommendation({
+      ok: true,
+      ms: Date.now() - startedAt,
+      empty: !result.recommendedItems?.length,
+    });
     return result;
   } catch (error) {
     // Sentry 는 apiPost 가 'api-post /api/recommendations/v4' 로 이미 보낸다.

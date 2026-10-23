@@ -269,8 +269,7 @@ export function setOverlayCollapsed(collapsed: boolean) {
 }
 
 type RecommendationResult =
-  | { ok: true; ms: number; empty: boolean }
-  | { ok: false; ms: number; kind: ApiErrorKind };
+  { ok: true; ms: number; empty: boolean } | { ok: false; ms: number; kind: ApiErrorKind };
 
 function avgRecommendMs(current: Game) {
   const count = current.recommendSuccess + current.recommendError;
