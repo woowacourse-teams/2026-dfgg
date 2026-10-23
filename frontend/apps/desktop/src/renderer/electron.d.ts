@@ -85,6 +85,8 @@ declare global {
       openHighlightFolder: () => Promise<string>;
       getHighlightMaxClipCount: () => Promise<number>;
       setHighlightMaxClipCount: (count: number) => Promise<number>;
+      getAppVersion: () => string;
+      openPrivacyPolicy: () => Promise<void>;
     };
   }
 }

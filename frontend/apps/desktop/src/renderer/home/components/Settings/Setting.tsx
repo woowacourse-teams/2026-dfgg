@@ -134,10 +134,30 @@ export default function Setting({ onCloseSetting }: { onCloseSetting: () => void
             </select>
           </SettingRow>
         </SettingSection>
+        <SettingSection title={t.setting.about}>
+          <SettingRow label={t.setting.version}>
+            <span className='setting-value'>{window.settings.getAppVersion()}</span>
+          </SettingRow>
+          <button
+            type='button'
+            className='setting-link-row'
+            onClick={() => window.settings.openPrivacyPolicy()}
+          >
+            {t.setting.privacyPolicy}
+            <span aria-hidden='true'>↗</span>
+          </button>
+        </SettingSection>
+        {/* Riot 이 요구하는 고지문 원문. 웹 SiteFooter 와 같고, 의역하지 않고 그대로 둔다. */}
+        <p className='setting-disclaimer'>
+          DFGG isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or opinions of
+          Riot Games or anyone officially involved in producing or managing Riot Games properties.
+          Riot Games and all associated properties are trademarks or registered trademarks of Riot
+          Games, Inc.
+        </p>
       </div>
       <footer className='setting-footer'>
-        <button className='setting-save-button' onClick={onCloseSetting}>
-          {t.setting.save}
+        <button type='button' className='setting-done-button' onClick={onCloseSetting}>
+          {t.setting.done}
         </button>
       </footer>
 

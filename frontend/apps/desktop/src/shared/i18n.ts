@@ -141,12 +141,15 @@ const KO = {
     maxClips: '최대 저장 개수',
     maxClipsDesc: '넘으면 오래된 클립부터 삭제됩니다',
     clips: (n: number) => `${n}개`,
-    save: '저장',
+    done: '완료',
     cancel: '취소',
     maxClipsConfirmTitle: '하이라이트를 삭제할까요?',
     maxClipsConfirmMessage: (n: number) =>
       `최근 ${n}판을 제외한 오래된 하이라이트가 바로 삭제됩니다. 삭제한 하이라이트는 되돌릴 수 없어요.`,
     maxClipsConfirmOk: '삭제하고 변경',
+    about: '정보',
+    version: '버전',
+    privacyPolicy: '개인정보처리방침',
   },
 };
 
@@ -282,12 +285,15 @@ const EN: typeof KO = {
     maxClips: 'Max clips',
     maxClipsDesc: 'Oldest clips are deleted when the limit is reached',
     clips: (n) => `${n} clips`,
-    save: 'save',
+    done: 'Done',
     cancel: 'Cancel',
     maxClipsConfirmTitle: 'Delete highlights?',
     maxClipsConfirmMessage: (n) =>
       `Highlights older than your last ${n} games will be deleted right away. This can't be undone.`,
     maxClipsConfirmOk: 'Delete and change',
+    about: 'About',
+    version: 'Version',
+    privacyPolicy: 'Privacy policy',
   },
 };
 

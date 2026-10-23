@@ -109,4 +109,6 @@ contextBridge.exposeInMainWorld('settings', {
   openHighlightFolder: () => ipcRenderer.invoke('highlight:open-folder'),
   getHighlightMaxClipCount: () => ipcRenderer.invoke('highlight:get-max-clip'),
   setHighlightMaxClipCount: (count: number) => ipcRenderer.invoke('highlight:set-max-clip', count),
+  getAppVersion: () => ipcRenderer.sendSync('app:version'),
+  openPrivacyPolicy: () => ipcRenderer.invoke('app:open-privacy'),
 });

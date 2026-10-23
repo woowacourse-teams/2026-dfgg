@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import fs from 'node:fs';
 import {
   fetchCurrentSummoner,
@@ -36,6 +36,8 @@ import { getDockingEnabled, setDockingEnabled } from '../docking/docking';
 import { isOverlayEnabled, setOverlayEnabled } from '../overlay/visibility';
 import { getHighlightEnabled, setHighlightEnabled } from '../highlight/highlight';
 import { getMaxGames, setMaxGames } from '../highlight/storage';
+
+const WEB_ORIGIN = 'https://dfgg.pro';
 
 // 오버레이가 마지막으로 알려 준 펼친 높이. 접었다 펼 때 이 높이로 돌아간다.
 let overlayHeight = EXPANDED_HEIGHT;
@@ -161,4 +163,10 @@ export function registerIpcHandlers() {
     setMaxGames(count);
     updateSettings({ maxClipCount: count });
   });
+  ipcMain.on('app:version', (event) => {
+    event.returnValue = app.getVersion();
+  });
+  ipcMain.handle('app:open-privacy', () =>
+    shell.openExternal(`${WEB_ORIGIN}/${getLocale()}/privacy`),
+  );
 }

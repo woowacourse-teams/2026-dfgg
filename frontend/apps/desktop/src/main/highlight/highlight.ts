@@ -127,10 +127,11 @@ function handlePhase(phase: GameflowPhase | null) {
 export function getHighlightEnabled() {
   return highlightEnabled;
 }
+
 export function setHighlightEnabled(enabled: boolean) {
   highlightEnabled = enabled;
-  if (enabled && isInGame()) void start();
-  if (!enabled) void stop();
+  if (enabled && isInGame()) void start(); // 게임 중에 켜면 지금부터 녹화
+  if (!enabled) void stop(); // 끄면 바로 녹화 정지
 }
 
 // main.ts의 whenReady에서 호출. 진행 단계 구독 시작
