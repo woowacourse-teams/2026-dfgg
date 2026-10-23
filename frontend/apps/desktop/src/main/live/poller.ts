@@ -5,7 +5,12 @@ import { getDDragonData } from './ddragon';
 import { getActivePlayer, getGameStats, getPlayerList } from './endpoints';
 import { buildRecommendationBody, extractItemIds, toInventory } from './payload';
 import { fetchGameVersion } from '../lcu/service';
-import { recordChampion, recordLiveError, recordPurchases } from '../analytics/gameTracker';
+import {
+  recordChampion,
+  recordLiveError,
+  recordPurchases,
+  recordSkip,
+} from '../analytics/gameTracker';
 import { reportError } from '../sentry';
 
 const POLL_INTERVAL_MS = 2000;
@@ -94,15 +99,18 @@ async function tick() {
     const myPlayers = players?.find(
       (player) => player.riotId === myRiotId || player.summonerName === myRiotId,
     );
-    if (!myPlayers || !players || !myRiotId || !patch || !championNames || !componentItemIds)
-      return;
+    // 여기서 막히면 추천을 묻지도 못한다. 실패 기록도 안 남아서 이유를 따로 센다.
+    if (!patch) return recordSkip('noPatch');
+    if (!championNames || !componentItemIds) return recordSkip('noDDragon');
+    if (!myPlayers || !players || !myRiotId) return recordSkip('noSelf');
 
     // 완성 아이템이 바뀌면 구매 순서를 갱신한다 (v3 와 같다)
     const itemIds = extractItemIds(myPlayers, componentItemIds);
     if (lastItemIds === null || !sameItems(itemIds, lastItemIds)) {
       if (lastItemIds !== null) {
         const newItemIds = itemIds.filter((id) => !purchasedItemIds.has(id));
-        recordPurchases(newItemIds, getLcuState().recommendations);
+        const { recommendations, situationalItems } = getLcuState();
+        recordPurchases(newItemIds, recommendations, situationalItems);
       }
       updatePurchaseOrder(itemIds, bootsItemIds, myPlayers.position === 'BOTTOM');
       lastItemIds = itemIds;
@@ -128,10 +136,11 @@ async function tick() {
     let result;
     try {
       result = await fetchItemRecommendations(body);
-    } catch (error) {
+    } catch {
       // live API 실패(게임 로딩 중 등)와 구분해서 추천 실패에만 간격을 늘린다.
+      // 추천 실패는 fetchItemRecommendations 가 기록·보고하므로 live 실패로 다시 세지 않는다.
       recommendFailures++;
-      throw error;
+      return;
     }
     recommendFailures = 0;
     lastRequestKey = key;

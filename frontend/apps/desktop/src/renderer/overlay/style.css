@@ -405,13 +405,6 @@
   color: var(--ink-3);
 }
 
-.bar-gold {
-  margin-left: auto;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--gold);
-}
-
 /* 골드가 접기 버튼을 오른쪽 끝으로 밀어 준다 */
 .bar-gold + .bar-button {
   margin-left: 0;

@@ -19,6 +19,8 @@ const WINDOW_POLL_MS = 2_000; // 게임 창 2초마다 확인
 // 번호표: 정지할 때마다 1씩 올라감 => 기다리던 시작 작업이 자기 번호가 아니면 그만둠
 let gameToken = 0;
 
+let highlightEnabled: boolean = true;
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const isInGame = () => getLcuState().phase === 'InProgress';
 
@@ -118,12 +120,23 @@ async function stop(build = true) {
 // 현재 phase에 따라서 실행할 함수를 정한다.
 function handlePhase(phase: GameflowPhase | null) {
   // void를 붙여 start()를 await 하지 않고 다음 실행을 계속 이어 간다.
-  if (phase === 'InProgress') void start();
+  if (phase === 'InProgress' && highlightEnabled) void start();
   else void stop();
 }
 
+export function getHighlightEnabled() {
+  return highlightEnabled;
+}
+
+export function setHighlightEnabled(enabled: boolean) {
+  highlightEnabled = enabled;
+  if (enabled && isInGame()) void start(); // 게임 중에 켜면 지금부터 녹화
+  if (!enabled) void stop(); // 끄면 바로 녹화 정지
+}
+
 // main.ts의 whenReady에서 호출. 진행 단계 구독 시작
-export function initHighlight() {
+export function initHighlight(enabled: boolean) {
+  highlightEnabled = enabled;
   onPhaseChange(handlePhase);
 }
 

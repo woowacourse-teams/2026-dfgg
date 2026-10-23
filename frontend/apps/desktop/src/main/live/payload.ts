@@ -1,4 +1,5 @@
 import type { LivePlayer } from './types';
+import { trackEvent } from '../analytics/umami';
 
 export interface ChampionEntry {
   name: string;
@@ -68,9 +69,21 @@ function splitPascalCase(alias: string) {
 }
 
 // ddragon에서 영어 이름 찾기
+// 표에 없어 이름을 추측한 원본 이름. 2초마다 10명을 변환하므로 같은 이름은 한 번만 보낸다.
+const reportedGuesses = new Set<string>();
+
 function toEnglishName(rawChampionName: string, championNames?: Record<string, string>) {
   const alias = toChampionAlias(rawChampionName, championNames);
-  return championNames?.[alias] ?? splitPascalCase(alias);
+  const known = championNames?.[alias];
+  if (known) return known;
+
+  // 신규 챔피언이나 이름 형식이 바뀌면 여기로 온다. 틀린 이름이 에러 없이 백엔드로 가서 따로 알린다.
+  const guessed = splitPascalCase(alias);
+  if (championNames && !reportedGuesses.has(rawChampionName)) {
+    reportedGuesses.add(rawChampionName);
+    trackEvent('desktop-error', { type: 'champion-name', raw: rawChampionName, guessed });
+  }
+  return guessed;
 }
 
 // 포지션 찾기

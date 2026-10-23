@@ -3,12 +3,20 @@ import path from 'node:path';
 import { app } from 'electron';
 import { highlightsRoot } from './library';
 
-const MAX_GAMES = 5; // 보관할 최대 판 수
 const MIN_FREE_BYTES = (app.isPackaged ? 10 : 3) * 1024 ** 3; // 10GB 미만이면 녹화 안 함
 const SESSION_NAME = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/; // 우리가 만든 세션 폴더 이름 형식
 const TEMP_FILES = ['raw.mkv', 'ffmpeg.log', 'events.jsonl', 'stats.jsonl', 'me.json']; // 클립 완성 후 필요 없는 파일
 
 const keepFiles = () => !app.isPackaged; // dev에서는 원본·로그 유지 (튜닝, 디버깅용)
+
+let maxGames = 5;
+export function getMaxGames() {
+  return maxGames;
+}
+export function setMaxGames(n: number) {
+  maxGames = n;
+  enforceLimit();
+}
 
 // 세션 폴더 목록. 이름이 날짜 형식인 폴더만 = 우리가 만든 폴더만 (다른 폴더는 절대 안 건드림)
 function sessionDirs(): string[] {
@@ -51,7 +59,7 @@ export function cleanupSession(dir: string, clipCount: number) {
 export function enforceLimit() {
   const done = sessionDirs().filter((d) => fs.existsSync(path.join(d, 'clips.json')));
   done.sort().reverse(); // 폴더 이릉미 ISO 시각이라 문자열 정렬 = 시간순 -> 뒤집으면 최신순
-  for (const d of done.slice(MAX_GAMES)) remove(d);
+  for (const d of done.slice(maxGames)) remove(d);
 }
 
 // 앱 시작 시: 클립을 못 만든 판(clips.json 없음) 삭제. 녹화 시작 전에 호출해야 함

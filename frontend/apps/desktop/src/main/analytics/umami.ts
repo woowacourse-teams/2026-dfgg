@@ -3,6 +3,7 @@ import { app } from 'electron';
 import { getIdentity } from './identity';
 import { AnalyticsTarget, readStore, updateStore, type PendingEvent } from './store';
 import { reportError } from '../sentry';
+import { settingSnapshot } from './settingSnapshot';
 
 const TIMEOUT_MS = 5000;
 const ALL_TARGETS: AnalyticsTarget[] = ['umami', 'posthog'];
@@ -71,6 +72,9 @@ async function sendPosthog({ name, data, id, timestamp }: PendingEvent) {
         language: app.isReady() ? app.getLocale() : undefined,
         ...data,
         ...(data?.riotId ? { $set: { name: data.riotId, riot_id: data.riotId } } : {}),
+        ...(name === 'desktop-settings' || name === 'desktop-setting-change'
+          ? { $set: { ...(data?.riotId && { name: data.riotId }), ...settingSnapshot() } }
+          : {}),
       },
     }),
     signal: AbortSignal.timeout(TIMEOUT_MS),

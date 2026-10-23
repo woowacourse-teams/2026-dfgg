@@ -30,8 +30,9 @@ import {
 import { initAutoUpdate } from './autoUpdate';
 import { endHighlight, initHighlight } from './highlight/highlight';
 import { handleMediaProtocol, registerMediaScheme } from './highlight/mediaProtocol';
-import { mainLocale } from './locale';
-import { cleanupOrphans } from './highlight/storage';
+import { cleanupOrphans, setMaxGames } from './highlight/storage';
+import { readSettings } from './settings';
+import { initOverlayVisibility, updateOverlayPhase } from './overlay/visibility';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
@@ -50,17 +51,6 @@ function loadRenderer(win: BrowserWindow, name: string) {
   }
 }
 
-// InProgress일 때만 오버레이 창을 표시하기
-function overlayWithPhase(overlay: BrowserWindow) {
-  onPhaseChange((phase) => {
-    if (phase === 'InProgress') {
-      overlay.showInactive();
-    } else {
-      overlay.hide();
-    }
-  });
-}
-
 // 연결 감지하면서 connected일 때, 앱 실행해서 home 화면 보이게 하기
 function detectClientStatus(home: BrowserWindow) {
   let shown = false;
@@ -75,10 +65,6 @@ function detectClientStatus(home: BrowserWindow) {
 }
 
 function createWindow() {
-  // renderer 의 navigator.languages 는 --lang 을 따르지 않고 OS 언어를 그대로 줄 때가 있다.
-  // main 이 정한 언어를 넘겨 화면과 서버 응답의 언어를 한 기준으로 맞춘다.
-  const localeArg = `--dfgg-locale=${mainLocale()}`;
-
   const home = new BrowserWindow({
     width: 480,
     height: 600,
@@ -86,7 +72,6 @@ function createWindow() {
     titleBarStyle: 'hidden',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      additionalArguments: [localeArg],
     },
   });
 
@@ -102,18 +87,19 @@ function createWindow() {
     alwaysOnTop: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      additionalArguments: [localeArg],
     },
   });
 
   setOverlayWindow(overlay);
 
   // home 창을 롤 클라이언트 옆에 붙인다. 네이티브 모듈이 없으면 조용히 건너뛴다.
-  attachHomeToClient(home);
+  attachHomeToClient(home, readSettings().docking ?? true);
   startSessionTracking(home);
 
   overlay.hide();
-  overlayWithPhase(overlay);
+  initOverlayVisibility(overlay, readSettings().showOverlay ?? true);
+  onPhaseChange((phase) => updateOverlayPhase(phase));
+
   detectClientStatus(home);
 
   // 앱 실행 시, 전체 화면 모드 수정하는 구독 설정
@@ -157,7 +143,8 @@ if (!gotTheLock) {
     initGameTracking();
 
     cleanupOrphans(); // 녹화 시작되기 전에 미사용 하이라이트 정리
-    initHighlight();
+    initHighlight(readSettings().highlight ?? true);
+    setMaxGames(readSettings().maxClipCount ?? 5);
 
     registerIpcHandlers();
     homeWindow = createWindow();
@@ -166,6 +153,7 @@ if (!gotTheLock) {
     if (!readStore().installed) {
       trackEvent('desktop-install');
       updateStore({ installed: true });
+      setAutoLaunch(true);
     }
 
     // 앱 시작 시에만 직접 앱 클릭했을 때 화면에 보여주기
@@ -174,7 +162,6 @@ if (!gotTheLock) {
     trackEvent('desktop-launch', { startup: startupLaunch });
 
     setTray(homeWindow);
-    setAutoLaunch(true);
 
     startLcuConnection();
     initLivePolling();

@@ -2,6 +2,8 @@ import { fetchCurrentSummoner } from '../lcu/service';
 import { onStatusChange } from '../lcu/state';
 import { trackEvent } from './umami';
 import { reportError } from '../sentry';
+import { settingSnapshot } from './settingSnapshot';
+import * as Sentry from '@sentry/electron/main';
 
 const RETRY_MS = 3000;
 const MAX_ATTEMPTS = 10;
@@ -23,11 +25,13 @@ async function resolveIdentity(gen: number, attempt = 1) {
 
     if (summoner?.puuid) {
       identity = { puuid: summoner.puuid, riotId: `${summoner.gameName}#${summoner.tagLine}` };
+      Sentry.setUser({ id: identity.puuid, username: identity.riotId });
 
       // 재연결마다 세지 않도록 소환사가 바뀔 때만 보낸다.
       if (lastConnectedPuuid !== identity.puuid) {
         lastConnectedPuuid = identity.puuid;
         trackEvent('desktop-connect', { riotId: identity.riotId, level: summoner.summonerLevel });
+        trackEvent('desktop-settings', settingSnapshot());
       }
       return;
     }
@@ -51,6 +55,7 @@ export function initIdentity() {
     } else if (status === 'disconnected') {
       generation++;
       identity = null;
+      Sentry.setUser(null);
     }
   });
 }

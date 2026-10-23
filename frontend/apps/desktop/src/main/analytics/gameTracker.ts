@@ -1,4 +1,10 @@
-import type { GameflowPhase, OverlayClickTarget, RecommendedItem } from '../../shared/types';
+import type {
+  GameflowPhase,
+  OverlayClickTarget,
+  RecommendedItem,
+  SituationalItem,
+} from '../../shared/types';
+import type { ApiErrorKind } from '../api/client';
 import { fetchEndOfGameStats, fetchGameflowSession, fetchQueueName } from '../lcu/service';
 import { getLcuState, onPhaseChange } from '../lcu/state';
 import { getIdentity, type Identity } from './identity';
@@ -21,13 +27,25 @@ type Game = {
   overlayExpanded: Stopwatch;
   overlayCollapsed: Stopwatch;
   collapseToggles: number;
+  startedAt: number;
   recommendSuccess: number;
   recommendError: number;
+  recommendErrorByKind: Record<ApiErrorKind, number>;
+  // 응답은 왔지만 추천이 비어 있던 횟수
+  recommendEmpty: number;
+  recommendMsTotal: number;
+  recommendMaxMs: number;
+  // 게임 시작부터 첫 추천을 받기까지 (못 받았으면 undefined)
+  firstRecommendSec?: number;
   liveError: number;
+  // 추천을 묻지도 못하고 넘어간 틱. 한 판 내내 쌓이면 추천이 한 번도 안 간 것이다.
+  skips: Record<SkipReason, number>;
   purchases: number;
   // 산 아이템이 직전 추천 목록에 있었던 횟수
   followed: number;
   followedTop1: number;
+  // 산 아이템이 직전 상황템 목록에 있었던 횟수
+  followedSituational: number;
   overlayClicks: Partial<Record<OverlayClickTarget, number>>;
   overlayMoves: number;
 };
@@ -86,10 +104,22 @@ function toEvent(current: Game, result: string): PendingEvent {
       collapseToggles: current.collapseToggles,
       recommendSuccess: current.recommendSuccess,
       recommendError: current.recommendError,
+      recommendErrorTimeout: current.recommendErrorByKind.timeout,
+      recommendError4xx: current.recommendErrorByKind['4xx'],
+      recommendError5xx: current.recommendErrorByKind['5xx'],
+      recommendErrorNetwork: current.recommendErrorByKind.network,
+      recommendEmpty: current.recommendEmpty,
+      recommendAvgMs: avgRecommendMs(current),
+      recommendMaxMs: current.recommendMaxMs || undefined,
+      firstRecommendSec: current.firstRecommendSec,
       liveError: current.liveError,
+      skipNoSelf: current.skips.noSelf,
+      skipNoPatch: current.skips.noPatch,
+      skipNoDDragon: current.skips.noDDragon,
       purchases: current.purchases,
       followed: current.followed,
       followedTop1: current.followedTop1,
+      followedSituational: current.followedSituational,
       overlayClicks: Object.values(current.overlayClicks).reduce((a, b) => a + b, 0),
       ...Object.fromEntries(
         Object.entries(current.overlayClicks).map(([k, v]) => [`click_${k}`, v]),
@@ -118,15 +148,22 @@ async function startGame() {
 
   const current: Game = {
     identity: getIdentity(),
+    startedAt: Date.now(),
     overlayExpanded: new Stopwatch(),
     overlayCollapsed: new Stopwatch(),
     collapseToggles: 0,
     recommendSuccess: 0,
     recommendError: 0,
+    recommendErrorByKind: { timeout: 0, '4xx': 0, '5xx': 0, network: 0 },
+    recommendEmpty: 0,
+    recommendMsTotal: 0,
+    recommendMaxMs: 0,
     liveError: 0,
+    skips: { noSelf: 0, noPatch: 0, noDDragon: 0 },
     purchases: 0,
     followed: 0,
     followedTop1: 0,
+    followedSituational: 0,
     overlayClicks: {},
     overlayMoves: 0,
   };
@@ -231,10 +268,38 @@ export function setOverlayCollapsed(collapsed: boolean) {
   syncOverlay();
 }
 
-export function recordRecommendation(success: boolean) {
+type RecommendationResult =
+  { ok: true; ms: number; empty: boolean } | { ok: false; ms: number; kind: ApiErrorKind };
+
+function avgRecommendMs(current: Game) {
+  const count = current.recommendSuccess + current.recommendError;
+  return count === 0 ? undefined : Math.round(current.recommendMsTotal / count);
+}
+
+export function recordRecommendation(result: RecommendationResult) {
   if (!game) return;
-  if (success) game.recommendSuccess++;
-  else game.recommendError++;
+
+  // 실패도 사용자가 기다린 시간이라 같이 잰다 (타임아웃이면 60초).
+  game.recommendMsTotal += result.ms;
+  game.recommendMaxMs = Math.max(game.recommendMaxMs, result.ms);
+
+  if (!result.ok) {
+    game.recommendError++;
+    game.recommendErrorByKind[result.kind]++;
+    return;
+  }
+
+  game.recommendSuccess++;
+  if (result.empty) game.recommendEmpty++;
+  if (game.firstRecommendSec === undefined) {
+    game.firstRecommendSec = Math.round((Date.now() - game.startedAt) / 1000);
+  }
+}
+
+export type SkipReason = 'noSelf' | 'noPatch' | 'noDDragon';
+
+export function recordSkip(reason: SkipReason) {
+  if (game) game.skips[reason]++;
 }
 
 export function recordLiveError() {
@@ -248,7 +313,11 @@ export function recordChampion(champion: { name: string; position: string }) {
 }
 
 // 새로 산 아이템이 직전 추천 목록에 있었는지 센다.
-export function recordPurchases(newItemIds: number[], recommendations: RecommendedItem[] | null) {
+export function recordPurchases(
+  newItemIds: number[],
+  recommendations: RecommendedItem[] | null,
+  situationalItems: SituationalItem[] = [],
+) {
   if (!game) return;
 
   for (const itemId of newItemIds) {
@@ -256,5 +325,6 @@ export function recordPurchases(newItemIds: number[], recommendations: Recommend
     const rank = recommendations?.findIndex((item) => item.id === itemId) ?? -1;
     if (rank >= 0) game.followed++;
     if (rank === 0) game.followedTop1++;
+    if (situationalItems.some((item) => item.id === itemId)) game.followedSituational++;
   }
 }

@@ -9,13 +9,7 @@ import {
   RecommendationUpdate,
   Summoner,
 } from '../shared/types';
-
-// main 이 additionalArguments 로 넘긴 언어. 샌드박스 preload 라 다른 파일을 불러올 수 없어 값만 꺼낸다.
-const LOCALE_ARG = '--dfgg-locale=';
-contextBridge.exposeInMainWorld(
-  'appLocale',
-  process.argv.find((arg) => arg.startsWith(LOCALE_ARG))?.slice(LOCALE_ARG.length) ?? null,
-);
+import type { Locale } from '../shared/i18n';
 
 contextBridge.exposeInMainWorld('lcu', {
   currentSummoner: () => ipcRenderer.invoke('lcu:current-summoner'),
@@ -97,4 +91,24 @@ contextBridge.exposeInMainWorld('highlight', {
     ipcRenderer.on('highlight:progress', listener);
     return () => ipcRenderer.removeListener('highlight:progress', listener);
   },
+});
+
+contextBridge.exposeInMainWorld('appLocale', ipcRenderer.sendSync('locale:get'));
+
+contextBridge.exposeInMainWorld('settings', {
+  setLocale: (locale: Locale) => ipcRenderer.invoke('locale:set', locale),
+  getAutoLaunch: () => ipcRenderer.invoke('autoLaunch:get'),
+  setAutoLaunch: (enabled: boolean) => ipcRenderer.invoke('autoLaunch:set', enabled),
+  getAutoDocking: () => ipcRenderer.invoke('docking:get'),
+  setAutoDocking: (enabled: boolean) => ipcRenderer.invoke('docking:set', enabled),
+  getOverlayShow: () => ipcRenderer.invoke('overlay:get-enabled'),
+  setOverlayShow: (enabled: boolean) => ipcRenderer.invoke('overlay:set-enabled', enabled),
+  getHighlightEnabled: () => ipcRenderer.invoke('highlight:get-enabled'),
+  setHighlightEnabled: (enabled: boolean) => ipcRenderer.invoke('highlight:set-enabled', enabled),
+  getHighlightRoot: () => ipcRenderer.sendSync('highlight:root'),
+  openHighlightFolder: () => ipcRenderer.invoke('highlight:open-folder'),
+  getHighlightMaxClipCount: () => ipcRenderer.invoke('highlight:get-max-clip'),
+  setHighlightMaxClipCount: (count: number) => ipcRenderer.invoke('highlight:set-max-clip', count),
+  getAppVersion: () => ipcRenderer.sendSync('app:version'),
+  openPrivacyPolicy: () => ipcRenderer.invoke('app:open-privacy'),
 });

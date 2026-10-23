@@ -1,3 +1,4 @@
+import { Locale } from '../shared/i18n';
 import type {
   DfScores,
   EndedGame,
@@ -68,6 +69,24 @@ declare global {
       summary: (gameIds: number[]) => Promise<Record<number, HighlightSummary>>;
       get: (gameId: number) => Promise<HighlightGame | null>;
       onProgress: (callback: HighlightProgressListener) => Unsubscribe;
+    };
+    settings: {
+      getLocale: Locale;
+      setLocale: (locale: Locale) => Promise<void>;
+      getAutoLaunch: () => Promise<boolean>;
+      setAutoLaunch: (enabled: boolean) => Promise<void>;
+      getAutoDocking: () => Promise<boolean>;
+      setAutoDocking: (enabled: boolean) => Promise<void>;
+      getOverlayShow: () => Promise<boolean>;
+      setOverlayShow: (enabled: boolean) => Promise<void>;
+      getHighlightEnabled: () => Promise<boolean>;
+      setHighlightEnabled: (enabled: boolean) => Promise<void>;
+      getHighlightRoot: () => string;
+      openHighlightFolder: () => Promise<string>;
+      getHighlightMaxClipCount: () => Promise<number>;
+      setHighlightMaxClipCount: (count: number) => Promise<number>;
+      getAppVersion: () => string;
+      openPrivacyPolicy: () => Promise<void>;
     };
   }
 }

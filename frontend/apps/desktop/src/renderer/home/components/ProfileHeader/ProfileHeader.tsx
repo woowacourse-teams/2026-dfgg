@@ -3,6 +3,7 @@ import './ProfileHeader.css';
 import type { Summoner } from '../../../../shared/types';
 import { t } from '../../../i18n';
 import { CloseIcon, MinimizeIcon } from '../../../icons';
+import { SettingsIcon } from '../Settings/SettingsIcon';
 
 const profileIconUrl = (id: number) =>
   `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/${id}.jpg`;
@@ -17,9 +18,10 @@ type Props = {
   summoner: Summoner | null;
   /** 배너에 걸 그림 주소. 없으면 그림 없이 그린다. */
   backdropUrl?: string;
+  onOpenSetting: () => void;
 };
 
-function ProfileHeader({ summoner, backdropUrl }: Props) {
+function ProfileHeader({ summoner, backdropUrl, onOpenSetting }: Props) {
   return (
     <>
       <header className='title-bar'>
@@ -27,6 +29,9 @@ function ProfileHeader({ summoner, backdropUrl }: Props) {
         <span className='title-bar-name'>DFGG</span>
 
         <div className='title-bar-controls'>
+          <button type='button' className='title-bar-button' onClick={onOpenSetting}>
+            <SettingsIcon />
+          </button>
           <button
             type='button'
             className='title-bar-button'

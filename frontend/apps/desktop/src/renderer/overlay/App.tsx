@@ -312,11 +312,6 @@ function App() {
           {purchasedCount === null ? t.overlay.title : t.overlay.coreTitle(purchasedCount + 1)}
         </span>
         {purchasedCount !== null && <BuildProgress purchased={purchasedCount} />}
-        {availableGold !== null && (
-          <span className='bar-gold' title={t.overlay.gold}>
-            {formatGold(availableGold)}
-          </span>
-        )}
 
         <button
           type='button'
