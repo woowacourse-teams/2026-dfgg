@@ -35,7 +35,7 @@ public record TodayPickResponse(TournamentResponse tournament, ChampionPosition 
         }
     }
 
-    /** 선수 사진은 위키 이미지 URL이고 없을 수 있다. */
+    /** 팀은 그 경기 당시 팀이다. 선수 사진은 위키 이미지 URL이고 없을 수 있다. */
     public record PlayerResponse(String name, String team, String imageUrl) {
     }
 

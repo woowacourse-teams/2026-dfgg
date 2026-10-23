@@ -124,6 +124,18 @@ class TodayPickServiceTest {
     }
 
     @Test
+    @DisplayName("선수 팀은 지금 소속이 아니라 그 경기 당시 팀이다 — 지금 소속이 비었거나 바뀌어도 그 경기의 팀을 낸다")
+    void recommend_WhenCurrentTeamDiffersOrMissing_UseTeamAtGame() {
+        // given
+        jdbcTemplate.update("UPDATE pro_players SET team = NULL WHERE leaguepedia_page = 'Faker'");
+        jdbcTemplate.update("UPDATE pro_players SET team = 'Dplus KIA' WHERE leaguepedia_page = 'Chovy'");
+
+        // when & then
+        assertThat(pickOf("Faker", Language.KO_KR).player().team()).isEqualTo("T1");
+        assertThat(pickOf("Chovy", Language.KO_KR).player().team()).isEqualTo("Gen.G");
+    }
+
+    @Test
     @DisplayName("소환사 주문과 최종 아이템을 칸 순서대로 이름·사진과 함께 담는다")
     void recommend_WhenPickDrawn_IncludeSpellsAndItemsInSlotOrder() {
         // when

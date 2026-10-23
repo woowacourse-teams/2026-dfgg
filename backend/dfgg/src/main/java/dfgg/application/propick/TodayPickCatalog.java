@@ -49,8 +49,9 @@ class TodayPickCatalog {
 
     PickResponse toResponse(ProPick pick) {
         ProPlayer player = pick.getPlayer();
+        // 팀은 선수의 지금 소속이 아니라 그 경기의 팀이다. 지금 소속은 비어 있거나 바뀌었을 수 있다.
         return new PickResponse(
-                new PlayerResponse(player.getName(), player.getTeam(), player.getImageUrl()),
+                new PlayerResponse(player.getName(), pick.getTeam(), player.getImageUrl()),
                 pick.getPlayedAt().toLocalDate(),
                 championOf(pick),
                 pick.getSpells().stream().map(spell -> spellOf(spell.getSpellId())).flatMap(Optional::stream).toList(),
