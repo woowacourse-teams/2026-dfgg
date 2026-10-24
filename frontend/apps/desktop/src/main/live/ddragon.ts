@@ -120,6 +120,11 @@ async function load(): Promise<DDragonData> {
 }
 
 export async function getDDragonData() {
-  if (cache === null) cache = load();
+  if (cache === null) {
+    cache = load().catch((error) => {
+      cache = null;
+      throw error;
+    });
+  }
   return cache;
 }

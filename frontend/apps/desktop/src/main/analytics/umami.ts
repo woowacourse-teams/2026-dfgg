@@ -4,6 +4,7 @@ import { getIdentity } from './identity';
 import { AnalyticsTarget, readStore, updateStore, type PendingEvent } from './store';
 import { reportError } from '../sentry';
 import { settingSnapshot } from './settingSnapshot';
+import { hardwareSnapshot } from './hardwareSnapshot';
 
 const TIMEOUT_MS = 5000;
 const ALL_TARGETS: AnalyticsTarget[] = ['umami', 'posthog'];
@@ -73,7 +74,13 @@ async function sendPosthog({ name, data, id, timestamp }: PendingEvent) {
         ...data,
         ...(data?.riotId ? { $set: { name: data.riotId, riot_id: data.riotId } } : {}),
         ...(name === 'desktop-settings' || name === 'desktop-setting-change'
-          ? { $set: { ...(data?.riotId && { name: data.riotId }), ...settingSnapshot() } }
+          ? {
+              $set: {
+                ...(data?.riotId && { name: data.riotId }),
+                ...settingSnapshot(),
+                ...hardwareSnapshot,
+              },
+            }
           : {}),
       },
     }),

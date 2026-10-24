@@ -13,6 +13,8 @@ import { readStore, updateStore, type PendingEvent } from './store';
 import { enqueue, trackEvent } from './umami';
 import { reportError } from '../sentry';
 import { BrowserWindow, screen } from 'electron';
+import { PerfSampler } from './perfSampler';
+import { isRecording } from '../highlight/highlight';
 
 const SNAPSHOT_INTERVAL_MS = 60_000;
 // 게임은 끝났지만 결과 화면 전인 phase. 이때는 게임을 끝내지 않는다.
@@ -48,6 +50,7 @@ type Game = {
   followedSituational: number;
   overlayClicks: Partial<Record<OverlayClickTarget, number>>;
   overlayMoves: number;
+  perf: PerfSampler;
 };
 
 let game: Game | null = null;
@@ -126,6 +129,7 @@ function toEvent(current: Game, result: string): PendingEvent {
       ),
       overlayMoves: current.overlayMoves,
       ...overlayPosition(),
+      ...current.perf.summary(),
     },
   };
 }
@@ -166,8 +170,10 @@ async function startGame() {
     followedSituational: 0,
     overlayClicks: {},
     overlayMoves: 0,
+    perf: new PerfSampler(),
   };
   game = current;
+  current.perf.start(isRecording);
   syncOverlay();
 
   // 게임 도중 강제 종료에 대비해 1분마다 저장해 둔다.
@@ -194,6 +200,7 @@ function closeGame() {
 
   current.overlayExpanded.stop();
   current.overlayCollapsed.stop();
+  current.perf.stop();
   game = null;
 
   if (timer !== null) clearInterval(timer);
