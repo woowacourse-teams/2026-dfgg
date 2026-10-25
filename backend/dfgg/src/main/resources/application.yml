@@ -91,8 +91,8 @@ recommendation:
 collection:
   scheduler:
     enabled: "${COLLECTION_SCHEDULER_ENABLED:false}"
-    cron: "${COLLECTION_SCHEDULER_CRON:0 */5 * * * *}"
-    zone: "${COLLECTION_SCHEDULER_ZONE:Asia/Seoul}"
+    # 이전 실행이 끝난 뒤 이만큼 쉬고 다음 실행을 시작한다. Riot 호출 간격은 RiotRateLimitExecutor가 지킨다.
+    fixed-delay: "${COLLECTION_SCHEDULER_FIXED_DELAY:10s}"
     tiers: "${COLLECTION_SCHEDULER_TIERS:PLATINUM}"
     divisions: "${COLLECTION_SCHEDULER_DIVISIONS:I}"
     league-page-count: "${COLLECTION_SCHEDULER_LEAGUE_PAGE_COUNT:1}"

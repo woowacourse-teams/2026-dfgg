@@ -13,6 +13,7 @@ import dfgg.application.RiotCollectionOrchestrator;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.Duration;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +23,8 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
+import org.springframework.scheduling.config.FixedDelayTask;
+import org.springframework.scheduling.config.ScheduledTask;
 
 @ExtendWith(OutputCaptureExtension.class)
 class RiotSchedulingConfigurationTest {
@@ -35,8 +38,29 @@ class RiotSchedulingConfigurationTest {
             );
 
     @Test
-    void 기본_cron은_5분_주기다() {
-        assertThat(new RiotSchedulerProperties().getCron()).isEqualTo("0 */5 * * * *");
+    void 기본_실행_간격은_10초다() {
+        RiotSchedulerProperties properties = new RiotSchedulerProperties();
+
+        assertThat(properties.getFixedDelay()).isEqualTo(Duration.ofSeconds(10));
+    }
+
+    @Test
+    void 수집은_이전_실행이_끝난_뒤_설정한_간격만큼_쉬고_다시_시작한다() {
+        contextRunner
+                .withPropertyValues(
+                        "collection.scheduler.enabled=true",
+                        "collection.scheduler.fixed-delay=30s"
+                )
+                .run(context -> {
+                    ScheduledAnnotationBeanPostProcessor processor =
+                            context.getBean(ScheduledAnnotationBeanPostProcessor.class);
+
+                    assertThat(processor.getScheduledTasks())
+                            .singleElement()
+                            .extracting(ScheduledTask::getTask)
+                            .isInstanceOfSatisfying(FixedDelayTask.class, task ->
+                                    assertThat(task.getIntervalDuration()).isEqualTo(Duration.ofSeconds(30)));
+                });
     }
 
     @Test
@@ -60,13 +84,12 @@ class RiotSchedulingConfigurationTest {
     }
 
     @Test
-    void cron_timezone과_수집_범위를_설정으로_bind한다() {
+    void 실행_간격과_수집_범위를_설정으로_bind한다() {
         new ApplicationContextRunner()
                 .withUserConfiguration(PropertiesConfiguration.class)
                 .withPropertyValues(
                         "collection.scheduler.enabled=true",
-                        "collection.scheduler.cron=0 30 4 * * *",
-                        "collection.scheduler.zone=UTC",
+                        "collection.scheduler.fixed-delay=30s",
                         "collection.scheduler.tiers=EMERALD",
                         "collection.scheduler.divisions=I,II",
                         "collection.scheduler.player-limit=3",
@@ -76,8 +99,7 @@ class RiotSchedulingConfigurationTest {
                 .run(context -> {
                     RiotSchedulerProperties properties = context.getBean(RiotSchedulerProperties.class);
                     assertThat(properties.isEnabled()).isTrue();
-                    assertThat(properties.getCron()).isEqualTo("0 30 4 * * *");
-                    assertThat(properties.getZone()).isEqualTo("UTC");
+                    assertThat(properties.getFixedDelay()).isEqualTo(Duration.ofSeconds(30));
                     assertThat(properties.getTiers()).containsExactly("EMERALD");
                     assertThat(properties.getDivisions()).containsExactly("I", "II");
                     assertThat(properties.getPlayerLimit()).isEqualTo(3);

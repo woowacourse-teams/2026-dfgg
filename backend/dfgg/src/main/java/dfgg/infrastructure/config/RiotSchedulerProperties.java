@@ -1,5 +1,6 @@
 package dfgg.infrastructure.config;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -8,8 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class RiotSchedulerProperties {
 
     private boolean enabled;
-    private String cron = "0 */5 * * * *";
-    private String zone = "Asia/Seoul";
+    private Duration fixedDelay = Duration.ofSeconds(10);
     private List<String> tiers = new ArrayList<>(List.of("PLATINUM"));
     private List<String> divisions = new ArrayList<>(List.of("I"));
     private int leaguePageCount = 1;
@@ -26,20 +26,12 @@ public class RiotSchedulerProperties {
         this.enabled = enabled;
     }
 
-    public String getCron() {
-        return cron;
+    public Duration getFixedDelay() {
+        return fixedDelay;
     }
 
-    public void setCron(String cron) {
-        this.cron = cron;
-    }
-
-    public String getZone() {
-        return zone;
-    }
-
-    public void setZone(String zone) {
-        this.zone = zone;
+    public void setFixedDelay(Duration fixedDelay) {
+        this.fixedDelay = fixedDelay;
     }
 
     public List<String> getTiers() {
