@@ -15,10 +15,13 @@ import static org.mockito.Mockito.when;
 
 import dfgg.application.match.MatchNormalizationService;
 import dfgg.application.match.RiotMatchSyncService;
+import dfgg.application.match.StoredParticipantItemPurchaseNormalizationService;
 import dfgg.application.player.RiotPlayerSyncService;
+import dfgg.application.rune.ParticipantRuneNormalizationService;
 import dfgg.application.stats.ChampionBuildStatsMatchService;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +35,8 @@ class RiotCollectionOrchestratorTest {
     private RiotMatchSyncService matchSyncService;
     private MatchNormalizationService matchNormalizationService;
     private ChampionBuildStatsMatchService statsMatchService;
+    private ParticipantRuneNormalizationService runeNormalizationService;
+    private StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService;
     private RiotSchedulerProperties properties;
     private RiotCollectionOrchestrator orchestrator;
 
@@ -41,6 +46,8 @@ class RiotCollectionOrchestratorTest {
         matchSyncService = mock(RiotMatchSyncService.class);
         matchNormalizationService = mock(MatchNormalizationService.class);
         statsMatchService = mock(ChampionBuildStatsMatchService.class);
+        runeNormalizationService = mock(ParticipantRuneNormalizationService.class);
+        purchaseNormalizationService = mock(StoredParticipantItemPurchaseNormalizationService.class);
         properties = new RiotSchedulerProperties();
         properties.setPlayerPageSize(2);
         properties.setPlayerLimit(100);
@@ -58,7 +65,9 @@ class RiotCollectionOrchestratorTest {
                 playerSyncService,
                 matchSyncService,
                 matchNormalizationService,
-                statsMatchService
+                statsMatchService,
+                runeNormalizationService,
+                purchaseNormalizationService
         );
     }
 
@@ -91,6 +100,70 @@ class RiotCollectionOrchestratorTest {
         order.verify(statsMatchService).registerMatchStats(normalized, "PLATINUM");
         order.verify(matchSyncService).findMatchIds("puuid-2", 0, 20);
         order.verify(matchSyncService).syncMissingTimelines();
+    }
+
+    @Test
+    void 새로_수집한_매치는_통계_집계_뒤_룬과_구매를_정규화한다() {
+        NormalizedMatch normalized = collectSingleMatch("KR_1");
+
+        orchestrator.runOnce();
+
+        InOrder order = inOrder(statsMatchService, runeNormalizationService, purchaseNormalizationService);
+        order.verify(statsMatchService).registerMatchStats(normalized, "PLATINUM");
+        order.verify(runeNormalizationService).normalize("KR_1");
+        order.verify(purchaseNormalizationService).normalizeMatch("KR_1");
+    }
+
+    @Test
+    void 룬_정규화가_실패해도_구매_정규화와_다음_매치를_계속한다() {
+        collectMatches("KR_1", "KR_2");
+        when(runeNormalizationService.normalize("KR_1"))
+                .thenThrow(new IllegalArgumentException("Raw Match 참가자의 룬(perks)이 없습니다: 1"));
+
+        orchestrator.runOnce();
+
+        verify(purchaseNormalizationService).normalizeMatch("KR_1");
+        verify(runeNormalizationService).normalize("KR_2");
+        verify(purchaseNormalizationService).normalizeMatch("KR_2");
+    }
+
+    @Test
+    void 구매_정규화가_실패해도_다음_매치를_계속한다() {
+        collectMatches("KR_1", "KR_2");
+        when(purchaseNormalizationService.normalizeMatch("KR_1"))
+                .thenThrow(new IllegalStateException("패치 16.15에 해당하는 Data Dragon 빌드가 없습니다."));
+
+        orchestrator.runOnce();
+
+        verify(matchNormalizationService).normalizeAsTierSample("KR_2", "PLATINUM");
+        verify(runeNormalizationService).normalize("KR_2");
+        verify(purchaseNormalizationService).normalizeMatch("KR_2");
+    }
+
+    @Test
+    void 원본이_이미_있던_매치는_룬과_구매를_정규화하지_않는다() {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
+        when(matchSyncService.findMatchIds("puuid-1", 0, 20)).thenReturn(List.of("KR_EXISTING"));
+        when(matchSyncService.syncMatch("KR_EXISTING")).thenReturn(false);
+
+        orchestrator.runOnce();
+
+        verifyNoInteractions(runeNormalizationService, purchaseNormalizationService);
+    }
+
+    @Test
+    void 참가자_정규화가_실패한_매치는_룬과_구매를_정규화하지_않는다() {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
+        when(matchSyncService.findMatchIds("puuid-1", 0, 20)).thenReturn(List.of("KR_FAILED"));
+        when(matchSyncService.syncMatch("KR_FAILED")).thenReturn(true);
+        when(matchNormalizationService.normalizeAsTierSample("KR_FAILED", "PLATINUM"))
+                .thenThrow(new IllegalStateException("Timeline 형식 오류"));
+
+        orchestrator.runOnce();
+
+        verifyNoInteractions(runeNormalizationService, purchaseNormalizationService);
     }
 
     @Test
@@ -611,6 +684,25 @@ class RiotCollectionOrchestratorTest {
                 .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
 
         order.verifyNoMoreInteractions();
+    }
+
+    private NormalizedMatch collectSingleMatch(String matchId) {
+        return collectMatches(matchId).getFirst();
+    }
+
+    /** 첫 리그 페이지의 플레이어 한 명이 주어진 매치들을 새로 수집하도록 준비한다. */
+    private List<NormalizedMatch> collectMatches(String... matchIds) {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
+        when(matchSyncService.findMatchIds("puuid-1", 0, 20)).thenReturn(List.of(matchIds));
+        List<NormalizedMatch> normalizedMatches = new ArrayList<>();
+        for (String matchId : matchIds) {
+            NormalizedMatch normalized = normalizedMatch(matchId);
+            when(matchSyncService.syncMatch(matchId)).thenReturn(true);
+            when(matchNormalizationService.normalizeAsTierSample(matchId, "PLATINUM")).thenReturn(normalized);
+            normalizedMatches.add(normalized);
+        }
+        return normalizedMatches;
     }
 
     private NormalizedMatch normalizedMatch(String matchId) {

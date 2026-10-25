@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -35,6 +36,8 @@ public class StoredParticipantItemPurchaseNormalizationService {
     private final ItemPurchaseTypeClassifier classifier;
     private final ParticipantItemPurchaseNormalizationService normalizationService;
     private final ObjectMapper objectMapper;
+    // 수집 경로가 경기마다 카탈로그를 받지 않도록 패치별로 보관한다. 받지 못한 패치는 담기지 않아 다음 경기에서 다시 받는다.
+    private final Map<String, ClassifiedCatalog> collectedCatalogsByPatch = new ConcurrentHashMap<>();
 
     public StoredParticipantItemPurchaseNormalizationService(RawMatchRepository rawMatchRepository,
                                                DataDragonClient dataDragonClient,
@@ -72,6 +75,17 @@ public class StoredParticipantItemPurchaseNormalizationService {
         log.info("패치 구매 정규화 배치 완료: patch={}, processed={}, failed={}, nextCursor={}",
                 patch, result.processed(), result.failed(), result.nextCursor());
         return result;
+    }
+
+    /**
+     * 방금 수집한 한 경기의 구매를 정규화하고 저장한 구매 수를 돌려준다.
+     * 원천·카탈로그·적재 실패는 호출자가 경기 단위로 격리할 수 있도록 그대로 전달한다.
+     */
+    public int normalizeMatch(String matchId) {
+        MatchContext context = acceptedContext(matchId, ANY_PATCH);
+        ClassifiedCatalog catalog = collectedCatalogsByPatch.computeIfAbsent(context.patch(), this::loadCatalog);
+        return normalizationService.normalize(matchId, context.patch(), catalog.purchaseTypes(), catalog.response(),
+                context.positionsByParticipant());
     }
 
     /** 실패한 경기가 있어도 이번 배치의 마지막 경기 다음부터 이어간다. */

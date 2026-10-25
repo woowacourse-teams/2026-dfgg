@@ -8,6 +8,13 @@ spring:
   config:
     import: "optional:file:.env[.properties]"
 
+  # Boot가 주입하는 RestClient.Builder로 만드는 외부 클라이언트(Riot, Data Dragon)의 기본 timeout.
+  # 수집 스케줄러는 advisory lock을 쥔 채 실행되므로, 응답이 멈추면 수집 전체가 재시작 전까지 멈춘다.
+  http:
+    clients:
+      connect-timeout: 3s
+      read-timeout: 10s
+
   datasource:
     url: "${DB_URL:jdbc:postgresql://127.0.0.1:5432/dfgg}"
     username: "${DB_USERNAME:}"

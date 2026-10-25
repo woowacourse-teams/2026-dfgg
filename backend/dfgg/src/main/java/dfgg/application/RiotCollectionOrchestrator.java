@@ -2,7 +2,9 @@ package dfgg.application;
 
 import dfgg.application.match.MatchNormalizationService;
 import dfgg.application.match.RiotMatchSyncService;
+import dfgg.application.match.StoredParticipantItemPurchaseNormalizationService;
 import dfgg.application.player.RiotPlayerSyncService;
+import dfgg.application.rune.ParticipantRuneNormalizationService;
 import dfgg.application.stats.ChampionBuildStatsMatchService;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
@@ -22,8 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 
 /**
- * Riot 데이터 자동 수집의 전체 순서만 조율한다. 플레이어를 조회한 뒤 새로 수집한 매치별로 원본 수집 → 정규화 → 통계 집계를 이어서 실행한다. 이전 실행에서 남은 미완료 데이터의 정규화와 집계는 관리자
- * API가 담당한다.
+ * Riot 데이터 자동 수집의 전체 순서만 조율한다. 플레이어를 조회한 뒤 새로 수집한 매치별로 원본 수집 → 정규화 → 통계 집계 → 룬·구매 정규화를 이어서 실행한다. 이전 실행에서 남은
+ * 미완료 데이터의 정규화와 집계는 관리자 API가 담당한다.
  */
 @Service
 public class RiotCollectionOrchestrator {
@@ -45,6 +47,8 @@ public class RiotCollectionOrchestrator {
     private final RiotMatchSyncService matchSyncService;
     private final MatchNormalizationService matchNormalizationService;
     private final ChampionBuildStatsMatchService statsMatchService;
+    private final ParticipantRuneNormalizationService runeNormalizationService;
+    private final StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService;
     private final Map<String, Integer> nextLeaguePages;
     private final Map<String, Integer> nextDivisionIndexes;
     private final Map<String, Boolean> leagueRangeHasPlayersByTier;
@@ -56,13 +60,17 @@ public class RiotCollectionOrchestrator {
             RiotPlayerSyncService playerSyncService,
             RiotMatchSyncService matchSyncService,
             MatchNormalizationService matchNormalizationService,
-            ChampionBuildStatsMatchService statsMatchService
+            ChampionBuildStatsMatchService statsMatchService,
+            ParticipantRuneNormalizationService runeNormalizationService,
+            StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService
     ) {
         this.properties = properties;
         this.playerSyncService = playerSyncService;
         this.matchSyncService = matchSyncService;
         this.matchNormalizationService = matchNormalizationService;
         this.statsMatchService = statsMatchService;
+        this.runeNormalizationService = runeNormalizationService;
+        this.purchaseNormalizationService = purchaseNormalizationService;
         this.nextLeaguePages = new HashMap<>();
         this.nextDivisionIndexes = new HashMap<>();
         this.leagueRangeHasPlayersByTier = new HashMap<>();
@@ -250,7 +258,7 @@ public class RiotCollectionOrchestrator {
     }
 
     /**
-     * 한 매치를 Raw Match → Timeline → 정규화 → 통계 순서로 처리한다. 원본 수집에 실패한 매치는 정규화하지 않고 다음 실행의 복구 대상으로 남긴다.
+     * 한 매치를 Raw Match → Timeline → 정규화 → 통계 → 룬 → 구매 순서로 처리한다. 원본 수집에 실패한 매치는 정규화하지 않고 다음 실행의 복구 대상으로 남긴다.
      */
     private void processMatch(String matchId, String sampleTier) {
         boolean collected;
@@ -266,13 +274,39 @@ public class RiotCollectionOrchestrator {
             return;
         }
 
+        NormalizedMatch normalized;
         try {
-            NormalizedMatch normalized = matchNormalizationService.normalizeAsTierSample(matchId, sampleTier);
+            normalized = matchNormalizationService.normalizeAsTierSample(matchId, sampleTier);
             matchNormalizationService.save(normalized);
             aggregateStats(normalized, List.of(sampleTier), new ArrayList<>());
         } catch (RuntimeException exception) {
             // 자동 재시도하지 않는다. 운영자가 수집을 중단한 뒤 관리자 재집계 API로 복구한다.
             log.error("매치 정규화 또는 통계 집계 실패: matchId={}", matchId, exception);
+            return;
+        }
+
+        // 룬과 구매는 원본만 읽어 서로 독립적이다. 한쪽이 실패해도 다른 쪽과 다음 매치는 계속한다.
+        normalizeRunes(normalized);
+        normalizePurchases(normalized);
+    }
+
+    /** 실패하면 패치별 룬 정규화 관리자 API로 복구한다. */
+    private void normalizeRunes(NormalizedMatch normalized) {
+        try {
+            runeNormalizationService.normalize(normalized.matchId());
+        } catch (RuntimeException exception) {
+            log.warn("룬 정규화 실패: matchId={}, patch={}, reason={}",
+                    normalized.matchId(), normalized.patch(), exception.getMessage(), exception);
+        }
+    }
+
+    /** 실패하면 패치별 구매 정규화 관리자 API로 복구한다. */
+    private void normalizePurchases(NormalizedMatch normalized) {
+        try {
+            purchaseNormalizationService.normalizeMatch(normalized.matchId());
+        } catch (RuntimeException exception) {
+            log.warn("구매 정규화 실패: matchId={}, patch={}, reason={}",
+                    normalized.matchId(), normalized.patch(), exception.getMessage(), exception);
         }
     }
 
