@@ -1,5 +1,6 @@
 package dfgg.application;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -21,14 +22,19 @@ import dfgg.application.rune.ParticipantRuneNormalizationService;
 import dfgg.application.stats.ChampionBuildStatsMatchService;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpClientErrorException;
 
+@ExtendWith(OutputCaptureExtension.class)
 class RiotCollectionOrchestratorTest {
 
     private RiotPlayerSyncService playerSyncService;
@@ -37,6 +43,7 @@ class RiotCollectionOrchestratorTest {
     private ChampionBuildStatsMatchService statsMatchService;
     private ParticipantRuneNormalizationService runeNormalizationService;
     private StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService;
+    private SimpleMeterRegistry meterRegistry;
     private RiotSchedulerProperties properties;
     private RiotCollectionOrchestrator orchestrator;
 
@@ -48,6 +55,7 @@ class RiotCollectionOrchestratorTest {
         statsMatchService = mock(ChampionBuildStatsMatchService.class);
         runeNormalizationService = mock(ParticipantRuneNormalizationService.class);
         purchaseNormalizationService = mock(StoredParticipantItemPurchaseNormalizationService.class);
+        meterRegistry = new SimpleMeterRegistry();
         properties = new RiotSchedulerProperties();
         properties.setPlayerPageSize(2);
         properties.setPlayerLimit(100);
@@ -67,7 +75,8 @@ class RiotCollectionOrchestratorTest {
                 matchNormalizationService,
                 statsMatchService,
                 runeNormalizationService,
-                purchaseNormalizationService
+                purchaseNormalizationService,
+                meterRegistry
         );
     }
 
@@ -164,6 +173,42 @@ class RiotCollectionOrchestratorTest {
         orchestrator.runOnce();
 
         verifyNoInteractions(runeNormalizationService, purchaseNormalizationService);
+    }
+
+    @Test
+    void 실행이_끝나면_매치_결과와_정규화_실패를_요약_로그와_메트릭으로_남긴다(CapturedOutput output) {
+        collectMatches("KR_NEW", "KR_DUPLICATE", "KR_UNREACHABLE", "KR_BROKEN");
+        when(matchSyncService.syncMatch("KR_DUPLICATE")).thenReturn(false);
+        when(matchSyncService.syncMatch("KR_UNREACHABLE")).thenThrow(new IllegalStateException("Riot timeout"));
+        when(matchNormalizationService.normalizeAsTierSample("KR_BROKEN", "PLATINUM"))
+                .thenThrow(new IllegalStateException("Timeline 형식 오류"));
+        when(purchaseNormalizationService.normalizeMatch("KR_NEW"))
+                .thenThrow(new IllegalStateException("Data Dragon 접속 실패"));
+
+        orchestrator.runOnce();
+
+        assertThat(output).contains("Riot 데이터 수집 실행 요약: tier=PLATINUM, collected=1, duplicate=1, "
+                + "collectionFailed=1, normalizationFailed=1, runeFailed=0, purchaseFailed=1");
+        assertThat(matches("collected")).isEqualTo(1);
+        assertThat(matches("duplicate")).isEqualTo(1);
+        assertThat(matches("collection_failed")).isEqualTo(1);
+        assertThat(matches("normalization_failed")).isEqualTo(1);
+        assertThat(normalizationFailures("rune")).isZero();
+        assertThat(normalizationFailures("purchase")).isEqualTo(1);
+    }
+
+    @Test
+    void 메트릭은_실행마다_누적되고_수집할_매치가_없어도_모든_결과를_0으로_남긴다() {
+        orchestrator.runOnce();
+        assertThat(matches("collected")).isZero();
+        assertThat(normalizationFailures("purchase")).isZero();
+
+        collectSingleMatch("KR_1");
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+
+        assertThat(matches("collected")).isEqualTo(1);
+        assertThat(matches("duplicate")).isZero();
     }
 
     @Test
@@ -684,6 +729,14 @@ class RiotCollectionOrchestratorTest {
                 .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
 
         order.verifyNoMoreInteractions();
+    }
+
+    private double matches(String result) {
+        return meterRegistry.get("riot.collection.matches").tag("result", result).counter().count();
+    }
+
+    private double normalizationFailures(String stage) {
+        return meterRegistry.get("riot.collection.normalization.failures").tag("stage", stage).counter().count();
     }
 
     private NormalizedMatch collectSingleMatch(String matchId) {
