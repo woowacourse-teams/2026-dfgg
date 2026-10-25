@@ -12,7 +12,6 @@ public class RiotSchedulerProperties {
     private Duration fixedDelay = Duration.ofSeconds(10);
     private List<String> tiers = new ArrayList<>(List.of("PLATINUM"));
     private List<String> divisions = new ArrayList<>(List.of("I"));
-    private int leaguePageCount = 1;
     private int playerPageSize = 100;
     private int playerLimit = 1;
     private int matchCount = 20;
@@ -49,14 +48,6 @@ public class RiotSchedulerProperties {
 
     public void setDivisions(List<String> divisions) {
         this.divisions = new ArrayList<>(divisions);
-    }
-
-    public int getLeaguePageCount() {
-        return leaguePageCount;
-    }
-
-    public void setLeaguePageCount(int leaguePageCount) {
-        this.leaguePageCount = leaguePageCount;
     }
 
     public int getPlayerPageSize() {

@@ -261,7 +261,6 @@ class RiotCollectionOrchestratorTest {
     void Master_리그는_디비전과_페이지_없이_수집한다() {
         properties.setTiers(List.of("MASTER"));
         properties.setDivisions(List.of());
-        properties.setLeaguePageCount(0);
         properties.setPlayerLimit(2);
         when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "MASTER"))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(
@@ -319,7 +318,6 @@ class RiotCollectionOrchestratorTest {
     void Grandmaster_매치를_Grandmaster_표본으로_정규화하고_집계한다() {
         properties.setTiers(List.of("GRANDMASTER"));
         properties.setDivisions(List.of());
-        properties.setLeaguePageCount(0);
         properties.setPlayerLimit(1);
         when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "GRANDMASTER"))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("grandmaster-puuid")));
@@ -342,7 +340,6 @@ class RiotCollectionOrchestratorTest {
     void Challenger_매치를_Challenger_표본으로_정규화하고_집계한다() {
         properties.setTiers(List.of("CHALLENGER"));
         properties.setDivisions(List.of());
-        properties.setLeaguePageCount(0);
         properties.setPlayerLimit(1);
         when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "CHALLENGER"))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("challenger-puuid")));
@@ -567,6 +564,27 @@ class RiotCollectionOrchestratorTest {
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 2);
         verify(matchSyncService).findMatchIdsSince("puuid-1", 20, START_TIME);
         verify(matchSyncService).findMatchIdsSince("puuid-2", 20, START_TIME);
+    }
+
+    @Test
+    void 페이지의_플레이어를_puuid_순으로_실행마다_이어서_쓰고_페이지는_다_쓸_때까지_다시_조회하지_않는다() {
+        properties.setPlayerLimit(1);
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(3, List.of("puuid-c", "puuid-a", "puuid-b")));
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 2))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-d")));
+
+        for (int execution = 0; execution < 4; execution++) {
+            orchestrator.runOnce();
+        }
+
+        InOrder order = inOrder(matchSyncService);
+        order.verify(matchSyncService).findMatchIdsSince("puuid-a", 20, START_TIME);
+        order.verify(matchSyncService).findMatchIdsSince("puuid-b", 20, START_TIME);
+        order.verify(matchSyncService).findMatchIdsSince("puuid-c", 20, START_TIME);
+        order.verify(matchSyncService).findMatchIdsSince("puuid-d", 20, START_TIME);
+        verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
+        verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 2);
     }
 
     @Test
