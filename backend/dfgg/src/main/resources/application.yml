@@ -99,6 +99,8 @@ collection:
     player-page-size: "${COLLECTION_SCHEDULER_PLAYER_PAGE_SIZE:100}"
     player-limit: "${COLLECTION_SCHEDULER_PLAYER_LIMIT:1}"
     match-count: "${COLLECTION_SCHEDULER_MATCH_COUNT:20}"
+    # 매치 ID를 이 기간 안의 경기로만 조회한다. 최근에 게임하지 않은 플레이어는 매치 ID 조회 1회로 끝난다.
+    match-lookback: "${COLLECTION_SCHEDULER_MATCH_LOOKBACK:14d}"
     recover-missing-timelines: "${COLLECTION_SCHEDULER_RECOVER_MISSING_TIMELINES:false}"
 
 server:

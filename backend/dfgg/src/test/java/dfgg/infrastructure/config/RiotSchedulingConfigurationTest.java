@@ -38,10 +38,11 @@ class RiotSchedulingConfigurationTest {
             );
 
     @Test
-    void 기본_실행_간격은_10초다() {
+    void 기본_실행_간격은_10초이고_매치는_최근_14일만_조회한다() {
         RiotSchedulerProperties properties = new RiotSchedulerProperties();
 
         assertThat(properties.getFixedDelay()).isEqualTo(Duration.ofSeconds(10));
+        assertThat(properties.getMatchLookback()).isEqualTo(Duration.ofDays(14));
     }
 
     @Test
@@ -94,6 +95,7 @@ class RiotSchedulingConfigurationTest {
                         "collection.scheduler.divisions=I,II",
                         "collection.scheduler.player-limit=3",
                         "collection.scheduler.match-count=50",
+                        "collection.scheduler.match-lookback=7d",
                         "collection.scheduler.recover-missing-timelines=true"
                 )
                 .run(context -> {
@@ -104,6 +106,7 @@ class RiotSchedulingConfigurationTest {
                     assertThat(properties.getDivisions()).containsExactly("I", "II");
                     assertThat(properties.getPlayerLimit()).isEqualTo(3);
                     assertThat(properties.getMatchCount()).isEqualTo(50);
+                    assertThat(properties.getMatchLookback()).isEqualTo(Duration.ofDays(7));
                     assertThat(properties.isRecoverMissingTimelines()).isTrue();
                 });
     }

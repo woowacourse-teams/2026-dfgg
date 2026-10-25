@@ -86,6 +86,18 @@ class RiotClientTest {
     }
 
     @Test
+    void 시작_시각을_주면_그_이후_경기의_매치_ID만_epoch_초로_조회한다() {
+        server.expect(requestTo(REGIONAL_BASE_URL
+                        + "/lol/match/v5/matches/by-puuid/encrypted-puuid/ids?queue=420&startTime=1791676800&start=0&count=47"))
+                .andRespond(withSuccess("[\"KR_1234567890\"]", MediaType.APPLICATION_JSON));
+
+        List<String> matchIds = client.getMatchIds("encrypted-puuid", 0, 47, Instant.parse("2026-10-11T00:00:00Z"));
+
+        assertThat(matchIds).containsExactly("KR_1234567890");
+        server.verify();
+    }
+
+    @Test
     void PUUID로_리그_엔트리를_조회한다() {
         server.expect(requestTo(PLATFORM_BASE_URL
                         + "/lol/league/v4/entries/by-puuid/encrypted-puuid"))

@@ -9,6 +9,8 @@ import dfgg.application.stats.ChampionBuildStatsMatchService;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -19,6 +21,7 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,12 +54,14 @@ public class RiotCollectionOrchestrator {
     private final ParticipantRuneNormalizationService runeNormalizationService;
     private final StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService;
     private final MeterRegistry meterRegistry;
+    private final Clock clock;
     private final Map<String, Integer> nextLeaguePages;
     private final Map<String, Integer> nextDivisionIndexes;
     private final Map<String, Boolean> leagueRangeHasPlayersByTier;
     private final Map<String, Integer> nextApexPlayerIndexes;
     private int nextTierIndex;
 
+    @Autowired
     public RiotCollectionOrchestrator(
             RiotSchedulerProperties properties,
             RiotPlayerSyncService playerSyncService,
@@ -67,6 +72,22 @@ public class RiotCollectionOrchestrator {
             StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService,
             MeterRegistry meterRegistry
     ) {
+        this(properties, playerSyncService, matchSyncService, matchNormalizationService, statsMatchService,
+                runeNormalizationService, purchaseNormalizationService, meterRegistry, Clock.systemUTC());
+    }
+
+    // 테스트가 현재 시각을 고정할 수 있도록 Clock을 받는 생성자를 따로 둔다.
+    RiotCollectionOrchestrator(
+            RiotSchedulerProperties properties,
+            RiotPlayerSyncService playerSyncService,
+            RiotMatchSyncService matchSyncService,
+            MatchNormalizationService matchNormalizationService,
+            ChampionBuildStatsMatchService statsMatchService,
+            ParticipantRuneNormalizationService runeNormalizationService,
+            StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService,
+            MeterRegistry meterRegistry,
+            Clock clock
+    ) {
         this.properties = properties;
         this.playerSyncService = playerSyncService;
         this.matchSyncService = matchSyncService;
@@ -75,6 +96,7 @@ public class RiotCollectionOrchestrator {
         this.runeNormalizationService = runeNormalizationService;
         this.purchaseNormalizationService = purchaseNormalizationService;
         this.meterRegistry = meterRegistry;
+        this.clock = clock;
         this.nextLeaguePages = new HashMap<>();
         this.nextDivisionIndexes = new HashMap<>();
         this.leagueRangeHasPlayersByTier = new HashMap<>();
@@ -254,11 +276,9 @@ public class RiotCollectionOrchestrator {
                                       CollectionRunSummary summary) {
         List<String> matchIds;
         try {
-            matchIds = matchSyncService.findMatchIds(
-                    puuid,
-                    0,
-                    properties.getMatchCount()
-            );
+            // 최근 matchLookback 안에 시작한 경기만 받는다. 오래 쉰 플레이어는 빈 목록이라 매치 ID 조회 1회로 끝난다.
+            Instant startTime = clock.instant().minus(properties.getMatchLookback());
+            matchIds = matchSyncService.findMatchIdsSince(puuid, properties.getMatchCount(), startTime);
         } catch (RuntimeException exception) {
             log.warn("플레이어 매치 ID 조회 실패, 해당 플레이어의 매치 수집 생략: puuid={}", puuid, exception);
             return;
@@ -536,6 +556,9 @@ public class RiotCollectionOrchestrator {
         }
         if (properties.getMatchCount() < 1 || properties.getMatchCount() > 100) {
             throw new IllegalArgumentException("플레이어당 조회할 매치 수는 1 이상 100 이하여야 합니다.");
+        }
+        if (properties.getMatchLookback().isNegative() || properties.getMatchLookback().isZero()) {
+            throw new IllegalArgumentException("매치 조회 기간은 0보다 길어야 합니다.");
         }
     }
 

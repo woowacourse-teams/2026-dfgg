@@ -16,6 +16,7 @@ public class RiotSchedulerProperties {
     private int playerPageSize = 100;
     private int playerLimit = 1;
     private int matchCount = 20;
+    private Duration matchLookback = Duration.ofDays(14);
     private boolean recoverMissingTimelines;
 
     public boolean isEnabled() {
@@ -80,6 +81,14 @@ public class RiotSchedulerProperties {
 
     public void setMatchCount(int matchCount) {
         this.matchCount = matchCount;
+    }
+
+    public Duration getMatchLookback() {
+        return matchLookback;
+    }
+
+    public void setMatchLookback(Duration matchLookback) {
+        this.matchLookback = matchLookback;
     }
 
     public boolean isRecoverMissingTimelines() {

@@ -2,6 +2,7 @@ package dfgg.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -23,6 +24,9 @@ import dfgg.application.stats.ChampionBuildStatsMatchService;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +40,10 @@ import org.springframework.web.client.HttpClientErrorException;
 
 @ExtendWith(OutputCaptureExtension.class)
 class RiotCollectionOrchestratorTest {
+
+    private static final Instant NOW = Instant.parse("2026-10-25T00:00:00Z");
+    // 기본 조회 기간 14일을 뺀 시각이다.
+    private static final Instant START_TIME = Instant.parse("2026-10-11T00:00:00Z");
 
     private RiotPlayerSyncService playerSyncService;
     private RiotMatchSyncService matchSyncService;
@@ -65,7 +73,7 @@ class RiotCollectionOrchestratorTest {
         )).thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of()));
         when(playerSyncService.syncApexLeague(anyString(), anyString()))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of()));
-        when(matchSyncService.findMatchIds(anyString(), anyInt(), anyInt()))
+        when(matchSyncService.findMatchIdsSince(anyString(), anyInt(), any()))
                 .thenReturn(List.of());
 
         orchestrator = new RiotCollectionOrchestrator(
@@ -76,7 +84,8 @@ class RiotCollectionOrchestratorTest {
                 statsMatchService,
                 runeNormalizationService,
                 purchaseNormalizationService,
-                meterRegistry
+                meterRegistry,
+                Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }
 
@@ -87,7 +96,7 @@ class RiotCollectionOrchestratorTest {
                         2,
                         List.of("puuid-1", "puuid-2")
                 ));
-        when(matchSyncService.findMatchIds("puuid-1", 0, 20))
+        when(matchSyncService.findMatchIdsSince("puuid-1", 20, START_TIME))
                 .thenReturn(List.of("KR_1"));
         when(matchSyncService.syncMatch("KR_1")).thenReturn(true);
         NormalizedMatch normalized = normalizedMatch("KR_1");
@@ -102,12 +111,12 @@ class RiotCollectionOrchestratorTest {
         );
         order.verify(playerSyncService)
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
-        order.verify(matchSyncService).findMatchIds("puuid-1", 0, 20);
+        order.verify(matchSyncService).findMatchIdsSince("puuid-1", 20, START_TIME);
         order.verify(matchSyncService).syncMatch("KR_1");
         order.verify(matchNormalizationService).normalizeAsTierSample("KR_1", "PLATINUM");
         order.verify(matchNormalizationService).save(normalized);
         order.verify(statsMatchService).registerMatchStats(normalized, "PLATINUM");
-        order.verify(matchSyncService).findMatchIds("puuid-2", 0, 20);
+        order.verify(matchSyncService).findMatchIdsSince("puuid-2", 20, START_TIME);
         order.verify(matchSyncService).syncMissingTimelines();
     }
 
@@ -153,7 +162,7 @@ class RiotCollectionOrchestratorTest {
     void 원본이_이미_있던_매치는_룬과_구매를_정규화하지_않는다() {
         when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
-        when(matchSyncService.findMatchIds("puuid-1", 0, 20)).thenReturn(List.of("KR_EXISTING"));
+        when(matchSyncService.findMatchIdsSince("puuid-1", 20, START_TIME)).thenReturn(List.of("KR_EXISTING"));
         when(matchSyncService.syncMatch("KR_EXISTING")).thenReturn(false);
 
         orchestrator.runOnce();
@@ -165,7 +174,7 @@ class RiotCollectionOrchestratorTest {
     void 참가자_정규화가_실패한_매치는_룬과_구매를_정규화하지_않는다() {
         when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
-        when(matchSyncService.findMatchIds("puuid-1", 0, 20)).thenReturn(List.of("KR_FAILED"));
+        when(matchSyncService.findMatchIdsSince("puuid-1", 20, START_TIME)).thenReturn(List.of("KR_FAILED"));
         when(matchSyncService.syncMatch("KR_FAILED")).thenReturn(true);
         when(matchNormalizationService.normalizeAsTierSample("KR_FAILED", "PLATINUM"))
                 .thenThrow(new IllegalStateException("Timeline 형식 오류"));
@@ -218,14 +227,14 @@ class RiotCollectionOrchestratorTest {
                         2,
                         List.of("puuid-1", "puuid-2")
                 ));
-        when(matchSyncService.findMatchIds(anyString(), eq(0), eq(20)))
+        when(matchSyncService.findMatchIdsSince(anyString(), eq(20), eq(START_TIME)))
                 .thenReturn(List.of("KR_SHARED"));
         when(matchSyncService.syncMatch("KR_SHARED")).thenReturn(true);
         NormalizedMatch normalized = normalizedMatch("KR_SHARED");
         when(matchNormalizationService.normalizeAsTierSample("KR_SHARED", "PLATINUM")).thenReturn(normalized);
         orchestrator.runOnce();
 
-        verify(matchSyncService, times(2)).findMatchIds(anyString(), eq(0), eq(20));
+        verify(matchSyncService, times(2)).findMatchIdsSince(anyString(), eq(20), eq(START_TIME));
         verify(matchSyncService).syncMatch("KR_SHARED");
         verify(matchNormalizationService).normalizeAsTierSample("KR_SHARED", "PLATINUM");
         verify(matchNormalizationService).save(normalized);
@@ -244,8 +253,8 @@ class RiotCollectionOrchestratorTest {
 
         orchestrator.runOnce();
 
-        verify(matchSyncService).findMatchIds("puuid-1", 0, 47);
-        verify(matchSyncService, never()).findMatchIds("puuid-2", 0, 47);
+        verify(matchSyncService).findMatchIdsSince("puuid-1", 47, START_TIME);
+        verify(matchSyncService, never()).findMatchIdsSince("puuid-2", 47, START_TIME);
     }
 
     @Test
@@ -263,9 +272,9 @@ class RiotCollectionOrchestratorTest {
         orchestrator.runOnce();
 
         verify(playerSyncService).syncApexLeague("RANKED_SOLO_5x5", "MASTER");
-        verify(matchSyncService).findMatchIds("puuid-a", 0, 20);
-        verify(matchSyncService).findMatchIds("puuid-b", 0, 20);
-        verify(matchSyncService, never()).findMatchIds("puuid-c", 0, 20);
+        verify(matchSyncService).findMatchIdsSince("puuid-a", 20, START_TIME);
+        verify(matchSyncService).findMatchIdsSince("puuid-b", 20, START_TIME);
+        verify(matchSyncService, never()).findMatchIdsSince("puuid-c", 20, START_TIME);
     }
 
     @Test
@@ -281,9 +290,9 @@ class RiotCollectionOrchestratorTest {
         orchestrator.runOnce();
         orchestrator.runOnce();
 
-        verify(matchSyncService, times(2)).findMatchIds("puuid-a", 0, 20);
-        verify(matchSyncService).findMatchIds("puuid-b", 0, 20);
-        verify(matchSyncService).findMatchIds("puuid-c", 0, 20);
+        verify(matchSyncService, times(2)).findMatchIdsSince("puuid-a", 20, START_TIME);
+        verify(matchSyncService).findMatchIdsSince("puuid-b", 20, START_TIME);
+        verify(matchSyncService).findMatchIdsSince("puuid-c", 20, START_TIME);
     }
 
     @Test
@@ -292,7 +301,7 @@ class RiotCollectionOrchestratorTest {
         properties.setPlayerLimit(1);
         when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "MASTER"))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("master-puuid")));
-        when(matchSyncService.findMatchIds("master-puuid", 0, 20))
+        when(matchSyncService.findMatchIdsSince("master-puuid", 20, START_TIME))
                 .thenReturn(List.of("KR_MASTER"));
         when(matchSyncService.syncMatch("KR_MASTER")).thenReturn(true);
         NormalizedMatch normalized = normalizedMatch("KR_MASTER");
@@ -314,7 +323,7 @@ class RiotCollectionOrchestratorTest {
         properties.setPlayerLimit(1);
         when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "GRANDMASTER"))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("grandmaster-puuid")));
-        when(matchSyncService.findMatchIds("grandmaster-puuid", 0, 20))
+        when(matchSyncService.findMatchIdsSince("grandmaster-puuid", 20, START_TIME))
                 .thenReturn(List.of("KR_GRANDMASTER"));
         when(matchSyncService.syncMatch("KR_GRANDMASTER")).thenReturn(true);
         NormalizedMatch normalized = normalizedMatch("KR_GRANDMASTER");
@@ -337,7 +346,7 @@ class RiotCollectionOrchestratorTest {
         properties.setPlayerLimit(1);
         when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "CHALLENGER"))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("challenger-puuid")));
-        when(matchSyncService.findMatchIds("challenger-puuid", 0, 20))
+        when(matchSyncService.findMatchIdsSince("challenger-puuid", 20, START_TIME))
                 .thenReturn(List.of("KR_CHALLENGER"));
         when(matchSyncService.syncMatch("KR_CHALLENGER")).thenReturn(true);
         NormalizedMatch normalized = normalizedMatch("KR_CHALLENGER");
@@ -484,7 +493,7 @@ class RiotCollectionOrchestratorTest {
         NormalizedMatch succeeded = normalizedMatch("KR_SUCCEEDED");
         when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
-        when(matchSyncService.findMatchIds("puuid-1", 0, 20))
+        when(matchSyncService.findMatchIdsSince("puuid-1", 20, START_TIME))
                 .thenReturn(List.of("KR_FAILED", "KR_SUCCEEDED"));
         when(matchSyncService.syncMatch("KR_FAILED")).thenReturn(true);
         when(matchSyncService.syncMatch("KR_SUCCEEDED")).thenReturn(true);
@@ -511,7 +520,7 @@ class RiotCollectionOrchestratorTest {
         NormalizedMatch succeeded = normalizedMatch("KR_SUCCEEDED");
         when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
-        when(matchSyncService.findMatchIds("puuid-1", 0, 20))
+        when(matchSyncService.findMatchIdsSince("puuid-1", 20, START_TIME))
                 .thenReturn(List.of("KR_FAILED", "KR_SUCCEEDED"));
         when(matchSyncService.syncMatch("KR_FAILED")).thenReturn(true);
         when(matchSyncService.syncMatch("KR_SUCCEEDED")).thenReturn(true);
@@ -538,7 +547,7 @@ class RiotCollectionOrchestratorTest {
         when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
                 .thenThrow(new IllegalStateException("league unavailable"));
         orchestrator.runOnce();
-        verify(matchSyncService, never()).findMatchIds(anyString(), eq(0), eq(20));
+        verify(matchSyncService, never()).findMatchIdsSince(anyString(), eq(20), eq(START_TIME));
         verify(matchSyncService).syncMissingTimelines();
         verifyNoInteractions(statsMatchService);
     }
@@ -556,8 +565,8 @@ class RiotCollectionOrchestratorTest {
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
         verify(playerSyncService)
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 2);
-        verify(matchSyncService).findMatchIds("puuid-1", 0, 20);
-        verify(matchSyncService).findMatchIds("puuid-2", 0, 20);
+        verify(matchSyncService).findMatchIdsSince("puuid-1", 20, START_TIME);
+        verify(matchSyncService).findMatchIdsSince("puuid-2", 20, START_TIME);
     }
 
     @Test
@@ -569,7 +578,7 @@ class RiotCollectionOrchestratorTest {
 
         verify(playerSyncService, times(2))
                 .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
-        verify(matchSyncService, never()).findMatchIds(anyString(), eq(0), eq(20));
+        verify(matchSyncService, never()).findMatchIdsSince(anyString(), eq(20), eq(START_TIME));
     }
 
     @Test
@@ -686,10 +695,10 @@ class RiotCollectionOrchestratorTest {
         // then
         InOrder order = inOrder(matchSyncService);
 
-        order.verify(matchSyncService).findMatchIds("master-a", 0, 20);
-        order.verify(matchSyncService).findMatchIds("grandmaster-a", 0, 20);
-        order.verify(matchSyncService).findMatchIds("master-b", 0, 20);
-        order.verify(matchSyncService).findMatchIds("grandmaster-b", 0, 20);
+        order.verify(matchSyncService).findMatchIdsSince("master-a", 20, START_TIME);
+        order.verify(matchSyncService).findMatchIdsSince("grandmaster-a", 20, START_TIME);
+        order.verify(matchSyncService).findMatchIdsSince("master-b", 20, START_TIME);
+        order.verify(matchSyncService).findMatchIdsSince("grandmaster-b", 20, START_TIME);
 
         order.verifyNoMoreInteractions();
     }
@@ -747,7 +756,7 @@ class RiotCollectionOrchestratorTest {
     private List<NormalizedMatch> collectMatches(String... matchIds) {
         when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
                 .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
-        when(matchSyncService.findMatchIds("puuid-1", 0, 20)).thenReturn(List.of(matchIds));
+        when(matchSyncService.findMatchIdsSince("puuid-1", 20, START_TIME)).thenReturn(List.of(matchIds));
         List<NormalizedMatch> normalizedMatches = new ArrayList<>();
         for (String matchId : matchIds) {
             NormalizedMatch normalized = normalizedMatch(matchId);
