@@ -42,10 +42,8 @@ public class RiotCollectionScheduler {
         this.dataSource = dataSource;
     }
 
-    @Scheduled(
-            cron = "${collection.scheduler.cron:0 */5 * * * *}",
-            zone = "${collection.scheduler.zone:Asia/Seoul}"
-    )
+    // 이전 실행이 끝난 시각부터 지연을 센다. 실행이 길어져도 다음 실행과 겹치거나 건너뛰지 않는다.
+    @Scheduled(fixedDelayString = "${collection.scheduler.fixed-delay:10s}")
     public void collect() {
         long startedAt = System.nanoTime();
         // 잠금의 소유권이 연결에 묶이므로, 획득부터 해제까지 같은 Connection을 유지한다.

@@ -1,6 +1,7 @@
 package dfgg.application.match;
 
 import dfgg.infrastructure.external.client.RiotClient;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -85,6 +86,11 @@ public class RiotMatchSyncService {
      */
     public List<String> findMatchIds(String puuid, int matchStart, int matchCount) {
         return List.copyOf(riotClient.getMatchIds(puuid, matchStart, matchCount));
+    }
+
+    /** startTime 이후에 시작한 경기의 ID만 조회한다. */
+    public List<String> findMatchIdsSince(String puuid, int matchCount, Instant startTime) {
+        return List.copyOf(riotClient.getMatchIds(puuid, 0, matchCount, startTime));
     }
 
     /**

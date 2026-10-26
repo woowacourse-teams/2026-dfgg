@@ -1,5 +1,6 @@
 package dfgg.infrastructure.config;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -8,14 +9,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class RiotSchedulerProperties {
 
     private boolean enabled;
-    private String cron = "0 */5 * * * *";
-    private String zone = "Asia/Seoul";
+    private Duration fixedDelay = Duration.ofSeconds(10);
     private List<String> tiers = new ArrayList<>(List.of("PLATINUM"));
     private List<String> divisions = new ArrayList<>(List.of("I"));
-    private int leaguePageCount = 1;
     private int playerPageSize = 100;
     private int playerLimit = 1;
     private int matchCount = 20;
+    private Duration matchLookback = Duration.ofDays(14);
     private boolean recoverMissingTimelines;
 
     public boolean isEnabled() {
@@ -26,20 +26,12 @@ public class RiotSchedulerProperties {
         this.enabled = enabled;
     }
 
-    public String getCron() {
-        return cron;
+    public Duration getFixedDelay() {
+        return fixedDelay;
     }
 
-    public void setCron(String cron) {
-        this.cron = cron;
-    }
-
-    public String getZone() {
-        return zone;
-    }
-
-    public void setZone(String zone) {
-        this.zone = zone;
+    public void setFixedDelay(Duration fixedDelay) {
+        this.fixedDelay = fixedDelay;
     }
 
     public List<String> getTiers() {
@@ -56,14 +48,6 @@ public class RiotSchedulerProperties {
 
     public void setDivisions(List<String> divisions) {
         this.divisions = new ArrayList<>(divisions);
-    }
-
-    public int getLeaguePageCount() {
-        return leaguePageCount;
-    }
-
-    public void setLeaguePageCount(int leaguePageCount) {
-        this.leaguePageCount = leaguePageCount;
     }
 
     public int getPlayerPageSize() {
@@ -88,6 +72,14 @@ public class RiotSchedulerProperties {
 
     public void setMatchCount(int matchCount) {
         this.matchCount = matchCount;
+    }
+
+    public Duration getMatchLookback() {
+        return matchLookback;
+    }
+
+    public void setMatchLookback(Duration matchLookback) {
+        this.matchLookback = matchLookback;
     }
 
     public boolean isRecoverMissingTimelines() {

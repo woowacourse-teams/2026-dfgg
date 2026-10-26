@@ -9,6 +9,8 @@ import dfgg.application.stats.ChampionBuildStatsMatchService;
 import dfgg.domain.match.NormalizedMatch;
 import dfgg.infrastructure.config.RiotSchedulerProperties;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -19,6 +21,7 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,12 +54,18 @@ public class RiotCollectionOrchestrator {
     private final ParticipantRuneNormalizationService runeNormalizationService;
     private final StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService;
     private final MeterRegistry meterRegistry;
+    private final Clock clock;
+    // 수집 위치는 메모리에만 둔다. 재시작하면 처음 페이지로 돌아가며, 배포 직후 duplicate가 튀면 DB로 옮긴다.
     private final Map<String, Integer> nextLeaguePages;
     private final Map<String, Integer> nextDivisionIndexes;
     private final Map<String, Boolean> leagueRangeHasPlayersByTier;
+    private final Map<String, Integer> nextLeaguePlayerIndexes;
+    // 페이지를 다 쓸 때까지 같은 페이지를 다시 조회하지 않도록 티어별로 마지막에 받은 페이지를 들고 있는다.
+    private final Map<String, LeaguePage> currentLeaguePages;
     private final Map<String, Integer> nextApexPlayerIndexes;
     private int nextTierIndex;
 
+    @Autowired
     public RiotCollectionOrchestrator(
             RiotSchedulerProperties properties,
             RiotPlayerSyncService playerSyncService,
@@ -67,6 +76,22 @@ public class RiotCollectionOrchestrator {
             StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService,
             MeterRegistry meterRegistry
     ) {
+        this(properties, playerSyncService, matchSyncService, matchNormalizationService, statsMatchService,
+                runeNormalizationService, purchaseNormalizationService, meterRegistry, Clock.systemUTC());
+    }
+
+    // 테스트가 현재 시각을 고정할 수 있도록 Clock을 받는 생성자를 따로 둔다.
+    RiotCollectionOrchestrator(
+            RiotSchedulerProperties properties,
+            RiotPlayerSyncService playerSyncService,
+            RiotMatchSyncService matchSyncService,
+            MatchNormalizationService matchNormalizationService,
+            ChampionBuildStatsMatchService statsMatchService,
+            ParticipantRuneNormalizationService runeNormalizationService,
+            StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService,
+            MeterRegistry meterRegistry,
+            Clock clock
+    ) {
         this.properties = properties;
         this.playerSyncService = playerSyncService;
         this.matchSyncService = matchSyncService;
@@ -75,9 +100,12 @@ public class RiotCollectionOrchestrator {
         this.runeNormalizationService = runeNormalizationService;
         this.purchaseNormalizationService = purchaseNormalizationService;
         this.meterRegistry = meterRegistry;
+        this.clock = clock;
         this.nextLeaguePages = new HashMap<>();
         this.nextDivisionIndexes = new HashMap<>();
         this.leagueRangeHasPlayersByTier = new HashMap<>();
+        this.nextLeaguePlayerIndexes = new HashMap<>();
+        this.currentLeaguePages = new HashMap<>();
         this.nextApexPlayerIndexes = new HashMap<>();
         this.nextTierIndex = 0;
     }
@@ -152,48 +180,57 @@ public class RiotCollectionOrchestrator {
         return selected;
     }
 
+    /**
+     * 현재 리그 페이지의 플레이어를 순번대로 이어서 고르고, 페이지를 다 쓰면 다음 디비전·페이지로 넘어간다.
+     * 페이지를 받지 못하면 위치를 그대로 두고 다음 실행에서 같은 페이지를 다시 시도한다.
+     */
     private List<String> collectLeaguePlayers(String tier) {
-        Set<String> collectedPuuids = new LinkedHashSet<>();
-        boolean allPagesCollected = collectLeaguePages(tier, collectedPuuids);
-
-        recordLeaguePlayersFound(tier, collectedPuuids);
-        if (allPagesCollected) {
+        LeaguePage leaguePage = currentLeaguePage(tier);
+        if (leaguePage == null) {
+            return List.of();
+        }
+        if (leaguePage.isEmpty()) {
             moveToNextLeagueRange(tier);
+            return List.of();
         }
-        return List.copyOf(collectedPuuids);
+        // 이번 디비전 바퀴에 플레이어가 있었다고 표시한다. 한 바퀴 내내 빈 페이지뿐이면 1페이지로 돌아간다.
+        leagueRangeHasPlayersByTier.put(tier, true);
+
+        int start = nextLeaguePlayerIndexes.getOrDefault(tier, 0);
+        List<String> selected = leaguePage.playersFrom(start, properties.getPlayerLimit());
+        int next = start + selected.size();
+        // 페이지에 남은 플레이어가 있으면 다음 실행이 이어서 쓴다.
+        if (next < leaguePage.size()) {
+            nextLeaguePlayerIndexes.put(tier, next);
+            return selected;
+        }
+        nextLeaguePlayerIndexes.put(tier, 0);
+        moveToNextLeagueRange(tier);
+        return selected;
     }
 
-    private boolean collectLeaguePages(String tier, Set<String> collectedPuuids) {
-        boolean allPagesCollected = true;
+    /** 들고 있는 페이지가 현재 위치와 같으면 그대로 쓰고, 다르면 새로 받는다. 받지 못하면 null을 돌려준다. */
+    private LeaguePage currentLeaguePage(String tier) {
         String division = currentDivision(tier);
-        int nextLeaguePage = nextLeaguePages.getOrDefault(tier, 1);
-        int pageEnd = nextLeaguePage + properties.getLeaguePageCount();
-        for (int page = nextLeaguePage; page < pageEnd; page++) {
-            boolean pageCollected = collectLeaguePage(tier, division, page, collectedPuuids);
-            allPagesCollected = allPagesCollected && pageCollected;
+        int page = nextLeaguePages.getOrDefault(tier, 1);
+        LeaguePage cached = currentLeaguePages.get(tier);
+        if (cached != null && cached.isAt(division, page)) {
+            return cached;
         }
-        return allPagesCollected;
-    }
-
-    private boolean collectLeaguePage(String tier, String division, int page, Set<String> collectedPuuids) {
         try {
             RiotPlayerSyncService.SyncResult result = playerSyncService.syncLeagueEntries(QUEUE_TYPE, tier, division,
                     page);
-            collectedPuuids.addAll(result.puuids());
-            return true;
+            LeaguePage fetched = LeaguePage.of(division, page, result.puuids());
+            currentLeaguePages.put(tier, fetched);
+            return fetched;
         } catch (RuntimeException ignored) {
-            return false;
+            return null;
         }
-    }
-
-    private void recordLeaguePlayersFound(String tier, Set<String> collectedPuuids) {
-        if (collectedPuuids.isEmpty()) {
-            return;
-        }
-        leagueRangeHasPlayersByTier.put(tier, true);
     }
 
     private void moveToNextLeagueRange(String tier) {
+        // 들고 있던 페이지는 다 썼다. 다음 위치가 같은 페이지로 돌아와도(빈 리그에서 1페이지로 복귀) 새로 받게 버린다.
+        currentLeaguePages.remove(tier);
         int nextDivisionIndex = nextDivisionIndexes.getOrDefault(tier, 0) + 1;
         if (nextDivisionIndex >= progressiveDivisions().size()) {
             nextDivisionIndex = 0;
@@ -212,7 +249,7 @@ public class RiotCollectionOrchestrator {
         }
 
         int nextLeaguePage = nextLeaguePages.getOrDefault(tier, 1);
-        nextLeaguePages.put(tier, nextLeaguePage + properties.getLeaguePageCount());
+        nextLeaguePages.put(tier, nextLeaguePage + 1);
     }
 
     private String currentDivision(String tier) {
@@ -254,11 +291,9 @@ public class RiotCollectionOrchestrator {
                                       CollectionRunSummary summary) {
         List<String> matchIds;
         try {
-            matchIds = matchSyncService.findMatchIds(
-                    puuid,
-                    0,
-                    properties.getMatchCount()
-            );
+            // 최근 matchLookback 안에 시작한 경기만 받는다. 오래 쉰 플레이어는 빈 목록이라 매치 ID 조회 1회로 끝난다.
+            Instant startTime = clock.instant().minus(properties.getMatchLookback());
+            matchIds = matchSyncService.findMatchIdsSince(puuid, properties.getMatchCount(), startTime);
         } catch (RuntimeException exception) {
             log.warn("플레이어 매치 ID 조회 실패, 해당 플레이어의 매치 수집 생략: puuid={}", puuid, exception);
             return;
@@ -537,6 +572,9 @@ public class RiotCollectionOrchestrator {
         if (properties.getMatchCount() < 1 || properties.getMatchCount() > 100) {
             throw new IllegalArgumentException("플레이어당 조회할 매치 수는 1 이상 100 이하여야 합니다.");
         }
+        if (properties.getMatchLookback().isNegative() || properties.getMatchLookback().isZero()) {
+            throw new IllegalArgumentException("매치 조회 기간은 0보다 길어야 합니다.");
+        }
     }
 
     private void validateLeagueSettings() {
@@ -553,9 +591,6 @@ public class RiotCollectionOrchestrator {
         if (!DIVISION_ORDER.containsAll(divisions)) {
             throw new IllegalArgumentException("수집 대상 디비전은 IV, III, II, I 중에서 설정해야 합니다.");
         }
-        if (properties.getLeaguePageCount() < 1) {
-            throw new IllegalArgumentException("한 번에 조회할 리그 페이지 수는 1 이상이어야 합니다.");
-        }
 
     }
 
@@ -567,6 +602,30 @@ public class RiotCollectionOrchestrator {
         }
         if (!SUPPORTED_TIERS.containsAll(tiers)) {
             throw new IllegalArgumentException("수집 대상에 지원하지 않는 티어가 포함되어 있습니다.");
+        }
+    }
+
+    /** 받아 온 리그 페이지 하나. 실행마다 같은 순번이 같은 플레이어를 가리키도록 puuid 순으로 정렬해 둔다. */
+    private record LeaguePage(String division, int page, List<String> puuids) {
+
+        private static LeaguePage of(String division, int page, List<String> puuids) {
+            return new LeaguePage(division, page, puuids.stream().distinct().sorted().toList());
+        }
+
+        private boolean isAt(String division, int page) {
+            return this.division.equals(division) && this.page == page;
+        }
+
+        private boolean isEmpty() {
+            return puuids.isEmpty();
+        }
+
+        private int size() {
+            return puuids.size();
+        }
+
+        private List<String> playersFrom(int start, int count) {
+            return puuids.subList(start, Math.min(start + count, puuids.size()));
         }
     }
 

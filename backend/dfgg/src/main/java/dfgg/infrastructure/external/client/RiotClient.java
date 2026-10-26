@@ -3,7 +3,9 @@ package dfgg.infrastructure.external.client;
 import dfgg.infrastructure.external.config.RiotApiProperties;
 import dfgg.infrastructure.external.dto.LeagueEntryResponse;
 import dfgg.infrastructure.external.dto.LeagueListResponse;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -140,6 +142,13 @@ public class RiotClient {
     }
 
     public List<String> getMatchIds(String puuid, int start, int count) {
+        return getMatchIds(puuid, start, count, null);
+    }
+
+    /**
+     * startTime이 있으면 그 시각 이후에 시작한 경기의 ID만 받는다. null이면 기간 제한 없이 받는다.
+     */
+    public List<String> getMatchIds(String puuid, int start, int count, Instant startTime) {
         Assert.hasText(puuid, "puuid must not be blank");
         Assert.isTrue(start >= 0, "start must not be negative");
         Assert.isTrue(count >= 0 && count <= 100, "count must be between 0 and 100");
@@ -149,6 +158,9 @@ public class RiotClient {
                         .uri(uriBuilder -> uriBuilder
                                 .path("/lol/match/v5/matches/by-puuid/{puuid}/ids")
                                 .queryParam("queue", RANKED_SOLO_QUEUE_ID)
+                                // Riot API는 epoch 초를 받는다. 값이 없으면 파라미터 자체를 붙이지 않는다.
+                                .queryParamIfPresent("startTime", Optional.ofNullable(startTime)
+                                        .map(Instant::getEpochSecond))
                                 .queryParam("start", start)
                                 .queryParam("count", count)
                                 .build(puuid))
