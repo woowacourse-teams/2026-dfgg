@@ -1,3 +1,5 @@
+import META from './meta.json';
+
 export type Locale = 'ko' | 'en';
 
 export function pickLocale(languages: readonly string[]): Locale {
@@ -10,11 +12,8 @@ export function pickLocale(languages: readonly string[]): Locale {
 }
 
 const KO = {
-  meta: {
-    title: 'DFGG - 조합 맞춤 아이템 추천 데스크톱 앱',
-    description:
-      '게임이 시작되면 양 팀 챔피언과 산 아이템을 보고 다음 코어 아이템을 게임 화면에 띄워주는 리그 오브 레전드 데스크톱 앱이에요.',
-  },
+  // 빌드 때 언어별 index.html 에도 넣어야 해서 webpack.config.js 와 같은 파일을 쓴다.
+  meta: META.ko,
   header: {
     navLabel: '주요 메뉴',
     homeLabel: '홈',
@@ -230,11 +229,7 @@ const KO = {
 };
 
 const EN: typeof KO = {
-  meta: {
-    title: 'DFGG - Build recommendations for your team comp',
-    description:
-      'A League of Legends desktop app that reads both team comps and your items once the game starts, then shows your next core item right on the game screen.',
-  },
+  meta: META.en,
   header: {
     navLabel: 'Main menu',
     homeLabel: 'home',
@@ -462,8 +457,10 @@ export function stripLocale(pathname: string): string {
 export const LOCALE: Locale =
   localeFromPath(window.location.pathname) ?? pickLocale(navigator.languages);
 
+// 언어별 첫 화면은 빌드 때 /ko/index.html, /en/index.html 로 따로 만든다.
+// 서버가 /ko 를 /ko/ 로 넘기므로 처음부터 끝에 / 를 붙여 한 번 더 오가지 않게 한다.
 export const localePath = (locale: Locale, path = '/'): string =>
-  `/${locale}${path === '/' ? '' : path}`;
+  `/${locale}${path === '/' ? '/' : path}`;
 
 export function strings(locale: Locale = LOCALE): typeof KO {
   if (locale === 'ko') return KO;
