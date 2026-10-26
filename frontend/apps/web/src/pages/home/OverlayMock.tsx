@@ -16,6 +16,7 @@ import {
 } from './demoData';
 
 const text = strings().overlay;
+const overlayLabel = strings().demo.overlayLabel;
 
 /** 순위 숫자를 붙이는 개수. 그 아래는 자리로만 순서를 알린다. */
 const TOP_COUNT = 3;
@@ -81,10 +82,14 @@ function Pick({ item, rank }: { item: DemoItem; rank: number }) {
   const art = (
     <span className='pick-art'>
       <motion.img layoutId={`item-${item.id}`} src={itemIcon(item.id)} alt='' />
+      {/* <b> 같은 일반 요소에는 aria-label 이 무시된다. 숫자는 숨기고 읽을 문장을 따로 둔다. */}
       {rank <= TOP_COUNT && (
-        <b className='pick-rank' aria-label={text.rank(rank)}>
-          {rank}
-        </b>
+        <>
+          <b className='pick-rank' aria-hidden='true'>
+            {rank}
+          </b>
+          <span className='sr-only'>{text.rank(rank)}</span>
+        </>
       )}
     </span>
   );
@@ -155,17 +160,20 @@ function SituationalRow({ item }: { item: DemoSituational }) {
   );
 }
 
-/** 지금 몇 번째 아이템을 살 차례인지 빗금 여섯 칸으로 보여 준다. */
+/**
+ * 지금 몇 번째 아이템을 살 차례인지 빗금 여섯 칸으로 보여 준다.
+ * 빈 칸 여섯 개를 목록으로 읽히면 뜻이 없어서, 그림 하나로 묶고 '6칸 중 1칸 구매'로 읽힌다.
+ */
 function BuildProgress({ purchased }: { purchased: number }) {
   return (
-    <ol className='progress' aria-label={text.progress(BUILD_SLOTS, purchased)}>
+    <span className='progress' role='img' aria-label={text.progress(BUILD_SLOTS, purchased)}>
       {Array.from({ length: BUILD_SLOTS }, (_, slot) => (
-        <li
+        <i
           key={slot}
           className={slot < purchased ? 'progress-done' : slot === purchased ? 'progress-next' : ''}
         />
       ))}
-    </ol>
+    </span>
   );
 }
 
@@ -202,7 +210,12 @@ export default function OverlayMock({
   }
 
   return (
-    <div className={`overlay-mock overlay ${isActive ? 'overlay-active' : ''}`}>
+    // 실제 앱 화면을 흉내 낸 예시라는 걸 먼저 알린다. 페이지 제목 구조에는 끼어들지 않게 제목 요소를 쓰지 않는다.
+    <div
+      role='group'
+      aria-label={overlayLabel}
+      className={`overlay-mock overlay ${isActive ? 'overlay-active' : ''}`}
+    >
       <header className='bar'>
         <span className='bar-title'>{text.coreTitle(purchased + 1)}</span>
         <BuildProgress purchased={purchased} />
@@ -231,21 +244,24 @@ export default function OverlayMock({
       </header>
 
       {/* 추천이 바뀌면 목록을 새로 그려 위에서부터 다시 차례로 나타나게 한다. */}
-      <ol className='picks' key={cores.map((item) => item.id).join()}>
+      {/* list-style 을 지우면 Safari VoiceOver 가 목록으로 안 읽어서 role 을 직접 붙인다 */}
+      <ol role='list' className='picks' key={cores.map((item) => item.id).join()}>
         {cores.map((item, index) => (
           <Pick key={item.id} item={item} rank={index + 1} />
         ))}
       </ol>
 
       {situational.length > 0 && (
-        <section className='situ-section' aria-label={text.situational}>
-          <h4>{text.situational}</h4>
-          <ul>
+        <div className='situ-section' role='group' aria-labelledby='overlay-situ-title'>
+          <p id='overlay-situ-title' className='situ-title'>
+            {text.situational}
+          </p>
+          <ul role='list'>
             {situational.map((item) => (
               <SituationalRow key={item.id} item={item} />
             ))}
           </ul>
-        </section>
+        </div>
       )}
     </div>
   );

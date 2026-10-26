@@ -22,7 +22,8 @@ export default function Home() {
   return (
     <MotionConfig reducedMotion='user'>
       <SiteHeader />
-      <main>
+      {/* 건너뛰기 링크가 닿는 곳. 고정 머리말에 가리지 않게 위 여백을 둔다. */}
+      <main id='main' tabIndex={-1} className='scroll-mt-16 outline-none'>
         <Hero />
         <ScrollDemo />
         <InstallGuide />

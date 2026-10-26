@@ -17,9 +17,12 @@ const KO = {
   },
   header: {
     navLabel: '주요 메뉴',
-    homeLabel: 'DFGG 홈',
+    homeLabel: '홈',
+    skipToContent: '본문으로 건너뛰기',
     installGuide: '설치 안내',
     switchLanguage: 'EN',
+    // 화면에 보이는 글자(EN)를 이름 안에 그대로 넣어야 음성 입력 사용자도 부를 수 있다.
+    switchLanguageLabel: 'EN, English',
   },
   download: {
     store: 'Microsoft Store에서 무료로 받기',
@@ -49,6 +52,9 @@ const KO = {
   demo: {
     heading: ['게임 중엔', '이렇게 뜹니다!'],
     stepsLabel: '데모 단계',
+    overlayLabel: '게임 화면 위에 뜨는 DFGG 오버레이 예시',
+    pauseVideo: '배경 영상 멈추기',
+    playVideo: '배경 영상 재생하기',
     stages: [
       {
         label: '게임 시작',
@@ -231,9 +237,11 @@ const EN: typeof KO = {
   },
   header: {
     navLabel: 'Main menu',
-    homeLabel: 'DFGG home',
+    homeLabel: 'home',
+    skipToContent: 'Skip to content',
     installGuide: 'Install guide',
     switchLanguage: '한국어',
+    switchLanguageLabel: '한국어',
   },
   download: {
     store: 'Get it free on Microsoft Store',
@@ -263,6 +271,9 @@ const EN: typeof KO = {
   demo: {
     heading: ['In game,', 'it looks like this!'],
     stepsLabel: 'Demo steps',
+    overlayLabel: 'Example of the DFGG overlay shown over the game',
+    pauseVideo: 'Pause background video',
+    playVideo: 'Play background video',
     stages: [
       {
         label: 'Game start',
