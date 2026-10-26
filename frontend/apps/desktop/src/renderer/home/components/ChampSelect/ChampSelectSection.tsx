@@ -3,6 +3,7 @@ import './ChampSelect.css';
 import * as Sentry from '@sentry/electron/renderer';
 import { useEffect, useState } from 'react';
 
+import { todayPickKey } from '../../../../shared/todayPicks';
 import type { ChampSelectState, Position } from '../../../../shared/types';
 import { t } from '../../../i18n';
 import { championIconUrl } from '../../lib/ddragon';
@@ -86,8 +87,8 @@ function ChampSelectSection({ state }: { state: ChampSelectState }) {
   const [selectedRank, selectRank] = useSelectedRank(state);
   const proInUse = typeof state.applied === 'string' ? state.applied.slice('pro:'.length) : null;
 
-  const applyPro = (playerName: string) => {
-    window.champSelect.applyProPage(playerName);
+  const applyPro = (key: string) => {
+    window.champSelect.applyProPage(key);
     window.analytics.track('champ-select-pro-runes');
   };
 
@@ -101,7 +102,13 @@ function ChampSelectSection({ state }: { state: ChampSelectState }) {
         </p>
       )}
       {state.todayPicks && state.todayPicks.picks.length > 0 && (
-        <TodayPickHero todayPicks={state.todayPicks} proInUse={proInUse} onUsePro={applyPro} />
+        // 새 목록이 오면 처음부터 다시 그린다. 고른 선수 순번도 첫 번째로 돌아간다
+        <TodayPickHero
+          key={state.todayPicks.picks.map(todayPickKey).join('|')}
+          todayPicks={state.todayPicks}
+          proInUse={proInUse}
+          onUsePro={applyPro}
+        />
       )}
       {state.counters && <CounterSection counters={state.counters} locked={state.locked} />}
       {state.position && (

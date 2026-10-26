@@ -9,6 +9,7 @@
  *   /home/index.html?phase=ChampSelect&cs=few      이번 패치 판 수 부족
  *   /home/index.html?phase=ChampSelect&cs=noslot   룬 페이지 칸이 꽉 참
  *   /home/index.html?phase=ChampSelect&cs=blind    포지션 배정이 없는 큐(블라인드·칼바람·사용자 설정)
+ *   /home/index.html?phase=ChampSelect&cs=full     상대 5명 공개 + 같은 선수가 두 번 온 오늘의 픽
  *
  * 응답 모양은 백엔드 문서 예시를 따른다. 그림 주소는 CommunityDragon 으로 대신 채웠다.
  */
@@ -313,6 +314,26 @@ const SCENARIOS: Record<string, Partial<ChampSelectState>> = {
   locked: { locked: true },
   few: { runes: { patch: '16.21', championGames: 60, pages: [] }, applied: null },
   noslot: { applied: null, runeError: 'no-slot' },
+  full: {
+    counters: counters([
+      ARI,
+      ZED,
+      VIEGO,
+      { ...ZED, championId: 4, name: '트위스티드 페이트' },
+      { ...VIEGO, championId: 517, name: '사일러스' },
+    ]),
+    // 백엔드는 같은 선수를 다른 챔피언으로 두 번 주기도 한다
+    todayPicks: {
+      ...TODAY_PICKS,
+      picks: [
+        ...TODAY_PICKS.picks.slice(0, 4),
+        {
+          ...TODAY_PICKS.picks[0],
+          champion: { ...TODAY_PICKS.picks[0].champion, id: 4, name: '트위스티드 페이트' },
+        },
+      ],
+    },
+  },
   // 포지션을 고르기 전. 고르면 devMock 이 기본 화면으로 채운다
   blind: {
     position: null,

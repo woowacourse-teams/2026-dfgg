@@ -76,7 +76,9 @@ contextBridge.exposeInMainWorld('champSelect', {
 
   pickPosition: (position: Position) => ipcRenderer.send('champ-select:pick-position', position),
 
-  applyProPage: (playerName: string) => ipcRenderer.send('champ-select:apply-pro', playerName),
+  applyProPage: (key: string) => ipcRenderer.send('champ-select:apply-pro', key),
+
+  pickChampion: (championId: number) => ipcRenderer.send('champ-select:pick-champion', championId),
 });
 
 contextBridge.exposeInMainWorld('windowControls', {

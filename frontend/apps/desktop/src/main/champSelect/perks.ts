@@ -49,7 +49,8 @@ export function fromPro({ runes }: TodayPick): PerkSelection | null {
 
 /**
  * DFGG 페이지를 지우고 새로 만들어 지금 페이지로 둔다. PUT 은 클라이언트 버전에 따라 무시될 때가 있어 지우고 만든다.
- * DFGG 페이지가 없고 빈 칸도 없으면 사용자 페이지를 지우지 않고 no-slot 을 돌려준다.
+ * DFGG 페이지가 없고 칸도 꽉 찼으면 지금 고른 페이지(없으면 맨 앞 페이지)를 지우고 그 자리에 만든다.
+ * 지울 수 있는 페이지가 하나도 없으면(기본 페이지만 있을 때) no-slot.
  */
 export async function applyPerkPage(
   lockfile: Lockfile,
@@ -61,12 +62,20 @@ export async function applyPerkPage(
     const pages = (await lcuRequest<LcuPerkPage[]>(lockfile, '/lol-perks/v1/pages')) ?? [];
     const ours = pages.find((page) => page.name === DFGG_PAGE_NAME && page.isDeletable);
 
-    if (ours) {
-      await lcuRequest(lockfile, `/lol-perks/v1/pages/${ours.id}`, { method: 'DELETE' });
-    } else {
+    const deletable = pages.filter((page) => page.isDeletable);
+    let replace = ours;
+
+    if (!replace) {
       const inventory = await lcuRequest<LcuPerkInventory>(lockfile, '/lol-perks/v1/inventory');
-      const used = pages.filter((page) => page.isDeletable).length;
-      if (inventory && used >= inventory.ownedPageCount) return 'no-slot';
+      const full = inventory !== null && deletable.length >= inventory.ownedPageCount;
+      if (full) {
+        replace = deletable.find((page) => page.current) ?? deletable[0];
+        if (!replace) return 'no-slot';
+      }
+    }
+
+    if (replace) {
+      await lcuRequest(lockfile, `/lol-perks/v1/pages/${replace.id}`, { method: 'DELETE' });
     }
 
     await lcuRequest(lockfile, '/lol-perks/v1/pages', {

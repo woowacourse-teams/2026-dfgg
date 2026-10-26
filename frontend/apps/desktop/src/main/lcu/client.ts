@@ -4,7 +4,7 @@ import { RIOT_ROOT_CERT } from './riotCert';
 
 const LCU_REQUEST_TIMEOUT_MS = 5000;
 
-type LcuRequestOptions = { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown };
+type LcuRequestOptions = { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: unknown };
 
 // lcu api 요청 함수. 기본은 GET, 룬 페이지처럼 바꾸는 요청은 method 와 body 를 넘긴다.
 export function lcuRequest<T>(

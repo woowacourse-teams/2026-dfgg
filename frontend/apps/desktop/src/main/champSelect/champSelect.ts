@@ -1,4 +1,6 @@
+import { todayPickKey } from '../../shared/todayPicks';
 import type { ChampSelectState, GameflowPhase, Lockfile, Position } from '../../shared/types';
+import { trackEvent } from '../analytics/umami';
 import { fetchCounters, fetchRuneRecommendation, fetchTodayPicks } from '../api/champSelect';
 import { broadcastToAllWindows } from '../ipc/broadcast';
 import type { LcuChampionSummary, LcuChampSelectSession } from '../lcu/champSelect.types';
@@ -18,6 +20,10 @@ let lastSession: LcuChampSelectSession | null = null;
 let pickedPosition: Position | null = null;
 /** 밴픽마다 올린다. 이전 밴픽의 늦은 응답이 새 화면을 덮지 않게 한다. */
 let round = 0;
+/** 이번 밴픽에서 화면을 띄웠다는 이벤트를 보냈는지 */
+let trackedRound = -1;
+
+type ApplySource = 'auto' | 'tab' | 'pro';
 
 const emptyState = (): ChampSelectState => ({
   position: null,
@@ -69,12 +75,15 @@ async function championName(lockfile: Lockfile, championId: number) {
   return championNames.get(championId) ?? null;
 }
 
-async function applyRunes(selection: PerkSelection | null, applied: ChampSelectState['applied']) {
+async function applyRunes(
+  selection: PerkSelection | null,
+  applied: ChampSelectState['applied'],
+  source: ApplySource,
+) {
   const lockfile = getLockfileContent();
-  if (!lockfile || !selection) return update({ runeError: 'failed' });
-
-  const error = await applyPerkPage(lockfile, selection);
+  const error = lockfile && selection ? await applyPerkPage(lockfile, selection) : 'failed';
   update(error ? { runeError: error } : { applied, runeError: null });
+  trackEvent('desktop-rune-apply', { source, ok: !error, error: error ?? undefined });
 }
 
 function loadRunes(next: ChampSelectInfo) {
@@ -95,7 +104,7 @@ function loadRunes(next: ChampSelectInfo) {
       update({ runes });
       // 챔피언을 고르면 1순위를 바로 넣는다
       const top = runes.pages[0];
-      if (top) void applyRunes(fromRecommended(top), top.rank);
+      if (top) void applyRunes(fromRecommended(top), top.rank, 'auto');
     },
   );
 }
@@ -115,17 +124,27 @@ function onSession(session: LcuChampSelectSession) {
   });
 
   const { position } = next;
+  if (trackedRound !== round) {
+    trackedRound = round;
+    trackEvent('desktop-champ-select', { assigned: parsed.position !== null });
+  }
+
   if (!position) return;
   const positionChanged = prev?.position !== position;
   const bansChanged = !sameIds(prev?.bans, next.bans);
 
   // ponytail: 밴이 바뀔 때마다 다시 받아 무작위 다섯이 섞인다. 밴은 픽 전에 끝나서 그대로 둔다. 거슬리면 밴에 걸린 픽만 뺀다.
   if (positionChanged || bansChanged) {
+    // 이전 목록을 먼저 비운다. 새 다섯이 오면 처음부터 다시 그린다
+    update({ todayPicks: null });
     void load(
       '오늘의 픽',
       () => fetchTodayPicks(position, next.bans),
       () => sameIds(info?.bans, next.bans),
-      (todayPicks) => update({ todayPicks }),
+      (todayPicks) => {
+        update({ todayPicks });
+        trackEvent('desktop-today-picks', { position, count: todayPicks.picks.length });
+      },
     );
   }
 
@@ -187,12 +206,45 @@ export function pickPosition(position: Position) {
 export function applyRecommendedPage(rank: number) {
   const page = state?.runes?.pages.find((candidate) => candidate.rank === rank);
   if (!page) return;
-  void applyRunes(fromRecommended(page), rank);
+  void applyRunes(fromRecommended(page), rank, 'tab');
 }
 
-/** '이 룬 쓰기': 오늘의 픽 선수 룬을 그대로 넣는다. */
-export function applyProPage(playerName: string) {
-  const pick = state?.todayPicks?.picks.find((candidate) => candidate.player.name === playerName);
+/** '이 룬 쓰기': 오늘의 픽 선수 룬을 그대로 넣는다. key 는 todayPickKey */
+export function applyProPage(key: string) {
+  const pick = state?.todayPicks?.picks.find((candidate) => todayPickKey(candidate) === key);
   if (!pick) return;
-  void applyRunes(fromPro(pick), `pro:${playerName}`);
+  void applyRunes(fromPro(pick), `pro:${key}`, 'pro');
+}
+
+/**
+ * 카운터 챔피언을 누르면 클라이언트에서 그 챔피언을 고른다. 확정(잠금)은 하지 않는다.
+ * 내 차례면 선택, 아직 차례 전이면 미리 고르기(선택 예정)로 들어간다.
+ */
+export async function pickChampion(championId: number) {
+  const lockfile = getLockfileContent();
+  const session = lastSession;
+  if (!lockfile || !session || state?.locked) return;
+
+  const myPick = session.actions
+    .flat()
+    .find(
+      (action) =>
+        action.type === 'pick' &&
+        action.actorCellId === session.localPlayerCellId &&
+        !action.completed,
+    );
+  if (!myPick) return;
+
+  try {
+    await lcuRequest(lockfile, `${SESSION_PATH}/actions/${myPick.id}`, {
+      method: 'PATCH',
+      body: { championId },
+    });
+    trackEvent('desktop-counter-pick', { ok: true, inProgress: myPick.isInProgress });
+  } catch (error) {
+    // 없는 챔피언이거나 이미 누가 고른 챔피언이면 클라이언트가 거절한다
+    console.error('카운터 챔피언 선택 실패', error);
+    reportError('champ-select-pick', error);
+    trackEvent('desktop-counter-pick', { ok: false });
+  }
 }

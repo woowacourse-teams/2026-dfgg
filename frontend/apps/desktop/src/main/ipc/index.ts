@@ -14,6 +14,7 @@ import {
   applyProPage,
   applyRecommendedPage,
   getChampSelectState,
+  pickChampion,
   pickPosition,
 } from '../champSelect/champSelect';
 import { getLcuState } from '../lcu/state';
@@ -86,8 +87,12 @@ export function registerIpcHandlers() {
       pickPosition(position as Position);
     }
   });
-  ipcMain.on('champ-select:apply-pro', (_event, playerName: unknown) => {
-    if (typeof playerName === 'string') applyProPage(playerName);
+  ipcMain.on('champ-select:apply-pro', (_event, key: unknown) => {
+    if (typeof key === 'string') applyProPage(key);
+  });
+  // championId 는 LCU 요청 본문에 그대로 들어가므로 정수인지 확인한다.
+  ipcMain.on('champ-select:pick-champion', (_event, championId: unknown) => {
+    if (Number.isInteger(championId)) void pickChampion(championId as number);
   });
 
   ipcMain.on('window:set-collapsed', (event, collapsed: boolean) => {

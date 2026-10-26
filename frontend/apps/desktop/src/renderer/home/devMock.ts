@@ -355,7 +355,8 @@ if (!window.lcu) {
       return () => champSelectListeners.delete(callback);
     },
     applyPage: (rank) => setChampSelect({ applied: rank, runeError: null }),
-    applyProPage: (name) => setChampSelect({ applied: `pro:${name}`, runeError: null }),
+    applyProPage: (key) => setChampSelect({ applied: `pro:${key}`, runeError: null }),
+    pickChampion: log('champSelect.pickChampion'),
     // 고르면 그 포지션으로 추천을 받은 것처럼 기본 화면을 채운다
     pickPosition: (position) =>
       setChampSelect({ ...champSelectMock('picked'), position, positionAssigned: false }),

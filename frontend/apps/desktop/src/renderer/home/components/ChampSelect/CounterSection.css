@@ -114,6 +114,25 @@
   transform: translateY(-2px);
 }
 
+.ctb-tiles button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ctb-tiles button:active {
+  transform: scale(0.96);
+}
+
+.ctb-tiles button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .ctb-tiles img {
   display: block;
   width: 100%;
@@ -168,6 +187,19 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
+  min-width: 0;
+  padding: 0 6px;
+}
+
+.ctb-switch-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctb-switch img,
+.ctb-switch small {
+  flex: none;
 }
 
 .ctb-switch img {

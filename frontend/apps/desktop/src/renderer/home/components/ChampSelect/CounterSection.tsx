@@ -71,6 +71,12 @@ function EnemyCard({
 }
 
 /** 받아칠 챔피언. 번호 순서가 곧 강한 순. 다섯이 안 되면 있는 만큼만 같은 크기로 둔다. */
+/** 누르면 클라이언트에서 그 챔피언을 고른다. 확정은 사용자가 직접 한다. */
+function pickCounter(championId: number, rank: number, enemyId: number) {
+  window.champSelect.pickChampion(championId);
+  window.analytics.track('champ-select-counter', { champion: championId, rank, enemy: enemyId });
+}
+
 function CounterTiles({ target }: { target: CounterEnemy }) {
   if (!target.counters.length) {
     const main = target.positions[0];
@@ -87,9 +93,15 @@ function CounterTiles({ target }: { target: CounterEnemy }) {
     <ol className='ctb-tiles'>
       {target.counters.map((counter, at) => (
         <li key={counter.championId}>
-          <img src={championTileUrl(counter.championId)} alt='' />
-          <i>{at + 1}</i>
-          <span>{counter.name}</span>
+          <button
+            type='button'
+            title={counter.name}
+            onClick={() => pickCounter(counter.championId, at + 1, target.championId)}
+          >
+            <img src={championTileUrl(counter.championId)} alt='' />
+            <i>{at + 1}</i>
+            <span>{counter.name}</span>
+          </button>
         </li>
       ))}
     </ol>
@@ -167,10 +179,15 @@ function CounterSection({ counters, locked }: Props) {
               type='button'
               role='tab'
               aria-selected={other === target}
-              onClick={() => setSelectedId(other.championId)}
+              title={other.name}
+              onClick={() => {
+                setSelectedId(other.championId);
+                window.analytics.track('champ-select-counter-enemy', { enemy: other.championId });
+              }}
             >
               <img src={championIconUrl(other.championId)} alt='' />
-              {other.name}
+              {/* 상대가 늘면 칸이 좁아져 이름을 말줄임으로 자른다 */}
+              <span className='ctb-switch-name'>{other.name}</span>
               {other.positions.length > 0 && <small>{Math.round(rateAt(other, my))}%</small>}
             </button>
           ))}

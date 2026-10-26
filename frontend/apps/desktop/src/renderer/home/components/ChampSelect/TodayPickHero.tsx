@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { runeTreeOf } from '../../../../shared/runeTrees';
+import { todayPickKey } from '../../../../shared/todayPicks';
 import type { TodayPick, TodayPicks } from '../../../../shared/types';
 import { t } from '../../../i18n';
 import { championIconUrl, championSplashUrl } from '../../lib/ddragon';
@@ -64,8 +65,9 @@ function ProRunes({ pick, inUse, onUse }: { pick: TodayPick; inUse: boolean; onU
 type Props = {
   todayPicks: TodayPicks;
   /** 지금 넣어 둔 프로 룬의 선수 이름 */
+  /** 지금 넣어 둔 프로 룬의 todayPickKey */
   proInUse: string | null;
-  onUsePro: (playerName: string) => void;
+  onUsePro: (key: string) => void;
 };
 
 /** 중계 화면 하단 자막처럼: 선수 한 명을 크게, 사진은 사선으로 잘라 오른쪽에 세운다. */
@@ -79,7 +81,7 @@ function TodayPickHero({ todayPicks, proInUse, onUsePro }: Props) {
     <>
       <section className='csa-hero' aria-label={t.champSelect.todayPick}>
         <img className='csa-hero-bg' src={championSplashUrl(pick.champion.id)} alt='' />
-        <ProPhoto key={pick.player.name} pick={pick} className='csa-hero-photo' />
+        <ProPhoto key={todayPickKey(pick)} pick={pick} className='csa-hero-photo' />
 
         <div className='csa-hero-body'>
           <span className='csa-tag'>
@@ -102,19 +104,25 @@ function TodayPickHero({ todayPicks, proInUse, onUsePro }: Props) {
 
         <ProRunes
           pick={pick}
-          inUse={proInUse === pick.player.name}
-          onUse={() => onUsePro(pick.player.name)}
+          inUse={proInUse === todayPickKey(pick)}
+          onUse={() => onUsePro(todayPickKey(pick))}
         />
 
         {/* 다른 선수로 넘기는 줄. 사진 대신 챔피언 얼굴로 무엇을 골랐는지 먼저 보인다. */}
         {picks.length > 1 && (
           <ol className='csa-strip' style={{ '--count': picks.length } as React.CSSProperties}>
             {picks.map((other, at) => (
-              <li key={other.player.name}>
+              <li key={todayPickKey(other)}>
                 <button
                   type='button'
                   className={other === pick ? 'csa-strip-on' : ''}
-                  onClick={() => setIndex(at)}
+                  onClick={() => {
+                    setIndex(at);
+                    window.analytics.track('champ-select-today-pick', {
+                      player: other.player.name,
+                      champion: other.champion.id,
+                    });
+                  }}
                 >
                   <img src={championIconUrl(other.champion.id)} alt='' />
                   <span>{other.player.name}</span>

@@ -88,14 +88,44 @@ describe('applyPerkPage', () => {
     });
   });
 
-  it('DFGG 페이지가 없고 칸도 꽉 찼으면 사용자 페이지를 지우지 않고 no-slot', async () => {
+  it('DFGG 페이지가 없고 칸도 꽉 찼으면 지금 고른 페이지를 지우고 그 자리에 만든다', async () => {
     request.mockReset();
     request
-      .mockResolvedValueOnce([{ id: 1, name: '내 페이지', isDeletable: true }])
-      .mockResolvedValueOnce({ ownedPageCount: 1 });
+      .mockResolvedValueOnce([
+        { id: 1, name: '내 페이지', isDeletable: true, current: false },
+        { id: 2, name: '쓰던 페이지', isDeletable: true, current: true },
+      ])
+      .mockResolvedValueOnce({ ownedPageCount: 2 })
+      .mockResolvedValue(null);
+
+    expect(await applyPerkPage(LOCKFILE, SELECTION)).toBeNull();
+    expect(request).toHaveBeenCalledWith(LOCKFILE, '/lol-perks/v1/pages/2', { method: 'DELETE' });
+    expect(request).toHaveBeenLastCalledWith(LOCKFILE, '/lol-perks/v1/pages', {
+      method: 'POST',
+      body: { name: DFGG_PAGE_NAME, ...SELECTION, current: true },
+    });
+  });
+
+  it('칸이 남아 있으면 아무것도 지우지 않고 만든다', async () => {
+    request.mockReset();
+    request
+      .mockResolvedValueOnce([{ id: 1, name: '내 페이지', isDeletable: true, current: true }])
+      .mockResolvedValueOnce({ ownedPageCount: 5 })
+      .mockResolvedValue(null);
+
+    expect(await applyPerkPage(LOCKFILE, SELECTION)).toBeNull();
+    expect(request).not.toHaveBeenCalledWith(LOCKFILE, expect.stringContaining('/pages/'), {
+      method: 'DELETE',
+    });
+  });
+
+  it('지울 수 있는 페이지가 없는데 칸도 없으면 no-slot', async () => {
+    request.mockReset();
+    request
+      .mockResolvedValueOnce([{ id: 9, name: '기본', isDeletable: false, current: true }])
+      .mockResolvedValueOnce({ ownedPageCount: 0 });
 
     expect(await applyPerkPage(LOCKFILE, SELECTION)).toBe('no-slot');
-    expect(request).toHaveBeenCalledTimes(2);
   });
 
   it('룬이 아홉 개가 아니면 요청하지 않는다', async () => {

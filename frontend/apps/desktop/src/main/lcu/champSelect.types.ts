@@ -8,9 +8,12 @@ export interface LcuChampSelectPlayer {
 }
 
 export interface LcuChampSelectAction {
+  id: number;
   actorCellId: number;
   championId: number;
   completed: boolean;
+  /** 지금 이 사람 차례인지 */
+  isInProgress: boolean;
   /** pick · ban · ten_bans_reveal 등 */
   type: string;
 }
@@ -29,6 +32,8 @@ export interface LcuPerkPage {
   id: number;
   name: string;
   isDeletable: boolean;
+  /** 지금 클라이언트에서 고른 페이지 */
+  current: boolean;
 }
 
 /** /lol-perks/v1/inventory 에서 쓰는 필드만 */

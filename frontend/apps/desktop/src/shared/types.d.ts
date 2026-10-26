@@ -420,7 +420,7 @@ export interface ChampSelectState {
   todayPicks: TodayPicks | null;
   counters: Counters | null;
   runes: RuneRecommendation | null;
-  /** 지금 클라이언트에 들어간 페이지. 추천 순위(rank)면 숫자, 프로 룬이면 'pro:선수이름' */
+  /** 지금 클라이언트에 들어간 페이지. 추천 순위(rank)면 숫자, 프로 룬이면 'pro:선수이름:챔피언id' */
   applied: number | `pro:${string}` | null;
   runeError: RuneApplyError | null;
 }
