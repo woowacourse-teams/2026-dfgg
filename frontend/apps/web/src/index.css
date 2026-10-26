@@ -1,9 +1,12 @@
 @import 'tailwindcss';
 
+/*
+ * 히어로 제목 한 줄에만 쓰는 글꼴이라, 원본(woff 407KB)에서 제목 글자만 남겨 직접 둔다(woff2 3KB).
+ * 제목 문구(i18n hero.headline)를 바꾸면 assets/fonts/README.md 대로 다시 뽑는다.
+ */
 @font-face {
   font-family: 'Cafe24Ohsquare';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/Cafe24Ohsquare.woff')
-    format('woff');
+  src: url('./assets/fonts/cafe24-ohsquare-headline.woff2') format('woff2');
   font-display: swap;
 }
 

@@ -20,7 +20,7 @@ import OverlayMock from './OverlayMock';
 const text = strings();
 
 const VIDEO_SRC = '/media/gameplay.mp4';
-const VIDEO_POSTER = '/media/gameplay-poster.jpg';
+const VIDEO_POSTER = '/media/gameplay-poster.webp';
 const EXPAND_END = 0.16;
 const STAGE = { purchase: 1, reason: 2, finale: 3 } as const;
 const FULL_AT = 0.75;
@@ -80,6 +80,8 @@ export default function ScrollDemo() {
   const [isHovered, setIsHovered] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [inventoryCount, setInventoryCount] = useState(0);
+  // 오버레이 목업은 챔피언·아이템 그림을 수십 장 받는다. 데모에 들어오기 전에는 안 보이므로 그때 그린다.
+  const [hasEntered, setHasEntered] = useState(false);
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -107,6 +109,7 @@ export default function ScrollDemo() {
     setStage(next);
     const count = countFor(next, sp);
     setInventoryCount(count);
+    if (p > 0) setHasEntered(true);
 
     if (p > 0.02) trackOnce('demo-enter');
     if (sp >= 0) trackOnce('demo-stage-view', { stage: STAGES[next].key });
@@ -120,13 +123,17 @@ export default function ScrollDemo() {
     const video = videoRef.current;
     if (!section || !video || prefersReducedMotion) return;
 
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        video.play().catch(() => video.pause());
-      } else {
-        video.pause();
-      }
-    });
+    // 첫 화면에는 데모 윗부분이 포스터로만 걸쳐 보인다. 화면 위쪽 절반까지 올라와야 영상을 받고 튼다.
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          video.play().catch(() => video.pause());
+        } else {
+          video.pause();
+        }
+      },
+      { rootMargin: '0px 0px -50% 0px' },
+    );
     observer.observe(section);
     return () => observer.disconnect();
   }, [prefersReducedMotion]);
@@ -162,7 +169,7 @@ export default function ScrollDemo() {
             muted
             loop
             playsInline
-            preload='metadata'
+            preload='none'
             onError={() => track('demo-video-error')}
             aria-hidden='true'
             style={{ scale: mediaScale }}
@@ -182,7 +189,7 @@ export default function ScrollDemo() {
 
           <motion.div style={{ opacity: uiOpacity }} className='absolute inset-0'>
             <AnimatePresence>
-              {!isFull && (
+              {hasEntered && !isFull && (
                 <motion.div
                   key='overlay'
                   exit={{ opacity: 0, x: -24 }}
