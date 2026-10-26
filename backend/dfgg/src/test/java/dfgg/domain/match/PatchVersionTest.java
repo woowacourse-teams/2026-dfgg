@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -49,6 +50,42 @@ class PatchVersionTest {
         // then
         assertThat(patches).extracting(PatchVersion::value)
                 .containsExactly("15.24", "16.2", "16.9", "16.10", "16.17");
+    }
+
+    @Test
+    @DisplayName("관측된 패치 중 가장 높은 패치를 현재 패치로 고른다 — 문자열로 고르면 16.9가 뽑힌다")
+    void latest_WhenMinorVersionDigitCountDiffers_ReturnsHighestByVersion() {
+        // given
+        List<String> observedPatches = List.of("16.9", "16.10", "15.24", "16.2");
+
+        // when
+        Optional<PatchVersion> latest = PatchVersion.latest(observedPatches);
+
+        // then
+        assertThat(latest).map(PatchVersion::value).hasValue("16.10");
+    }
+
+    @Test
+    @DisplayName("빌드 번호가 붙은 패치도 major.minor로 맞춰 비교한다")
+    void latest_WhenBuildNumberAttached_ComparesByMajorMinor() {
+        // given
+        List<String> observedPatches = List.of("16.18.1", "16.17");
+
+        // when
+        Optional<PatchVersion> latest = PatchVersion.latest(observedPatches);
+
+        // then
+        assertThat(latest).map(PatchVersion::value).hasValue("16.18");
+    }
+
+    @Test
+    @DisplayName("관측된 패치가 없으면 현재 패치도 없다")
+    void latest_WhenNoPatchObserved_ReturnsEmpty() {
+        // when
+        Optional<PatchVersion> latest = PatchVersion.latest(List.of());
+
+        // then
+        assertThat(latest).isEmpty();
     }
 
     @Test

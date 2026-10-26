@@ -62,4 +62,15 @@ class ImageUrlsTest {
         assertThat(url).isEqualTo(
                 "https://bucket.s3.region.amazonaws.com/" + ImageKeys.rune("16.21", 8437));
     }
+
+    @Test
+    @DisplayName("소환사 주문 이미지 URL은 영문 키로 만든다 — 업로드 키와 같다")
+    void summonerSpellOf_WhenBuilt_PathEqualsUploadKey() {
+        // given
+        ImageUrls imageUrls = new ImageUrls("bucket", "region", "16.18");
+
+        // when & then
+        assertThat(imageUrls.summonerSpellOf("SummonerFlash")).isEqualTo(
+                "https://bucket.s3.region.amazonaws.com/dfgg/images/16.18/summoner-spells/SummonerFlash.png");
+    }
 }

@@ -28,13 +28,22 @@ public class Rune {
     @Column(name = "name", nullable = false, columnDefinition = "jsonb")
     private Map<String, String> name;
 
+    /** 속한 계열(STYLE)의 id. 계열은 자기 id이고, 능력치 파편은 계열이 없어 null이다. */
+    @Column(name = "tree_id")
+    private Integer treeId;
+
     protected Rune() {
     }
 
     public Rune(int runeId, RuneKind kind, Map<String, String> name) {
+        this(runeId, kind, name, null);
+    }
+
+    public Rune(int runeId, RuneKind kind, Map<String, String> name, Integer treeId) {
         this.runeId = runeId;
         this.kind = kind;
         this.name = Map.copyOf(name);
+        this.treeId = treeId;
     }
 
     public int runeId() {
@@ -47,5 +56,13 @@ public class Rune {
 
     public String nameIn(Language language) {
         return language.pick(name);
+    }
+
+    public Integer treeId() {
+        return treeId;
+    }
+
+    public boolean isStatShard() {
+        return kind == RuneKind.STAT_SHARD;
     }
 }

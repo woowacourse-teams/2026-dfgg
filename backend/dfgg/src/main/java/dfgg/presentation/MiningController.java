@@ -1,10 +1,14 @@
 package dfgg.presentation;
 
+import dfgg.application.counter.ChampionPositionAggregationResult;
+import dfgg.application.counter.ChampionPositionAggregationService;
 import dfgg.application.itemstats.ItemStatsAggregationResult;
 import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.mining.EmbeddingTrainingResult;
 import dfgg.application.mining.MiningTriggerService;
 import dfgg.application.mining.SequentialPatternMiningResult;
+import dfgg.application.propick.ProPickCollectionResult;
+import dfgg.application.propick.ProPickCollectionService;
 import dfgg.domain.embedding.TrainingConfig;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -23,13 +27,19 @@ public class MiningController {
 
     private final MiningTriggerService miningTriggerService;
     private final ItemStatsAggregationService itemStatsAggregationService;
+    private final ChampionPositionAggregationService championPositionAggregationService;
+    private final ProPickCollectionService proPickCollectionService;
 
     public MiningController(
             MiningTriggerService miningTriggerService,
-            ItemStatsAggregationService itemStatsAggregationService
+            ItemStatsAggregationService itemStatsAggregationService,
+            ChampionPositionAggregationService championPositionAggregationService,
+            ProPickCollectionService proPickCollectionService
     ) {
         this.miningTriggerService = miningTriggerService;
         this.itemStatsAggregationService = itemStatsAggregationService;
+        this.championPositionAggregationService = championPositionAggregationService;
+        this.proPickCollectionService = proPickCollectionService;
     }
 
     /**
@@ -44,6 +54,18 @@ public class MiningController {
             @RequestParam(defaultValue = "3") @Min(1) @Max(20) int recentPatchWindowSize
     ) {
         return ResponseEntity.ok(itemStatsAggregationService.aggregate(recentPatchWindowSize));
+    }
+
+    /** 현재 패치의 챔피언별 라인 분포를 집계한다. 상대 픽 분석 응답의 라인 분포 %가 이 값을 쓴다. */
+    @PostMapping("/champion-positions")
+    public ResponseEntity<ChampionPositionAggregationResult> aggregateChampionPositions() {
+        return ResponseEntity.ok(championPositionAggregationService.aggregate());
+    }
+
+    /** 주요 리그의 최근 대회 픽을 Leaguepedia에서 받아 저장한다. 요청 사이 12초라 수 분 걸린다. 멱등하다. */
+    @PostMapping("/pro-picks")
+    public ResponseEntity<ProPickCollectionResult> collectProPicks() {
+        return ResponseEntity.ok(proPickCollectionService.collect());
     }
 
     @PostMapping("/embeddings")
