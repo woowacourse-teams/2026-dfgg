@@ -4,10 +4,17 @@ import { RIOT_ROOT_CERT } from './riotCert';
 
 const LCU_REQUEST_TIMEOUT_MS = 5000;
 
-// lcu api 요청 함수
-export function lcuRequest<T>(lockfile: Lockfile, endpoint: string): Promise<T | null> {
+type LcuRequestOptions = { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown };
+
+// lcu api 요청 함수. 기본은 GET, 룬 페이지처럼 바꾸는 요청은 method 와 body 를 넘긴다.
+export function lcuRequest<T>(
+  lockfile: Lockfile,
+  endpoint: string,
+  { method = 'GET', body: requestBody }: LcuRequestOptions = {},
+): Promise<T | null> {
   const { port, password } = lockfile;
   const auth = Buffer.from(`riot:${password}`).toString('base64');
+  const payload = requestBody === undefined ? undefined : JSON.stringify(requestBody);
 
   return new Promise((resolve, reject) => {
     const req = https.request(
@@ -15,8 +22,14 @@ export function lcuRequest<T>(lockfile: Lockfile, endpoint: string): Promise<T |
         hostname: `127.0.0.1`,
         port: port,
         path: endpoint,
-        method: 'GET',
-        headers: { Authorization: `Basic ${auth}` },
+        method,
+        headers: {
+          Authorization: `Basic ${auth}`,
+          ...(payload && {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload),
+          }),
+        },
         ca: RIOT_ROOT_CERT,
         timeout: LCU_REQUEST_TIMEOUT_MS,
       },
@@ -45,6 +58,6 @@ export function lcuRequest<T>(lockfile: Lockfile, endpoint: string): Promise<T |
       req.destroy(new Error(`LCU 요청 시간 초과: ${endpoint}`));
     });
     req.on('error', reject);
-    req.end();
+    req.end(payload);
   });
 }

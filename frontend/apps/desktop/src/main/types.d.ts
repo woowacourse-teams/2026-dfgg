@@ -1,4 +1,5 @@
 import type {
+  ChampSelectState,
   GameflowPhase,
   HighlightProgress,
   LcuStatus,
@@ -14,4 +15,6 @@ export type BroadcastChannels = {
   'lcu:profile-background': number | null;
   'lcu:items-recommendation': RecommendationUpdate | null;
   'highlight:progress': HighlightProgress;
+  /** 밴픽 화면 상태. 밴픽이 아니면 null */
+  'champ-select:state': ChampSelectState | null;
 };

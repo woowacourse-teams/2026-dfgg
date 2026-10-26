@@ -10,6 +10,11 @@ import {
   fetchMatchDfScores,
 } from '../lcu/service';
 import { launchLeagueClient } from '../lcu/launch';
+import {
+  applyProPage,
+  applyRecommendedPage,
+  getChampSelectState,
+} from '../champSelect/champSelect';
 import { getLcuState } from '../lcu/state';
 import {
   EXPANDED_WIDTH,
@@ -69,6 +74,14 @@ export function registerIpcHandlers() {
   ipcMain.handle('lcu:df-score', (_event, gameId: unknown) =>
     Number.isInteger(gameId) ? fetchMatchDfScores(gameId as number) : null,
   );
+
+  ipcMain.handle('champ-select:get-state', getChampSelectState);
+  ipcMain.on('champ-select:apply-page', (_event, rank: unknown) => {
+    if (Number.isInteger(rank)) applyRecommendedPage(rank as number);
+  });
+  ipcMain.on('champ-select:apply-pro', (_event, playerName: unknown) => {
+    if (typeof playerName === 'string') applyProPage(playerName);
+  });
 
   ipcMain.on('window:set-collapsed', (event, collapsed: boolean) => {
     const win = BrowserWindow.fromWebContents(event.sender);

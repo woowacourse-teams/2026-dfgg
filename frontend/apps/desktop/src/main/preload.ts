@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 import {
+  ChampSelectState,
   EndedGame,
   FeedbackRating,
   GameflowPhase,
@@ -59,6 +60,20 @@ contextBridge.exposeInMainWorld('lcu', {
   },
 
   getEndedGame: () => ipcRenderer.invoke('lcu:ended-game'),
+});
+
+contextBridge.exposeInMainWorld('champSelect', {
+  getState: () => ipcRenderer.invoke('champ-select:get-state'),
+
+  onStateChange: (callback: (state: ChampSelectState | null) => void) => {
+    const listener = (_: IpcRendererEvent, state: ChampSelectState | null) => callback(state);
+    ipcRenderer.on('champ-select:state', listener);
+    return () => ipcRenderer.removeListener('champ-select:state', listener);
+  },
+
+  applyPage: (rank: number) => ipcRenderer.send('champ-select:apply-page', rank),
+
+  applyProPage: (playerName: string) => ipcRenderer.send('champ-select:apply-pro', playerName),
 });
 
 contextBridge.exposeInMainWorld('windowControls', {

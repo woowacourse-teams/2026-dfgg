@@ -7,6 +7,7 @@ import { reportError } from '../sentry';
 const SUBSCRIPTIONS = [
   'OnJsonApiEvent_lol-gameflow_v1_gameflow-phase',
   'OnJsonApiEvent_lol-summoner_v1_current-summoner',
+  'OnJsonApiEvent_lol-champ-select_v1_session',
 ];
 const HANDSHAKE_TIMEOUT_MS = 5000;
 

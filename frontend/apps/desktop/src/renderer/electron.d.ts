@@ -1,5 +1,6 @@
 import { Locale } from '../shared/i18n';
 import type {
+  ChampSelectState,
   DfScores,
   EndedGame,
   FeedbackRating,
@@ -49,6 +50,15 @@ declare global {
       onProfileBackgroundChange: (callback: (skinId: number | null) => void) => Unsubscribe;
       onItemsRecommendationChange: (callback: ItemsListener) => Unsubscribe;
       getEndedGame: () => Promise<EndedGame | null>;
+    };
+    champSelect: {
+      /** 밴픽 중이 아니면 null */
+      getState: () => Promise<ChampSelectState | null>;
+      onStateChange: (callback: (state: ChampSelectState | null) => void) => Unsubscribe;
+      /** 추천 페이지(rank)를 클라이언트 룬 페이지에 넣는다 */
+      applyPage: (rank: number) => void;
+      /** 오늘의 픽 선수 룬을 그대로 넣는다 */
+      applyProPage: (playerName: string) => void;
     };
     windowControls: {
       setCollapsed: (collapsed: boolean) => void;
