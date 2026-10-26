@@ -95,7 +95,7 @@ class ComponentRuntimeConfigurationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"missing-model", "invalid-json", "wrong-schema", "wrong-hash", "missing-lookup", "invalid-lookup", "wrong-patch"})
+    @ValueSource(strings = {"missing-model", "invalid-json", "wrong-schema", "wrong-hash", "missing-lookup", "invalid-lookup"})
     void 모델이나_조회표_준비_실패는_Component만_비활성화한다(String failure) throws Exception {
         Map<String, Object> model = model();
         String lookupPath = "";
@@ -103,11 +103,6 @@ class ComponentRuntimeConfigurationTest {
         if (failure.equals("wrong-hash")) model.put("policy_lookup_sha256", "a".repeat(64));
         if (failure.equals("missing-lookup")) lookupPath = "classpath:missing-lookup.json";
         if (failure.equals("invalid-lookup")) lookupPath = write("lookup.json", "{}");
-        if (failure.equals("wrong-patch")) {
-            byte[] lookup = lookup("16.17");
-            lookupPath = write("lookup.json", new String(lookup, java.nio.charset.StandardCharsets.UTF_8));
-            attachLookup(model, lookup);
-        }
         String modelPath = failure.equals("missing-model") ? "classpath:missing-model.json"
                 : write("model.json", failure.equals("invalid-json") ? "broken" : MAPPER.writeValueAsString(model));
 
@@ -146,6 +141,26 @@ class ComponentRuntimeConfigurationTest {
                     assertThatThrownBy(() -> runtime.recommend(query("16.17")))
                             .isInstanceOf(IllegalArgumentException.class);
                     assertV3(context.getBean(RecommendationController.class));
+                    server.verify();
+                });
+    }
+
+    @Test
+    void 조회표_패치가_운영_버전과_달라도_Component를_준비한다() throws Exception {
+        byte[] lookup = lookup("16.17");
+        Map<String, Object> model = model();
+        attachLookup(model, lookup);
+        expectVersions();
+        expectCatalog("en_US", "16.18.1");
+        expectCatalog("ko_KR", "16.18.1");
+        runner.withPropertyValues("recommendation.component-ltr.model-path=" + write("model.json", MAPPER.writeValueAsString(model)),
+                        "recommendation.component-ltr.policy-lookup-path="
+                                + write("lookup.json", new String(lookup, java.nio.charset.StandardCharsets.UTF_8)))
+                .run(context -> {
+                    var runtime = context.getBean(ComponentRecommendationRuntime.class);
+                    assertThat(runtime.isAvailable()).isTrue();
+                    assertThat(runtime.recommend(query("16.18")).getFirst().status())
+                            .isEqualTo(ComponentRecommendationService.Status.OK);
                     server.verify();
                 });
     }

@@ -43,7 +43,6 @@ public final class ComponentRecommendationService {
     }
 
     public List<TargetRecommendation> recommend(ComponentRecommendationQuery query, ItemResponse response) {
-        lookup.validatePatch(query.patch());
         if (lookup.enabled() && query.championId() == null) throw new IllegalArgumentException("정책 추천에는 Champion ID가 필요합니다.");
         String version = response.dataVersion() == null ? response.version() : response.dataVersion();
         if (version == null || !version.matches("\\d+\\.\\d+\\.\\d+")

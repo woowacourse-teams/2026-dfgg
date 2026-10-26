@@ -49,9 +49,4 @@ class SituationalComponentLookupTest {
         assertThatThrownBy(() -> new SituationalComponentLookup.Lift(40, 1.4)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new SituationalComponentLookup.LiftKey(1036, WARWICK, "BOTTOM")).isInstanceOf(IllegalArgumentException.class);
     }
-
-    @Test void patch_must_match_operating_patch() {
-        assertThatCode(() -> lookup.validatePatch("16.18")).doesNotThrowAnyException();
-        assertThatThrownBy(() -> lookup.validatePatch("16.19")).isInstanceOf(IllegalArgumentException.class);
-    }
 }

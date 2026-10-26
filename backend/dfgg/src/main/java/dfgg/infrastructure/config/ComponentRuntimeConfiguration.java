@@ -2,7 +2,6 @@ package dfgg.infrastructure.config;
 
 import dfgg.application.recommend.component.ComponentRecommendationRuntime;
 import dfgg.application.recommend.component.ComponentRecommendationService;
-import dfgg.domain.match.ComponentPolicyLookup;
 import dfgg.infrastructure.external.client.DataDragonClient;
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -22,7 +21,6 @@ public class ComponentRuntimeConfiguration {
     @Bean
     public ComponentRecommendationRuntime componentRecommendationRuntime(
             ObjectProvider<ComponentRecommendationService> recommendations,
-            ObjectProvider<ComponentPolicyLookup> lookups,
             LeagueOfLegendsVersionProperties version,
             RestClient.Builder restClients,
             @Value("${recommendation.component-ltr.model-path:}") String modelPath) {
@@ -32,7 +30,6 @@ public class ComponentRuntimeConfiguration {
                 log.info("Component 모델이 설정되지 않아 Component 추천을 비활성화합니다.");
                 return ComponentRecommendationRuntime.unavailable();
             }
-            lookups.getObject().validatePatch(version.version());
             DataDragonClient client = catalogClient(restClients);
             String dataVersion = client.resolveItemDataVersionForPatch(version.version());
             var catalog = client.getLocalizedItems(dataVersion);
