@@ -25,13 +25,45 @@ export function useChampSelect(): ChampSelectState | null {
   return state;
 }
 
-/** 밴픽 중이라는 것과 지금 내 포지션·챔피언. 화면 맨 위에 한 줄로 둔다. */
-function ContextBar({ position, championId }: { position: Position; championId: number | null }) {
+const POSITIONS: Position[] = ['TOP', 'JUNGLE', 'MID', 'BOTTOM', 'SUPPORT'];
+
+/**
+ * 밴픽 중이라는 것과 지금 내 포지션·챔피언. 화면 맨 위에 한 줄로 둔다.
+ * 포지션이 배정되지 않는 큐(블라인드·칼바람·사용자 설정)는 여기서 알약 탭으로 고른다.
+ */
+function ContextBar({ state }: { state: ChampSelectState }) {
+  const { position, positionAssigned, myChampionId } = state;
+
+  const pick = (next: Position) => {
+    window.champSelect.pickPosition(next);
+    window.analytics.track('champ-select-pick-position', { position: next });
+  };
+
   return (
     <header className='cs-context'>
       <span className='cs-phase'>{t.champSelect.phase}</span>
-      {championId !== null && <img src={championIconUrl(championId)} alt='' />}
-      <b>{t.champSelect.positions[position]}</b>
+      {myChampionId !== null && <img src={championIconUrl(myChampionId)} alt='' />}
+      {positionAssigned && position ? (
+        <b>{t.champSelect.positions[position]}</b>
+      ) : (
+        <div
+          className='board-views cs-positions'
+          role='tablist'
+          aria-label={t.champSelect.positionTabs}
+        >
+          {POSITIONS.map((candidate) => (
+            <button
+              key={candidate}
+              type='button'
+              role='tab'
+              aria-selected={candidate === position}
+              onClick={() => pick(candidate)}
+            >
+              {t.champSelect.positions[candidate]}
+            </button>
+          ))}
+        </div>
+      )}
     </header>
   );
 }
@@ -49,8 +81,8 @@ function useSelectedRank(state: ChampSelectState) {
   return [rank, select] as const;
 }
 
-/** 밴픽 화면: 오늘의 픽 → 카운터 → 룬. 배정 포지션이 있을 때만 그린다(App 이 거른다). */
-function ChampSelectSection({ state, position }: { state: ChampSelectState; position: Position }) {
+/** 밴픽 화면: 오늘의 픽 → 카운터 → 룬. 포지션을 알아야 추천을 받으므로 그전에는 고르라고만 한다. */
+function ChampSelectSection({ state }: { state: ChampSelectState }) {
   const [selectedRank, selectRank] = useSelectedRank(state);
   const proInUse = typeof state.applied === 'string' ? state.applied.slice('pro:'.length) : null;
 
@@ -61,19 +93,27 @@ function ChampSelectSection({ state, position }: { state: ChampSelectState; posi
 
   return (
     <div className='cs'>
-      <ContextBar position={position} championId={state.myChampionId} />
+      <ContextBar state={state} />
+      {!state.position && (
+        <p className='csr-empty'>
+          <b>{t.champSelect.choosePosition}</b>
+          <small>{t.champSelect.choosePositionDesc}</small>
+        </p>
+      )}
       {state.todayPicks && state.todayPicks.picks.length > 0 && (
         <TodayPickHero todayPicks={state.todayPicks} proInUse={proInUse} onUsePro={applyPro} />
       )}
       {state.counters && <CounterSection counters={state.counters} locked={state.locked} />}
-      <RuneSection
-        myChampionId={state.myChampionId}
-        runes={state.runes}
-        selectedRank={selectedRank}
-        proInUse={proInUse !== null}
-        onSelect={selectRank}
-        error={state.runeError}
-      />
+      {state.position && (
+        <RuneSection
+          myChampionId={state.myChampionId}
+          runes={state.runes}
+          selectedRank={selectedRank}
+          proInUse={proInUse !== null}
+          onSelect={selectRank}
+          error={state.runeError}
+        />
+      )}
     </div>
   );
 }

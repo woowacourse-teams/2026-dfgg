@@ -1,4 +1,5 @@
 import type { Lockfile, RecommendedRunePage, RuneApplyError, TodayPick } from '../../shared/types';
+import { runeTreeOf } from '../../shared/runeTrees';
 import { lcuRequest } from '../lcu/client';
 import type { LcuPerkInventory, LcuPerkPage } from '../lcu/champSelect.types';
 import { reportError } from '../sentry';
@@ -28,12 +29,18 @@ export function fromRecommended(page: RecommendedRunePage): PerkSelection {
   };
 }
 
-/** 프로 룬은 트리나 핵심 룬이 비어 올 수 있다. 그럴 땐 넣을 수 없어 null */
+/**
+ * 프로 룬. 응답에 트리가 비어 오면 핵심 룬과 보조 룬으로 트리를 찾는다.
+ * 핵심 룬이 없거나 트리를 못 찾으면 넣을 수 없어 null
+ */
 export function fromPro({ runes }: TodayPick): PerkSelection | null {
-  if (!runes.primaryTree || !runes.secondaryTree || !runes.keystone) return null;
+  if (!runes.keystone) return null;
+  const primaryStyleId = runes.primaryTree?.id ?? runeTreeOf(runes.keystone.id);
+  const subStyleId = runes.secondaryTree?.id ?? runeTreeOf(runes.secondary[0]?.id ?? 0);
+  if (!primaryStyleId || !subStyleId) return null;
   return {
-    primaryStyleId: runes.primaryTree.id,
-    subStyleId: runes.secondaryTree.id,
+    primaryStyleId,
+    subStyleId,
     selectedPerkIds: [runes.keystone, ...runes.primary, ...runes.secondary, ...runes.shards].map(
       ({ id }) => id,
     ),

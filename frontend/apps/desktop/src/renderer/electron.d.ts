@@ -14,6 +14,7 @@ import type {
   MatchDetail,
   MatchSummary,
   OverlayClickTarget,
+  Position,
   RecommendationUpdate,
   Summoner,
 } from '../shared/types';
@@ -59,6 +60,8 @@ declare global {
       applyPage: (rank: number) => void;
       /** 오늘의 픽 선수 룬을 그대로 넣는다 */
       applyProPage: (playerName: string) => void;
+      /** 배정 포지션이 없는 큐에서 추천받을 포지션을 고른다 */
+      pickPosition: (position: Position) => void;
     };
     windowControls: {
       setCollapsed: (collapsed: boolean) => void;

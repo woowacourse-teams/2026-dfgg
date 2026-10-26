@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 import {
   ChampSelectState,
+  Position,
   EndedGame,
   FeedbackRating,
   GameflowPhase,
@@ -72,6 +73,8 @@ contextBridge.exposeInMainWorld('champSelect', {
   },
 
   applyPage: (rank: number) => ipcRenderer.send('champ-select:apply-page', rank),
+
+  pickPosition: (position: Position) => ipcRenderer.send('champ-select:pick-position', position),
 
   applyProPage: (playerName: string) => ipcRenderer.send('champ-select:apply-pro', playerName),
 });

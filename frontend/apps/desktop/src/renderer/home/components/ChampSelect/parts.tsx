@@ -85,7 +85,8 @@ export function Build({ pick, size }: { pick: TodayPick; size: number }) {
           height={size}
         />
       ))}
-      <i className='cs-build-gap' />
+      {/* 주문이 비어 오는 대회 기록이 있어 그땐 사이 틈도 뺀다 */}
+      {pick.spells.length > 0 && <i className='cs-build-gap' />}
       {pick.items.map((item) => (
         <img
           key={item.id}

@@ -14,6 +14,7 @@ import {
   applyProPage,
   applyRecommendedPage,
   getChampSelectState,
+  pickPosition,
 } from '../champSelect/champSelect';
 import { getLcuState } from '../lcu/state';
 import {
@@ -27,7 +28,7 @@ import {
 import { recordOverlayClick, setOverlayCollapsed } from '../analytics/gameTracker';
 import { setQuitSource } from '../analytics/sessionTracker';
 import { trackEvent, type EventData } from '../analytics/umami';
-import type { FeedbackRating, EndedGame, OverlayClickTarget } from '../../shared/types';
+import type { FeedbackRating, EndedGame, OverlayClickTarget, Position } from '../../shared/types';
 import { submitFeedback } from '../api/feedback';
 import {
   getHighlight,
@@ -49,6 +50,7 @@ const WEB_ORIGIN = 'https://dfgg.pro';
 let overlayHeight = EXPANDED_HEIGHT;
 
 const CLICK_TARGETS = new Set(['item', 'collapse', 'expand', 'empty', 'other']);
+const POSITIONS = new Set(['TOP', 'JUNGLE', 'MID', 'BOTTOM', 'SUPPORT']);
 
 // 창 크기를 바꾼다. 크기 조절을 막아 둔 창이라 잠깐 풀었다가 다시 잠근다.
 function resizeWindow(win: BrowserWindow, width: number, height: number, resizable: boolean) {
@@ -78,6 +80,11 @@ export function registerIpcHandlers() {
   ipcMain.handle('champ-select:get-state', getChampSelectState);
   ipcMain.on('champ-select:apply-page', (_event, rank: unknown) => {
     if (Number.isInteger(rank)) applyRecommendedPage(rank as number);
+  });
+  ipcMain.on('champ-select:pick-position', (_event, position: unknown) => {
+    if (typeof position === 'string' && POSITIONS.has(position)) {
+      pickPosition(position as Position);
+    }
   });
   ipcMain.on('champ-select:apply-pro', (_event, playerName: unknown) => {
     if (typeof playerName === 'string') applyProPage(playerName);

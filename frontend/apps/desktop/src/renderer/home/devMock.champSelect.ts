@@ -8,6 +8,7 @@
  *   /home/index.html?phase=ChampSelect&cs=locked   내 챔피언 확정 후
  *   /home/index.html?phase=ChampSelect&cs=few      이번 패치 판 수 부족
  *   /home/index.html?phase=ChampSelect&cs=noslot   룬 페이지 칸이 꽉 참
+ *   /home/index.html?phase=ChampSelect&cs=blind    포지션 배정이 없는 큐(블라인드·칼바람·사용자 설정)
  *
  * 응답 모양은 백엔드 문서 예시를 따른다. 그림 주소는 CommunityDragon 으로 대신 채웠다.
  */
@@ -294,6 +295,7 @@ const RUNES = { patch: '16.21', championGames: 1520, pages: PAGES };
 
 const BASE: ChampSelectState = {
   position: 'MID',
+  positionAssigned: true,
   myChampionId: 61,
   locked: false,
   todayPicks: TODAY_PICKS,
@@ -311,6 +313,15 @@ const SCENARIOS: Record<string, Partial<ChampSelectState>> = {
   locked: { locked: true },
   few: { runes: { patch: '16.21', championGames: 60, pages: [] }, applied: null },
   noslot: { applied: null, runeError: 'no-slot' },
+  // 포지션을 고르기 전. 고르면 devMock 이 기본 화면으로 채운다
+  blind: {
+    position: null,
+    positionAssigned: false,
+    counters: null,
+    todayPicks: null,
+    runes: null,
+    applied: null,
+  },
 };
 
 export function champSelectMock(scenario: string | null): ChampSelectState {

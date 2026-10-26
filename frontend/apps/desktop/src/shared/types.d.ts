@@ -410,8 +410,10 @@ export type RuneApplyError = 'no-slot' | 'failed';
 
 /** 밴픽 화면에 그릴 것 전부. 밴픽이 아니면 null 로 보낸다. */
 export interface ChampSelectState {
-  /** 배정된 포지션. 일반 블라인드·칼바람처럼 배정이 없으면 null */
+  /** 추천에 쓰는 포지션. 배정이 없으면 사용자가 고른 포지션, 그것도 없으면 null */
   position: Position | null;
+  /** 클라이언트가 포지션을 배정했는지. 블라인드·칼바람·사용자 설정은 false 라 화면에서 고르게 한다 */
+  positionAssigned: boolean;
   myChampionId: number | null;
   /** 내 픽을 확정했는지 */
   locked: boolean;

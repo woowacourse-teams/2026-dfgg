@@ -552,3 +552,13 @@
   font-size: 11.5px;
   color: var(--accent);
 }
+
+/* 포지션이 배정되지 않는 큐: 맨 윗줄에서 갈 라인을 고른다. 전적 상세 탭과 같은 알약 */
+.cs-positions {
+  flex: 1;
+}
+
+.cs-positions button {
+  flex: 1;
+  padding: 0 6px;
+}

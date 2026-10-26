@@ -35,7 +35,26 @@ describe('fromRecommended', () => {
 });
 
 describe('fromPro', () => {
-  it('트리나 핵심 룬이 비어 있으면 넣을 수 없다', () => {
+  it('트리가 비어 오면 핵심 룬과 보조 룬으로 트리를 찾는다', () => {
+    const pick = {
+      runes: {
+        primaryTree: null,
+        keystone: rune(8112),
+        primary: [rune(8143), rune(8137), rune(8106)],
+        secondaryTree: null,
+        secondary: [rune(8473), rune(8242)],
+        shards: [rune(5005), rune(5010), rune(5011)],
+      },
+    } as unknown as TodayPick;
+
+    expect(fromPro(pick)).toEqual({
+      primaryStyleId: 8100,
+      subStyleId: 8400,
+      selectedPerkIds: [8112, 8143, 8137, 8106, 8473, 8242, 5005, 5010, 5011],
+    });
+  });
+
+  it('핵심 룬이 비어 있으면 넣을 수 없다', () => {
     const pick = {
       runes: {
         primaryTree: null,

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { runeTreeOf } from '../../../../shared/runeTrees';
 import type { TodayPick, TodayPicks } from '../../../../shared/types';
 import { t } from '../../../i18n';
 import { championIconUrl, championSplashUrl } from '../../lib/ddragon';
@@ -11,9 +12,13 @@ import { Build, ProPhoto, RuneIcon, runeTreeIconUrl, shortDate } from './parts';
  */
 function ProRunes({ pick, inUse, onUse }: { pick: TodayPick; inUse: boolean; onUse: () => void }) {
   const { runes } = pick;
-  const tree = runes.secondaryTree && runeTreeIconUrl(runes.secondaryTree.id);
-  // 트리나 핵심 룬이 비어 오면 넣을 수 없어 버튼을 감춘다
-  const usable = Boolean(runes.primaryTree && runes.secondaryTree && runes.keystone);
+  // 응답에 트리가 비어 오면 보조 룬으로 트리를 찾는다
+  const subTreeId = runes.secondaryTree?.id ?? runeTreeOf(runes.secondary[0]?.id ?? 0);
+  const tree = subTreeId && runeTreeIconUrl(subTreeId);
+  // 핵심 룬이나 트리를 알 수 없으면 넣을 수 없어 버튼을 감춘다 (메인의 fromPro 와 같은 조건)
+  const usable = Boolean(
+    runes.keystone && (runes.primaryTree?.id ?? runeTreeOf(runes.keystone.id)) && subTreeId,
+  );
 
   return (
     <div className='csa-pro-runes'>

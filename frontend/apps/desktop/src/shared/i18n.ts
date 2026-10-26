@@ -152,6 +152,9 @@ const KO = {
   },
   champSelect: {
     phase: '밴픽',
+    positionTabs: '포지션',
+    choosePosition: '포지션을 고르면 추천해요',
+    choosePositionDesc: '이 판은 포지션이 정해지지 않아요. 갈 라인을 골라 주세요',
     todayPick: "TODAY'S PICK",
     played: (date: string) => `${date} 경기`,
     proRunes: (name: string) => `${name}의 룬`,
@@ -332,6 +335,9 @@ const EN: typeof KO = {
   },
   champSelect: {
     phase: 'Draft',
+    positionTabs: 'Position',
+    choosePosition: 'Pick a position to get recommendations',
+    choosePositionDesc: 'This queue has no assigned roles. Pick the lane you are playing',
     todayPick: "TODAY'S PICK",
     played: (date) => `Played ${date}`,
     proRunes: (name) => `${name}'s runes`,

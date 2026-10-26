@@ -1,4 +1,4 @@
-import type { ChampSelectState, GameflowPhase, Lockfile } from '../../shared/types';
+import type { ChampSelectState, GameflowPhase, Lockfile, Position } from '../../shared/types';
 import { fetchCounters, fetchRuneRecommendation, fetchTodayPicks } from '../api/champSelect';
 import { broadcastToAllWindows } from '../ipc/broadcast';
 import type { LcuChampionSummary, LcuChampSelectSession } from '../lcu/champSelect.types';
@@ -13,11 +13,15 @@ const SESSION_PATH = '/lol-champ-select/v1/session';
 
 let state: ChampSelectState | null = null;
 let info: ChampSelectInfo | null = null;
+let lastSession: LcuChampSelectSession | null = null;
+/** 배정이 없는 큐에서 사용자가 고른 포지션. 다음 판에도 같은 걸 쓰도록 밴픽이 끝나도 남겨 둔다. */
+let pickedPosition: Position | null = null;
 /** 밴픽마다 올린다. 이전 밴픽의 늦은 응답이 새 화면을 덮지 않게 한다. */
 let round = 0;
 
 const emptyState = (): ChampSelectState => ({
   position: null,
+  positionAssigned: false,
   myChampionId: null,
   locked: false,
   todayPicks: null,
@@ -97,10 +101,18 @@ function loadRunes(next: ChampSelectInfo) {
 }
 
 function onSession(session: LcuChampSelectSession) {
+  lastSession = session;
   const prev = info;
-  const next = toChampSelectInfo(session);
+  const parsed = toChampSelectInfo(session);
+  // 배정이 없으면 사용자가 고른 포지션으로 추천을 받는다
+  const next = { ...parsed, position: parsed.position ?? pickedPosition };
   info = next;
-  update({ position: next.position, myChampionId: next.myChampionId, locked: next.locked });
+  update({
+    position: next.position,
+    positionAssigned: parsed.position !== null,
+    myChampionId: next.myChampionId,
+    locked: next.locked,
+  });
 
   const { position } = next;
   if (!position) return;
@@ -138,6 +150,7 @@ export function handleChampSelectSession(session: LcuChampSelectSession | null) 
 function reset() {
   round += 1;
   info = null;
+  lastSession = null;
   if (state === null) return;
   state = null;
   broadcastToAllWindows('champ-select:state', null);
@@ -161,6 +174,13 @@ async function syncWithPhase(phase: GameflowPhase | null) {
 export function initChampSelect() {
   void syncWithPhase(getLcuState().phase);
   onPhaseChange((phase) => void syncWithPhase(phase));
+}
+
+/** 배정이 없는 큐에서 포지션을 고르면 그 포지션으로 세 추천을 다시 받는다. 배정이 있으면 무시한다. */
+export function pickPosition(position: Position) {
+  if (state?.positionAssigned) return;
+  pickedPosition = position;
+  if (lastSession) onSession(lastSession);
 }
 
 /** 탭을 바꾸면 그 추천 페이지를 넣는다. */

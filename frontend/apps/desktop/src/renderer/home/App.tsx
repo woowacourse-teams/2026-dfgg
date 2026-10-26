@@ -243,10 +243,10 @@ function App() {
       />
       {isSettingOpen && <Setting onCloseSetting={() => setIsSettingOpen(false)} />}
 
-      {currentSummoner && champSelect?.position ? (
-        // 밴픽 중에는 전적 대신 밴픽 화면. 배정 포지션이 없는 큐(칼바람 등)는 평소 화면 그대로
+      {currentSummoner && champSelect ? (
+        // 밴픽 중에는 전적 대신 밴픽 화면. 포지션이 배정되지 않는 큐는 화면에서 고르게 한다
         <main className='content'>
-          <ChampSelectSection state={champSelect} position={champSelect.position} />
+          <ChampSelectSection state={champSelect} />
         </main>
       ) : currentSummoner ? (
         <main className='content'>
