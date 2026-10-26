@@ -195,8 +195,8 @@ export default function ScrollDemo() {
                   className='absolute top-[14%] left-[4%] origin-top-left scale-[0.72] sm:top-[16%] sm:scale-90 md:scale-100 lg:scale-110'
                 >
                   <OverlayMock
-                    coreIndex={inventoryCount + 1}
-                    items={recommendationsAfter(inventoryCount)}
+                    purchased={inventoryCount}
+                    {...recommendationsAfter(inventoryCount)}
                     isActive={isHovered || stage === STAGE.reason}
                     isCollapsed={isCollapsed}
                     onToggle={() => setIsCollapsed((collapsed) => !collapsed)}

@@ -1,173 +1,252 @@
-// 인게임 오버레이 목업 파일
-import { AnimatePresence, motion } from 'motion/react';
+// 인게임 오버레이 목업 파일. 데스크톱 앱 overlay/App.tsx 의 생김새를 그대로 따른다.
+import './overlayMock.css';
+
+import { motion } from 'motion/react';
+import type { CSSProperties } from 'react';
 
 import Logo from '../../assets/icon.png';
-import BorderBeam from '../../components/effects/BorderBeam';
 import { strings } from '../../i18n/i18n';
 import { championIcon, itemIcon } from '../../lib';
-import { CHAMPION_NAMES, type DemoItem } from './demoData';
+import {
+  CHAMPION_NAMES,
+  DEMO_GOLD,
+  type DemoBundle,
+  type DemoItem,
+  type DemoSituational,
+} from './demoData';
 
-const text = strings();
+const text = strings().overlay;
 
+/** 순위 숫자를 붙이는 개수. 그 아래는 자리로만 순서를 알린다. */
 const TOP_COUNT = 3;
-const RANK_STYLE = [
-  'border-rank-1 [&_.rank]:bg-rank-1',
-  'border-rank-2 [&_.rank]:bg-rank-2',
-  'border-rank-3 [&_.rank]:bg-rank-3',
-];
+/** 한 판에 채우는 아이템 칸 수 */
+const BUILD_SLOTS = 6;
 
-interface ChampionsProps {
-  ids: string[];
-  variant: 'ally' | 'counter';
-}
+const formatGold = (gold: number) => `${gold.toLocaleString('ko-KR')}G`;
 
-function Champions({ ids, variant }: ChampionsProps) {
-  if (ids.length === 0) return null;
-  const isAlly = variant === 'ally';
+type Variant = 'ally' | 'counter';
 
+const VARIANT_LABEL: Record<Variant, string> = { ally: text.synergy, counter: text.counter };
+const VARIANT_RELATION: Record<Variant, string> = {
+  ally: text.allyRelation,
+  counter: text.counterRelation,
+};
+
+function Bundle({ bundle, size }: { bundle: DemoBundle; size: 'large' | 'small' }) {
   return (
-    <div className='flex items-center gap-[5px]'>
-      <span
-        className={`text-[10px] font-bold tracking-[-0.02em] ${isAlly ? 'text-[#8cc2ff]' : 'text-[#ff9b8d]'}`}
-      >
-        {isAlly ? text.overlay.synergy : text.overlay.counter}
-      </span>
-      <ul className='flex gap-1'>
-        {ids.map((id) => (
-          <li key={id}>
-            <img
-              src={championIcon(id)}
-              alt={CHAMPION_NAMES[id]}
-              width={26}
-              height={26}
-              className={`size-[26px] rounded-full border-2 ${
-                isAlly
-                  ? 'border-[#5aa2ff] shadow-[0_0_4px_rgb(90_162_255/0.6)]'
-                  : 'border-[#f4705f] shadow-[0_0_4px_rgb(244_112_95/0.6)]'
-              }`}
-            />
-          </li>
-        ))}
-      </ul>
-    </div>
+    <span className={`bundle bundle-${size}`}>
+      {bundle.parts.map((part, index) => (
+        <span key={part.id} className='bundle-step'>
+          {index > 0 && <i aria-hidden='true'>›</i>}
+          <img src={itemIcon(part.id)} alt={part.name} title={part.name} />
+          {part.quantity > 1 && <b>×{part.quantity}</b>}
+        </span>
+      ))}
+      <span className='cost'>{formatGold(bundle.cost)}</span>
+    </span>
   );
 }
 
-function ItemRow({ item, rank, isActive }: { item: DemoItem; rank: number; isActive: boolean }) {
-  const isTop = rank <= TOP_COUNT;
-  const hasChampions = item.ally.length > 0 || item.counter.length > 0;
+function Faces({
+  ids,
+  variant,
+  withLabel = false,
+}: {
+  ids: string[];
+  variant: Variant;
+  withLabel?: boolean;
+}) {
+  if (ids.length === 0) return null;
 
   return (
-    <motion.li
-      layout
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.35 }}
-      className={`flex min-h-[58px] items-center gap-2 rounded-md border-l-[3px] p-1.5 ${
-        isTop
-          ? `${RANK_STYLE[rank - 1]} ${isActive ? 'bg-white/8' : 'bg-black/42'}`
-          : `border-transparent pl-[30px] ${isActive ? 'bg-white/8 opacity-85' : 'bg-black/20 opacity-55'}`
-      }`}
-    >
-      {isTop && (
-        <span className='rank grid size-4 shrink-0 place-items-center rounded-full text-[10px] leading-none font-extrabold text-[#10131a] [text-shadow:none]'>
+    <span className={`faces faces-${variant}`}>
+      {withLabel && <span className='faces-label'>{VARIANT_LABEL[variant]}</span>}
+      {ids.map((id) => (
+        <img
+          key={id}
+          src={championIcon(id)}
+          alt={`${CHAMPION_NAMES[id]} — ${VARIANT_RELATION[variant]}`}
+          title={`${CHAMPION_NAMES[id]} — ${VARIANT_RELATION[variant]}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+function Pick({ item, rank }: { item: DemoItem; rank: number }) {
+  const isBest = rank === 1;
+  const traits = item.traits.join(' · ');
+
+  // 산 아이템이 인벤토리로 날아가도록 그림에 layoutId 를 붙인다.
+  const art = (
+    <span className='pick-art'>
+      <motion.img layoutId={`item-${item.id}`} src={itemIcon(item.id)} alt='' />
+      {rank <= TOP_COUNT && (
+        <b className='pick-rank' aria-label={text.rank(rank)}>
           {rank}
-        </span>
+        </b>
       )}
-      <motion.img
-        layoutId={`item-${item.id}`}
-        src={itemIcon(item.id)}
-        alt={item.name}
-        width={36}
-        height={36}
-        className='size-9 shrink-0 rounded'
-      />
-      <div className='flex min-w-0 flex-col gap-[5px]'>
-        <p className='truncate text-[11px] leading-[1.35] text-white/80'>
-          {item.traits.join(' · ')}
-        </p>
-        {hasChampions && (
-          <div className='flex flex-wrap gap-x-2.5 gap-y-1'>
-            <Champions ids={item.ally} variant='ally' />
-            <Champions ids={item.counter} variant='counter' />
-          </div>
+    </span>
+  );
+
+  if (isBest) {
+    return (
+      <li className='pick pick-best' style={{ '--order': 0 } as CSSProperties}>
+        <span className='pick-main'>
+          {art}
+          <span className='pick-body'>
+            <span className='pick-name'>{item.name}</span>
+            {traits && <span className='pick-traits'>{traits}</span>}
+            {(item.ally.length > 0 || item.counter.length > 0) && (
+              <span className='pick-reasons'>
+                <Faces ids={item.ally} variant='ally' withLabel />
+                <Faces ids={item.counter} variant='counter' withLabel />
+              </span>
+            )}
+          </span>
+        </span>
+        {item.bundle && (
+          <span className='now-buy'>
+            <span className='now-buy-label'>{text.nowBuy}</span>
+            <Bundle bundle={item.bundle} size='large' />
+          </span>
         )}
-      </div>
-    </motion.li>
+      </li>
+    );
+  }
+
+  return (
+    <li
+      className={`pick ${rank > TOP_COUNT ? 'pick-rest' : ''}`}
+      style={{ '--order': rank - 1 } as CSSProperties}
+    >
+      {art}
+      <span className='pick-body'>
+        <span className='pick-name'>{item.name}</span>
+        {item.bundle ? (
+          <Bundle bundle={item.bundle} size='small' />
+        ) : (
+          traits && <span className='pick-traits'>{traits}</span>
+        )}
+      </span>
+      <span className='pick-faces'>
+        <Faces ids={item.ally} variant='ally' />
+        <Faces ids={item.counter} variant='counter' />
+      </span>
+    </li>
+  );
+}
+
+function SituationalRow({ item }: { item: DemoSituational }) {
+  const shortage = item.cost - DEMO_GOLD;
+
+  return (
+    <li className={`situ ${item.isAffordable ? '' : 'situ-locked'}`}>
+      <img className='situ-art' src={itemIcon(item.id)} alt='' />
+      <span className='pick-body'>
+        <span className='pick-name'>{item.name}</span>
+        {item.traits.length > 0 && <span className='pick-traits'>{item.traits.join(' · ')}</span>}
+      </span>
+      <Faces ids={item.counter} variant='counter' />
+      <span className={`cost ${item.isAffordable ? '' : 'cost-short'}`}>
+        {item.isAffordable ? formatGold(item.cost) : text.shortage(formatGold(shortage))}
+      </span>
+    </li>
+  );
+}
+
+/** 지금 몇 번째 아이템을 살 차례인지 빗금 여섯 칸으로 보여 준다. */
+function BuildProgress({ purchased }: { purchased: number }) {
+  return (
+    <ol className='progress' aria-label={text.progress(BUILD_SLOTS, purchased)}>
+      {Array.from({ length: BUILD_SLOTS }, (_, slot) => (
+        <li
+          key={slot}
+          className={slot < purchased ? 'progress-done' : slot === purchased ? 'progress-next' : ''}
+        />
+      ))}
+    </ol>
   );
 }
 
 interface OverlayMockProps {
-  coreIndex: number;
-  items: DemoItem[];
+  purchased: number;
+  cores: DemoItem[];
+  situational: DemoSituational[];
   isActive: boolean;
   isCollapsed: boolean;
   onToggle: () => void;
 }
 
 export default function OverlayMock({
-  coreIndex,
-  items,
+  purchased,
+  cores,
+  situational,
   isActive,
   isCollapsed,
   onToggle,
 }: OverlayMockProps) {
   if (isCollapsed) {
     return (
-      <div className='grid size-10 place-items-center rounded-[10px] bg-black/30'>
+      <div className='overlay-mock overlay-collapsed'>
         <button
           type='button'
-          aria-label={text.overlay.expand}
+          aria-label={text.expand}
           data-umami-event='demo-overlay-expand'
           onClick={onToggle}
-          className='size-6 cursor-pointer rounded-md p-0 hover:bg-white/20'
         >
-          <img src={Logo} alt='' width={24} height={24} className='size-full rounded' />
+          <img src={Logo} alt='' width={20} height={20} />
         </button>
       </div>
     );
   }
 
   return (
-    <div
-      className={`relative flex w-[260px] flex-col overflow-hidden rounded-[10px] text-white transition-colors duration-150 [text-shadow:0_1px_2px_rgb(0_0_0/0.95),0_0_6px_rgb(0_0_0/0.8)] ${
-        isActive ? 'bg-overlay' : 'bg-[rgb(10_14_28/0.22)]'
-      }`}
-    >
-      <div
-        className={`flex h-10 shrink-0 items-center justify-between pl-5 transition-colors duration-150 ${
-          isActive ? 'bg-black/70' : 'bg-black/30'
-        }`}
-      >
-        <AnimatePresence mode='wait' initial={false}>
-          <motion.span
-            key={coreIndex}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.2 }}
-            className='text-xs font-semibold'
-          >
-            {text.overlay.coreTitle(coreIndex)}
-          </motion.span>
-        </AnimatePresence>
+    <div className={`overlay-mock overlay ${isActive ? 'overlay-active' : ''}`}>
+      <header className='bar'>
+        <span className='bar-title'>{text.coreTitle(purchased + 1)}</span>
+        <BuildProgress purchased={purchased} />
         <button
           type='button'
-          aria-label={text.overlay.collapse}
+          className='bar-button'
+          aria-label={text.collapse}
           data-umami-event='demo-overlay-collapse'
           onClick={onToggle}
-          className='h-full w-10 cursor-pointer text-base text-white/85 hover:bg-[rgb(244_112_95/0.35)] hover:text-white'
         >
-          ×
+          {/* 데스크톱 icons.tsx 의 ChevronIcon 과 같은 모양 */}
+          <svg
+            width='12'
+            height='12'
+            viewBox='0 0 12 12'
+            fill='none'
+            stroke='currentColor'
+            strokeWidth='1.2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+            aria-hidden='true'
+          >
+            <path d='M3 4.5l3 3 3-3' />
+          </svg>
         </button>
-      </div>
+      </header>
 
-      <ul className='flex flex-col gap-1.5 p-2'>
-        {items.map((item, index) => (
-          <ItemRow key={item.id} item={item} rank={index + 1} isActive={isActive} />
+      {/* 추천이 바뀌면 목록을 새로 그려 위에서부터 다시 차례로 나타나게 한다. */}
+      <ol className='picks' key={cores.map((item) => item.id).join()}>
+        {cores.map((item, index) => (
+          <Pick key={item.id} item={item} rank={index + 1} />
         ))}
-      </ul>
-      <BorderBeam />
+      </ol>
+
+      {situational.length > 0 && (
+        <section className='situ-section' aria-label={text.situational}>
+          <h4>{text.situational}</h4>
+          <ul>
+            {situational.map((item) => (
+              <SituationalRow key={item.id} item={item} />
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

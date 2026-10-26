@@ -1,0 +1,512 @@
+/*
+ * 데스크톱 앱 overlay/style.css 를 옮겨 온 것이다. 오버레이 UI 가 바뀌면 같이 고친다.
+ * 랜딩 페이지 스타일과 섞이지 않게 모든 규칙을 .overlay-mock 아래에 둔다.
+ * 창 끌기(-webkit-app-region)처럼 Electron 에만 있는 규칙은 뺐다.
+ */
+
+/* 데스크톱 tokens.css 에서 오버레이가 쓰는 값만 가져온다 */
+.overlay-mock {
+  --ink: #eef0f3;
+  --ink-2: #a2a7b1;
+  --ink-3: #6a707b;
+  --surface-3: #1f2228;
+  --accent: #e63950;
+  --gold: #e6b450;
+  --good: #5fd4a8;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --duration-press: 140ms;
+  --duration-fast: 160ms;
+  --duration-normal: 240ms;
+
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.overlay-mock button {
+  font: inherit;
+  color: inherit;
+}
+
+.overlay-mock :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ---------- 창 ---------- */
+/* 평소에는 옅게 깔려 게임을 가리지 않고, 마우스를 올려 읽으려 할 때만 진해진다. */
+.overlay-mock.overlay {
+  --glass: 46%;
+
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 12px;
+  background: rgb(10 11 13 / var(--glass));
+  text-shadow:
+    0 1px 2px rgb(0 0 0 / 90%),
+    0 0 6px rgb(0 0 0 / 70%);
+  transition: background-color var(--duration-normal) ease;
+}
+
+.overlay-mock.overlay-active {
+  --glass: 92%;
+}
+
+/* ---------- 머리줄 ---------- */
+.overlay-mock .bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding-left: 12px;
+}
+
+.overlay-mock .bar-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* 아이템 여섯 칸. 산 칸은 흰 빗금, 이번에 살 칸은 붉은 빗금, 남은 칸은 옅은 빗금. */
+.overlay-mock .progress {
+  display: flex;
+  gap: 3px;
+  margin: 0;
+  padding: 0 2px;
+  list-style: none;
+}
+
+.overlay-mock .progress li {
+  width: 5px;
+  height: 11px;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 18%);
+  transform: skewX(-25deg);
+}
+
+.overlay-mock .progress .progress-done {
+  background: var(--ink);
+}
+
+.overlay-mock .progress .progress-next {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgb(230 57 80 / 90%);
+  animation: overlay-next-blink 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes overlay-next-blink {
+  to {
+    opacity: 0.45;
+  }
+}
+
+.overlay-mock .bar-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 100%;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+.overlay-mock .bar-button:hover {
+  background: rgb(255 255 255 / 10%);
+  color: var(--ink);
+}
+
+/* ---------- 추천 목록 ---------- */
+.overlay-mock .picks {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0 6px 6px;
+  list-style: none;
+}
+
+.overlay-mock .pick {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 8px 5px 5px;
+  border-radius: 9px;
+  /* 추천이 바뀌면 위에서부터 차례로 올라온다 */
+  animation: overlay-pick-in 380ms var(--ease-out) backwards;
+  animation-delay: calc(var(--order) * 55ms);
+}
+
+@keyframes overlay-pick-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ---------- 아이템 그림과 순위 ---------- */
+.overlay-mock .pick-art {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
+
+.overlay-mock .pick-art img {
+  width: 100%;
+  height: 100%;
+  border-radius: 7px;
+  outline: 1px solid rgb(255 255 255 / 14%);
+  outline-offset: -1px;
+}
+
+/* 순위는 그림 왼쪽 위에 걸친 비스듬한 딱지로 붙인다 */
+.overlay-mock .pick-rank {
+  position: absolute;
+  top: -3px;
+  left: -4px;
+  min-width: 13px;
+  padding: 0 2px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 13px;
+  text-align: center;
+  text-shadow: none;
+  color: var(--ink);
+  transform: skewX(-12deg);
+}
+
+/* ---------- 글자 ---------- */
+.overlay-mock .pick-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.overlay-mock .pick-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.overlay-mock .pick-traits {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+
+/* ---------- 1순위 ---------- */
+/* 지금 살 아이템이다. 가장 크게, 붉은 빛이 도는 판 위에 세운다. 위에 코어, 아래에 '지금 살 것'. */
+.overlay-mock .pick-best {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgb(230 57 80 / 38%);
+  background: linear-gradient(120deg, rgb(230 57 80 / 26%), rgb(230 57 80 / 6%) 62%);
+}
+
+.overlay-mock .pick-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.overlay-mock .pick-best .pick-art {
+  width: 46px;
+  height: 46px;
+}
+
+.overlay-mock .pick-best .pick-art img {
+  border-radius: 10px;
+  outline-color: rgb(255 255 255 / 22%);
+  box-shadow: 0 4px 16px rgb(230 57 80 / 45%);
+}
+
+.overlay-mock .pick-best .pick-rank {
+  top: -5px;
+  left: -5px;
+  min-width: 16px;
+  background: var(--accent);
+  font-size: 11px;
+  line-height: 16px;
+  color: #fff;
+}
+
+.overlay-mock .pick-best .pick-name {
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.overlay-mock .pick-best .pick-traits {
+  font-size: 11px;
+  color: var(--ink);
+  opacity: 0.82;
+}
+
+.overlay-mock .pick-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 5px;
+}
+
+/* ---------- 4순위 아래 ---------- */
+.overlay-mock .pick-rest {
+  opacity: 0.78;
+}
+
+.overlay-mock .pick-rest .pick-art {
+  width: 24px;
+  height: 24px;
+  margin: 0 3px;
+}
+
+/* ---------- 챔피언 초상화 ---------- */
+.overlay-mock .pick-faces {
+  flex: none;
+  display: flex;
+  gap: 5px;
+}
+
+.overlay-mock .faces {
+  --tone: var(--good);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.overlay-mock .faces-counter {
+  --tone: var(--accent);
+}
+
+.overlay-mock .faces-label {
+  margin-right: 1px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--tone);
+}
+
+/* 아군은 초록 테, 상대는 붉은 테 */
+.overlay-mock .faces img {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  outline: 1.5px solid var(--tone);
+}
+
+/* ---------- 1순위: 지금 살 것 ---------- */
+.overlay-mock .now-buy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 28%);
+}
+
+.overlay-mock .now-buy-label {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+/* ---------- 하위 아이템 묶음 ---------- */
+.overlay-mock .bundle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.overlay-mock .bundle-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.overlay-mock .bundle-step i {
+  font-style: normal;
+  color: var(--ink-3);
+}
+
+.overlay-mock .bundle-step b {
+  font-size: 10px;
+  color: var(--ink-2);
+}
+
+.overlay-mock .bundle img {
+  border-radius: 5px;
+  outline: 1px solid rgb(255 255 255 / 14%);
+  outline-offset: -1px;
+}
+
+.overlay-mock .bundle-large {
+  flex: 1;
+}
+
+.overlay-mock .bundle-large img {
+  width: 22px;
+  height: 22px;
+}
+
+.overlay-mock .bundle-large .cost {
+  margin-left: auto;
+}
+
+.overlay-mock .bundle-small {
+  margin-top: 2px;
+}
+
+.overlay-mock .bundle-small img {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+}
+
+.overlay-mock .bundle-small .cost {
+  margin-left: 4px;
+  font-size: 10px;
+}
+
+/* 골드는 금색 칩으로 통일한다 */
+.overlay-mock .cost {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: none;
+  white-space: nowrap;
+}
+
+.overlay-mock .cost-short {
+  background: rgb(255 255 255 / 7%);
+  color: var(--ink-3);
+}
+
+/* ---------- 상대 조합 대응 (상황템) ---------- */
+.overlay-mock .situ-section {
+  flex: none;
+  padding: 4px 6px 8px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+
+.overlay-mock .situ-section h4 {
+  margin: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.overlay-mock .situ-section ul {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overlay-mock .situ {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border: 1px solid rgb(230 57 80 / 22%);
+  border-radius: 9px;
+  background: rgb(230 57 80 / 7%);
+  animation: overlay-pick-in 380ms var(--ease-out) backwards;
+}
+
+/* 지금 골드로 못 사는 상황템은 흐리게 둔다 */
+.overlay-mock .situ-locked {
+  border-color: rgb(255 255 255 / 6%);
+  background: transparent;
+  opacity: 0.6;
+}
+
+.overlay-mock .situ-art {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  outline: 1px solid rgb(255 255 255 / 14%);
+  outline-offset: -1px;
+}
+
+/* ---------- 접힌 모습 ---------- */
+.overlay-mock.overlay-collapsed {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 50%;
+  background: rgb(10 11 13 / 78%);
+  transition: background-color var(--duration-fast) ease;
+}
+
+.overlay-mock.overlay-collapsed:hover {
+  background: rgb(10 11 13 / 95%);
+}
+
+.overlay-mock.overlay-collapsed button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: transform var(--duration-press) var(--ease-out);
+}
+
+.overlay-mock.overlay-collapsed button:active {
+  transform: scale(0.88);
+}
+
+.overlay-mock.overlay-collapsed img {
+  width: 20px;
+  height: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay-mock .pick,
+  .overlay-mock .situ,
+  .overlay-mock .progress .progress-next {
+    animation: none;
+  }
+
+  .overlay-mock,
+  .overlay-mock.overlay-collapsed button {
+    transition: none;
+  }
+}
