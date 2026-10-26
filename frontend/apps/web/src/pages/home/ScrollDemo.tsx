@@ -9,7 +9,7 @@ import {
   useSpring,
   useTransform,
 } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { strings } from '../../i18n/i18n';
 import { track, trackOnce } from '../../lib';
@@ -38,7 +38,13 @@ const smoothstep = (edge0: number, edge1: number, x: number) => {
 };
 const toStageProgress = (p: number) => (p - EXPAND_END) / (1 - EXPAND_END);
 
-function RailSegment({ index, progress, isCurrent, onSelect }: RailSegmentProps) {
+// 단계가 바뀔 때마다 ScrollDemo 가 다시 그려지는데, 칸 네 개는 자기 isCurrent 가 바뀔 때만 다시 그리면 된다.
+const RailSegment = memo(function RailSegment({
+  index,
+  progress,
+  isCurrent,
+  onSelect,
+}: RailSegmentProps) {
   const start = STAGES[index].start;
   const end = STAGES[index + 1]?.start ?? 1;
   const fill = useTransform(progress, (p) => smoothstep(start, end, toStageProgress(p)));
@@ -64,7 +70,7 @@ function RailSegment({ index, progress, isCurrent, onSelect }: RailSegmentProps)
       </span>
     </button>
   );
-}
+});
 
 interface RailSegmentProps {
   index: number;
@@ -138,14 +144,15 @@ export default function ScrollDemo() {
     return () => observer.disconnect();
   }, [prefersReducedMotion]);
 
-  const scrollToStage = (index: number) => {
+  // RailSegment 가 memo 라서 매번 새 함수를 넘기면 소용이 없다. ref 만 쓰므로 한 번만 만든다.
+  const scrollToStage = useCallback((index: number) => {
     const el = sectionRef.current;
     if (!el) return;
     const top = el.getBoundingClientRect().top + window.scrollY;
     const scrollable = el.offsetHeight - window.innerHeight;
     const p = EXPAND_END + (STAGES[index].start + 0.03) * (1 - EXPAND_END);
     window.scrollTo({ top: top + p * scrollable, behavior: 'smooth' });
-  };
+  }, []);
 
   const isFull = inventoryCount === INVENTORY_ORDER.length;
   const current = STAGES[stage];

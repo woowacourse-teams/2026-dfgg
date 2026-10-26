@@ -1,5 +1,6 @@
 // 인벤토리 목업 파일
 import { AnimatePresence, motion } from 'motion/react';
+import { memo } from 'react';
 
 import BorderBeam from '../../components/effects/BorderBeam';
 import { strings } from '../../i18n/i18n';
@@ -11,7 +12,8 @@ interface InventoryProps {
   isCentered: boolean;
 }
 
-export default function Inventory({ count, isCentered }: InventoryProps) {
+// 산 개수(count)나 자리(isCentered)가 바뀔 때만 다시 그린다. 오버레이에 마우스를 올리는 것만으로는 바뀌지 않는다.
+function Inventory({ count, isCentered }: InventoryProps) {
   const isFull = count === INVENTORY_ORDER.length;
 
   return (
@@ -73,3 +75,5 @@ export default function Inventory({ count, isCentered }: InventoryProps) {
     </motion.div>
   );
 }
+
+export default memo(Inventory);

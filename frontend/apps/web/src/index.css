@@ -75,6 +75,25 @@
     -apple-system, sans-serif;
 }
 
+/* 끝없이 도는 장식 애니메이션. JS 가 매 프레임 스타일을 쓰지 않게 CSS 로 둔다. */
+@keyframes pulse-ring {
+  from {
+    opacity: 0.9;
+    scale: 1;
+  }
+
+  to {
+    opacity: 0;
+    scale: 1.15;
+  }
+}
+
+@keyframes border-beam {
+  to {
+    offset-distance: 100%;
+  }
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;

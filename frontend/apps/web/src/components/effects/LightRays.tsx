@@ -1,6 +1,8 @@
 // 위에서 쏟아지는 빛줄기 배경 파일 (Magic UI LightRays 기반 · MIT © Magic UI)
-import { motion } from 'motion/react';
-import { type CSSProperties, useState } from 'react';
+import './lightRays.css';
+
+import { useInView } from 'motion/react';
+import { type CSSProperties, useRef, useState } from 'react';
 
 interface LightRaysProps {
   count?: number;
@@ -36,6 +38,10 @@ const createRays = (count: number, cycle: number): Ray[] =>
     };
   });
 
+/**
+ * 빛줄기 움직임은 CSS 애니메이션(opacity·rotate)으로 돌린다. JS 가 매 프레임 스타일을 쓰지 않고
+ * 컴포지터가 처리한다. 히어로가 화면 밖으로 나가면 멈춘다.
+ */
 export default function LightRays({
   count = 7,
   color = 'rgba(230, 57, 80, 0.35)',
@@ -43,12 +49,16 @@ export default function LightRays({
   speed = 14,
   length = '80vh',
 }: LightRaysProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref);
   const [rays] = useState(() => createRays(count, Math.max(speed, 0.1)));
 
   return (
     <div
+      ref={ref}
       aria-hidden='true'
-      className='pointer-events-none absolute inset-0 isolate overflow-hidden mask-b-from-50% mask-b-to-100%'
+      data-paused={!isInView || undefined}
+      className='light-rays pointer-events-none absolute inset-0 isolate overflow-hidden mask-b-from-50% mask-b-to-100%'
       style={
         {
           '--light-rays-color': color,
@@ -60,22 +70,20 @@ export default function LightRays({
       <div className='absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,color-mix(in_srgb,var(--light-rays-color)_45%,transparent),transparent_70%)] opacity-60' />
       <div className='absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,color-mix(in_srgb,var(--light-rays-color)_35%,transparent),transparent_75%)] opacity-60' />
       {rays.map((ray) => (
-        <motion.div
+        <div
           key={ray.id}
-          className='absolute -top-[12%] left-(--ray-left) h-(--light-rays-length) w-(--ray-width) origin-top -translate-x-1/2 rounded-full bg-linear-to-b from-[color-mix(in_srgb,var(--light-rays-color)_70%,transparent)] to-transparent opacity-0 mix-blend-screen blur-(--light-rays-blur)'
-          style={{ '--ray-left': `${ray.left}%`, '--ray-width': `${ray.width}px` } as CSSProperties}
-          initial={{ rotate: ray.rotate }}
-          animate={{
-            opacity: [0, ray.intensity, 0],
-            rotate: [ray.rotate - ray.swing, ray.rotate + ray.swing, ray.rotate - ray.swing],
-          }}
-          transition={{
-            duration: ray.duration,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: ray.delay,
-            repeatDelay: ray.duration * 0.1,
-          }}
+          className='light-ray absolute -top-[12%] left-(--ray-left) h-(--light-rays-length) w-(--ray-width) origin-top -translate-x-1/2 rounded-full bg-linear-to-b from-[color-mix(in_srgb,var(--light-rays-color)_70%,transparent)] to-transparent opacity-0 mix-blend-screen blur-(--light-rays-blur)'
+          style={
+            {
+              '--ray-left': `${ray.left}%`,
+              '--ray-width': `${ray.width}px`,
+              '--ray-from': `${ray.rotate - ray.swing}deg`,
+              '--ray-to': `${ray.rotate + ray.swing}deg`,
+              '--ray-intensity': ray.intensity,
+              '--ray-duration': `${ray.duration}s`,
+              '--ray-delay': `${ray.delay}s`,
+            } as CSSProperties
+          }
         />
       ))}
     </div>
