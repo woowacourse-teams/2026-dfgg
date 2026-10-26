@@ -1,6 +1,7 @@
-import { useItemIcons } from './icons';
-import { OverlayA, OverlayB, OverlayC } from './OverlayProposals';
-import { DetailA, DetailB, DetailC, PostGameA, PostGameB, PostGameC } from './RankProposals';
+import { ChampSelect } from './ChampSelectProposals';
+import { Counter, COUNTER_CASES } from './CounterProposals';
+import { COUNTERS } from './data';
+import { useIcons } from './icons';
 
 type Variant = { label: string; title: string; points: string[]; frame: React.ReactNode };
 
@@ -44,8 +45,10 @@ function Section({
   );
 }
 
+const HOME_WIDTH = 448;
+
 function Proposals() {
-  const icon = useItemIcons();
+  const icons = useIcons();
 
   return (
     <main className='pp-page'>
@@ -53,130 +56,134 @@ function Proposals() {
         <img src='./icon.png' alt='' />
         <div>
           <h1>DFGG 디자인 시안</h1>
-          <p>추천 v4 오버레이 · DF 스코어 순위 표시. 모두 실제 창 크기로 그렸다.</p>
+          <p>밴픽 화면: 오늘의 픽 · 룬 추천과 자동 적용. 홈 창 폭(480px) 그대로 그렸다.</p>
         </div>
         <nav>
-          <a href='#overlay'>오버레이</a>
-          <a href='#postgame'>방금 끝난 판</a>
-          <a href='#detail'>전적 상세</a>
+          <a href='#champ-select'>밴픽 화면</a>
+          <a href='#counter'>카운터</a>
+          <a href='#counter-states'>카운터 상황</a>
+          <a href='#states'>빈 상태</a>
         </nav>
       </header>
 
       <Section
-        id='overlay'
-        title='1. 오버레이: 하위 아이템과 상황템'
-        description='추천 v4에서 코어마다 "지금 살 하위 아이템 묶음"과 상대 조합 때문에 고려할 "상황템(최대 2개)"이 더해진다. 폭 260px, 마우스를 올린 상태로 그렸다.'
-        frameWidth={260}
+        id='champ-select'
+        title='1. 밴픽 화면 (최종)'
+        description='밴픽이 시작되면 홈 창이 이 화면으로 바뀐다. 맨 위는 최근 대회에서 내 포지션 프로들이 고른 "오늘의 픽"(밴된 챔피언 제외, 매번 무작위 5개), 아래는 내 챔피언 룬 추천 3페이지. 선수 사진은 백엔드가 주는 Leaguepedia 직접 링크이고, 없거나 안 열리면 그 판 챔피언 그림으로 대신한다.'
+        frameWidth={HOME_WIDTH}
         variants={[
           {
-            label: 'A안',
-            title: '지금 구조에 붙이기',
+            label: '최종',
+            title: '중계 자막 + 룬 탭',
             points: [
-              '1순위 카드 안에 "지금 살 것" 줄을 넣는다. 구매 순서대로 › 로 잇고 끝에 골드',
-              '2·3순위는 이름 아래 작은 묶음',
-              '상황템은 맨 아래 "상대 조합 대응"으로 분리',
+              '오늘의 픽: 선수 한 명을 크게(이름, 팀, 대회, 챔피언, 빌드), 아래 줄에서 5명을 넘긴다',
+              '고른 선수의 룬 한 줄과 "이 룬 쓰기"로 그 룬을 바로 내 페이지에 넣는다',
+              '룬 추천: 챔피언을 고르면 나오고 1순위가 바로 적용된다. 탭을 바꾸면 그 페이지가 바로 적용된다',
+              '고른 탭이 곧 지금 들어간 룬이라 "적용됨" 같은 표시는 따로 두지 않는다',
             ],
-            frame: <OverlayA icon={icon} />,
-          },
-          {
-            label: 'B안',
-            title: '지금 사기 우선',
-            points: [
-              '맨 위가 "지금 사야 할 재료". 번호 순서대로 사면 된다',
-              '1순위 코어는 그 재료의 목적지로만 작게',
-              '상황템은 "워윅 대응" 같은 한 줄 알림',
-            ],
-            frame: <OverlayB icon={icon} />,
-          },
-          {
-            label: 'C안',
-            title: '탭으로 나누기 (코어 탭)',
-            points: [
-              '코어 / 상황템을 탭으로 가른다. 한 번에 한 가지만 보여 가장 덜 붐빈다',
-              '줄을 누르면 그 코어의 묶음이 펼쳐진다',
-              '상황템은 탭을 눌러야 보여서 놓칠 수 있다',
-            ],
-            frame: <OverlayC icon={icon} tab='core' />,
-          },
-          {
-            label: 'C안',
-            title: '탭으로 나누기 (상황템 탭)',
-            points: ['같은 C안의 상황템 탭', '살 수 없는 상황템은 흐리게, 모자란 골드를 표시'],
-            frame: <OverlayC icon={icon} tab='situational' />,
+            frame: <ChampSelect icons={icons} />,
           },
         ]}
       />
 
       <Section
-        id='postgame'
-        title='2. 방금 끝난 판: 하이라이트 위 DF 순위'
-        description='게임이 끝나면 하이라이트 위에 이번 판 DF 스코어 등수를 보여 준다. 홈 창 폭 480px.'
-        frameWidth={448}
+        id='counter'
+        title='2. 카운터 추천 (최종: 맞라인 상대 크게)'
+        description='오늘의 픽과 룬 사이. 상대가 챔피언을 하나 공개할 때마다 /api/counters 를 다시 부른다. 상대 픽마다 이번 패치 라인 분포와 내 포지션 기준 카운터 최대 5명이 온다(아군·적·밴 제외). 내 라인으로 올 확률이 가장 높은 상대를 크게 보여 주고, 다른 상대는 알약 탭으로 바꿔 본다.'
+        frameWidth={HOME_WIDTH}
         variants={[
           {
-            label: 'A안',
-            title: '큰 등수 하나',
+            label: '최종',
+            title: '상대 3명 공개',
             points: [
-              '"3등 / 10명"이 가장 먼저 읽힌다',
-              '점수, 우리 팀 내 순위, 승패를 옆에',
-              '오른쪽 빗금 막대가 점수',
+              '맞라인 유력(내 라인 50% 이상) 상대를 전적 카드처럼 크게: 사선 그림 + 딱지 + 확률 빗금',
+              '받아칠 챔피언은 번호 달린 큰 타일. 1순위만 레드 테',
+              '아래 알약 탭으로 다른 상대를 본다. 내 라인 확률이 높은 순',
             ],
-            frame: <PostGameA />,
-          },
-          {
-            label: 'B안',
-            title: '10명 줄 세우기',
-            points: [
-              '10명을 점수 순으로 세운다. 내 자리는 붉은 테와 "나"',
-              '위아래 누구와 비슷한지 보인다',
-              '팀은 테 색으로 구분',
-            ],
-            frame: <PostGameB />,
-          },
-          {
-            label: 'C안',
-            title: '칭호 카드',
-            points: [
-              '1등 MVP, 2·3등 TOP 3처럼 칭호로 부른다',
-              '내 챔피언 그림을 사선으로 깔아 결과 화면처럼',
-              '아래 열 칸 사다리에 내 위치',
-            ],
-            frame: <PostGameC />,
+            frame: (
+              <ChampSelect
+                icons={icons}
+                counter={<Counter enemies={COUNTER_CASES.many} patch={COUNTERS.patch} />}
+              />
+            ),
           },
         ]}
       />
 
       <Section
-        id='detail'
-        title='3. 전적 상세: 10명 DF 순위'
-        description='전적 카드를 펼친 상세에서 10명 각각의 DF 등수를 보여 준다. 세 시안 모두 "내 플레이" 칸 맨 앞에 내 등수를 더했다.'
-        frameWidth={448}
+        id='counter-states'
+        title='3. 카운터 상황별'
+        description='밴픽이 진행되면서 같은 자리가 이렇게 바뀐다. 카운터 영역만 그렸다.'
+        frameWidth={HOME_WIDTH}
         variants={[
           {
-            label: 'A안',
-            title: '그림 위 등수 딱지',
-            points: [
-              '챔피언 그림 모서리에 등수. 1등 금색, 2·3등 흰색',
-              '줄 구성은 지금 그대로',
-              '점수 숫자는 마우스를 올려야 보인다',
-            ],
-            frame: <DetailA />,
+            label: '상황 1',
+            title: '블루 1픽 · 상대 공개 전',
+            points: ['enemies: [] 로 온다', '무엇을 기다리는지와 언제 바뀌는지만 알린다'],
+            frame: <Counter enemies={COUNTER_CASES.blueFirst} patch={COUNTERS.patch} />,
           },
           {
-            label: 'B안',
-            title: '이름 옆 등수와 점수',
-            points: ['이름 옆에 "3등 86"', '숫자까지 바로 읽힌다', '긴 이름은 더 일찍 잘린다'],
-            frame: <DetailB />,
+            label: '상황 2',
+            title: '상대 1명 공개',
+            points: ['상대가 하나뿐이라 탭은 숨긴다'],
+            frame: <Counter enemies={COUNTER_CASES.one} patch={COUNTERS.patch} />,
           },
           {
-            label: 'C안',
-            title: 'DF 순위 보기 추가',
+            label: '상황 3',
+            title: '공개된 상대가 내 라인이 아님',
             points: [
-              '피해량 · 아이템 옆에 "DF 순위" 보기',
-              '고르면 10명을 등수대로 한 줄씩, 점수는 빗금 막대',
-              '평소 맞대결 화면은 A안처럼 딱지만',
+              '내 라인 확률이 50% 아래면 "맞라인 유력" 대신 "정글 챔피언"처럼 주 라인을 적고 색을 뺀다',
+              '카운터가 비면 이유를 한 줄로',
             ],
-            frame: <DetailC />,
+            frame: <Counter enemies={COUNTER_CASES.noLaner} patch={COUNTERS.patch} />,
+          },
+          {
+            label: '상황 4',
+            title: '카운터가 다섯보다 적음',
+            points: [
+              '아군·적·밴에 들어간 카운터를 빼고 채울 게 모자랄 때',
+              '있는 만큼만 같은 크기로',
+            ],
+            frame: <Counter enemies={COUNTER_CASES.fewCounters} patch={COUNTERS.patch} />,
+          },
+          {
+            label: '상황 5',
+            title: '라인 집계 없음',
+            points: ['새 챔피언이거나 patch 가 null', '확률 빗금을 빼고 "라인 정보 없음"'],
+            frame: <Counter enemies={COUNTER_CASES.noPositions} patch={null} />,
+          },
+          {
+            label: '상황 6',
+            title: '내 챔피언 확정 후',
+            points: [
+              '고른 뒤에는 카운터가 필요 없어서 맞라인 한 줄로 접는다',
+              '그만큼 룬 추천이 위로 올라온다',
+            ],
+            frame: <Counter enemies={COUNTER_CASES.many} patch={COUNTERS.patch} locked />,
+          },
+        ]}
+      />
+
+      <Section
+        id='states'
+        title='4. 룬을 못 보여 줄 때'
+        description='오늘의 픽은 포지션만 있으면 나오므로 밴픽 시작부터 보인다. 룬은 챔피언을 골라야 나오고, 이번 패치 판 수가 100판보다 적으면 백엔드가 빈 목록을 준다.'
+        frameWidth={HOME_WIDTH}
+        variants={[
+          {
+            label: '상태',
+            title: '챔피언 고르기 전',
+            points: [
+              '오늘의 픽을 보며 챔피언을 고를 수 있다',
+              '룬 자리는 다음에 일어날 일만 알린다',
+            ],
+            frame: <ChampSelect icons={icons} state='noChampion' />,
+          },
+          {
+            label: '상태',
+            title: '판 수 부족',
+            points: ['이유와 기준(100판)을 같이 적는다', '자동 적용은 하지 않는다'],
+            frame: <ChampSelect icons={icons} state='fewGames' />,
           },
         ]}
       />

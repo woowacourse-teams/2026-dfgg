@@ -81,13 +81,12 @@ export default function SmartScreenMock() {
   );
 }
 
+// 끝없이 도는 장식이라 JS 대신 CSS 애니메이션(opacity·scale)으로 컴포지터에 맡긴다.
 function Pulse() {
   return (
-    <motion.span
+    <span
       aria-hidden='true'
-      className='pointer-events-none absolute -inset-2 border-2 border-rank-1'
-      animate={{ opacity: [0.9, 0], scale: [1, 1.15] }}
-      transition={{ duration: 1.3, repeat: Infinity, ease: 'easeOut' }}
+      className='pointer-events-none absolute -inset-2 animate-[pulse-ring_1.3s_ease-out_infinite] border-2 border-rank-1 motion-reduce:animate-none'
     />
   );
 }

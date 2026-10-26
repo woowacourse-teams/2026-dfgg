@@ -9,7 +9,7 @@ import {
   useSpring,
   useTransform,
 } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { strings } from '../../i18n/i18n';
 import { track, trackOnce } from '../../lib';
@@ -20,7 +20,7 @@ import OverlayMock from './OverlayMock';
 const text = strings();
 
 const VIDEO_SRC = '/media/gameplay.mp4';
-const VIDEO_POSTER = '/media/gameplay-poster.jpg';
+const VIDEO_POSTER = '/media/gameplay-poster.webp';
 const EXPAND_END = 0.16;
 const STAGE = { purchase: 1, reason: 2, finale: 3 } as const;
 const FULL_AT = 0.75;
@@ -38,7 +38,13 @@ const smoothstep = (edge0: number, edge1: number, x: number) => {
 };
 const toStageProgress = (p: number) => (p - EXPAND_END) / (1 - EXPAND_END);
 
-function RailSegment({ index, progress, isCurrent, onSelect }: RailSegmentProps) {
+// 단계가 바뀔 때마다 ScrollDemo 가 다시 그려지는데, 칸 네 개는 자기 isCurrent 가 바뀔 때만 다시 그리면 된다.
+const RailSegment = memo(function RailSegment({
+  index,
+  progress,
+  isCurrent,
+  onSelect,
+}: RailSegmentProps) {
   const start = STAGES[index].start;
   const end = STAGES[index + 1]?.start ?? 1;
   const fill = useTransform(progress, (p) => smoothstep(start, end, toStageProgress(p)));
@@ -64,7 +70,7 @@ function RailSegment({ index, progress, isCurrent, onSelect }: RailSegmentProps)
       </span>
     </button>
   );
-}
+});
 
 interface RailSegmentProps {
   index: number;
@@ -80,6 +86,11 @@ export default function ScrollDemo() {
   const [isHovered, setIsHovered] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [inventoryCount, setInventoryCount] = useState(0);
+  // 오버레이 목업은 챔피언·아이템 그림을 수십 장 받는다. 데모에 들어오기 전에는 안 보이므로 그때 그린다.
+  const [hasEntered, setHasEntered] = useState(false);
+  // 저절로 계속 도는 영상은 멈출 수 있어야 한다(WCAG 2.2.2). 사용자가 멈췄으면 다시 화면에 들어와도 틀지 않는다.
+  const [isVideoPaused, setIsVideoPaused] = useState(false);
+  const isVideoPausedRef = useRef(false);
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -107,6 +118,7 @@ export default function ScrollDemo() {
     setStage(next);
     const count = countFor(next, sp);
     setInventoryCount(count);
+    if (p > 0) setHasEntered(true);
 
     if (p > 0.02) trackOnce('demo-enter');
     if (sp >= 0) trackOnce('demo-stage-view', { stage: STAGES[next].key });
@@ -120,24 +132,44 @@ export default function ScrollDemo() {
     const video = videoRef.current;
     if (!section || !video || prefersReducedMotion) return;
 
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        video.play().catch(() => video.pause());
-      } else {
-        video.pause();
-      }
-    });
+    // 첫 화면에는 데모 윗부분이 포스터로만 걸쳐 보인다. 화면 위쪽 절반까지 올라와야 영상을 받고 튼다.
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isVideoPausedRef.current) {
+          video.play().catch(() => video.pause());
+        } else {
+          video.pause();
+        }
+      },
+      { rootMargin: '0px 0px -50% 0px' },
+    );
     observer.observe(section);
     return () => observer.disconnect();
   }, [prefersReducedMotion]);
 
-  const scrollToStage = (index: number) => {
+  // RailSegment 가 memo 라서 매번 새 함수를 넘기면 소용이 없다. ref 만 쓰므로 한 번만 만든다.
+  const scrollToStage = useCallback((index: number) => {
     const el = sectionRef.current;
     if (!el) return;
     const top = el.getBoundingClientRect().top + window.scrollY;
     const scrollable = el.offsetHeight - window.innerHeight;
     const p = EXPAND_END + (STAGES[index].start + 0.03) * (1 - EXPAND_END);
     window.scrollTo({ top: top + p * scrollable, behavior: 'smooth' });
+  }, []);
+
+  const toggleVideo = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const next = !isVideoPaused;
+    isVideoPausedRef.current = next;
+    setIsVideoPaused(next);
+    if (next) video.pause();
+    else video.play().catch(() => video.pause());
+  };
+
+  // 데모 화면이 펼쳐지기 전에는 버튼들이 투명하다. 키보드로 그 버튼에 닿으면 데모를 펼쳐 보이게 한다.
+  const revealOnFocus = () => {
+    if (progress.get() < EXPAND_END * 1.2) scrollToStage(stage);
   };
 
   const isFull = inventoryCount === INVENTORY_ORDER.length;
@@ -151,6 +183,18 @@ export default function ScrollDemo() {
       className='relative h-[600vh] [overflow-anchor:none]'
     >
       <div className='sticky top-0 h-svh overflow-hidden [perspective:1400px]'>
+        {/* 화면에선 영상 위에 겹쳐 보이지만, 읽는 순서는 섹션 맨 앞이어야 h2 → h3 차례가 맞는다. */}
+        <motion.h2
+          id='demo-heading'
+          style={{ opacity: titleOpacity, y: titleY }}
+          className='pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6 text-center text-4xl leading-tight font-bold tracking-[-0.03em] text-white [text-shadow:0_2px_24px_rgb(0_0_0/0.6)] sm:text-6xl'
+        >
+          <span>
+            {text.demo.heading[0]}
+            <br />
+            {text.demo.heading[1]}
+          </span>
+        </motion.h2>
         <motion.div
           style={{ clipPath, rotateX: tilt }}
           className='absolute inset-0 origin-bottom bg-surface'
@@ -162,7 +206,7 @@ export default function ScrollDemo() {
             muted
             loop
             playsInline
-            preload='metadata'
+            preload='none'
             onError={() => track('demo-video-error')}
             aria-hidden='true'
             style={{ scale: mediaScale }}
@@ -180,9 +224,36 @@ export default function ScrollDemo() {
             className='absolute inset-0 bg-black/40'
           />
 
-          <motion.div style={{ opacity: uiOpacity }} className='absolute inset-0'>
+          <motion.div
+            style={{ opacity: uiOpacity }}
+            onFocus={revealOnFocus}
+            className='absolute inset-0'
+          >
+            {!prefersReducedMotion && (
+              <button
+                type='button'
+                onClick={toggleVideo}
+                aria-label={isVideoPaused ? text.demo.playVideo : text.demo.pauseVideo}
+                data-umami-event='demo-video-toggle'
+                className='absolute top-20 right-[4%] grid size-9 cursor-pointer place-items-center rounded-full bg-black/50 text-white/80 ring-1 ring-white/15 transition-colors hover:bg-black/70 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+              >
+                <svg
+                  width='12'
+                  height='12'
+                  viewBox='0 0 12 12'
+                  aria-hidden='true'
+                  fill='currentColor'
+                >
+                  {isVideoPaused ? (
+                    <path d='M3 1.5v9l7.5-4.5z' />
+                  ) : (
+                    <path d='M2.5 1.5h2.5v9H2.5zM7 1.5h2.5v9H7z' />
+                  )}
+                </svg>
+              </button>
+            )}
             <AnimatePresence>
-              {!isFull && (
+              {hasEntered && !isFull && (
                 <motion.div
                   key='overlay'
                   exit={{ opacity: 0, x: -24 }}
@@ -195,8 +266,8 @@ export default function ScrollDemo() {
                   className='absolute top-[14%] left-[4%] origin-top-left scale-[0.72] sm:top-[16%] sm:scale-90 md:scale-100 lg:scale-110'
                 >
                   <OverlayMock
-                    coreIndex={inventoryCount + 1}
-                    items={recommendationsAfter(inventoryCount)}
+                    purchased={inventoryCount}
+                    {...recommendationsAfter(inventoryCount)}
                     isActive={isHovered || stage === STAGE.reason}
                     isCollapsed={isCollapsed}
                     onToggle={() => setIsCollapsed((collapsed) => !collapsed)}
@@ -241,18 +312,6 @@ export default function ScrollDemo() {
             </div>
           </motion.div>
         </motion.div>
-
-        <motion.h2
-          id='demo-heading'
-          style={{ opacity: titleOpacity, y: titleY }}
-          className='pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-4xl leading-tight font-bold tracking-[-0.03em] text-white [text-shadow:0_2px_24px_rgb(0_0_0/0.6)] sm:text-6xl'
-        >
-          <span>
-            {text.demo.heading[0]}
-            <br />
-            {text.demo.heading[1]}
-          </span>
-        </motion.h2>
       </div>
     </section>
   );

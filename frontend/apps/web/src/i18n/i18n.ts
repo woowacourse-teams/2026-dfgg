@@ -1,3 +1,5 @@
+import META from './meta.json';
+
 export type Locale = 'ko' | 'en';
 
 export function pickLocale(languages: readonly string[]): Locale {
@@ -10,16 +12,16 @@ export function pickLocale(languages: readonly string[]): Locale {
 }
 
 const KO = {
-  meta: {
-    title: 'DFGG - 조합 맞춤 아이템 추천 데스크톱 앱',
-    description:
-      '게임이 시작되면 양 팀 챔피언과 산 아이템을 보고 다음 코어 아이템을 게임 화면에 띄워주는 리그 오브 레전드 데스크톱 앱이에요.',
-  },
+  // 빌드 때 언어별 index.html 에도 넣어야 해서 webpack.config.js 와 같은 파일을 쓴다.
+  meta: META.ko,
   header: {
     navLabel: '주요 메뉴',
-    homeLabel: 'DFGG 홈',
+    homeLabel: '홈',
+    skipToContent: '본문으로 건너뛰기',
     installGuide: '설치 안내',
     switchLanguage: 'EN',
+    // 화면에 보이는 글자(EN)를 이름 안에 그대로 넣어야 음성 입력 사용자도 부를 수 있다.
+    switchLanguageLabel: 'EN, English',
   },
   download: {
     store: 'Microsoft Store에서 무료로 받기',
@@ -49,6 +51,9 @@ const KO = {
   demo: {
     heading: ['게임 중엔', '이렇게 뜹니다!'],
     stepsLabel: '데모 단계',
+    overlayLabel: '게임 화면 위에 뜨는 DFGG 오버레이 예시',
+    pauseVideo: '배경 영상 멈추기',
+    playVideo: '배경 영상 재생하기',
     stages: [
       {
         label: '게임 시작',
@@ -76,8 +81,15 @@ const KO = {
     coreTitle: (core: number) => `${core}코어 추천`,
     synergy: '시너지',
     counter: '카운터',
-    expand: '오버레이 켜기',
-    collapse: '오버레이 끄기',
+    allyRelation: '아군 — 시너지 좋음',
+    counterRelation: '상대 — 카운터로 좋음',
+    rank: (n: number) => `추천 ${n}순위`,
+    progress: (total: number, done: number) => `아이템 ${total}칸 중 ${done}칸 구매`,
+    nowBuy: '지금 살 것',
+    shortage: (gold: string) => `${gold} 부족`,
+    situational: '상대 조합 대응',
+    expand: '오버레이 펼치기',
+    collapse: '오버레이 접기',
     inventoryLabel: (count: number) => `인벤토리 ${count}칸 채워짐`,
   },
   install: {
@@ -192,6 +204,16 @@ const KO = {
     6665: { name: '해신 작쇼', traits: ['방어력', '마법 저항력'] },
     2504: { name: '케이닉 루컨', traits: ['마법 저항력', '보호막'] },
     4629: { name: '우주의 추진력', traits: ['주문력', '이동 속도'] },
+    // '지금 살 것'에 나오는 하위 아이템
+    3057: { name: '광휘의 검', traits: [] },
+    1001: { name: '장화', traits: [] },
+    1033: { name: '마법무효화의 망토', traits: [] },
+    1029: { name: '천 갑옷', traits: [] },
+    3067: { name: '점화석', traits: [] },
+    3211: { name: '망령의 두건', traits: [] },
+    3082: { name: '파수꾼의 갑옷', traits: [] },
+    1011: { name: '거인의 허리띠', traits: [] },
+    1031: { name: '쇠사슬 조끼', traits: [] },
   } as Record<number, { name: string; traits: string[] }>,
   champions: {
     Jax: '잭스',
@@ -207,16 +229,14 @@ const KO = {
 };
 
 const EN: typeof KO = {
-  meta: {
-    title: 'DFGG - Build recommendations for your team comp',
-    description:
-      'A League of Legends desktop app that reads both team comps and your items once the game starts, then shows your next core item right on the game screen.',
-  },
+  meta: META.en,
   header: {
     navLabel: 'Main menu',
-    homeLabel: 'DFGG home',
+    homeLabel: 'home',
+    skipToContent: 'Skip to content',
     installGuide: 'Install guide',
     switchLanguage: '한국어',
+    switchLanguageLabel: '한국어',
   },
   download: {
     store: 'Get it free on Microsoft Store',
@@ -246,6 +266,9 @@ const EN: typeof KO = {
   demo: {
     heading: ['In game,', 'it looks like this!'],
     stepsLabel: 'Demo steps',
+    overlayLabel: 'Example of the DFGG overlay shown over the game',
+    pauseVideo: 'Pause background video',
+    playVideo: 'Play background video',
     stages: [
       {
         label: 'Game start',
@@ -273,8 +296,15 @@ const EN: typeof KO = {
     coreTitle: (core: number) => `Core ${core} picks`,
     synergy: 'Synergy',
     counter: 'Counter',
-    expand: 'Show overlay',
-    collapse: 'Hide overlay',
+    allyRelation: 'Ally — good synergy',
+    counterRelation: 'Enemy — good counter',
+    rank: (n: number) => `Pick #${n}`,
+    progress: (total: number, done: number) => `${done} of ${total} items bought`,
+    nowBuy: 'Buy now',
+    shortage: (gold: string) => `${gold} short`,
+    situational: 'Vs. enemy comp',
+    expand: 'Expand overlay',
+    collapse: 'Collapse overlay',
     inventoryLabel: (count: number) => `Inventory: ${count} slots filled`,
   },
   install: {
@@ -390,6 +420,15 @@ const EN: typeof KO = {
     6665: { name: 'Jak’Sho, The Protean', traits: ['Armor', 'Magic resist'] },
     2504: { name: 'Kaenic Rookern', traits: ['Magic resist', 'Shield'] },
     4629: { name: 'Cosmic Drive', traits: ['Ability power', 'Move speed'] },
+    3057: { name: 'Sheen', traits: [] },
+    1001: { name: 'Boots', traits: [] },
+    1033: { name: 'Null-Magic Mantle', traits: [] },
+    1029: { name: 'Cloth Armor', traits: [] },
+    3067: { name: 'Kindlegem', traits: [] },
+    3211: { name: 'Spectre’s Cowl', traits: [] },
+    3082: { name: 'Warden’s Mail', traits: [] },
+    1011: { name: 'Giant’s Belt', traits: [] },
+    1031: { name: 'Chain Vest', traits: [] },
   },
   champions: {
     Jax: 'Jax',
@@ -418,8 +457,10 @@ export function stripLocale(pathname: string): string {
 export const LOCALE: Locale =
   localeFromPath(window.location.pathname) ?? pickLocale(navigator.languages);
 
+// 언어별 첫 화면은 빌드 때 /ko/index.html, /en/index.html 로 따로 만든다.
+// 서버가 /ko 를 /ko/ 로 넘기므로 처음부터 끝에 / 를 붙여 한 번 더 오가지 않게 한다.
 export const localePath = (locale: Locale, path = '/'): string =>
-  `/${locale}${path === '/' ? '' : path}`;
+  `/${locale}${path === '/' ? '/' : path}`;
 
 export function strings(locale: Locale = LOCALE): typeof KO {
   if (locale === 'ko') return KO;

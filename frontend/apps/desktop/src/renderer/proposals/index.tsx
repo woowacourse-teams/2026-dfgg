@@ -2,8 +2,9 @@ import './index.css';
 import '../home/App.css';
 import '../home/components/MatchSection/MatchSection.css';
 import '../home/components/MatchSection/MatchDetail.css';
-import '../overlay/style.css';
 import './proposals.css';
+import './champSelect.css';
+import './counter.css';
 
 import ReactDOM from 'react-dom/client';
 

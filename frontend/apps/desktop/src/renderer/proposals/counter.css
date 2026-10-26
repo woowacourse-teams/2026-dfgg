@@ -1,0 +1,245 @@
+/* 카운터 추천 시안(최종 B안). 홈 화면의 섹션 제목·알약 탭·빗금 막대·사선 그림을 그대로 쓴다. */
+.ct .section-head {
+  align-items: center;
+  margin-top: 6px;
+}
+
+.ct-meta {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.ct-empty {
+  margin: 0;
+  padding: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.ctb-card {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  min-height: 108px;
+  overflow: hidden;
+  border: 1px solid rgb(230 57 80 / 30%);
+  border-radius: var(--radius-l);
+  background: linear-gradient(90deg, rgb(230 57 80 / 14%), transparent 60%), var(--surface);
+}
+
+.ctb-art {
+  overflow: hidden;
+  clip-path: polygon(0 0, 100% 0, 80% 100%, 0 100%);
+}
+
+.ctb-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 25%;
+}
+
+.ctb-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 14px 12px 4px;
+}
+
+.ctb-tag {
+  align-self: flex-start;
+  padding: 0 7px;
+  border-radius: 3px;
+  background: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 18px;
+  color: #fff;
+  transform: skewX(-12deg);
+}
+
+.ctb-tag-off {
+  background: rgb(255 255 255 / 10%);
+  color: var(--ink-2);
+}
+
+.ctb-body strong {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.ctb-rate {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.ctb-rate small {
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.ctb-rate b {
+  color: var(--ink);
+}
+
+.ctb-rate-bar {
+  display: flex;
+  max-width: 200px;
+}
+
+.ctb-tiles {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ctb-tiles li {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.ctb-tiles li:hover {
+  transform: translateY(-2px);
+}
+
+.ctb-tiles img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+/* 순위 딱지. DF 순위와 같은 기울기 */
+.ctb-tiles i {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgb(10 11 13 / 80%);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+  transform: skewX(-12deg);
+}
+
+.ctb-tiles li:first-child {
+  border-color: var(--accent);
+}
+
+.ctb-tiles li:first-child i {
+  background: var(--accent);
+  color: #fff;
+}
+
+.ctb-tiles span {
+  display: block;
+  padding: 4px 2px 5px;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctb-switch {
+  margin-top: 8px;
+}
+
+.ctb-switch button {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.ctb-switch img {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+
+.ctb-switch small {
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+/* 내 라인 상대가 아니면 색을 빼서 덜 급해 보이게 한다 */
+.ctb-card-off {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+.ctb-card-off .ctb-art img {
+  filter: saturate(0.4);
+  opacity: 0.7;
+}
+
+.ct-empty {
+  margin-top: 8px;
+}
+
+.ct-wait {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+}
+
+.ct-wait b {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+/* 확정 후: 맞라인 한 줄 */
+.ct-locked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.ct-locked img {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.ct-locked b {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.ct-locked-note {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctb-tiles li {
+    transition: none;
+  }
+}

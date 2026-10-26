@@ -1,9 +1,12 @@
 @import 'tailwindcss';
 
+/*
+ * 히어로 제목 한 줄에만 쓰는 글꼴이라, 원본(woff 407KB)에서 제목 글자만 남겨 직접 둔다(woff2 3KB).
+ * 제목 문구(i18n hero.headline)를 바꾸면 assets/fonts/README.md 대로 다시 뽑는다.
+ */
 @font-face {
   font-family: 'Cafe24Ohsquare';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/Cafe24Ohsquare.woff')
-    format('woff');
+  src: url('./assets/fonts/cafe24-ohsquare-headline.woff2') format('woff2');
   font-display: swap;
 }
 
@@ -70,6 +73,25 @@
   --font-body:
     'Pretendard Variable', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui,
     -apple-system, sans-serif;
+}
+
+/* 끝없이 도는 장식 애니메이션. JS 가 매 프레임 스타일을 쓰지 않게 CSS 로 둔다. */
+@keyframes pulse-ring {
+  from {
+    opacity: 0.9;
+    scale: 1;
+  }
+
+  to {
+    opacity: 0;
+    scale: 1.15;
+  }
+}
+
+@keyframes border-beam {
+  to {
+    offset-distance: 100%;
+  }
 }
 
 @layer base {

@@ -1,9 +1,9 @@
 import './index.css';
 
-import * as Sentry from '@sentry/react';
+import type { ErrorInfo } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { initAnalytics } from './analytics';
+import { afterPageLoad, initAnalytics } from './analytics';
 import App from './App';
 import { LOCALE, localeFromPath, localePath, strings, stripLocale } from './i18n/i18n';
 
@@ -13,12 +13,27 @@ const SENTRY_DSN =
 const PROD_HOSTNAMES = ['dfgg.pro', 'www.dfgg.pro'];
 const { hostname } = window.location;
 
-// 로컬 개발 서버에서 난 에러는 보내지 않는다. dev 인스턴스 에러는 environment 로 구분한다.
-Sentry.init({
-  dsn: SENTRY_DSN,
-  enabled: hostname !== 'localhost',
-  environment: PROD_HOSTNAMES.includes(hostname) ? 'production' : 'development',
-});
+/**
+ * Sentry 는 첫 화면을 그리는 데 필요 없어서 로딩이 끝난 뒤 따로 받는다.
+ * 그 사이 React 에서 난 에러는 Sentry 를 받은 뒤 보낸다. 받기 전 window 전역 에러는 놓친다.
+ * 로컬 개발 서버에서 난 에러는 보내지 않는다. dev 인스턴스 에러는 environment 로 구분한다.
+ */
+const sentryReady =
+  hostname === 'localhost'
+    ? null
+    : afterPageLoad()
+        .then(() => import(/* webpackChunkName: "sentry" */ '@sentry/react'))
+        .then((Sentry) => {
+          Sentry.init({
+            dsn: SENTRY_DSN,
+            environment: PROD_HOSTNAMES.includes(hostname) ? 'production' : 'development',
+          });
+          return Sentry;
+        });
+
+const reportReactError = (error: unknown, errorInfo: ErrorInfo) => {
+  sentryReady?.then((Sentry) => Sentry.reactErrorHandler()(error, errorInfo)).catch(() => {});
+};
 
 const { pathname, search, hash } = window.location;
 if (!localeFromPath(pathname) && LOCALE === 'ko') {
@@ -34,7 +49,7 @@ initAnalytics();
 
 // React 19 는 렌더링 중 에러를 window.onerror 로 올리지 않아서 직접 연결해야 Sentry 에 잡힌다.
 createRoot(document.getElementById('root')!, {
-  onUncaughtError: Sentry.reactErrorHandler(),
-  onCaughtError: Sentry.reactErrorHandler(),
-  onRecoverableError: Sentry.reactErrorHandler(),
+  onUncaughtError: reportReactError,
+  onCaughtError: reportReactError,
+  onRecoverableError: reportReactError,
 }).render(<App />);
