@@ -13,6 +13,7 @@ import type {
 } from '../../shared/types';
 import { t } from '../i18n';
 import Bento from './components/Bento/Bento';
+import ChampSelectSection, { useChampSelect } from './components/ChampSelect/ChampSelectSection';
 import EmptyState from './components/EmptyState/EmptyState';
 import FeedbackModal from './components/feedback/FeedbackModal';
 import MatchSection from './components/MatchSection/MatchSection';
@@ -37,6 +38,7 @@ function App() {
     () => sessionStorage.getItem('reopenSetting') === '1',
   );
   const version = useDdragonVersion();
+  const champSelect = useChampSelect();
 
   const playedGame = useRef(false); // 앱을 켠 뒤 한 게임을 한 판이라도 했는지 확인
   const askedFeedback = useRef(false); // 이번 실행에서 피드백을 이미 했는지 확인
@@ -241,7 +243,12 @@ function App() {
       />
       {isSettingOpen && <Setting onCloseSetting={() => setIsSettingOpen(false)} />}
 
-      {currentSummoner ? (
+      {currentSummoner && champSelect ? (
+        // 밴픽 중에는 전적 대신 밴픽 화면. 포지션이 배정되지 않는 큐는 화면에서 고르게 한다
+        <main className='content'>
+          <ChampSelectSection state={champSelect} />
+        </main>
+      ) : currentSummoner ? (
         <main className='content'>
           <PostGameSection matches={matches} version={version} phase={lcuPhase} />
           <QueueTabs tabs={tabs} active={activeQueue} onChange={setQueue} />

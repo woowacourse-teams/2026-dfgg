@@ -6,6 +6,7 @@ import path from 'node:path';
 import { registerIpcHandlers } from './ipc';
 import { startLcuConnection, stopLcuConnection } from './lcu/connection';
 import { initLivePolling, stopLivePolling } from './live/poller';
+import { initChampSelect } from './champSelect/champSelect';
 import { EXPANDED_WIDTH, EXPANDED_HEIGHT } from './constants';
 import { onPhaseChange, onStatusChange } from './lcu/state';
 import { ensureBorderlessMode } from './gameConfig/gameConfig';
@@ -165,6 +166,7 @@ if (!gotTheLock) {
 
     startLcuConnection();
     initLivePolling();
+    initChampSelect();
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {

@@ -6,6 +6,7 @@ import { LCU_URI } from './events';
 import type WebSocket from 'ws';
 import { reportError } from '../sentry';
 import { broadcastToAllWindows } from '../ipc/broadcast';
+import { handleChampSelectSession } from '../champSelect/champSelect';
 
 const WAIT_FOR_CLIENT_MS = 3000; // 롤이 꺼져 있을 때
 const MIN_RETRY_MS = 1000; // 연결 실패 백오프 시작
@@ -80,6 +81,9 @@ function connect() {
     }
     if (payload.uri === LCU_URI.summonerProfile && payload.data) {
       broadcastToAllWindows('lcu:profile-background', payload.data.backgroundSkinId ?? null);
+    }
+    if (payload.uri === LCU_URI.champSelectSession) {
+      handleChampSelectSession(payload.data);
     }
   });
   activeSocket = ws;

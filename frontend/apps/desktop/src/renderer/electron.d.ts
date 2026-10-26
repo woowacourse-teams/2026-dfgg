@@ -1,5 +1,6 @@
 import { Locale } from '../shared/i18n';
 import type {
+  ChampSelectState,
   DfScores,
   EndedGame,
   FeedbackRating,
@@ -13,6 +14,7 @@ import type {
   MatchDetail,
   MatchSummary,
   OverlayClickTarget,
+  Position,
   RecommendationUpdate,
   Summoner,
 } from '../shared/types';
@@ -49,6 +51,19 @@ declare global {
       onProfileBackgroundChange: (callback: (skinId: number | null) => void) => Unsubscribe;
       onItemsRecommendationChange: (callback: ItemsListener) => Unsubscribe;
       getEndedGame: () => Promise<EndedGame | null>;
+    };
+    champSelect: {
+      /** 밴픽 중이 아니면 null */
+      getState: () => Promise<ChampSelectState | null>;
+      onStateChange: (callback: (state: ChampSelectState | null) => void) => Unsubscribe;
+      /** 추천 페이지(rank)를 클라이언트 룬 페이지에 넣는다 */
+      applyPage: (rank: number) => void;
+      /** 오늘의 픽 선수 룬을 그대로 넣는다. key 는 todayPickKey(선수:챔피언) */
+      applyProPage: (key: string) => void;
+      /** 클라이언트에서 그 챔피언을 고른다(확정은 하지 않는다) */
+      pickChampion: (championId: number) => void;
+      /** 배정 포지션이 없는 큐에서 추천받을 포지션을 고른다 */
+      pickPosition: (position: Position) => void;
     };
     windowControls: {
       setCollapsed: (collapsed: boolean) => void;

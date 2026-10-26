@@ -5,7 +5,7 @@
  * 주소에 값을 붙여 상태를 바꾼다.
  *   /home/index.html                      연결됨 · 로비 (기본)
  *   /home/index.html?status=disconnected  롤 클라이언트 꺼짐
- *   /home/index.html?phase=ChampSelect    챔피언 선택 중
+ *   /home/index.html?phase=ChampSelect    챔피언 선택 중 (상황은 &cs= 로 고른다. devMock.champSelect.ts 참고)
  *   /home/index.html?stress=1             이름·숫자를 가장 길게 (칸이 넘치는지 볼 때)
  *   /home/index.html?status=disconnected&nolaunch=1   클라이언트 실행 실패
  */
@@ -23,6 +23,7 @@ import type {
   RankedQueueType,
   Summoner,
 } from '../../shared/types';
+import { champSelectMock } from './devMock.champSelect';
 
 const params = new URLSearchParams(window.location.search);
 const status = (params.get('status') ?? 'connected') as LcuStatus;
@@ -338,6 +339,27 @@ if (!window.lcu) {
         : undefined;
       return () => clearTimeout(timer);
     },
+  };
+  // 밴픽 mock: 탭이나 '이 룬 쓰기'를 누르면 그걸 넣은 것처럼 상태를 돌려준다
+  let champSelect = phase === 'ChampSelect' ? champSelectMock(params.get('cs')) : null;
+  const champSelectListeners = new Set<(state: typeof champSelect) => void>();
+  const setChampSelect = (patch: Partial<NonNullable<typeof champSelect>>) => {
+    if (!champSelect) return;
+    champSelect = { ...champSelect, ...patch };
+    for (const listener of champSelectListeners) listener(champSelect);
+  };
+  window.champSelect = {
+    getState: async () => champSelect,
+    onStateChange: (callback) => {
+      champSelectListeners.add(callback);
+      return () => champSelectListeners.delete(callback);
+    },
+    applyPage: (rank) => setChampSelect({ applied: rank, runeError: null }),
+    applyProPage: (key) => setChampSelect({ applied: `pro:${key}`, runeError: null }),
+    pickChampion: log('champSelect.pickChampion'),
+    // 고르면 그 포지션으로 추천을 받은 것처럼 기본 화면을 채운다
+    pickPosition: (position) =>
+      setChampSelect({ ...champSelectMock('picked'), position, positionAssigned: false }),
   };
   window.windowControls = {
     setCollapsed: log('windowControls.setCollapsed'),

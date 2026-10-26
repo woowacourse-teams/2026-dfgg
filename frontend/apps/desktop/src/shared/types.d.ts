@@ -335,3 +335,92 @@ export type DfScore = { score: number; rank: number };
 
 /** 참가자 번호(participantId) → DF 스코어 */
 export type DfScores = Record<number, DfScore>;
+
+/* ---------- 챔피언 선택(밴픽) ---------- */
+
+/** 백엔드가 쓰는 포지션 이름 */
+export type Position = 'TOP' | 'JUNGLE' | 'MID' | 'BOTTOM' | 'SUPPORT';
+
+/** 이름과 그림이 붙은 항목. 카탈로그에 아직 없으면 name·imageUrl 이 null 로 온다. */
+export interface RuneEntry {
+  id: number;
+  name: string | null;
+  imageUrl: string | null;
+}
+
+/** POST /api/recommendations/runes 의 페이지 하나 */
+export interface RecommendedRunePage {
+  rank: number;
+  primaryStyle: RuneEntry;
+  keystone: RuneEntry;
+  primaryRunes: RuneEntry[];
+  subStyle: RuneEntry;
+  subRunes: RuneEntry[];
+  statShards: RuneEntry[];
+  evidence: { games: number; pickRate: number };
+}
+
+export interface RuneRecommendation {
+  patch: string | null;
+  championGames: number;
+  /** 판 수가 100판보다 적으면 비어 있다 */
+  pages: RecommendedRunePage[];
+}
+
+/** POST /api/today-picks 의 프로 픽 하나 */
+export interface TodayPick {
+  player: { name: string; team: string | null; imageUrl: string | null };
+  playedAt: string;
+  champion: { id: number; name: string; imageUrl: string; position: string };
+  spells: { id: number; name: string; imageUrl: string }[];
+  items: { id: number; name: string; imageUrl: string }[];
+  runes: {
+    primaryTree: { id: number; name: string } | null;
+    keystone: RuneEntry | null;
+    primary: RuneEntry[];
+    secondaryTree: { id: number; name: string } | null;
+    secondary: RuneEntry[];
+    shards: RuneEntry[];
+  };
+}
+
+export interface TodayPicks {
+  tournament: { name: string; league: string; startDate: string | null } | null;
+  position: Position;
+  picks: TodayPick[];
+}
+
+/** POST /api/counters 의 상대 한 명 */
+export interface CounterEnemy {
+  championId: number;
+  name: string;
+  /** 이번 패치 라인 분포. 비율 내림차순, 기록이 없으면 비어 있다 */
+  positions: { position: Position; rate: number }[];
+  counters: { championId: number; name: string }[];
+}
+
+export interface Counters {
+  patch: string | null;
+  myPosition: Position;
+  enemies: CounterEnemy[];
+}
+
+/** 룬을 클라이언트에 넣지 못한 이유. no-slot 은 빈 룬 페이지 칸이 없을 때 */
+export type RuneApplyError = 'no-slot' | 'failed';
+
+/** 밴픽 화면에 그릴 것 전부. 밴픽이 아니면 null 로 보낸다. */
+export interface ChampSelectState {
+  /** 추천에 쓰는 포지션. 배정이 없으면 사용자가 고른 포지션, 그것도 없으면 null */
+  position: Position | null;
+  /** 클라이언트가 포지션을 배정했는지. 블라인드·칼바람·사용자 설정은 false 라 화면에서 고르게 한다 */
+  positionAssigned: boolean;
+  myChampionId: number | null;
+  /** 내 픽을 확정했는지 */
+  locked: boolean;
+  todayPicks: TodayPicks | null;
+  counters: Counters | null;
+  runes: RuneRecommendation | null;
+  /** 지금 클라이언트에 들어간 페이지. 추천 순위(rank)면 숫자, 프로 룬이면 'pro:선수이름:챔피언id' */
+  applied: number | `pro:${string}` | null;
+  runeError: RuneApplyError | null;
+}
