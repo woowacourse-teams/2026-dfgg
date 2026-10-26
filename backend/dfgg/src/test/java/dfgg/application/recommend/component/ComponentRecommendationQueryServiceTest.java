@@ -80,8 +80,9 @@ class ComponentRecommendationQueryServiceTest {
         });
         assertThatThrownBy(() -> service.recommend(query(null, List.of(3), inventory, ChampionPosition.TOP, "16.18"), response))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Champion ID");
-        assertThatThrownBy(() -> service.recommend(query(81, List.of(3), inventory, ChampionPosition.TOP, "16.19"), response))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("조회표 패치");
+        var otherPatchLookup = new ComponentPolicyLookup("16.17", "a".repeat(64), Map.of(
+                new ComponentPolicyLookup.RoleKey(81, "TOP"), new ComponentPolicyLookup.Prepared(1062, .85)));
+        assertThat(new ComponentRecommendationService(model, otherPatchLookup).recommend(query, response)).isEqualTo(results);
     }
 
     @Test

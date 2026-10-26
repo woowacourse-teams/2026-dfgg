@@ -20,16 +20,15 @@ public class SituationalComponentConfiguration {
             @Value("${recommendation.situational.lookup-path:}") String path,
             @Value("${recommendation.situational.min-lift:2.0}") double minLift,
             @Value("${recommendation.situational.min-base-rate:0.01}") double minBaseRate,
-            ResourceLoader resources, LeagueOfLegendsVersionProperties version) {
+            ResourceLoader resources) {
         if (path.isBlank()) {
             log.info("Situational 조회표가 설정되지 않아 상황 대응 추천을 비활성화합니다.");
             return SituationalComponentRuntime.disabled();
         }
         try (var input = resources.getResource(path).getInputStream()) {
             var lookup = SituationalComponentLookupLoader.load(input.readAllBytes());
-            lookup.validatePatch(version.version());
             var thresholds = new SituationalThresholds(minLift, minBaseRate);
-            log.info("Situational 추천 준비 완료: patch={}, minLift={}, minBaseRate={}", version.version(), minLift, minBaseRate);
+            log.info("Situational 추천 준비 완료: patch={}, minLift={}, minBaseRate={}", lookup.patch(), minLift, minBaseRate);
             return SituationalComponentRuntime.available(lookup, thresholds);
         } catch (Exception exception) {
             log.error("Situational 추천 준비 실패: path={}. 상황 대응 추천을 비활성화합니다.", path, exception);

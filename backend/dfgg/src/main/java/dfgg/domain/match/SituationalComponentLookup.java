@@ -21,8 +21,8 @@ public final class SituationalComponentLookup {
         this.baseRates = Map.copyOf(baseRates);
     }
 
-    public void validatePatch(String operatingPatch) {
-        if (!patch.equals(operatingPatch)) throw new IllegalArgumentException("Situational 조회표 패치 불일치: " + patch);
+    public String patch() {
+        return patch;
     }
 
     /**
