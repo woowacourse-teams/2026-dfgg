@@ -5,6 +5,7 @@ export type TestEnv = {
   livePort?: number;
   riotCa?: string;
   ddragonUrl?: string;
+  fallbackDirs?: string[]; // 롤 설치 예비 경로. 테스트 중에는 빈 목록으로 두어 롤을 찾지 못하게 한다.
 };
 
 // 소켓
@@ -26,5 +27,6 @@ export function loadTestEnvFromProcess(isPackaged: boolean) {
     riotCa: caPath ? fs.readFileSync(caPath, 'utf-8') : undefined,
     livePort: Number(process.env.DFGG_LIVE_PORT) || undefined,
     ddragonUrl: process.env.DFGG_DRAGON_URL,
+    fallbackDirs: [],
   });
 }
