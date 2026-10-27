@@ -207,6 +207,30 @@ public class NormalizedMatchParticipantItemEvent {
         return purchaseOrder;
     }
 
+    public String getEventType() {
+        return eventType;
+    }
+
+    public Integer getFrameIndex() {
+        return frameIndex;
+    }
+
+    public Integer getEventIndex() {
+        return eventIndex;
+    }
+
+    public Integer getUndoBeforeItemId() {
+        return undoBeforeItemId;
+    }
+
+    public Integer getUndoAfterItemId() {
+        return undoAfterItemId;
+    }
+
+    public String getNormalizationVersion() {
+        return normalizationVersion;
+    }
+
     public Integer getItemId() {
         return itemId;
     }

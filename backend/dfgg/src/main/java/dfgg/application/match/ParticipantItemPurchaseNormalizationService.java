@@ -82,7 +82,7 @@ public class ParticipantItemPurchaseNormalizationService {
         }
         // 구매의 계산 결과와 전체 상태 변경 이벤트를 같은 테이블에 원자적으로 교체한다.
         eventRepository.deleteEventsByMatchId(matchId);
-        eventRepository.saveAllAndFlush(normalizedEvents);
+        eventRepository.insertAll(normalizedEvents);
         return purchases.size();
     }
 
