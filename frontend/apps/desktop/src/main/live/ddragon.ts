@@ -1,3 +1,4 @@
+import { getTestEnv } from '../testEnv';
 import type { DDragonChampionList, DDragonItemList, DDragonVersions } from './types';
 
 type DDragonData = {
@@ -9,9 +10,11 @@ type DDragonData = {
 
 let cache: Promise<DDragonData> | null = null;
 
+const ddragonUrl = () => getTestEnv()?.ddragonUrl ?? 'https://ddragon.leagueoflegends.com';
+
 async function fetchVersion(): Promise<DDragonVersions> {
   try {
-    const response = await fetch('https://ddragon.leagueoflegends.com/api/versions.json');
+    const response = await fetch(`${ddragonUrl()}/api/versions.json`);
     if (!response.ok) {
       throw new Error(`Ddragon version HTTP 에러! 상태 코드: ${response.status}`);
     }
@@ -25,9 +28,7 @@ async function fetchVersion(): Promise<DDragonVersions> {
 
 async function fetchChampionList(version: string): Promise<DDragonChampionList> {
   try {
-    const response = await fetch(
-      `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`,
-    );
+    const response = await fetch(`${ddragonUrl()}/cdn/${version}/data/en_US/champion.json`);
     if (!response.ok) {
       throw new Error(`Ddragon champion HTTP 에러! 상태 코드: ${response.status}`);
     }
@@ -43,9 +44,7 @@ async function fetchChampionList(version: string): Promise<DDragonChampionList> 
 // 아이템 정보 가져오기
 async function fetchItemList(version: string): Promise<DDragonItemList> {
   try {
-    const response = await fetch(
-      `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/item.json`,
-    );
+    const response = await fetch(`${ddragonUrl()}/cdn/${version}/data/en_US/item.json`);
     if (!response.ok) {
       throw new Error(`Ddragon champion HTTP 에러! 상태 코드: ${response.status}`);
     }

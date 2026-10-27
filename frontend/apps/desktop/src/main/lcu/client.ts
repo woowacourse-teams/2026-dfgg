@@ -1,6 +1,6 @@
 import { Lockfile } from '../../shared/types';
 import https from 'node:https';
-import { RIOT_ROOT_CERT } from './riotCert';
+import { riotCa } from './riotCert';
 
 const LCU_REQUEST_TIMEOUT_MS = 5000;
 
@@ -30,7 +30,7 @@ export function lcuRequest<T>(
             'Content-Length': Buffer.byteLength(payload),
           }),
         },
-        ca: RIOT_ROOT_CERT,
+        ca: riotCa(),
         timeout: LCU_REQUEST_TIMEOUT_MS,
       },
       (res) => {
