@@ -21,7 +21,8 @@
     "package": "pnpm build && electron-builder --win nsis",
     "package:store": "pnpm build && electron-builder --win appx",
     "package:all": "pnpm build && electron-builder --win nsis appx",
-    "package:publish": "pnpm build && electron-builder --win nsis --publish always"
+    "package:publish": "pnpm build && electron-builder --win nsis --publish always",
+    "typecheck:test": "tsc -p tsconfig.test.json"
   },
   "dependencies": {
     "electron-overlay-window": "^4.1.0",
