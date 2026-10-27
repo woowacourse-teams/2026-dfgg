@@ -43,7 +43,7 @@ class ChampionCounterRepositoryTest {
     @Test
     @Sql("/sql/champion-counter-test-data.sql")
     @DisplayName("적·라인의 카운터를 넣은 순서가 아니라 rank 오름차순으로 돌려준다")
-    void findByEnemyChampionIdAndPositionOrderByRankAsc_WhenInsertedOutOfOrder_ReturnByRank() {
+    void findByEnemiesAndPosition_WhenInsertedOutOfOrder_ReturnByRank() {
         // given: (적, 라인, rank) 유니크 인덱스를 타면 ORDER BY 없이도 rank 순으로 나온다.
         //        인덱스를 끄고 입력 순서(3·1·2위)대로 읽혀도 정렬되는지 본다. SET LOCAL은 이 테스트 트랜잭션에만 걸린다.
         jdbcTemplate.execute("SET LOCAL enable_indexscan = off");
@@ -52,7 +52,7 @@ class ChampionCounterRepositoryTest {
 
         // when
         List<ChampionCounter> counters =
-                counterRepository.findByEnemyChampionIdAndPositionOrderByRankAsc(AHRI, ChampionPosition.MID);
+                counterRepository.findByEnemiesAndPosition(List.of(AHRI), ChampionPosition.MID);
 
         // then
         assertThat(counters)
@@ -63,10 +63,10 @@ class ChampionCounterRepositoryTest {
     @Test
     @Sql("/sql/champion-counter-test-data.sql")
     @DisplayName("다른 라인이나 다른 적의 카운터는 섞이지 않는다")
-    void findByEnemyChampionIdAndPositionOrderByRankAsc_WhenOtherPositionOrEnemyExists_ExcludeThem() {
+    void findByEnemiesAndPosition_WhenOtherPositionOrEnemyExists_ExcludeThem() {
         // when
         List<ChampionCounter> counters =
-                counterRepository.findByEnemyChampionIdAndPositionOrderByRankAsc(AHRI, ChampionPosition.MID);
+                counterRepository.findByEnemiesAndPosition(List.of(AHRI), ChampionPosition.MID);
 
         // then
         assertThat(counters)
@@ -80,13 +80,27 @@ class ChampionCounterRepositoryTest {
     @Test
     @Sql("/sql/champion-counter-test-data.sql")
     @DisplayName("넣어 둔 데이터가 없는 적·라인이면 빈 목록이다")
-    void findByEnemyChampionIdAndPositionOrderByRankAsc_WhenNoData_ReturnEmpty() {
+    void findByEnemiesAndPosition_WhenNoData_ReturnEmpty() {
         // when
         List<ChampionCounter> counters =
-                counterRepository.findByEnemyChampionIdAndPositionOrderByRankAsc(ZED, ChampionPosition.TOP);
+                counterRepository.findByEnemiesAndPosition(List.of(ZED), ChampionPosition.TOP);
 
         // then
         assertThat(counters).isEmpty();
+    }
+
+    @Test
+    @Sql("/sql/champion-counter-test-data.sql")
+    @DisplayName("여러 적의 카운터를 한 번에 읽고, 적마다 rank 순으로 묶어 돌려준다")
+    void findByEnemiesAndPosition_WhenSeveralEnemies_ReturnAllGroupedByEnemyInRankOrder() {
+        // when
+        List<ChampionCounter> counters =
+                counterRepository.findByEnemiesAndPosition(List.of(ZED, AHRI), ChampionPosition.MID);
+
+        // then
+        assertThat(counters)
+                .extracting(ChampionCounter::getEnemyChampionId, ChampionCounter::getRank)
+                .containsExactly(tuple(AHRI, 1), tuple(AHRI, 2), tuple(AHRI, 3), tuple(ZED, 1));
     }
 
     @Test

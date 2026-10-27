@@ -3,7 +3,6 @@ package dfgg.application.counter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willAnswer;
@@ -21,6 +20,7 @@ import dfgg.presentation.dto.request.CounterRequest;
 import dfgg.presentation.dto.response.CounterResponse;
 import dfgg.presentation.dto.response.CounterResponse.CounterPickResponse;
 import dfgg.presentation.dto.response.CounterResponse.EnemyCounterResponse;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
@@ -138,7 +138,7 @@ class CounterServiceTest {
     void recommend_WhenSevenCountersStored_ReturnFirstFiveForMyPosition() {
         // given
         List<ChampionCounter> stored = counters(AHRI, ChampionPosition.MID, 1, 2, 3, 4, 5, 6, 7);
-        given(counterRepository.findByEnemyChampionIdAndPositionOrderByRankAsc(AHRI, ChampionPosition.MID))
+        given(counterRepository.findByEnemiesAndPosition(anyCollection(), eq(ChampionPosition.MID)))
                 .willReturn(stored);
         CounterRequest request = new CounterRequest(ChampionPosition.MID, List.of(AHRI), List.of(), List.of());
 
@@ -155,7 +155,7 @@ class CounterServiceTest {
     void recommend_WhenCountersAlreadyTaken_SkipAndFillWithNext() {
         // given
         List<ChampionCounter> stored = counters(AHRI, ChampionPosition.MID, LEE_SIN, 1, DARIUS, 2, YASUO, 3, 4);
-        given(counterRepository.findByEnemyChampionIdAndPositionOrderByRankAsc(AHRI, ChampionPosition.MID))
+        given(counterRepository.findByEnemiesAndPosition(anyCollection(), eq(ChampionPosition.MID)))
                 .willReturn(stored);
         CounterRequest request = new CounterRequest(ChampionPosition.MID, List.of(AHRI, DARIUS),
                 List.of(LEE_SIN), List.of(YASUO));
@@ -174,7 +174,7 @@ class CounterServiceTest {
         // given
         int unregistered = 777;
         List<ChampionCounter> stored = counters(AHRI, ChampionPosition.MID, 1, unregistered, 2, 3, 4, 5, 6);
-        given(counterRepository.findByEnemyChampionIdAndPositionOrderByRankAsc(AHRI, ChampionPosition.MID))
+        given(counterRepository.findByEnemiesAndPosition(anyCollection(), eq(ChampionPosition.MID)))
                 .willReturn(stored);
         willAnswer(invocation -> {
             Iterable<Long> ids = invocation.getArgument(0);
@@ -197,10 +197,31 @@ class CounterServiceTest {
     }
 
     @Test
+    @DisplayName("여러 적의 카운터를 한 번에 받아도 적마다 자기 카운터만 담는다")
+    void recommend_WhenCountersOfSeveralEnemiesLoadedTogether_SplitByEnemy() {
+        // given
+        List<ChampionCounter> stored = new ArrayList<>(counters(AHRI, ChampionPosition.MID, 1, 2));
+        stored.addAll(counters(DARIUS, ChampionPosition.MID, 3));
+        given(counterRepository.findByEnemiesAndPosition(anyCollection(), eq(ChampionPosition.MID)))
+                .willReturn(stored);
+        CounterRequest request = new CounterRequest(ChampionPosition.MID, List.of(AHRI, DARIUS), List.of(), List.of());
+
+        // when
+        CounterResponse response = counterService.recommend(request, Language.KO_KR);
+
+        // then
+        assertThat(response.enemies()).extracting(EnemyCounterResponse::championId).containsExactly(AHRI, DARIUS);
+        assertThat(response.enemies().get(0).counters()).extracting(CounterPickResponse::championId)
+                .containsExactly(1, 2);
+        assertThat(response.enemies().get(1).counters()).extracting(CounterPickResponse::championId)
+                .containsExactly(3);
+    }
+
+    @Test
     @DisplayName("넣어 둔 카운터가 없으면 빈 목록이다")
     void recommend_WhenNoCounterStored_ReturnEmptyCounters() {
         // given
-        given(counterRepository.findByEnemyChampionIdAndPositionOrderByRankAsc(anyInt(), any())).willReturn(List.of());
+        given(counterRepository.findByEnemiesAndPosition(anyCollection(), any())).willReturn(List.of());
         CounterRequest request = new CounterRequest(ChampionPosition.MID, List.of(DARIUS), List.of(), List.of());
 
         // when
@@ -215,7 +236,7 @@ class CounterServiceTest {
     void recommend_WhenLanguageGiven_UseLocalizedNames() {
         // given
         List<ChampionCounter> stored = counters(AHRI, ChampionPosition.MID, 90);
-        given(counterRepository.findByEnemyChampionIdAndPositionOrderByRankAsc(AHRI, ChampionPosition.MID))
+        given(counterRepository.findByEnemiesAndPosition(anyCollection(), eq(ChampionPosition.MID)))
                 .willReturn(stored);
         CounterRequest request = new CounterRequest(ChampionPosition.MID, List.of(AHRI), List.of(), List.of());
 

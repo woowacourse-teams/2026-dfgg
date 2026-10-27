@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
@@ -121,16 +120,19 @@ public class CounterService {
                 .toList();
     }
 
-    /** 아군·적·밴에 있는 챔피언을 뺀 카운터 후보를 저장 순서대로 모은다. 개수는 이름을 확인한 뒤 자른다. */
+    /**
+     * 아군·적·밴에 있는 챔피언을 뺀 카운터 후보를 적마다 저장 순서대로 모은다. 개수는 이름을 확인한 뒤 자른다.
+     * 모든 적의 카운터를 한 번에 읽는다 — 적마다 따로 읽으면 적 수만큼 쿼리가 는다.
+     */
     private Map<Integer, List<Integer>> countersByEnemy(CounterRequest request) {
         Set<Integer> taken = takenChampions(request);
-        return request.enemies().stream()
-                .distinct()
-                .collect(Collectors.toMap(Function.identity(), enemyId -> counterRepository
-                        .findByEnemyChampionIdAndPositionOrderByRankAsc(enemyId, request.myPosition()).stream()
-                        .map(ChampionCounter::getCounterChampionId)
-                        .filter(counterId -> !taken.contains(counterId))
-                        .toList()));
+        Map<Integer, List<Integer>> counters = counterRepository
+                .findByEnemiesAndPosition(request.enemies(), request.myPosition()).stream()
+                .filter(counter -> !taken.contains(counter.getCounterChampionId()))
+                .collect(Collectors.groupingBy(ChampionCounter::getEnemyChampionId,
+                        Collectors.mapping(ChampionCounter::getCounterChampionId, Collectors.toList())));
+        request.enemies().forEach(enemyId -> counters.putIfAbsent(enemyId, List.of()));
+        return counters;
     }
 
     private Set<Integer> takenChampions(CounterRequest request) {
