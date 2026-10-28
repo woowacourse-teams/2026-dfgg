@@ -1,9 +1,7 @@
 package dfgg.domain.propick;
 
 import dfgg.domain.champion.ChampionPosition;
-import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -13,22 +11,26 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import org.hibernate.annotations.BatchSize;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.ToIntFunction;
+import java.util.stream.IntStream;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
- * 대회 경기에서 선수 한 명의 픽. 주문·아이템·룬은 칸 순서가 있는 자식 행이다.
- * 자식 컬렉션은 픽 묶음 단위로 한 번에 읽는다 ({@link BatchSize}) — 픽마다 따로 읽지 않는다.
+ * 대회 경기에서 선수 한 명의 픽. 주문·아이템·룬은 픽 행의 배열 컬럼이고 배열 위치가 칸 번호다(빈 칸은 null).
  */
 @Entity
 @Table(name = "pro_picks")
 public class ProPick {
 
-    private static final int CHILD_BATCH_SIZE = 500;
+    private static final int SPELL_SLOTS = 2;
+    private static final int ITEM_SLOTS = 7;
+    private static final int RUNE_SLOTS = 9;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -65,23 +67,17 @@ public class ProPick {
     @Column(nullable = false)
     private boolean win;
 
-    @ElementCollection
-    @CollectionTable(name = "pro_pick_spells", joinColumns = @JoinColumn(name = "pick_id"))
-    @OrderBy("slot")
-    @BatchSize(size = CHILD_BATCH_SIZE)
-    private List<ProPickSpell> spells = new ArrayList<>();
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "spell_ids", nullable = false)
+    private Integer[] spellIds = new Integer[SPELL_SLOTS];
 
-    @ElementCollection
-    @CollectionTable(name = "pro_pick_items", joinColumns = @JoinColumn(name = "pick_id"))
-    @OrderBy("slot")
-    @BatchSize(size = CHILD_BATCH_SIZE)
-    private List<ProPickItem> items = new ArrayList<>();
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "item_ids", nullable = false)
+    private Long[] itemIds = new Long[ITEM_SLOTS];
 
-    @ElementCollection
-    @CollectionTable(name = "pro_pick_runes", joinColumns = @JoinColumn(name = "pick_id"))
-    @OrderBy("slot")
-    @BatchSize(size = CHILD_BATCH_SIZE)
-    private List<ProPickRune> runes = new ArrayList<>();
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "rune_ids", nullable = false)
+    private Integer[] runeIds = new Integer[RUNE_SLOTS];
 
     protected ProPick() {
     }
@@ -92,7 +88,7 @@ public class ProPick {
         this.sourceGameId = sourceGameId;
     }
 
-    /** 다시 수집하면 경기 정보를 덮어쓰고 주문·아이템·룬 자식 행은 지우고 다시 넣는다. */
+    /** 다시 수집하면 경기 정보와 주문·아이템·룬 배열을 통째로 덮어쓴다. */
     public void update(ProTournament tournament, OffsetDateTime playedAt, String team, ProPickSide side,
                        ChampionPosition position, Long championId, boolean win,
                        List<ProPickSpell> spells, List<ProPickItem> items, List<ProPickRune> runes) {
@@ -103,12 +99,14 @@ public class ProPick {
         this.position = position;
         this.championId = championId;
         this.win = win;
-        this.spells.clear();
-        this.spells.addAll(spells);
-        this.items.clear();
-        this.items.addAll(items);
-        this.runes.clear();
-        this.runes.addAll(runes);
+        this.spellIds = toSlots(spells, new Integer[SPELL_SLOTS], ProPickSpell::getSlot, ProPickSpell::getSpellId);
+        this.itemIds = toSlots(items, new Long[ITEM_SLOTS], ProPickItem::getSlot, ProPickItem::getItemId);
+        this.runeIds = toSlots(runes, new Integer[RUNE_SLOTS], ProPickRune::getSlot, ProPickRune::getRuneId);
+    }
+
+    private static <T, V> V[] toSlots(List<T> values, V[] slots, ToIntFunction<T> slotOf, Function<T, V> idOf) {
+        values.forEach(value -> slots[slotOf.applyAsInt(value)] = idOf.apply(value));
+        return slots;
     }
 
     public Long getId() {
@@ -151,15 +149,23 @@ public class ProPick {
         return win;
     }
 
+    /** 채워진 칸만 칸 순서로 돌려준다. */
     public List<ProPickSpell> getSpells() {
-        return List.copyOf(spells);
+        return filledSlots(spellIds, ProPickSpell::new);
     }
 
     public List<ProPickItem> getItems() {
-        return List.copyOf(items);
+        return filledSlots(itemIds, ProPickItem::new);
     }
 
     public List<ProPickRune> getRunes() {
-        return List.copyOf(runes);
+        return filledSlots(runeIds, ProPickRune::new);
+    }
+
+    private static <V, R> List<R> filledSlots(V[] slots, BiFunction<Integer, V, R> slotValue) {
+        return IntStream.range(0, slots.length)
+                .filter(slot -> slots[slot] != null)
+                .mapToObj(slot -> slotValue.apply(slot, slots[slot]))
+                .toList();
     }
 }

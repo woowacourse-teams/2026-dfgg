@@ -3,7 +3,7 @@
 -- 대회 1 MID: 픽 101(10-25), 102(10-27), 103(10-26)   ← 조회 대상, played_at 내림차순이면 102·103·101
 -- 대회 1 TOP: 픽 104                                   ← 다른 라인
 -- 대회 2 MID: 픽 105                                   ← 다른 대회
--- 픽 102의 자식 행은 칸 순서와 다르게 넣는다. 아이템 0번 칸은 비어 있다(행 없음).
+-- 주문 2칸·아이템 7칸·룬 9칸 배열이고 배열 위치 = 칸 + 1. 빈 칸은 NULL이다(픽 102의 아이템 0번 칸 등).
 DELETE FROM pro_picks;
 DELETE FROM pro_players;
 DELETE FROM pro_tournaments;
@@ -35,23 +35,15 @@ INSERT INTO pro_players (id, leaguepedia_page, name, team, image_url, updated_at
     (2, 'Chovy', 'Chovy', 'Gen.G', NULL, '2026-10-22 00:00:00+00'),
     (3, 'Zeus', 'Zeus', 'Hanwha Life Esports', NULL, '2026-10-22 00:00:00+00');
 INSERT INTO pro_picks (id, tournament_id, player_id, source_game_id, played_at, team, side, position, champion_id,
-                       win)
+                       win, spell_ids, item_ids, rune_ids)
 VALUES
-    (101, 1, 1, 'g1', '2026-10-25 08:00:00+00', 'T1', 'BLUE', 'MID', 9001, true),
-    (102, 1, 2, 'g2', '2026-10-27 08:00:00+00', 'Gen.G', 'RED', 'MID', 9001, false),
-    (103, 1, 1, 'g3', '2026-10-26 08:00:00+00', 'T1', 'RED', 'MID', 9001, true),
-    (104, 1, 3, 'g1', '2026-10-25 08:00:00+00', 'Hanwha Life Esports', 'BLUE', 'TOP', 9001, true),
-    (105, 2, 2, 'g9', '2026-10-28 08:00:00+00', 'Gen.G', 'BLUE', 'MID', 9001, true);
-
-INSERT INTO pro_pick_spells (pick_id, slot, spell_id) VALUES
-    (102, 1, 9002), (102, 0, 9001),
-    (101, 0, 9001), (101, 1, 9002),
-    (103, 0, 9002), (103, 1, 9001);
-INSERT INTO pro_pick_items (pick_id, slot, item_id) VALUES
-    (102, 6, 9003), (102, 2, 9002), (102, 1, 9001),
-    (101, 0, 9001),
-    (103, 0, 9002);
-INSERT INTO pro_pick_runes (pick_id, slot, rune_id) VALUES
-    (102, 8, 9002), (102, 0, 9001), (102, 4, 9002), (102, 1, 9002),
-    (101, 0, 9001),
-    (103, 0, 9001);
+    (101, 1, 1, 'g1', '2026-10-25 08:00:00+00', 'T1', 'BLUE', 'MID', 9001, true,
+        '{9001,9002}', '{9001,NULL,NULL,NULL,NULL,NULL,NULL}', '{9001,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL}'),
+    (102, 1, 2, 'g2', '2026-10-27 08:00:00+00', 'Gen.G', 'RED', 'MID', 9001, false,
+        '{9001,9002}', '{NULL,9001,9002,NULL,NULL,NULL,9003}', '{9001,9002,NULL,NULL,9002,NULL,NULL,NULL,9002}'),
+    (103, 1, 1, 'g3', '2026-10-26 08:00:00+00', 'T1', 'RED', 'MID', 9001, true,
+        '{9002,9001}', '{9002,NULL,NULL,NULL,NULL,NULL,NULL}', '{9001,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL}'),
+    (104, 1, 3, 'g1', '2026-10-25 08:00:00+00', 'Hanwha Life Esports', 'BLUE', 'TOP', 9001, true,
+        '{NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL}'),
+    (105, 2, 2, 'g9', '2026-10-28 08:00:00+00', 'Gen.G', 'BLUE', 'MID', 9001, true,
+        '{NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL}');

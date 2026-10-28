@@ -27,6 +27,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,11 +38,12 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 
-@DataJpaTest
+@DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({ProPickCollectionService.class, ProPickWriter.class, ProMetadataService.class, ProPickRowConverter.class,
@@ -71,6 +74,9 @@ class ProPickCollectionServiceTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
@@ -135,6 +141,48 @@ class ProPickCollectionServiceTest {
         assertThat(faker.getChampionId()).isEqualTo(9002L);
         assertThat(faker.getItems()).extracting(ProPickItem::getSlot, ProPickItem::getItemId)
                 .containsExactly(tuple(1, 9001L));
+    }
+
+    @Test
+    @DisplayName("다시 수집해 칸이 바뀌면 픽 행 하나만 고친다 — 빈 칸은 배열 안의 NULL이 되고 다른 행은 넣거나 지우지 않는다")
+    void collect_WhenSlotsChange_UpdateOnlyPickRow() {
+        // given
+        given(scoreboardSource.fetchLeague(LCK, SINCE)).willReturn(
+                List.of(row("g1", LCK_PLAYOFFS, "Faker", "1", "Test Champion", "Item 1;Item 2")),
+                List.of(row("g1", LCK_PLAYOFFS, "Faker", "1", "Test Champion", ";Item 1")));
+        collectionService.collect();
+        flushAndClear();
+        Statistics statistics = statistics();
+
+        // when
+        collectionService.collect();
+        flushAndClear();
+
+        // then
+        assertThat(statistics.getEntityUpdateCount()).isEqualTo(1);
+        assertThat(statistics.getEntityInsertCount()).isZero();
+        assertThat(statistics.getEntityDeleteCount()).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT item_ids::text FROM pro_picks WHERE source_game_id = 'g1'",
+                String.class)).isEqualTo("{NULL,9001,NULL,NULL,NULL,NULL,NULL}");
+    }
+
+    @Test
+    @DisplayName("같은 내용으로 다시 수집하면 아무것도 쓰지 않는다 — 배열을 새로 만들어도 값이 같으면 바뀐 것으로 보지 않는다")
+    void collect_WhenRunTwiceWithSameRows_WriteNothing() {
+        // given
+        given(scoreboardSource.fetchLeague(LCK, SINCE)).willReturn(
+                List.of(row("g1", LCK_PLAYOFFS, "Faker", "1", "Test Champion", "Item 1;Item 2")));
+        collectionService.collect();
+        flushAndClear();
+        Statistics statistics = statistics();
+
+        // when
+        collectionService.collect();
+        flushAndClear();
+
+        // then
+        assertThat(statistics.getEntityUpdateCount()).isZero();
+        assertThat(statistics.getEntityInsertCount()).isZero();
     }
 
     @Test
@@ -215,6 +263,12 @@ class ProPickCollectionServiceTest {
                         && pick.getPlayer().getLeaguepediaPage().equals(playerPage))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private Statistics statistics() {
+        Statistics statistics = entityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+        return statistics;
     }
 
     private void flushAndClear() {

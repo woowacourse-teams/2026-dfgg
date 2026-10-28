@@ -2,7 +2,8 @@
 --
 -- 대회 1 (최근: 마지막 경기 10-27)  MID 201 Faker 9001 · MID 202 Chovy 9002 · TOP 203 Zeus 9001
 -- 대회 2 (예전: 마지막 경기 10-20)  MID 204 Faker 9002            ← 최근 대회가 아니라 뽑히지 않는다
--- 픽 201: 주문 점멸·점화, 아이템 0번·장신구, 룬 핵심·주 1·보조 1·파편 2 (5008·5011 파편은 아래에서 넣는다)
+-- 픽 201: 주문 점멸·점화, 아이템 0번·장신구, 룬 핵심·주 1·보조 1·파편 2. 다른 픽은 모든 칸이 비어 있다(NULL).
+-- 주문 2칸·아이템 7칸·룬 9칸 배열이고 배열 위치 = 칸 + 1.
 DELETE FROM pro_picks;
 DELETE FROM pro_players;
 DELETE FROM pro_tournaments;
@@ -38,14 +39,13 @@ INSERT INTO pro_players (id, leaguepedia_page, name, team, image_url, updated_at
     (2, 'Chovy', 'Chovy', 'Gen.G', NULL, '2026-10-22 00:00:00+00'),
     (3, 'Zeus', 'Zeus', 'Hanwha Life Esports', NULL, '2026-10-22 00:00:00+00');
 INSERT INTO pro_picks (id, tournament_id, player_id, source_game_id, played_at, team, side, position, champion_id,
-                       win)
+                       win, spell_ids, item_ids, rune_ids)
 VALUES
-    (201, 1, 1, 'w1', '2026-10-27 08:00:00+00', 'T1', 'BLUE', 'MID', 9001, true),
-    (202, 1, 2, 'w1', '2026-10-27 08:00:00+00', 'Gen.G', 'RED', 'MID', 9002, false),
-    (203, 1, 3, 'w2', '2026-10-26 08:00:00+00', 'Hanwha Life Esports', 'BLUE', 'TOP', 9001, true),
-    (204, 2, 1, 'l1', '2026-10-20 08:00:00+00', 'T1', 'BLUE', 'MID', 9002, true);
-
-INSERT INTO pro_pick_spells (pick_id, slot, spell_id) VALUES (201, 0, 9001), (201, 1, 9002);
-INSERT INTO pro_pick_items (pick_id, slot, item_id) VALUES (201, 6, 9002), (201, 0, 9001);
-INSERT INTO pro_pick_runes (pick_id, slot, rune_id) VALUES
-    (201, 0, 9001), (201, 1, 9002), (201, 4, 9101), (201, 6, 5008), (201, 8, 5011);
+    (201, 1, 1, 'w1', '2026-10-27 08:00:00+00', 'T1', 'BLUE', 'MID', 9001, true,
+        '{9001,9002}', '{9001,NULL,NULL,NULL,NULL,NULL,9002}', '{9001,9002,NULL,NULL,9101,NULL,5008,NULL,5011}'),
+    (202, 1, 2, 'w1', '2026-10-27 08:00:00+00', 'Gen.G', 'RED', 'MID', 9002, false,
+        '{NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL}'),
+    (203, 1, 3, 'w2', '2026-10-26 08:00:00+00', 'Hanwha Life Esports', 'BLUE', 'TOP', 9001, true,
+        '{NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL}'),
+    (204, 2, 1, 'l1', '2026-10-20 08:00:00+00', 'T1', 'BLUE', 'MID', 9002, true,
+        '{NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL}');

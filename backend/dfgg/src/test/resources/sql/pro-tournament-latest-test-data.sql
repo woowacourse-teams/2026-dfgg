@@ -19,7 +19,11 @@ INSERT INTO pro_tournaments (id, overview_page, name, league, region, start_date
         '2026-11-08', NULL);
 INSERT INTO pro_players (id, leaguepedia_page, name, team, image_url, updated_at) VALUES
     (1, 'Faker', 'Faker', 'T1', NULL, '2026-10-22 00:00:00+00');
-INSERT INTO pro_picks (tournament_id, player_id, source_game_id, played_at, team, side, position, champion_id, win)
+-- 주문·아이템·룬은 이 조회와 상관없어 모든 칸을 비워 둔다(NULL).
+INSERT INTO pro_picks (tournament_id, player_id, source_game_id, played_at, team, side, position, champion_id, win,
+                       spell_ids, item_ids, rune_ids)
 VALUES
-    (1, 1, 'worlds-game', '2026-10-25 08:00:00+00', 'T1', 'BLUE', 'MID', 9001, true),
-    (2, 1, 'lck-game', '2026-10-26 08:00:00+00', 'T1', 'RED', 'MID', 9001, false);
+    (1, 1, 'worlds-game', '2026-10-25 08:00:00+00', 'T1', 'BLUE', 'MID', 9001, true,
+        '{NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL}'),
+    (2, 1, 'lck-game', '2026-10-26 08:00:00+00', 'T1', 'RED', 'MID', 9001, false,
+        '{NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL}', '{NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL}');

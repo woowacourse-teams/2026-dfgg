@@ -20,10 +20,13 @@ import dfgg.presentation.dto.response.TodayPickResponse.EntryResponse;
 import dfgg.presentation.dto.response.TodayPickResponse.PickResponse;
 import dfgg.presentation.dto.response.TodayPickResponse.RunesResponse;
 import dfgg.presentation.dto.response.TodayPickResponse.TreeResponse;
+import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,7 +37,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 
-@DataJpaTest
+@DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Sql("/sql/today-pick-test-data.sql")
@@ -62,6 +65,9 @@ class TodayPickServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private EntityManager entityManager;
 
     private TodayPickService todayPickService;
 
@@ -227,6 +233,30 @@ class TodayPickServiceTest {
                 Language.KO_KR))
                 .isInstanceOf(ChampionNotFoundException.class)
                 .hasMessageContaining("99999");
+    }
+
+    @Test
+    @DisplayName("후보 픽이 많아도 쿼리 7번으로 끝난다 — 최근 대회·픽(선수·대회·주문·아이템·룬) 각 1번과 카탈로그 5번")
+    void recommend_WhenManyCandidates_UseSevenQueries() {
+        // given
+        jdbcTemplate.update("""
+                INSERT INTO pro_picks (tournament_id, player_id, source_game_id, played_at, team, side, position,
+                                       champion_id, win, spell_ids, item_ids, rune_ids)
+                SELECT 1, 2, 'extra' || n, '2026-10-26 08:00:00+00', 'Gen.G', 'RED', 'MID', 9002, true,
+                       '{9001,9002}', '{9001,NULL,NULL,NULL,NULL,NULL,9002}',
+                       '{9001,9002,NULL,NULL,9101,NULL,5008,NULL,5011}'
+                FROM generate_series(1, 30) n
+                """);
+        entityManager.clear();
+        Statistics statistics = entityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        // when
+        TodayPickResponse response = todayPickService.recommend(ChampionPosition.MID, List.of(), Language.KO_KR);
+
+        // then
+        assertThat(response.picks()).isNotEmpty();
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(7);
     }
 
     private PickResponse fakerPick(Language language) {

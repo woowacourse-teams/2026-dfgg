@@ -63,8 +63,8 @@ class ProPickRepositoryTest {
     }
 
     @Test
-    @DisplayName("주문·아이템·룬은 넣은 순서가 아니라 칸 순서로 읽고, 빈 칸은 행이 없다")
-    void findByTournamentAndPosition_WhenChildrenInsertedOutOfOrder_ReturnBySlot() {
+    @DisplayName("주문·아이템·룬 배열을 칸 순서로 읽고, 빈 칸(NULL)은 빠진다")
+    void findByTournamentAndPosition_WhenSlotArraysHaveEmptySlots_ReturnFilledSlotsInOrder() {
         // when
         ProPick chovy = pickRepository.findByTournamentAndPosition(WORLDS, ChampionPosition.MID).getFirst();
 
@@ -78,8 +78,8 @@ class ProPickRepositoryTest {
     }
 
     @Test
-    @DisplayName("픽 수와 상관없이 픽·주문·아이템·룬 네 번의 쿼리로 읽는다 (N+1 없음)")
-    void findByTournamentAndPosition_WhenReadingAllRelations_UseFourQueries() {
+    @DisplayName("픽 수와 상관없이 쿼리 한 번으로 선수·대회·주문·아이템·룬까지 읽는다")
+    void findByTournamentAndPosition_WhenReadingAllRelations_UseOneQuery() {
         // given
         entityManager.clear();
         Statistics statistics = entityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
@@ -97,7 +97,7 @@ class ProPickRepositoryTest {
 
         // then
         assertThat(picks).hasSize(3);
-        assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
     }
 
     @Test
