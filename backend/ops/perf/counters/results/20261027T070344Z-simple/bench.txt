@@ -1,0 +1,117 @@
+== before enemies=1 c=1 round=1
+tps = 197.958233 (without initial connection time)
+p50 4.86 ms  p95 5.47 ms  p99 8.44 ms  (n=2965)
+== batched enemies=1 c=1 round=1
+tps = 179.494731 (without initial connection time)
+p50 5.19 ms  p95 7.37 ms  p99 12.90 ms  (n=2683)
+== denorm enemies=1 c=1 round=1
+tps = 520.719148 (without initial connection time)
+p50 1.83 ms  p95 2.18 ms  p99 3.62 ms  (n=7800)
+== before enemies=1 c=1 round=2
+tps = 193.084994 (without initial connection time)
+p50 4.95 ms  p95 5.90 ms  p99 10.57 ms  (n=2893)
+== batched enemies=1 c=1 round=2
+tps = 195.543177 (without initial connection time)
+p50 4.93 ms  p95 5.65 ms  p99 8.05 ms  (n=2930)
+== denorm enemies=1 c=1 round=2
+tps = 523.395666 (without initial connection time)
+p50 1.86 ms  p95 2.15 ms  p99 2.63 ms  (n=7839)
+== before enemies=1 c=1 round=3
+tps = 194.255031 (without initial connection time)
+p50 4.96 ms  p95 5.75 ms  p99 8.65 ms  (n=2910)
+== batched enemies=1 c=1 round=3
+tps = 195.219791 (without initial connection time)
+p50 4.85 ms  p95 5.81 ms  p99 11.45 ms  (n=2925)
+== denorm enemies=1 c=1 round=3
+tps = 516.167037 (without initial connection time)
+p50 1.84 ms  p95 2.10 ms  p99 2.94 ms  (n=7732)
+== before enemies=1 c=8 round=1
+tps = 1306.360484 (without initial connection time)
+p50 5.74 ms  p95 7.44 ms  p99 14.07 ms  (n=19543)
+== batched enemies=1 c=8 round=1
+tps = 1339.231773 (without initial connection time)
+p50 5.64 ms  p95 7.08 ms  p99 12.61 ms  (n=20006)
+== denorm enemies=1 c=8 round=1
+tps = 3909.137229 (without initial connection time)
+p50 1.91 ms  p95 2.46 ms  p99 5.05 ms  (n=58431)
+== before enemies=1 c=8 round=2
+tps = 1328.177002 (without initial connection time)
+p50 5.57 ms  p95 7.21 ms  p99 13.57 ms  (n=19852)
+== batched enemies=1 c=8 round=2
+tps = 1311.225756 (without initial connection time)
+p50 5.78 ms  p95 7.41 ms  p99 13.41 ms  (n=19576)
+== denorm enemies=1 c=8 round=2
+tps = 3980.375289 (without initial connection time)
+p50 1.91 ms  p95 2.33 ms  p99 3.73 ms  (n=59469)
+== before enemies=1 c=8 round=3
+tps = 1331.857696 (without initial connection time)
+p50 5.60 ms  p95 7.29 ms  p99 15.91 ms  (n=19919)
+== batched enemies=1 c=8 round=3
+tps = 1338.989028 (without initial connection time)
+p50 5.61 ms  p95 7.15 ms  p99 14.82 ms  (n=20013)
+== denorm enemies=1 c=8 round=3
+tps = 3867.503825 (without initial connection time)
+p50 1.95 ms  p95 2.48 ms  p99 4.07 ms  (n=57782)
+== before enemies=5 c=1 round=1
+tps = 110.418308 (without initial connection time)
+p50 8.86 ms  p95 9.92 ms  p99 14.30 ms  (n=1654)
+== batched enemies=5 c=1 round=1
+tps = 188.425671 (without initial connection time)
+p50 5.08 ms  p95 5.80 ms  p99 10.54 ms  (n=2823)
+== denorm enemies=5 c=1 round=1
+tps = 487.934273 (without initial connection time)
+p50 1.94 ms  p95 2.59 ms  p99 3.52 ms  (n=7310)
+== before enemies=5 c=1 round=2
+tps = 104.554867 (without initial connection time)
+p50 9.09 ms  p95 11.46 ms  p99 17.43 ms  (n=1566)
+== batched enemies=5 c=1 round=2
+tps = 182.882199 (without initial connection time)
+p50 5.26 ms  p95 6.35 ms  p99 9.97 ms  (n=2740)
+== denorm enemies=5 c=1 round=2
+tps = 494.203044 (without initial connection time)
+p50 1.93 ms  p95 2.30 ms  p99 3.65 ms  (n=7403)
+== before enemies=5 c=1 round=3
+tps = 110.730928 (without initial connection time)
+p50 8.67 ms  p95 10.32 ms  p99 16.21 ms  (n=1659)
+== batched enemies=5 c=1 round=3
+tps = 187.458580 (without initial connection time)
+p50 5.17 ms  p95 5.90 ms  p99 8.64 ms  (n=2808)
+== denorm enemies=5 c=1 round=3
+tps = 510.998244 (without initial connection time)
+p50 1.91 ms  p95 2.19 ms  p99 2.69 ms  (n=7655)
+== before enemies=5 c=8 round=1
+tps = 693.449501 (without initial connection time)
+p50 10.65 ms  p95 15.45 ms  p99 29.08 ms  (n=10367)
+== batched enemies=5 c=8 round=1
+tps = 1101.418663 (without initial connection time)
+p50 6.68 ms  p95 9.61 ms  p99 18.87 ms  (n=16469)
+== denorm enemies=5 c=8 round=1
+tps = 3485.183833 (without initial connection time)
+p50 2.17 ms  p95 2.73 ms  p99 4.43 ms  (n=52033)
+== before enemies=5 c=8 round=2
+tps = 729.030071 (without initial connection time)
+p50 10.54 ms  p95 12.91 ms  p99 21.93 ms  (n=10885)
+== batched enemies=5 c=8 round=2
+tps = 1140.683495 (without initial connection time)
+p50 6.52 ms  p95 8.88 ms  p99 18.55 ms  (n=17049)
+== denorm enemies=5 c=8 round=2
+tps = 3487.722346 (without initial connection time)
+p50 2.14 ms  p95 2.80 ms  p99 5.78 ms  (n=52124)
+== before enemies=5 c=8 round=3
+tps = 731.763608 (without initial connection time)
+p50 10.37 ms  p95 12.98 ms  p99 23.42 ms  (n=10945)
+== batched enemies=5 c=8 round=3
+tps = 1159.041315 (without initial connection time)
+p50 6.57 ms  p95 8.69 ms  p99 12.98 ms  (n=17336)
+== denorm enemies=5 c=8 round=3
+tps = 3427.591486 (without initial connection time)
+p50 2.14 ms  p95 2.83 ms  p99 6.79 ms  (n=51203)
+== ping enemies=0 c=1 round=1
+tps = 1208.758938 (without initial connection time)
+p50 0.80 ms  p95 0.93 ms  p99 1.11 ms  (n=18103)
+== ping enemies=0 c=1 round=2
+tps = 1208.188229 (without initial connection time)
+p50 0.79 ms  p95 0.92 ms  p99 1.13 ms  (n=18098)
+== ping enemies=0 c=1 round=3
+tps = 1234.255778 (without initial connection time)
+p50 0.79 ms  p95 0.90 ms  p99 1.01 ms  (n=18488)

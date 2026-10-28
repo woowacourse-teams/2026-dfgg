@@ -1,0 +1,5 @@
+source: 127.0.0.1:5432/dfgg_db_prod (picks=1080)
+client: 4a6c7d6b1d34
+server: 16.14 (Debian 16.14-1.pgdg13+1)
+copies: 23  duration: 1s
+실행 계획·건수 확인용(측정 1초, 지연 값은 버림). 지연은 2026-10-25 측정값을 쓴다.

@@ -1,0 +1,14 @@
+ tournaments | players | picks | spells | items  | runes  | flat_rows | normalized_size | flat_size 
+-------------+---------+-------+--------+--------+--------+-----------+-----------------+-----------
+         156 |      21 | 25600 |  51200 | 128000 | 230400 |     25600 | 40 MB           | 13 MB
+(1 row)
+
+ position | candidates 
+----------+------------
+ BOTTOM   |        160
+ JUNGLE   |        160
+ MID      |        160
+ SUPPORT  |        160
+ TOP      |        160
+(5 rows)
+

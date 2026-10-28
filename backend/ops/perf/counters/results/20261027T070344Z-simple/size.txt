@@ -1,0 +1,6 @@
+ counters | position_stats | champions | counter_view_rows | normalized_size | denorm_size 
+----------+----------------+-----------+-------------------+-----------------+-------------
+     1799 |            624 |       173 |               865 | 480 kB          | 504 kB
+(1 row)
+
+position=MID enemies=1,3,4,7,8 patch=16.18

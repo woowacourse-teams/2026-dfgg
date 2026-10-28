@@ -1,0 +1,109 @@
+### SELECT t.id FROM pro_picks p JOIN pro_tournaments t ON t.id = p.tournament_id ORDER BY p.played_at DESC, t.id DESC LIMIT 1
+                                                                             QUERY PLAN                                                                              
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=1.30..1.38 rows=1 width=16) (actual time=1.307..1.308 rows=1 loops=1)
+   Buffers: shared hit=17
+   ->  Incremental Sort  (cost=1.30..21360.06 rows=249600 width=16) (actual time=1.306..1.307 rows=1 loops=1)
+         Sort Key: p.played_at DESC, t.id DESC
+         Presorted Key: p.played_at
+         Full-sort Groups: 1  Sort Method: top-N heapsort  Average Memory: 25kB  Peak Memory: 25kB
+         Buffers: shared hit=17
+         ->  Nested Loop  (cost=0.58..16494.56 rows=249600 width=16) (actual time=1.258..1.273 rows=11 loops=1)
+               Buffers: shared hit=8
+               ->  Index Scan using idx_pro_picks_played_at on pro_picks p  (cost=0.29..9796.31 rows=249600 width=16) (actual time=0.022..0.028 rows=11 loops=1)
+                     Buffers: shared hit=5
+               ->  Memoize  (cost=0.29..0.31 rows=1 width=8) (actual time=0.112..0.112 rows=1 loops=11)
+                     Cache Key: p.tournament_id
+                     Cache Mode: logical
+                     Hits: 10  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                     Buffers: shared hit=3
+                     ->  Index Only Scan using pro_tournaments_pkey on pro_tournaments t  (cost=0.28..0.30 rows=1 width=8) (actual time=0.014..0.014 rows=1 loops=1)
+                           Index Cond: (id = p.tournament_id)
+                           Heap Fetches: 0
+                           Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=241
+ Planning Time: 2.148 ms
+ Execution Time: 1.378 ms
+(24 rows)
+
+### SELECT p.*, pl.*, t.* FROM pro_picks p JOIN pro_players pl ON pl.id = p.player_id JOIN pro_tournaments t ON t.id = p.tournament_id WHERE p.tournament_id = 1 AND p.position = 'MID' ORDER BY p.played_at DESC, p.id DESC
+                                                                              QUERY PLAN                                                                              
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=74.30..74.38 rows=32 width=404) (actual time=1.578..1.582 rows=32 loops=1)
+   Sort Key: p.played_at DESC, p.id DESC
+   Sort Method: quicksort  Memory: 38kB
+   Buffers: shared hit=40
+   ->  Nested Loop  (cost=2.17..73.50 rows=32 width=404) (actual time=1.464..1.506 rows=32 loops=1)
+         Buffers: shared hit=34
+         ->  Index Scan using pro_tournaments_pkey on pro_tournaments t  (cost=0.28..8.29 rows=1 width=113) (actual time=0.045..0.046 rows=1 loops=1)
+               Index Cond: (id = 1)
+               Buffers: shared hit=6
+         ->  Hash Join  (cost=1.89..64.89 rows=32 width=291) (actual time=1.415..1.450 rows=32 loops=1)
+               Hash Cond: (p.player_id = pl.id)
+               Buffers: shared hit=28
+               ->  Index Scan using idx_pro_picks_tournament_position on pro_picks p  (cost=0.42..63.31 rows=32 width=115) (actual time=1.359..1.377 rows=32 loops=1)
+                     Index Cond: ((tournament_id = 1) AND (("position")::text = 'MID'::text))
+                     Buffers: shared hit=27
+               ->  Hash  (cost=1.21..1.21 rows=21 width=176) (actual time=0.032..0.033 rows=21 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 13kB
+                     Buffers: shared hit=1
+                     ->  Seq Scan on pro_players pl  (cost=0.00..1.21 rows=21 width=176) (actual time=0.010..0.012 rows=21 loops=1)
+                           Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=306
+ Planning Time: 2.351 ms
+ Execution Time: 1.702 ms
+(24 rows)
+
+### SELECT pick_id, slot, rune_id FROM pro_pick_runes WHERE pick_id = ANY(ARRAY(SELECT id FROM pro_picks WHERE tournament_id = 1 AND position = 'MID')) ORDER BY pick_id, slot
+                                                                       QUERY PLAN                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using pro_pick_runes_pkey on pro_pick_runes  (cost=63.74..263.65 rows=87 width=14) (actual time=0.126..0.273 rows=288 loops=1)
+   Index Cond: (pick_id = ANY ($0))
+   Buffers: shared hit=137
+   InitPlan 1 (returns $0)
+     ->  Index Scan using idx_pro_picks_tournament_position on pro_picks  (cost=0.42..63.31 rows=32 width=8) (actual time=0.054..0.072 rows=32 loops=1)
+           Index Cond: ((tournament_id = 1) AND (("position")::text = 'MID'::text))
+           Buffers: shared hit=30
+ Planning:
+   Buffers: shared hit=180
+ Planning Time: 0.738 ms
+ Execution Time: 0.350 ms
+(11 rows)
+
+### SELECT tournament_id FROM pro_picks_flat ORDER BY played_at DESC, tournament_id DESC LIMIT 1
+                                                                        QUERY PLAN                                                                        
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=1.22..1.31 rows=1 width=16) (actual time=0.086..0.087 rows=1 loops=1)
+   Buffers: shared hit=17
+   ->  Incremental Sort  (cost=1.22..23256.42 rows=249600 width=16) (actual time=0.085..0.085 rows=1 loops=1)
+         Sort Key: played_at DESC, tournament_id DESC
+         Presorted Key: played_at
+         Full-sort Groups: 1  Sort Method: top-N heapsort  Average Memory: 25kB  Peak Memory: 25kB
+         Buffers: shared hit=17
+         ->  Index Scan using idx_flat_played_at on pro_picks_flat  (cost=0.42..18394.46 rows=249600 width=16) (actual time=0.023..0.034 rows=11 loops=1)
+               Buffers: shared hit=7
+ Planning:
+   Buffers: shared hit=127
+ Planning Time: 0.584 ms
+ Execution Time: 0.115 ms
+(13 rows)
+
+### SELECT * FROM pro_picks_flat WHERE tournament_id = 1 AND position = 'MID' ORDER BY played_at DESC, id DESC
+                                                                       QUERY PLAN                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+ Incremental Sort  (cost=2.41..65.31 rows=32 width=387) (actual time=0.107..0.109 rows=32 loops=1)
+   Sort Key: played_at DESC, id DESC
+   Presorted Key: played_at
+   Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 38kB  Peak Memory: 38kB
+   Buffers: shared hit=42
+   ->  Index Scan using idx_flat_tournament_position on pro_picks_flat  (cost=0.42..63.87 rows=32 width=387) (actual time=0.045..0.066 rows=32 loops=1)
+         Index Cond: ((tournament_id = 1) AND (("position")::text = 'MID'::text))
+         Buffers: shared hit=33
+ Planning:
+   Buffers: shared hit=206
+ Planning Time: 0.584 ms
+ Execution Time: 0.181 ms
+(12 rows)
+

@@ -1,0 +1,90 @@
+== normalized c=1 round=1
+number of transactions actually processed: 2474
+latency average = 8.077 ms
+tps = 123.804119 (without initial connection time)
+p50 7.77 ms  p95 8.94 ms  p99 14.68 ms  (n=2474)
+== flat c=1 round=1
+number of transactions actually processed: 7748
+latency average = 2.579 ms
+tps = 387.774144 (without initial connection time)
+p50 2.48 ms  p95 2.83 ms  p99 4.40 ms  (n=7748)
+== ping c=1 round=1
+number of transactions actually processed: 24688
+latency average = 0.809 ms
+tps = 1235.659075 (without initial connection time)
+p50 0.78 ms  p95 0.89 ms  p99 1.00 ms  (n=24688)
+== normalized c=1 round=2
+number of transactions actually processed: 2496
+latency average = 8.005 ms
+tps = 124.919523 (without initial connection time)
+p50 7.70 ms  p95 9.04 ms  p99 14.99 ms  (n=2496)
+== flat c=1 round=2
+number of transactions actually processed: 7762
+latency average = 2.574 ms
+tps = 388.490238 (without initial connection time)
+p50 2.47 ms  p95 2.87 ms  p99 4.62 ms  (n=7762)
+== ping c=1 round=2
+number of transactions actually processed: 25164
+latency average = 0.794 ms
+tps = 1259.527920 (without initial connection time)
+p50 0.77 ms  p95 0.87 ms  p99 0.99 ms  (n=25164)
+== normalized c=1 round=3
+number of transactions actually processed: 2503
+latency average = 7.982 ms
+tps = 125.282768 (without initial connection time)
+p50 7.69 ms  p95 8.92 ms  p99 14.33 ms  (n=2503)
+== flat c=1 round=3
+number of transactions actually processed: 7907
+latency average = 2.527 ms
+tps = 395.713780 (without initial connection time)
+p50 2.45 ms  p95 2.83 ms  p99 3.71 ms  (n=7907)
+== ping c=1 round=3
+number of transactions actually processed: 24356
+latency average = 0.820 ms
+tps = 1219.102428 (without initial connection time)
+p50 0.79 ms  p95 0.89 ms  p99 1.02 ms  (n=24356)
+== normalized c=8 round=1
+number of transactions actually processed: 8958
+latency average = 17.820 ms
+tps = 448.922893 (without initial connection time)
+p50 16.87 ms  p95 24.17 ms  p99 43.02 ms  (n=8958)
+== flat c=8 round=1
+number of transactions actually processed: 32168
+latency average = 4.961 ms
+tps = 1612.599289 (without initial connection time)
+p50 4.61 ms  p95 7.73 ms  p99 13.21 ms  (n=32168)
+== ping c=8 round=1
+number of transactions actually processed: 187567
+latency average = 0.850 ms
+tps = 9406.616884 (without initial connection time)
+p50 0.80 ms  p95 1.01 ms  p99 1.25 ms  (n=187567)
+== normalized c=8 round=2
+number of transactions actually processed: 8971
+latency average = 17.804 ms
+tps = 449.334943 (without initial connection time)
+p50 17.02 ms  p95 27.03 ms  p99 40.95 ms  (n=8971)
+== flat c=8 round=2
+number of transactions actually processed: 31317
+latency average = 5.091 ms
+tps = 1571.325441 (without initial connection time)
+p50 4.65 ms  p95 8.27 ms  p99 15.22 ms  (n=31317)
+== ping c=8 round=2
+number of transactions actually processed: 187681
+latency average = 0.850 ms
+tps = 9411.509963 (without initial connection time)
+p50 0.79 ms  p95 1.01 ms  p99 1.32 ms  (n=187681)
+== normalized c=8 round=3
+number of transactions actually processed: 8966
+latency average = 17.806 ms
+tps = 449.287894 (without initial connection time)
+p50 16.86 ms  p95 23.76 ms  p99 41.50 ms  (n=8966)
+== flat c=8 round=3
+number of transactions actually processed: 32620
+latency average = 4.890 ms
+tps = 1635.988128 (without initial connection time)
+p50 4.56 ms  p95 7.46 ms  p99 12.90 ms  (n=32620)
+== ping c=8 round=3
+number of transactions actually processed: 192184
+latency average = 0.830 ms
+tps = 9638.572103 (without initial connection time)
+p50 0.78 ms  p95 0.96 ms  p99 1.12 ms  (n=192184)

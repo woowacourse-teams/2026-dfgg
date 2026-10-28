@@ -1,0 +1,48 @@
+### 상대 한 명의 카운터 (이전 방식, 상대마다 반복)
+                                                                  QUERY PLAN                                                                  
+----------------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using uk_champion_counters_rank on champion_counters  (cost=0.28..8.30 rows=1 width=25) (actual time=0.014..0.016 rows=7 loops=1)
+   Index Cond: ((enemy_champion_id = 1) AND (("position")::text = 'MID'::text))
+   Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=140
+ Planning Time: 0.454 ms
+ Execution Time: 0.062 ms
+(7 rows)
+
+### 비정규화: 상대 다섯 명의 행을 한 번에
+                                                        QUERY PLAN                                                         
+---------------------------------------------------------------------------------------------------------------------------
+ Bitmap Heap Scan on counter_view  (cost=17.43..32.91 rows=5 width=440) (actual time=0.035..0.050 rows=5 loops=1)
+   Recheck Cond: ((enemy_champion_id = ANY ('{1,3,4,7,8}'::integer[])) AND ("position" = 'MID'::text))
+   Heap Blocks: exact=5
+   Buffers: shared hit=15
+   ->  Bitmap Index Scan on counter_view_pkey  (cost=0.00..17.43 rows=5 width=0) (actual time=0.030..0.031 rows=5 loops=1)
+         Index Cond: ((enemy_champion_id = ANY ('{1,3,4,7,8}'::integer[])) AND ("position" = 'MID'::text))
+         Buffers: shared hit=10
+ Planning:
+   Buffers: shared hit=165
+ Planning Time: 0.566 ms
+ Execution Time: 0.111 ms
+(11 rows)
+
+### 상대 다섯 명의 카운터를 한 번에
+                                                                QUERY PLAN                                                                 
+-------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=31.47..31.50 rows=12 width=25) (actual time=0.073..0.075 rows=35 loops=1)
+   Sort Key: enemy_champion_id, rank
+   Sort Method: quicksort  Memory: 26kB
+   Buffers: shared hit=16
+   ->  Bitmap Heap Scan on champion_counters  (cost=17.49..31.25 rows=12 width=25) (actual time=0.031..0.041 rows=35 loops=1)
+         Recheck Cond: ((enemy_champion_id = ANY ('{1,3,4,7,8}'::integer[])) AND (("position")::text = 'MID'::text))
+         Heap Blocks: exact=3
+         Buffers: shared hit=13
+         ->  Bitmap Index Scan on uk_champion_counters_rank  (cost=0.00..17.49 rows=12 width=0) (actual time=0.020..0.020 rows=35 loops=1)
+               Index Cond: ((enemy_champion_id = ANY ('{1,3,4,7,8}'::integer[])) AND (("position")::text = 'MID'::text))
+               Buffers: shared hit=10
+ Planning:
+   Buffers: shared hit=140
+ Planning Time: 0.438 ms
+ Execution Time: 0.141 ms
+(15 rows)
+

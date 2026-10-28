@@ -1,0 +1,5 @@
+ picks  | child_rows | normalized_size | flat_size 
+--------+------------+-----------------+-----------
+ 248400 |    3990270 | 393 MB          | 122 MB
+(1 row)
+

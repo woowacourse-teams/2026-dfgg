@@ -1,0 +1,4 @@
+source: dfgg-db-perf.cqsc6pyqhwww.ap-northeast-2.rds.amazonaws.com:5432/dfgg (picks=160)
+client: ip-10-0-0-231
+server: 16.14
+copies: 1560  duration: 20s
