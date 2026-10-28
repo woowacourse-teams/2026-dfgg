@@ -10,13 +10,16 @@ export type FakeLive = {
   port: number;
   setResponse: (path: string, body: unknown) => void;
   setRawResponse: (path: string, response: RawResponse) => void;
+  requests: () => string[];
   close: () => Promise<void>;
 };
 
 export async function startFakeLive(): Promise<FakeLive> {
   const responses = new Map<string, RawResponse>();
+  const received: string[] = [];
 
   const server = https.createServer({ cert: FAKE_CERT, key: FAKE_KEY }, (req, res) => {
+    received.push(req.url ?? '');
     const response = responses.get(req.url ?? '');
     if (response === undefined) {
       res.statusCode = 404;
@@ -36,6 +39,7 @@ export async function startFakeLive(): Promise<FakeLive> {
     port,
     setResponse: (path, body) => responses.set(path, { body: JSON.stringify(body) }),
     setRawResponse: (path, response) => responses.set(path, response),
+    requests: () => [...received],
     close: () => new Promise((resolve) => server.close(() => resolve())),
   };
 }
