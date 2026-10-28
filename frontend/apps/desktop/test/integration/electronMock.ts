@@ -11,7 +11,11 @@ export const electronMock = {
     getPath: () => os.tmpdir(),
     getVersion: () => '0.0.0-test',
   },
-  BrowserWindow: class {},
+  BrowserWindow: class {
+    static getAllWindows() {
+      return [];
+    }
+  },
   screen: {},
   desktopCapturer: { getSources: async () => [] },
 };
