@@ -1,6 +1,6 @@
-// 기술 소개: 개발자가 아니어도 "왜 믿을 만한지"가 읽히게, 그림 하나에 이야기 하나씩
+// 기술 소개: 개발자가 아니어도 "왜 믿을 만한지"가 읽히게. 한 줄에 이유 하나, 왼쪽은 글 오른쪽은 그림
 import { motion } from 'motion/react';
-import { useRef } from 'react';
+import { type ReactNode, useRef } from 'react';
 
 import useTrackInView from '../../hooks/useTrackInView';
 import { strings } from '../../i18n/i18n';
@@ -13,7 +13,7 @@ const text = t.features.tech;
 const reveal = {
   initial: { opacity: 0, y: 20 },
   whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, amount: 0.3 },
+  viewport: { once: true, amount: 0.25 },
   transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] as const },
 };
 
@@ -24,12 +24,40 @@ const REASON_ITEM = 3075;
 const REASON_SYNERGY = ['Lulu'];
 const REASON_COUNTER = ['Sylas', 'Jax'];
 
-function Heading({ title, body }: { title: string; body: string }) {
+const BEFORE_HOURS = 15;
+const AFTER_HOURS = 2.5;
+
+/**
+ * 이유 한 줄. 번호 딱지 → 제목 → 짧게 나눈 설명 / 오른쪽에 그림.
+ * 설명은 문구에 넣어 둔 줄바꿈을 넓은 화면에서만 따른다. 좁은 화면은 저절로 감긴다.
+ */
+function Story({
+  index,
+  title,
+  body,
+  children,
+}: {
+  index: number;
+  title: string;
+  body: string;
+  children: ReactNode;
+}) {
   return (
-    <>
-      <h3 className='text-xl font-bold tracking-[-0.01em] text-white sm:text-2xl'>{title}</h3>
-      <p className='mt-3 text-sm leading-relaxed text-ink-2 sm:text-base'>{body}</p>
-    </>
+    <motion.article
+      {...reveal}
+      className='grid gap-8 border-t border-line py-14 md:grid-cols-[1fr_1.15fr] md:items-center md:gap-16 md:py-20'
+    >
+      <div>
+        <span className='inline-block -skew-x-12 bg-accent-strong px-2 py-0.5 font-display text-sm font-bold text-white'>
+          {String(index).padStart(2, '0')}
+        </span>
+        <h3 className='mt-4 text-[clamp(1.4rem,2.6vw,2rem)] leading-snug font-bold tracking-[-0.02em] text-white'>
+          {title}
+        </h3>
+        <p className='mt-4 text-base leading-[1.8] text-ink-2 sm:whitespace-pre-line'>{body}</p>
+      </div>
+      <div>{children}</div>
+    </motion.article>
   );
 }
 
@@ -54,19 +82,14 @@ function Hatch({ percent, tone }: { percent: number; tone: 'accent' | 'muted' })
   );
 }
 
-function Data() {
+/** 큰 숫자 둘. 반올림 안내는 숫자 바로 아래에 붙인다 */
+function DataStats() {
   return (
-    <motion.div
-      {...reveal}
-      className='grid gap-8 border-y border-line py-10 md:grid-cols-[1fr_1.4fr] md:items-end'
-    >
-      <div>
-        <Heading title={text.data.title} body={text.data.body} />
-      </div>
+    <div>
       <dl className='grid grid-cols-2 gap-6'>
         {text.data.stats.map((stat) => (
           <div key={stat.label}>
-            <dd className='font-display text-[clamp(1.9rem,6vw,4.2rem)] leading-none font-bold whitespace-nowrap text-white'>
+            <dd className='font-display text-[clamp(1.9rem,5vw,3.6rem)] leading-none font-bold whitespace-nowrap text-white'>
               {stat.value}
               <span className='ml-1 text-lg text-ink-2'>{stat.unit}</span>
             </dd>
@@ -74,16 +97,16 @@ function Data() {
           </div>
         ))}
       </dl>
-    </motion.div>
+      <p className='mt-4 text-xs text-ink-3'>{text.data.note}</p>
+    </div>
   );
 }
 
-/** 네 갈래에서 후보를 모으고 → 모델이 순서를 매긴다 */
-function Model() {
+/** 네 갈래에서 후보를 모으고 → AI 모델이 순서를 매긴다 */
+function ModelDiagram() {
   return (
-    <motion.div {...reveal}>
-      <Heading title={text.model.title} body={text.model.body} />
-      <div className='mt-7 grid items-center gap-4 sm:grid-cols-[1fr_auto_1fr]'>
+    <div>
+      <div className='grid items-center gap-4 sm:grid-cols-[1fr_auto_1fr]'>
         <figure>
           <figcaption className='text-xs text-ink-3'>{text.model.sourcesLabel}</figcaption>
           <ul className='mt-2 flex flex-col gap-1.5'>
@@ -99,7 +122,7 @@ function Model() {
         </figure>
         <span
           aria-hidden='true'
-          className='justify-self-center rotate-90 font-display text-2xl text-accent sm:rotate-0'
+          className='rotate-90 justify-self-center font-display text-2xl text-accent sm:rotate-0'
         >
           →
         </span>
@@ -127,8 +150,10 @@ function Model() {
           </ol>
         </figure>
       </div>
-      <p className='mt-5 text-xs leading-relaxed text-ink-3'>{text.model.note}</p>
-    </motion.div>
+      <p className='mt-4 text-xs leading-relaxed text-ink-3 sm:whitespace-pre-line'>
+        {text.model.note}
+      </p>
+    </div>
   );
 }
 
@@ -151,80 +176,58 @@ function Faces({ ids, tone }: { ids: string[]; tone: 'win' | 'loss' }) {
 }
 
 /** 오버레이의 추천 한 줄을 크게 떼어 와서 이유 부분을 보여 준다 */
-function Reason() {
+function ReasonCard() {
   const item = t.items[REASON_ITEM];
   return (
-    <motion.div {...reveal}>
-      <Heading title={text.reason.title} body={text.reason.body} />
-      <div className='mt-7 rounded-2xl bg-overlay p-4 ring-1 ring-accent/40 shadow-[0_20px_60px_-25px_rgb(230_57_80/0.5)]'>
-        <div className='flex items-center gap-3'>
-          <img
-            src={itemIcon(REASON_ITEM)}
-            alt=''
-            width={48}
-            height={48}
-            className='size-12 rounded-lg'
-          />
-          <div>
-            <p className='font-bold text-white'>{item?.name}</p>
-            <p className='text-xs text-ink-3'>{item?.traits.join(' · ')}</p>
-          </div>
-        </div>
-        <div className='mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-bold'>
-          <span className='flex items-center gap-2 text-win'>
-            {text.reason.synergy}
-            <Faces ids={REASON_SYNERGY} tone='win' />
-          </span>
-          <span className='flex items-center gap-2 text-loss'>
-            {text.reason.counter}
-            <Faces ids={REASON_COUNTER} tone='loss' />
-          </span>
+    <div className='mx-auto max-w-100 rounded-2xl bg-overlay p-5 ring-1 ring-accent/40 shadow-[0_20px_60px_-25px_rgb(230_57_80/0.5)]'>
+      <div className='flex items-center gap-3'>
+        <img
+          src={itemIcon(REASON_ITEM)}
+          alt=''
+          width={52}
+          height={52}
+          className='size-13 rounded-lg'
+        />
+        <div>
+          <p className='text-lg font-bold text-white'>{item?.name}</p>
+          <p className='text-xs text-ink-3'>{item?.traits.join(' · ')}</p>
         </div>
       </div>
-    </motion.div>
+      <div className='mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-bold'>
+        <span className='flex items-center gap-2 text-win'>
+          {text.reason.synergy}
+          <Faces ids={REASON_SYNERGY} tone='win' />
+        </span>
+        <span className='flex items-center gap-2 text-loss'>
+          {text.reason.counter}
+          <Faces ids={REASON_COUNTER} tone='loss' />
+        </span>
+      </div>
+    </div>
   );
 }
 
-function Patch() {
-  const BEFORE_HOURS = 15;
-  const AFTER_HOURS = 2.5;
+function PatchBars() {
   return (
-    <motion.div {...reveal}>
-      <Heading title={text.patch.title} body={text.patch.body} />
-      <figure className='mt-7'>
-        <figcaption className='text-xs text-ink-3'>{text.patch.caption}</figcaption>
-        <dl className='mt-3 flex flex-col gap-4'>
-          <div>
-            <div className='flex items-baseline justify-between text-sm'>
-              <dt className='text-ink-3'>{text.patch.before}</dt>
-              <dd className='font-display text-lg text-ink-2'>{text.patch.beforeValue}</dd>
-            </div>
-            <Hatch percent={100} tone='muted' />
+    <figure>
+      <figcaption className='text-xs text-ink-3'>{text.patch.caption}</figcaption>
+      <dl className='mt-3 flex flex-col gap-5'>
+        <div>
+          <div className='flex items-baseline justify-between text-sm'>
+            <dt className='text-ink-3'>{text.patch.before}</dt>
+            <dd className='font-display text-lg text-ink-2'>{text.patch.beforeValue}</dd>
           </div>
-          <div>
-            <div className='flex items-baseline justify-between text-sm'>
-              <dt className='font-bold text-white'>{text.patch.after}</dt>
-              <dd className='font-display text-2xl font-bold text-white'>
-                {text.patch.afterValue}
-              </dd>
-            </div>
-            <Hatch percent={(AFTER_HOURS / BEFORE_HOURS) * 100} tone='accent' />
+          <Hatch percent={100} tone='muted' />
+        </div>
+        <div>
+          <div className='flex items-baseline justify-between text-sm'>
+            <dt className='font-bold text-white'>{text.patch.after}</dt>
+            <dd className='font-display text-2xl font-bold text-white'>{text.patch.afterValue}</dd>
           </div>
-        </dl>
-      </figure>
-    </motion.div>
-  );
-}
-
-function Speed() {
-  return (
-    <motion.div {...reveal}>
-      <Heading title={text.speed.title} body={text.speed.body} />
-      <div className='mt-7'>
-        <SpeedDots />
-        <p className='mt-3 text-xs text-ink-3'>{text.speed.caption}</p>
-      </div>
-    </motion.div>
+          <Hatch percent={(AFTER_HOURS / BEFORE_HOURS) * 100} tone='accent' />
+        </div>
+      </dl>
+    </figure>
   );
 }
 
@@ -239,37 +242,40 @@ export default function Tech() {
       aria-labelledby='tech-title'
       className='mx-auto max-w-300 scroll-mt-24 px-4 sm:px-8'
     >
-      <motion.header {...reveal} className='grid gap-6 md:grid-cols-[1.1fr_1fr] md:items-end'>
-        <div>
-          <p className='text-sm font-bold text-accent'>{text.kicker}</p>
-          <h2
-            id='tech-title'
-            className='mt-3 text-[clamp(2.2rem,6vw,4.2rem)] leading-[1.08] font-extrabold tracking-[-0.03em] text-white'
-          >
-            {text.title.map((line) => (
-              <span key={line} className='block'>
-                {line}
-              </span>
-            ))}
-          </h2>
-        </div>
-        <p className='text-base leading-relaxed text-ink-2'>{text.intro}</p>
+      <motion.header {...reveal} className='pb-14 md:pb-20'>
+        <p className='text-sm font-bold text-accent'>{text.kicker}</p>
+        {/* 히어로 글꼴은 히어로 제목 글자만 남긴 파일이라 여기서는 본문 글꼴을 굵게 쓴다 */}
+        <h2
+          id='tech-title'
+          className='mt-3 text-[clamp(2.2rem,6vw,4.2rem)] leading-[1.08] font-extrabold tracking-[-0.03em] text-white'
+        >
+          {text.title.map((line) => (
+            <span key={line} className='block'>
+              {line}
+            </span>
+          ))}
+        </h2>
+        <p className='mt-6 text-base leading-[1.8] text-ink-2 sm:text-lg sm:whitespace-pre-line'>
+          {text.intro}
+        </p>
       </motion.header>
 
-      <div className='mt-14'>
-        <Data />
-      </div>
-
-      {/* 칸 너비를 일부러 다르게 둔다. 같은 카드가 줄지어 서면 읽는 순서가 사라진다 */}
-      <div className='mt-16 grid gap-16 md:grid-cols-[1.25fr_1fr] md:gap-20'>
-        <Model />
-        <Reason />
-      </div>
-      <div className='mt-20 grid gap-16 md:grid-cols-[1fr_1.25fr] md:gap-20'>
-        <Patch />
-        <Speed />
-      </div>
-      <p className='mt-12 text-xs text-ink-3'>{text.footnote}</p>
+      <Story index={1} title={text.data.title} body={text.data.body}>
+        <DataStats />
+      </Story>
+      <Story index={2} title={text.model.title} body={text.model.body}>
+        <ModelDiagram />
+      </Story>
+      <Story index={3} title={text.reason.title} body={text.reason.body}>
+        <ReasonCard />
+      </Story>
+      <Story index={4} title={text.patch.title} body={text.patch.body}>
+        <PatchBars />
+      </Story>
+      <Story index={5} title={text.speed.title} body={text.speed.body}>
+        <SpeedDots />
+        <p className='mt-3 text-xs text-ink-3'>{text.speed.caption}</p>
+      </Story>
     </section>
   );
 }

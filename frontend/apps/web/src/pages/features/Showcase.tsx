@@ -119,12 +119,17 @@ function Row({ step, index }: { step: Step; index: number }) {
         >
           {step.title}
         </h2>
-        <p className='mt-4 max-w-120 text-base leading-relaxed text-ink-2'>{step.body}</p>
-        <dl className='mt-7 max-w-120 divide-y divide-line border-y border-line'>
+        {/* 문구에 넣어 둔 줄바꿈대로 문장마다 나눈다. 좁은 화면은 저절로 감긴다 */}
+        <p className='mt-4 text-base leading-[1.8] text-ink-2 sm:whitespace-pre-line'>
+          {step.body}
+        </p>
+        <dl className='mt-7 max-w-130 divide-y divide-line border-y border-line'>
           {step.points.map((point) => (
             <div key={point.name} className='flex gap-4 py-3.5'>
               <dt className='w-24 flex-none text-sm font-bold text-white sm:w-28'>{point.name}</dt>
-              <dd className='text-sm leading-relaxed text-ink-2'>{point.text}</dd>
+              <dd className='text-sm leading-relaxed text-ink-2 sm:whitespace-pre-line'>
+                {point.text}
+              </dd>
             </div>
           ))}
         </dl>
