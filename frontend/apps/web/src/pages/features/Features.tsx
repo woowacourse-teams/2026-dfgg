@@ -58,7 +58,7 @@ export default function Features() {
   return (
     <MotionConfig reducedMotion='user'>
       <SiteHeader />
-      <main id='main' tabIndex={-1} className='scroll-mt-16 outline-none'>
+      <main id='main' tabIndex={-1} className='features-page scroll-mt-16 outline-none'>
         <section
           aria-labelledby='features-heading'
           className='relative overflow-hidden px-4 pt-32 pb-20 text-center sm:pt-40 sm:pb-28'

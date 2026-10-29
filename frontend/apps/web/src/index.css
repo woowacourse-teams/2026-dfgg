@@ -117,4 +117,16 @@
       scroll-behavior: auto;
     }
   }
+
+  /*
+   * 기능 소개 페이지: 제목은 줄 길이를 고르게 나눠 '지금 살 / 템까지'처럼 끝 단어만 떨어지지 않게,
+   * 본문은 마지막 줄에 한 단어만 남지 않게 한다. word-break: keep-all 과 함께 어절 단위로 바뀐다.
+   */
+  .features-page :is(h1, h2, h3) {
+    text-wrap: balance;
+  }
+
+  .features-page :is(p, dd, li) {
+    text-wrap: pretty;
+  }
 }
