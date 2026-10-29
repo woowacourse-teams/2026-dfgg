@@ -133,14 +133,14 @@ function onSession(session: LcuChampSelectSession) {
   const positionChanged = prev?.position !== position;
   const bansChanged = !sameIds(prev?.bans, next.bans);
 
-  // ponytail: 밴이 바뀔 때마다 다시 받아 무작위 다섯이 섞인다. 밴은 픽 전에 끝나서 그대로 둔다. 거슬리면 밴에 걸린 픽만 뺀다.
-  if (positionChanged || bansChanged) {
-    // 이전 목록을 먼저 비운다. 새 다섯이 오면 처음부터 다시 그린다
+  // 오늘의 픽은 밴과 상관없이 20개를 한 번에 준다. 포지션이 정해질 때 한 번만 받아 밴픽 내내 그대로 둔다.
+  // 매번 다시 받으면 무작위 20개가 바뀌면서 화면이 깜빡인다.
+  if (positionChanged) {
     update({ todayPicks: null });
     void load(
       '오늘의 픽',
-      () => fetchTodayPicks(position, next.bans),
-      () => sameIds(info?.bans, next.bans),
+      () => fetchTodayPicks(position),
+      () => info?.position === position,
       (todayPicks) => {
         update({ todayPicks });
         trackEvent('desktop-today-picks', { position, count: todayPicks.picks.length });

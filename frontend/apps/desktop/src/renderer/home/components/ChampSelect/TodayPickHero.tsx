@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { runeTreeOf } from '../../../../shared/runeTrees';
 import { todayPickKey } from '../../../../shared/todayPicks';
@@ -64,76 +64,169 @@ function ProRunes({ pick, inUse, onUse }: { pick: TodayPick; inUse: boolean; onU
 
 type Props = {
   todayPicks: TodayPicks;
-  /** 지금 넣어 둔 프로 룬의 선수 이름 */
   /** 지금 넣어 둔 프로 룬의 todayPickKey */
   proInUse: string | null;
   onUsePro: (key: string) => void;
 };
 
-/** 중계 화면 하단 자막처럼: 선수 한 명을 크게, 사진은 사선으로 잘라 오른쪽에 세운다. */
+type Slide = { index: number; dir: 'next' | 'prev' };
+
+/** 이만큼 지나면 다음 선수로 넘긴다. 진행 칸이 같은 시간 동안 차오른다 (CSS csa-autoplay 5s 와 같은 값) */
+const AUTOPLAY_MS = 5000;
+const AUTOPLAY_TICK_MS = 100;
+
+/**
+ * 중계 화면 하단 자막처럼: 선수 한 명을 크게, 사진은 사선으로 잘라 오른쪽에 세운다.
+ * 받은 20명을 카드 넘기듯 좌우 화살표로 넘긴다. 끝에서 넘기면 처음으로 돌아간다.
+ */
 function TodayPickHero({ todayPicks, proInUse, onUsePro }: Props) {
-  const [index, setIndex] = useState(0);
+  const [slide, setSlide] = useState<Slide>({ index: 0, dir: 'next' });
+  const heroRef = useRef<HTMLElement>(null);
   const { picks, tournament } = todayPicks;
-  const pick = picks[Math.min(index, picks.length - 1)];
+  const total = picks.length;
+  const index = Math.min(slide.index, total - 1);
+  const pick = picks[index];
+
+  // 선수가 바뀔 때마다 다시 센다. 직접 넘기면 그때부터 5초.
+  // 마우스를 올렸거나 키보드로 안을 고르는 중이면 그동안은 세지 않는다. 보는 중에 넘어가면 안 된다.
+  // mouseenter/leave 를 상태로 들면 넘길 때마다 안쪽을 새로 그려서 나간 걸 놓친다. 그래서 그때그때 :hover 를 본다.
+  useEffect(() => {
+    if (total < 2) return;
+    let elapsed = 0;
+    const timer = setInterval(() => {
+      if (heroRef.current?.matches(':hover, :focus-within')) return;
+      elapsed += AUTOPLAY_TICK_MS;
+      if (elapsed < AUTOPLAY_MS) return;
+      setSlide((current) => ({ index: (current.index + 1) % total, dir: 'next' }));
+    }, AUTOPLAY_TICK_MS);
+    return () => clearInterval(timer);
+  }, [slide, total]);
+
   if (!pick) return null;
+
+  const show = (next: number, dir: Slide['dir'], how: 'arrow' | 'tick' | 'key') => {
+    const target = (next + total) % total;
+    setSlide({ index: target, dir });
+    window.analytics.track('champ-select-today-pick', {
+      player: picks[target].player.name,
+      champion: picks[target].champion.id,
+      how,
+    });
+  };
+  const prev = (how: 'arrow' | 'key') => show(index - 1, 'prev', how);
+  const next = (how: 'arrow' | 'key') => show(index + 1, 'next', how);
 
   return (
     <>
-      <section className='csa-hero' aria-label={t.champSelect.todayPick}>
-        <img className='csa-hero-bg' src={championSplashUrl(pick.champion.id)} alt='' />
-        <ProPhoto key={todayPickKey(pick)} pick={pick} className='csa-hero-photo' />
+      <section
+        ref={heroRef}
+        className='csa-hero'
+        aria-label={t.champSelect.todayPick}
+        aria-roledescription='carousel'
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowLeft') prev('key');
+          if (event.key === 'ArrowRight') next('key');
+        }}
+      >
+        {/* 넘길 때마다 새로 그려서 넘기는 방향으로 미끄러져 들어온다 */}
+        <div
+          key={todayPickKey(pick)}
+          className={`csa-slide csa-slide-${slide.dir}`}
+          aria-roledescription='slide'
+          aria-label={t.champSelect.pickOf(index + 1, total)}
+        >
+          <img className='csa-hero-bg' src={championSplashUrl(pick.champion.id)} alt='' />
+          <ProPhoto pick={pick} className='csa-hero-photo' />
 
-        <div className='csa-hero-body'>
-          <span className='csa-tag'>
-            <b>{t.champSelect.todayPick}</b>
-            {tournament && <span>{tournament.name}</span>}
-          </span>
-          <strong className='csa-name'>{pick.player.name}</strong>
-          {pick.player.team && <span className='csa-team'>{pick.player.team}</span>}
+          <div className='csa-hero-body'>
+            <span className='csa-tag'>
+              <b>{t.champSelect.todayPick}</b>
+              {tournament && <span>{tournament.name}</span>}
+            </span>
+            <strong className='csa-name'>{pick.player.name}</strong>
+            {pick.player.team && <span className='csa-team'>{pick.player.team}</span>}
 
-          <span className='csa-champ'>
-            <img src={championIconUrl(pick.champion.id)} alt='' />
-            <b>{pick.champion.name}</b>
-            <small>{t.champSelect.played(shortDate(pick.playedAt))}</small>
-          </span>
+            <span className='csa-champ'>
+              <img src={championIconUrl(pick.champion.id)} alt='' />
+              <b>{pick.champion.name}</b>
+              <small>
+                {t.champSelect.played(shortDate(pick.playedAt))}
+                {pick.setNumber ? ` · ${t.champSelect.setNumber(pick.setNumber)}` : ''}
+              </small>
+            </span>
 
-          <span className='csa-loadout'>
-            <Build pick={pick} size={20} />
-          </span>
+            <span className='csa-loadout'>
+              <Build pick={pick} size={20} />
+            </span>
+          </div>
+
+          <ProRunes
+            pick={pick}
+            inUse={proInUse === todayPickKey(pick)}
+            onUse={() => onUsePro(todayPickKey(pick))}
+          />
         </div>
 
-        <ProRunes
-          pick={pick}
-          inUse={proInUse === todayPickKey(pick)}
-          onUse={() => onUsePro(todayPickKey(pick))}
-        />
+        {/* 넘기는 줄: ‹ 진행 칸 n / 20 › */}
+        {total > 1 && (
+          <div className='csa-nav'>
+            <button
+              type='button'
+              className='csa-arrow'
+              onClick={() => prev('arrow')}
+              aria-label={t.champSelect.prevPick}
+            >
+              <ArrowIcon dir='left' />
+            </button>
 
-        {/* 다른 선수로 넘기는 줄. 사진 대신 챔피언 얼굴로 무엇을 골랐는지 먼저 보인다. */}
-        {picks.length > 1 && (
-          <ol className='csa-strip' style={{ '--count': picks.length } as React.CSSProperties}>
-            {picks.map((other, at) => (
-              <li key={todayPickKey(other)}>
-                <button
-                  type='button'
-                  className={other === pick ? 'csa-strip-on' : ''}
-                  onClick={() => {
-                    setIndex(at);
-                    window.analytics.track('champ-select-today-pick', {
-                      player: other.player.name,
-                      champion: other.champion.id,
-                    });
-                  }}
-                >
-                  <img src={championIconUrl(other.champion.id)} alt='' />
-                  <span>{other.player.name}</span>
-                </button>
-              </li>
-            ))}
-          </ol>
+            <ol className='csa-ticks' aria-hidden='true'>
+              {picks.map((other, at) => (
+                <li key={todayPickKey(other)}>
+                  <button
+                    // 지금 칸은 다시 그려서 차오르는 애니메이션을 처음부터 시작한다
+                    key={at === index ? `on-${todayPickKey(pick)}` : 'off'}
+                    type='button'
+                    tabIndex={-1}
+                    className={at === index ? 'csa-tick-on' : ''}
+                    onClick={() => show(at, at < index ? 'prev' : 'next', 'tick')}
+                  />
+                </li>
+              ))}
+            </ol>
+
+            <span className='csa-count'>
+              <b>{index + 1}</b> / {total}
+            </span>
+
+            <button
+              type='button'
+              className='csa-arrow'
+              onClick={() => next('arrow')}
+              aria-label={t.champSelect.nextPick}
+            >
+              <ArrowIcon dir='right' />
+            </button>
+          </div>
         )}
       </section>
       <p className='cs-credit'>{t.champSelect.credit}</p>
     </>
+  );
+}
+
+/** 화살표. 글자(‹ ›)는 글꼴마다 높이가 달라 가운데가 안 맞아서 선으로 그린다 */
+function ArrowIcon({ dir }: { dir: 'left' | 'right' }) {
+  return (
+    <svg width='14' height='14' viewBox='0 0 14 14' aria-hidden='true'>
+      <path
+        d={dir === 'left' ? 'M8.5 2.5 4 7l4.5 4.5' : 'M5.5 2.5 10 7l-4.5 4.5'}
+        fill='none'
+        stroke='currentColor'
+        strokeWidth='1.8'
+        strokeLinecap='round'
+        strokeLinejoin='round'
+      />
+    </svg>
   );
 }
 
