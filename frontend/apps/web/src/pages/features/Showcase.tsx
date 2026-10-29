@@ -25,6 +25,10 @@ const SHOTS: Record<string, { main: Shot; sub?: Shot; wide?: boolean }> = {
     main: { src: '/media/features/postgame.webp', width: 1000, height: 355 },
     sub: { src: '/media/features/ranking.webp', width: 1000, height: 1228 },
   },
+  highlight: {
+    main: { src: '/media/features/highlight.webp', width: 1000, height: 1045 },
+    sub: { src: '/media/features/highlight-match.webp', width: 1000, height: 915 },
+  },
   history: {
     main: { src: '/media/features/home.webp', width: 1000, height: 1560 },
     sub: { src: '/media/features/detail.webp', width: 1000, height: 1222 },

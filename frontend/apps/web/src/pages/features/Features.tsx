@@ -22,7 +22,11 @@ const fadeUp = (delay: number) => ({
 function StepNav() {
   return (
     <motion.nav {...fadeUp(0.35)} aria-label={text.stepsLabel} className='mt-12'>
-      <ol className='mx-auto grid max-w-180 grid-cols-4'>
+      {/* 단계 수만큼 칸을 나눈다 */}
+      <ol
+        className='mx-auto grid max-w-200'
+        style={{ gridTemplateColumns: `repeat(${text.steps.length}, minmax(0, 1fr))` }}
+      >
         {text.steps.map((step, index) => (
           <li key={step.key} className='relative'>
             {/* 단계 사이를 잇는 선. 다이아몬드(z-10) 아래에 깐다 */}
