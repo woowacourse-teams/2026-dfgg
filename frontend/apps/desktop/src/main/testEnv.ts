@@ -7,10 +7,20 @@ export type TestEnv = {
   ddragonUrl?: string;
   fallbackDirs?: string[]; // 롤 설치 예비 경로. 테스트 중에는 빈 목록으로 두어 롤을 찾지 못하게 한다.
   apiUrl?: string;
+  userDataDir?: string;
 };
 
 // 소켓
 let current: TestEnv | null = null;
+
+export const TEST_ENV_VARS = {
+  e2e: 'DFGG_E2E',
+  riotCaPath: 'DFGG_RIOT_CA_PATH',
+  livePort: 'DFGG_LIVE_PORT',
+  ddragonUrl: 'DFGG_DDRAGON_URL',
+  apiUrl: 'DFGG_API_URL',
+  userDataDir: 'DFGG_USER_DATA_DIR',
+} as const;
 
 export const getTestEnv = () => current;
 
@@ -27,8 +37,9 @@ export function loadTestEnvFromProcess(isPackaged: boolean) {
   setTestEnv({
     riotCa: caPath ? fs.readFileSync(caPath, 'utf-8') : undefined,
     livePort: Number(process.env.DFGG_LIVE_PORT) || undefined,
-    ddragonUrl: process.env.DFGG_DRAGON_URL,
+    ddragonUrl: process.env.DFGG_DDRAGON_URL,
     fallbackDirs: [],
     apiUrl: process.env.DFGG_API_URL,
+    userDataDir: process.env.DFGG_USER_DATA_DIR,
   });
 }

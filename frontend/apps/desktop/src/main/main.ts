@@ -1,4 +1,4 @@
-// 다른 모듈이 로드되기 전에 초기화해야 그 안에서 난 에러도 잡힌다.
+import './testMode';
 import './sentry';
 
 import { app, BrowserWindow } from 'electron';
@@ -34,7 +34,7 @@ import { handleMediaProtocol, registerMediaScheme } from './highlight/mediaProto
 import { cleanupOrphans, setMaxGames } from './highlight/storage';
 import { readSettings } from './settings';
 import { initOverlayVisibility, updateOverlayPhase } from './overlay/visibility';
-import { getTestEnv, loadTestEnvFromProcess } from './testEnv';
+import { getTestEnv } from './testEnv';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
@@ -43,7 +43,6 @@ let homeWindow: BrowserWindow | null = null;
 const gotTheLock = app.requestSingleInstanceLock();
 
 registerMediaScheme(); // dfgg-media 스킴 등록
-loadTestEnvFromProcess(app.isPackaged);
 
 // 렌더러는 창 단위(out/renderer/home, out/renderer/overlay ...)로 빌드된다.
 function loadRenderer(win: BrowserWindow, name: string) {
