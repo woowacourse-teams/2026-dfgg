@@ -3,6 +3,7 @@
 -- 대회 1 MID: 픽 101(10-25), 102(10-27), 103(10-26)   ← 조회 대상, played_at 내림차순이면 102·103·101
 -- 대회 1 TOP: 픽 104                                   ← 다른 라인
 -- 대회 2 MID: 픽 105                                   ← 다른 대회
+-- 대회 1 MID: 픽 106(10-27 09:00, 진 경기)             ← 진 경기라 읽지 않는다
 -- 픽 102의 자식 행은 칸 순서와 다르게 넣는다. 아이템 0번 칸은 비어 있다(행 없음).
 DELETE FROM pro_picks;
 DELETE FROM pro_players;
@@ -38,10 +39,11 @@ INSERT INTO pro_picks (id, tournament_id, player_id, source_game_id, played_at, 
                        win)
 VALUES
     (101, 1, 1, 'g1', '2026-10-25 08:00:00+00', 'T1', 'BLUE', 'MID', 9001, true),
-    (102, 1, 2, 'g2', '2026-10-27 08:00:00+00', 'Gen.G', 'RED', 'MID', 9001, false),
+    (102, 1, 2, 'g2', '2026-10-27 08:00:00+00', 'Gen.G', 'RED', 'MID', 9001, true),
     (103, 1, 1, 'g3', '2026-10-26 08:00:00+00', 'T1', 'RED', 'MID', 9001, true),
     (104, 1, 3, 'g1', '2026-10-25 08:00:00+00', 'Hanwha Life Esports', 'BLUE', 'TOP', 9001, true),
-    (105, 2, 2, 'g9', '2026-10-28 08:00:00+00', 'Gen.G', 'BLUE', 'MID', 9001, true);
+    (105, 2, 2, 'g9', '2026-10-28 08:00:00+00', 'Gen.G', 'BLUE', 'MID', 9001, true),
+    (106, 1, 3, 'g4', '2026-10-27 09:00:00+00', 'Hanwha Life Esports', 'RED', 'MID', 9001, false);
 
 INSERT INTO pro_pick_spells (pick_id, slot, spell_id) VALUES
     (102, 1, 9002), (102, 0, 9001),

@@ -28,7 +28,7 @@ public class TodayPickController {
             @Valid @RequestBody TodayPickRequest request,
             @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage
     ) {
-        return ResponseEntity.ok(todayPickService.recommend(request.position(), request.bans(),
+        return ResponseEntity.ok(todayPickService.recommend(request.position(),
                 Language.fromAcceptLanguage(acceptLanguage)));
     }
 }

@@ -38,19 +38,30 @@ class ProPickRepositoryTest {
 
     @Test
     @DisplayName("대회·포지션이 같은 픽만 최근 경기 순으로 읽는다 — 다른 대회·라인은 섞이지 않는다")
-    void findByTournamentAndPosition_WhenOtherTournamentOrPositionExists_ReturnOnlyMatchingByPlayedAt() {
+    void findWinsByTournamentAndPosition_WhenOtherTournamentOrPositionExists_ReturnOnlyMatchingByPlayedAt() {
         // when
-        List<ProPick> picks = pickRepository.findByTournamentAndPosition(WORLDS, ChampionPosition.MID);
+        List<ProPick> picks = pickRepository.findWinsByTournamentAndPosition(WORLDS, ChampionPosition.MID);
 
         // then
         assertThat(picks).extracting(ProPick::getId).containsExactly(102L, 103L, 101L);
     }
 
     @Test
-    @DisplayName("픽과 함께 선수·대회·챔피언·진영·승패를 읽는다")
-    void findByTournamentAndPosition_WhenPickFound_IncludePlayerAndTournament() {
+    @DisplayName("진 경기의 픽은 읽지 않는다 — 가장 최근 경기라도 빠진다")
+    void findWinsByTournamentAndPosition_WhenLostPickExists_ExcludeLostPick() {
         // when
-        ProPick chovy = pickRepository.findByTournamentAndPosition(WORLDS, ChampionPosition.MID).getFirst();
+        List<ProPick> picks = pickRepository.findWinsByTournamentAndPosition(WORLDS, ChampionPosition.MID);
+
+        // then
+        assertThat(picks).extracting(ProPick::getId).doesNotContain(106L);
+        assertThat(picks).allMatch(ProPick::isWin);
+    }
+
+    @Test
+    @DisplayName("픽과 함께 선수·대회·챔피언·진영·승패를 읽는다")
+    void findWinsByTournamentAndPosition_WhenPickFound_IncludePlayerAndTournament() {
+        // when
+        ProPick chovy = pickRepository.findWinsByTournamentAndPosition(WORLDS, ChampionPosition.MID).getFirst();
 
         // then
         assertThat(chovy.getPlayer().getName()).isEqualTo("Chovy");
@@ -59,14 +70,14 @@ class ProPickRepositoryTest {
         assertThat(chovy.getChampionId()).isEqualTo(9001L);
         assertThat(chovy.getSide()).isEqualTo(ProPickSide.RED);
         assertThat(chovy.getPosition()).isEqualTo(ChampionPosition.MID);
-        assertThat(chovy.isWin()).isFalse();
+        assertThat(chovy.isWin()).isTrue();
     }
 
     @Test
     @DisplayName("주문·아이템·룬은 넣은 순서가 아니라 칸 순서로 읽고, 빈 칸은 행이 없다")
-    void findByTournamentAndPosition_WhenChildrenInsertedOutOfOrder_ReturnBySlot() {
+    void findWinsByTournamentAndPosition_WhenChildrenInsertedOutOfOrder_ReturnBySlot() {
         // when
-        ProPick chovy = pickRepository.findByTournamentAndPosition(WORLDS, ChampionPosition.MID).getFirst();
+        ProPick chovy = pickRepository.findWinsByTournamentAndPosition(WORLDS, ChampionPosition.MID).getFirst();
 
         // then
         assertThat(chovy.getSpells()).extracting(ProPickSpell::getSlot, ProPickSpell::getSpellId)
@@ -79,14 +90,14 @@ class ProPickRepositoryTest {
 
     @Test
     @DisplayName("픽 수와 상관없이 픽·주문·아이템·룬 네 번의 쿼리로 읽는다 (N+1 없음)")
-    void findByTournamentAndPosition_WhenReadingAllRelations_UseFourQueries() {
+    void findWinsByTournamentAndPosition_WhenReadingAllRelations_UseFourQueries() {
         // given
         entityManager.clear();
         Statistics statistics = entityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
         statistics.clear();
 
         // when
-        List<ProPick> picks = pickRepository.findByTournamentAndPosition(WORLDS, ChampionPosition.MID);
+        List<ProPick> picks = pickRepository.findWinsByTournamentAndPosition(WORLDS, ChampionPosition.MID);
         picks.forEach(pick -> {
             pick.getPlayer().getName();
             pick.getTournament().getName();
@@ -102,9 +113,9 @@ class ProPickRepositoryTest {
 
     @Test
     @DisplayName("해당 라인 픽이 없으면 빈 목록이다")
-    void findByTournamentAndPosition_WhenNoPickForPosition_ReturnEmpty() {
+    void findWinsByTournamentAndPosition_WhenNoPickForPosition_ReturnEmpty() {
         // when
-        List<ProPick> picks = pickRepository.findByTournamentAndPosition(WORLDS, ChampionPosition.SUPPORT);
+        List<ProPick> picks = pickRepository.findWinsByTournamentAndPosition(WORLDS, ChampionPosition.SUPPORT);
 
         // then
         assertThat(picks).isEmpty();
