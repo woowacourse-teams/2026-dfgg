@@ -50,3 +50,43 @@ jobs:
 
       - name: 빌드 검사
         run: pnpm build
+
+      - name: 테스트 타입 검사
+        run: pnpm --filter desktop typecheck:test
+
+      - name: 단위, 통합 테스트
+        run: pnpm --filter desktop test
+
+  desktop-e2e:
+    name: Desktop-E2E
+    runs-on: windows-latest
+    needs: fe-check # 단위·통합이 깨지면 비싼 E2E는 돌리지 않는다
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: pnpm 바이너리 설치
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - name: 노드 설치
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: E2E 테스트
+        run: pnpm --filter desktop test:e2e
+
+      - name: 실패 기록 올리기
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: frontend/apps/desktop/test-results/
+          retention-days: 7
