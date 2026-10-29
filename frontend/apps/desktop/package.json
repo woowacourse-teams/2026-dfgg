@@ -16,6 +16,7 @@
     "build": "pnpm build:main && pnpm build:renderer",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "pnpm build && playwright test",
     "electron:start": "pnpm build:main && electron .",
     "electron:dev": "concurrently -k \"pnpm start\" \"wait-on http://localhost:3001/home/index.html && pnpm electron:start\"",
     "package": "pnpm build && electron-builder --win nsis",
@@ -31,6 +32,7 @@
     "ws": "^8.21.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@sentry/electron": "^7.20.0",
     "@types/node": "^22.20.4",
     "@types/react": "^19.3.0",
