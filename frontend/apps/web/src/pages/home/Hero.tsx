@@ -68,7 +68,8 @@ export default function Hero() {
         <strong className='font-bold text-white'>{sub.coreItem}</strong>
         {sub.secondLineSuffix}
       </motion.p>
-      <motion.div {...fadeUp(1.25)} className='relative mt-9'>
+      {/* 헤더의 다운로드 버튼이 내려오는 곳. 고정 헤더에 가리지 않게 위 여백을 둔다 */}
+      <motion.div {...fadeUp(1.25)} id='download' className='relative mt-9 scroll-mt-40'>
         <DownloadButtons />
         <p className='mt-3 text-sm text-ink-3'>{strings().download.requirement}</p>
       </motion.div>
