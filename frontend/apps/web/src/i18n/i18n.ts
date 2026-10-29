@@ -186,12 +186,25 @@ const KO = {
         label: '게임 후',
         title: '끝나면, 내가 몇 등이었는지',
         body: '게임이 끝나면 10명의 플레이를 같은 기준으로 매긴\nDF 스코어가 나와요.\n킬만이 아니라 피해량, 시야, 오브젝트까지 함께 봐서\n1등은 MVP로 불러 드려요.',
-        points: [
-          { name: 'DF 스코어', text: '이번 판 10명 중 내 순위와 점수' },
-          { name: '하이라이트', text: '킬 장면을 자동으로 잘라\n바로 다시 보기' },
-        ],
+        points: [{ name: 'DF 스코어', text: '이번 판 10명 중 내 순위와 점수' }],
         imageAlt: '방금 끝난 판의 DF 스코어 MVP 카드',
         subImageAlt: '10명의 DF 스코어 순위',
+      },
+      {
+        key: 'highlight',
+        label: '하이라이트',
+        title: '내 활약은 알아서 남아요',
+        body: '녹화 버튼을 누를 필요가 없어요.\n내가 킬을 따거나 용·바론을 잡은 장면을\n싸움이 시작된 순간부터 클립으로 잘라 둬요.',
+        points: [
+          { name: '자동 녹화', text: '게임이 시작되면 알아서 녹화하고\n끝나면 바로 클립으로 정리' },
+          { name: '이어 보기', text: '한 클립이 끝나면\n다음 장면으로 넘어가요' },
+          {
+            name: '전적에서 다시',
+            text: '전적 카드의 하이라이트 버튼으로\n그 판 장면을 언제든 다시 보기',
+          },
+        ],
+        imageAlt: '방금 끝난 판의 하이라이트 클립 재생 화면',
+        subImageAlt: '전적 카드에서 연 하이라이트 클립',
       },
       {
         key: 'history',
@@ -528,12 +541,25 @@ const EN: typeof KO = {
         label: 'After the game',
         title: 'See where you ranked',
         body: 'When the game ends, DF Score rates all ten players\non the same scale.\nNot just kills, but damage, vision and objectives too.\nFirst place gets MVP.',
-        points: [
-          { name: 'DF Score', text: 'Your rank and score among all ten players' },
-          { name: 'Highlights', text: 'Your kills clipped automatically,\nready to replay' },
-        ],
+        points: [{ name: 'DF Score', text: 'Your rank and score among all ten players' }],
         imageAlt: 'DF Score MVP card for the game that just ended',
         subImageAlt: 'DF Score ranking of all ten players',
+      },
+      {
+        key: 'highlight',
+        label: 'Highlights',
+        title: 'Your best plays, saved for you',
+        body: 'No record button to press.\nWhen you get a kill or take dragon or baron,\nDFGG clips it from the moment the fight started.',
+        points: [
+          {
+            name: 'Auto record',
+            text: 'Records when the game starts\nand clips it the moment it ends',
+          },
+          { name: 'Keep watching', text: 'When one clip ends,\nthe next play starts' },
+          { name: 'From history', text: 'Open any game’s highlights\nfrom its match card' },
+        ],
+        imageAlt: 'Highlight clips playing for the game that just ended',
+        subImageAlt: 'Highlight clips opened from a match card',
       },
       {
         key: 'history',
