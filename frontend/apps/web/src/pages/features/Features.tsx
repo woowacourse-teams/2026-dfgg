@@ -25,18 +25,18 @@ function StepNav() {
       <ol className='mx-auto grid max-w-180 grid-cols-4'>
         {text.steps.map((step, index) => (
           <li key={step.key} className='relative'>
-            {/* 단계 사이를 잇는 선 */}
+            {/* 단계 사이를 잇는 선. 다이아몬드(z-10) 아래에 깐다 */}
             {index > 0 && (
               <span
                 aria-hidden='true'
-                className='absolute top-2 right-1/2 left-[-50%] h-px bg-gradient-to-r from-line to-accent/60'
+                className='absolute top-2 right-1/2 left-[-50%] z-0 h-px bg-gradient-to-r from-line to-accent/60'
               />
             )}
             <a
               href={`#${step.key}`}
               data-umami-event='features-step-click'
               data-umami-event-step={step.key}
-              className='group relative flex flex-col items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent'
+              className='group relative z-10 flex flex-col items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent'
             >
               <span className='size-4 rotate-45 border-2 border-accent bg-ground transition-colors group-hover:bg-accent' />
               <span className='text-xs text-ink-2 transition-colors group-hover:text-white sm:text-sm'>
