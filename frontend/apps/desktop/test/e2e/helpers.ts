@@ -15,6 +15,9 @@ const APP_DIR = path.resolve(__dirname, '../..');
 
 export async function launchApp(env: Record<string, string>) {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dfgg-e2e-'));
+
+  fs.writeFileSync(path.join(userDataDir, 'setting.json'), JSON.stringify({ locale: 'ko' }));
+
   const app = await electron.launch({
     args: ['.'],
     cwd: APP_DIR,
