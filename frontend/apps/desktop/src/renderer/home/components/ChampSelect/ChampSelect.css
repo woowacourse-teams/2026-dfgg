@@ -292,58 +292,157 @@
   transform: scale(0.96);
 }
 
-.csa-strip {
+.csa-slide {
+  position: relative;
+}
+
+/* 넘긴 방향에서 미끄러져 들어온다. 사진이 글보다 조금 더 멀리서 와 깊이가 생긴다 */
+.csa-slide .csa-hero-body {
+  animation: csa-in 380ms var(--ease-out) both;
+}
+
+.csa-slide .csa-hero-photo {
+  animation: csa-in-photo 460ms var(--ease-out) both;
+}
+
+.csa-slide-next {
+  --slide-from: 18px;
+}
+
+.csa-slide-prev {
+  --slide-from: -18px;
+}
+
+@keyframes csa-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--slide-from));
+  }
+}
+
+@keyframes csa-in-photo {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--slide-from) * 2.2));
+  }
+}
+
+/* ---------- 넘기는 줄: ‹ 진행 칸 n / 20 › ---------- */
+.csa-nav {
   position: relative;
   z-index: 2;
-  display: grid;
-  /* 선수가 다섯보다 적게 오면 그만큼만 나눈다 */
-  grid-template-columns: repeat(var(--count, 5), 1fr);
-  margin: 0;
-  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
   border-top: 1px solid var(--line);
   background: rgb(10 11 13 / 85%);
+}
+
+.csa-arrow {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 4%);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    background var(--duration-fast) ease,
+    transform var(--duration-press) var(--ease-out);
+}
+
+.csa-arrow:hover {
+  border-color: color-mix(in srgb, var(--accent) 65%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: #fff;
+}
+
+.csa-arrow:active {
+  transform: scale(0.9);
+}
+
+.csa-arrow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 받은 수만큼 칸. 빗금 막대와 같은 기울기로, 지금 선수만 레드 */
+.csa-ticks {
+  display: flex;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
 
-.csa-strip button {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+.csa-ticks li {
+  flex: 1;
+}
+
+.csa-ticks button {
+  display: block;
   width: 100%;
-  padding: 7px 6px;
+  height: 14px;
+  padding: 0;
   border: none;
   background: transparent;
-  font-size: 11px;
-  color: var(--ink-3);
   cursor: pointer;
-  transition: color var(--duration-fast) ease;
 }
 
-.csa-strip button:hover {
+/* 누르는 칸은 넉넉하게, 보이는 막대는 가늘게 */
+.csa-ticks button::before {
+  content: '';
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  background: rgb(255 255 255 / 14%);
+  transform: skewX(-25deg);
+  transition: background var(--duration-fast) ease;
+}
+
+.csa-ticks button:hover::before {
+  background: rgb(255 255 255 / 30%);
+}
+
+.csa-ticks .csa-tick-on::before {
+  background: var(--accent);
+  box-shadow: 0 0 6px rgb(230 57 80 / 70%);
+}
+
+.csa-count {
+  flex: none;
+  min-width: 42px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ink-3);
+}
+
+.csa-count b {
+  font-size: 13px;
+  font-weight: 800;
   color: var(--ink);
 }
 
-.csa-strip img {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  filter: grayscale(0.7);
-}
+@media (prefers-reduced-motion: reduce) {
+  .csa-slide .csa-hero-body,
+  .csa-slide .csa-hero-photo {
+    animation: none;
+  }
 
-.csa-strip span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 지금 보는 선수: 위쪽 레드 줄 + 색을 돌려준다 */
-.csa-strip .csa-strip-on {
-  box-shadow: inset 0 2px 0 var(--accent);
-  color: var(--ink);
-}
-
-.csa-strip .csa-strip-on img {
-  filter: none;
+  .csa-arrow,
+  .csa-ticks button::before {
+    transition: none;
+  }
 }
 
 /* ---------- 룬 추천: 홈 화면의 섹션·탭·카드·칩을 그대로 쓴다 ---------- */

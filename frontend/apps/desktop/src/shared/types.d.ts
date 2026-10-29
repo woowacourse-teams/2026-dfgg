@@ -371,6 +371,8 @@ export interface RuneRecommendation {
 export interface TodayPick {
   player: { name: string; team: string | null; imageUrl: string | null };
   playedAt: string;
+  /** 매치 안 몇 번째 경기인지. 알 수 없으면 null */
+  setNumber?: number | null;
   champion: { id: number; name: string; imageUrl: string; position: string };
   spells: { id: number; name: string; imageUrl: string }[];
   items: { id: number; name: string; imageUrl: string }[];
