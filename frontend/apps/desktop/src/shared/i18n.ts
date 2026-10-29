@@ -98,7 +98,9 @@ const KO = {
   },
   df: {
     cardLabel: '이번 판 DF 스코어',
-    meta: (score: string, total: number) => `${score}점 · ${total}명 중`,
+    // 좁은 창에서 '1 / 등'처럼 끊기지 않게 점수와 순위를 따로 묶는다. 줄은 둘 사이에서만 바뀐다
+    points: (score: string) => `${score}점`,
+    among: (total: number) => `${total}명 중`,
     rank: (n: number) => `${n}등`,
     rankSuffix: (() => '등') as (n: number) => string,
   },
@@ -277,7 +279,8 @@ const EN: typeof KO = {
   },
   df: {
     cardLabel: 'DF score this game',
-    meta: (score, total) => `${score} pts · of ${total}`,
+    points: (score) => `${score} pts`,
+    among: (total) => `of ${total}`,
     rank: (n) => `#${n}`,
     rankSuffix: (n) => {
       const tens = n % 100;
