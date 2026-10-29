@@ -1,7 +1,7 @@
 {
   "name": "desktop",
   "productName": "dfgg",
-  "version": "2.1.0",
+  "version": "2.1.2",
   "description": "League of Legends item build recommendations from the ten champions in your match",
   "author": {
     "name": "dfgg"
@@ -16,12 +16,14 @@
     "build": "pnpm build:main && pnpm build:renderer",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "pnpm build && playwright test",
     "electron:start": "pnpm build:main && electron .",
     "electron:dev": "concurrently -k \"pnpm start\" \"wait-on http://localhost:3001/home/index.html && pnpm electron:start\"",
     "package": "pnpm build && electron-builder --win nsis",
     "package:store": "pnpm build && electron-builder --win appx",
     "package:all": "pnpm build && electron-builder --win nsis appx",
-    "package:publish": "pnpm build && electron-builder --win nsis --publish always"
+    "package:publish": "pnpm build && electron-builder --win nsis --publish always",
+    "typecheck:test": "tsc -p tsconfig.test.json"
   },
   "dependencies": {
     "electron-overlay-window": "^4.1.0",
@@ -30,6 +32,7 @@
     "ws": "^8.21.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@sentry/electron": "^7.20.0",
     "@types/node": "^22.20.4",
     "@types/react": "^19.3.0",

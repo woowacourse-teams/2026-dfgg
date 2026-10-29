@@ -4,6 +4,8 @@ import { getIdentity, type Identity } from './identity';
 import { Stopwatch } from './stopwatch';
 import { readStore, updateStore, type PendingEvent } from './store';
 import { enqueue } from './umami';
+import { appMemoryMb } from './perfSampler';
+import { isRecording } from '../highlight/highlight';
 
 const SNAPSHOT_INTERVAL_MS = 60_000;
 
@@ -15,9 +17,14 @@ const clientConnected = new Stopwatch();
 let lastIdentity: Identity | null = null;
 let quitSource: QuitSource = 'system';
 let timer: NodeJS.Timeout | null = null;
+// 스냅샷 때마다 잰 앱 메모리 중 최대
+let appMemMaxMb = 0;
 
 function snapshot(quit: QuitSource | 'crash'): PendingEvent {
   lastIdentity = getIdentity() ?? lastIdentity;
+  // 크래시면 마지막 스냅샷이 그대로 전송된다 → 죽기 직전(최대 1분 전) 녹화 중이었는지, 메모리가 얼마였는지 남는다.
+  const appMemMb = appMemoryMb();
+  appMemMaxMb = Math.max(appMemMaxMb, appMemMb);
 
   return {
     name: 'desktop-session-end',
@@ -28,6 +35,9 @@ function snapshot(quit: QuitSource | 'crash'): PendingEvent {
       homeVisibleSec: homeVisible.seconds(),
       clientConnectedSec: clientConnected.seconds(),
       quit,
+      recording: isRecording(),
+      appMemMb,
+      appMemMaxMb,
     },
   };
 }

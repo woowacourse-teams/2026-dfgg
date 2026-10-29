@@ -126,6 +126,8 @@ export function stopLcuConnection() {
   if (activeSocket === null) return;
 
   activeSocket.removeAllListeners();
+  // 연결 중 닫으면 ws가 error를 내는데, 예외 무시하기
+  activeSocket.on('error', () => {});
   activeSocket.close();
   activeSocket = null;
 }

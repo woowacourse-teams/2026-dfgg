@@ -1,5 +1,6 @@
 import https from 'node:https';
-import { RIOT_ROOT_CERT } from '../lcu/riotCert';
+import { riotCa } from '../lcu/riotCert';
+import { getTestEnv } from '../testEnv';
 
 const LIVE_REQUEST_TIMEOUT_MS = 5000;
 
@@ -8,10 +9,10 @@ export function liveRequest<T>(endpoint: string): Promise<T | null> {
     const req = https.request(
       {
         hostname: `127.0.0.1`,
-        port: 2999,
+        port: getTestEnv()?.livePort ?? 2999,
         path: endpoint,
         method: 'GET',
-        ca: RIOT_ROOT_CERT,
+        ca: riotCa(),
         timeout: LIVE_REQUEST_TIMEOUT_MS,
       },
       (res) => {

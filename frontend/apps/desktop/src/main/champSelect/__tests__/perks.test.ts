@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { Lockfile, RecommendedRunePage, TodayPick } from '../../../shared/types';
+import { lcuRequest } from '../../lcu/client';
+import { applyPerkPage, DFGG_PAGE_NAME, fromPro, fromRecommended } from '../perks';
 
-vi.mock('../sentry', () => ({ reportError: vi.fn() }));
-vi.mock('../lcu/client', () => ({ lcuRequest: vi.fn() }));
-
-import type { Lockfile, RecommendedRunePage, TodayPick } from '../../shared/types';
-import { lcuRequest } from '../lcu/client';
-import { applyPerkPage, DFGG_PAGE_NAME, fromPro, fromRecommended } from './perks';
+vi.mock('../../sentry', () => ({ reportError: vi.fn() }));
+vi.mock('../../lcu/client', () => ({ lcuRequest: vi.fn() }));
 
 const rune = (id: number) => ({ id, name: null, imageUrl: null });
 

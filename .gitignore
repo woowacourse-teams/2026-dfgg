@@ -41,3 +41,6 @@ umami-to-posthog/
 frontend/apps/desktop/resources/ffmpeg/
 
 frontend/apps/desktop/to-shorts.ps1
+
+frontend/apps/desktop/test-results/
+frontend/apps/desktop/playwright-report/

@@ -15,6 +15,7 @@ import { reportError } from '../sentry';
 import { BrowserWindow, screen } from 'electron';
 import { PerfSampler } from './perfSampler';
 import { isRecording } from '../highlight/highlight';
+import { getRecorderPid } from '../highlight/recoder';
 
 const SNAPSHOT_INTERVAL_MS = 60_000;
 // 게임은 끝났지만 결과 화면 전인 phase. 이때는 게임을 끝내지 않는다.
@@ -23,6 +24,8 @@ const POST_GAME_PHASES: (GameflowPhase | null)[] = ['WaitingForStats', 'PreEndOf
 type Game = {
   identity: Identity | null;
   gameId?: number;
+  // 큐 이름은 클라이언트 언어마다 달라서, 집계는 queueId 로 한다.
+  queueId?: number;
   queue?: string;
   champion?: string;
   position?: string;
@@ -97,6 +100,7 @@ function toEvent(current: Game, result: string): PendingEvent {
     data: {
       riotId: current.identity?.riotId,
       gameId: current.gameId,
+      queueId: current.queueId,
       queue: current.queue,
       champion: current.champion,
       position: current.position,
@@ -173,7 +177,7 @@ async function startGame() {
     perf: new PerfSampler(),
   };
   game = current;
-  current.perf.start(isRecording);
+  current.perf.start(isRecording, getRecorderPid);
   syncOverlay();
 
   // 게임 도중 강제 종료에 대비해 1분마다 저장해 둔다.
@@ -187,6 +191,7 @@ async function startGame() {
 
     const queueId = session.gameData.queue.id;
     current.gameId = session.gameData.gameId;
+    current.queueId = queueId;
     current.queue = (await fetchQueueName(queueId)) ?? String(queueId);
   } catch (error) {
     // 큐 정보 없이 계속한다.

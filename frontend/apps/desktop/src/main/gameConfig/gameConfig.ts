@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
-import { FALLBACK_DIRS, readInstallDirFromMetadata } from '../lcu/credentials';
+import { fallbackDirs, readInstallDirFromMetadata } from '../lcu/credentials';
 import { getLcuState } from '../lcu/state';
 import type { GameflowPhase } from '../../shared/types';
 import { trackEvent } from '../analytics/umami';
@@ -21,7 +21,7 @@ const WINDOWED = 1; // 창모드
 
 // 게임 설정 파일 찾기
 function findGameConfigPath() {
-  const candidates = [readInstallDirFromMetadata(), ...FALLBACK_DIRS]
+  const candidates = [readInstallDirFromMetadata(), ...fallbackDirs()]
     .filter((dir): dir is string => dir !== null)
     .map((dir) => path.join(dir, 'Config', 'game.cfg'));
   return candidates.find((p) => fs.existsSync(p)) ?? null;

@@ -1,13 +1,20 @@
 import { app } from 'electron';
 import * as Sentry from '@sentry/electron/main';
+import { makeMultiplexedTransport } from '@sentry/core';
 
 const SENTRY_DSN =
   'https://1f8b68803ea7d169f619192a0a33f4fc@o4512044427968512.ingest.us.sentry.io/4512179706200064';
+const SECOND_DSN =
+  'https://92f829b051589b80ba5778faf386124a@o4512292906270720.ingest.de.sentry.io/4512334770929744';
 
 // 개발 중 에러는 보내지 않는다. 개발 환경에서 연동을 확인할 때만 SENTRY_DEBUG=1 로 켠다.
 Sentry.init({
   dsn: SENTRY_DSN,
   enabled: app.isPackaged || process.env.SENTRY_DEBUG === '1',
+  transport: makeMultiplexedTransport(Sentry.makeElectronOfflineTransport(), () => [
+    SENTRY_DSN,
+    SECOND_DSN,
+  ]),
 });
 
 // 롤이 꺼져 있거나 파일이 아직 없는 건 정상 흐름이라 보내지 않는다.

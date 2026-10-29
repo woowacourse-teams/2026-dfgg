@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import type { LcuEvent, Lockfile } from '../../shared/types';
-import { RIOT_ROOT_CERT } from './riotCert';
+import { riotCa } from './riotCert';
 import { reportError } from '../sentry';
 
 // 이벤트 이름은 주소의 앞부분과 맞춰진다. current-summoner 하나로 그 아래 summoner-profile 까지 받는다.
@@ -18,7 +18,7 @@ export function connectLcuSocket(lockfile: Lockfile, onEvent: (payload: LcuEvent
 
   const ws = new WebSocket(`wss://127.0.0.1:${port}`, {
     headers: { Authorization: `Basic ${auth}` },
-    ca: RIOT_ROOT_CERT,
+    ca: riotCa(),
     handshakeTimeout: HANDSHAKE_TIMEOUT_MS,
   });
 

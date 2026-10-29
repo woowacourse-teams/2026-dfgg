@@ -78,7 +78,7 @@ async function sendPosthog({ name, data, id, timestamp }: PendingEvent) {
               $set: {
                 ...(data?.riotId && { name: data.riotId }),
                 ...settingSnapshot(),
-                ...hardwareSnapshot,
+                ...hardwareSnapshot(),
               },
             }
           : {}),

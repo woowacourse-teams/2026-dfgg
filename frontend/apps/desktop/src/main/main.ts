@@ -1,4 +1,4 @@
-// 다른 모듈이 로드되기 전에 초기화해야 그 안에서 난 에러도 잡힌다.
+import './testMode';
 import './sentry';
 
 import { app, BrowserWindow } from 'electron';
@@ -17,6 +17,7 @@ import { attachHomeToClient } from './docking/docking';
 import { flushOutbox, trackEvent } from './analytics/umami';
 import { readStore, updateStore } from './analytics/store';
 import { initIdentity } from './analytics/identity';
+import { loadGpuInfo } from './analytics/hardwareSnapshot';
 import {
   endSessionTracking,
   recoverLastSession,
@@ -34,6 +35,7 @@ import { handleMediaProtocol, registerMediaScheme } from './highlight/mediaProto
 import { cleanupOrphans, setMaxGames } from './highlight/storage';
 import { readSettings } from './settings';
 import { initOverlayVisibility, updateOverlayPhase } from './overlay/visibility';
+import { getTestEnv } from './testEnv';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
@@ -45,7 +47,7 @@ registerMediaScheme(); // dfgg-media 스킴 등록
 
 // 렌더러는 창 단위(out/renderer/home, out/renderer/overlay ...)로 빌드된다.
 function loadRenderer(win: BrowserWindow, name: string) {
-  if (app.isPackaged) {
+  if (app.isPackaged || getTestEnv()) {
     win.loadFile(path.join(__dirname, `../renderer/${name}/index.html`));
   } else {
     win.loadURL(`${DEV_SERVER_URL}/${name}/index.html`);
@@ -138,6 +140,9 @@ if (!gotTheLock) {
     recoverLastSession();
     recoverLastGame();
     flushOutbox();
+
+    // 사양은 소환사 연결 때(desktop-settings) 보내므로, 그 전에 GPU 정보를 읽어 둔다.
+    void loadGpuInfo();
 
     // LCU 연결 전에 구독해야 첫 connected 를 놓치지 않는다.
     initIdentity();

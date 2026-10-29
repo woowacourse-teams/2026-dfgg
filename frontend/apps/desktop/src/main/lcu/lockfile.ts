@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { readInstallDirFromMetadata, FALLBACK_DIRS } from './credentials';
+import { readInstallDirFromMetadata, fallbackDirs } from './credentials';
 import { reportError } from '../sentry';
 
 // 롤 폴더에서 lock file 경로를 찾는 함수
 function findLockfilePath() {
-  const candidates = [readInstallDirFromMetadata(), ...FALLBACK_DIRS]
+  const candidates = [readInstallDirFromMetadata(), ...fallbackDirs()]
     .filter((dir): dir is string => dir !== null)
     .map((dir) => path.join(dir, 'lockfile'));
 

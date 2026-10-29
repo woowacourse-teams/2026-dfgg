@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { LcuChampSelectSession } from '../lcu/champSelect.types';
-import { sameIds, toChampSelectInfo } from './session';
-
-const ME = 2;
+import { action, ME } from '../../../../test/fixtures/champSelect';
+import type { LcuChampSelectSession } from '../../lcu/champSelect.types';
+import { sameIds, toChampSelectInfo } from '../session';
 
 function session(overrides: Partial<LcuChampSelectSession> = {}): LcuChampSelectSession {
   return {
@@ -19,11 +18,11 @@ function session(overrides: Partial<LcuChampSelectSession> = {}): LcuChampSelect
     ],
     actions: [
       [
-        { actorCellId: 0, championId: 157, completed: true, type: 'ban' },
-        { actorCellId: 5, championId: 238, completed: true, type: 'ban' },
-        { actorCellId: 6, championId: 0, completed: false, type: 'ban' },
+        action({ actorCellId: 0, championId: 157, completed: true, type: 'ban' }),
+        action({ actorCellId: 5, championId: 238, completed: true, type: 'ban' }),
+        action({ actorCellId: 6, championId: 0, completed: false, type: 'ban' }),
       ],
-      [{ actorCellId: ME, championId: 61, completed: false, type: 'pick' }],
+      [action({ actorCellId: ME, championId: 61, completed: false, type: 'pick' })],
     ],
     ...overrides,
   };
@@ -59,7 +58,7 @@ describe('toChampSelectInfo', () => {
 
   it('내 픽 행동이 끝나면 확정으로 본다', () => {
     const locked = session({
-      actions: [[{ actorCellId: ME, championId: 61, completed: true, type: 'pick' }]],
+      actions: [[action({ actorCellId: ME, championId: 61, completed: true, type: 'pick' })]],
     });
 
     expect(toChampSelectInfo(locked).locked).toBe(true);
