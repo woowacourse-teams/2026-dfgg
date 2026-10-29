@@ -3,10 +3,13 @@ import { useMotionValueEvent, useScroll } from 'motion/react';
 import { useState } from 'react';
 
 import Logo from '../assets/icon.png';
-import { LOCALE, localePath, strings } from '../i18n/i18n';
+import { LOCALE, localePath, strings, stripLocale } from '../i18n/i18n';
 
 const text = strings().header;
 const OTHER_LOCALE = LOCALE === 'ko' ? 'en' : 'ko';
+// 언어를 바꿔도 보던 페이지에 머문다. 홈이면 '/' 그대로
+const CURRENT_PATH = stripLocale(window.location.pathname);
+const ON_FEATURES = CURRENT_PATH.startsWith('/features');
 
 export default function SiteHeader() {
   const { scrollY } = useScroll();
@@ -44,16 +47,38 @@ export default function SiteHeader() {
             <span className='text-xs font-medium text-ink-3'>Beta</span>{' '}
             <span className='sr-only'>{text.homeLabel}</span>
           </a>
-          <div className='flex items-center gap-5'>
+          <div className='flex items-center gap-4 sm:gap-5'>
             <a
-              href='#install'
-              data-umami-event='header-install-guide-click'
-              className='text-sm text-ink-2 transition-colors hover:text-ink'
+              href={localePath(LOCALE, '/features')}
+              aria-current={ON_FEATURES ? 'page' : undefined}
+              data-umami-event='header-features-click'
+              className={`text-sm transition-colors hover:text-ink ${
+                ON_FEATURES ? 'text-white' : 'text-ink-2'
+              }`}
             >
-              {text.installGuide}
+              {text.features}
+            </a>
+            {/* 설치 안내는 홈에만 있다 */}
+            {!ON_FEATURES && (
+              <a
+                href='#install'
+                data-umami-event='header-install-guide-click'
+                className='hidden text-sm text-ink-2 transition-colors hover:text-ink sm:inline'
+              >
+                {text.installGuide}
+              </a>
+            )}
+            {/* 지금 페이지의 다운로드 자리로 내려간다 (홈은 히어로, 기능 소개는 맨 아래) */}
+            <a
+              href='#download'
+              data-umami-event='header-download-click'
+              data-umami-event-page={ON_FEATURES ? 'features' : 'home'}
+              className='rounded-md bg-accent-strong px-3.5 py-1.5 text-sm font-bold text-white transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent active:bg-accent-deep'
+            >
+              {text.download}
             </a>
             <a
-              href={localePath(OTHER_LOCALE)}
+              href={localePath(OTHER_LOCALE, CURRENT_PATH)}
               hrefLang={OTHER_LOCALE}
               lang={OTHER_LOCALE}
               aria-label={text.switchLanguageLabel}

@@ -75,6 +75,10 @@
   color: var(--ink-2);
 }
 
+.df-card-meta > span {
+  white-space: nowrap;
+}
+
 .df-card-ladder {
   display: flex;
   gap: 3px;
