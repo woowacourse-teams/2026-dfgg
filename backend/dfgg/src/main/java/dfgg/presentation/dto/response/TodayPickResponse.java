@@ -23,6 +23,7 @@ public record TodayPickResponse(TournamentResponse tournament, ChampionPosition 
     public record PickResponse(
             PlayerResponse player,
             LocalDate playedAt,
+            Integer setNumber,
             ChampionResponse champion,
             List<EntryResponse> spells,
             List<EntryResponse> items,

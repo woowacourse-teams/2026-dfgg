@@ -53,6 +53,7 @@ class TodayPickCatalog {
         return new PickResponse(
                 new PlayerResponse(player.getName(), pick.getTeam(), player.getImageUrl()),
                 pick.getPlayedAt().toLocalDate(),
+                pick.getSetNumber(),
                 championOf(pick),
                 pick.getSpells().stream().map(spell -> spellOf(spell.getSpellId())).flatMap(Optional::stream).toList(),
                 pick.getItems().stream().map(item -> itemOf(item.getItemId())).flatMap(Optional::stream).toList(),

@@ -72,6 +72,7 @@ class TodayPickControllerTest {
                 .body("position", equalTo("MID"))
                 .body("picks.player.name", containsInAnyOrder("Faker", "Chovy"))
                 .body("picks.find { it.player.name == 'Faker' }.playedAt", equalTo("2026-10-27"))
+                .body("picks.find { it.player.name == 'Faker' }.setNumber", equalTo(2))
                 .body("picks.find { it.player.name == 'Faker' }.champion.name", equalTo("테스트챔피언"))
                 .body("picks.find { it.player.name == 'Faker' }.spells.name", contains("점멸", "점화"))
                 .body("picks.find { it.player.name == 'Faker' }.items.id", contains(9001, 9002))
