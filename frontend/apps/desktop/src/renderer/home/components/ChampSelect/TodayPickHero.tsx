@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { runeTreeOf } from '../../../../shared/runeTrees';
 import { todayPickKey } from '../../../../shared/todayPicks';
@@ -71,16 +71,37 @@ type Props = {
 
 type Slide = { index: number; dir: 'next' | 'prev' };
 
+/** 이만큼 지나면 다음 선수로 넘긴다. 진행 칸이 같은 시간 동안 차오른다 (CSS csa-autoplay 5s 와 같은 값) */
+const AUTOPLAY_MS = 5000;
+const AUTOPLAY_TICK_MS = 100;
+
 /**
  * 중계 화면 하단 자막처럼: 선수 한 명을 크게, 사진은 사선으로 잘라 오른쪽에 세운다.
  * 받은 20명을 카드 넘기듯 좌우 화살표로 넘긴다. 끝에서 넘기면 처음으로 돌아간다.
  */
 function TodayPickHero({ todayPicks, proInUse, onUsePro }: Props) {
   const [slide, setSlide] = useState<Slide>({ index: 0, dir: 'next' });
+  const heroRef = useRef<HTMLElement>(null);
   const { picks, tournament } = todayPicks;
   const total = picks.length;
   const index = Math.min(slide.index, total - 1);
   const pick = picks[index];
+
+  // 선수가 바뀔 때마다 다시 센다. 직접 넘기면 그때부터 5초.
+  // 마우스를 올렸거나 키보드로 안을 고르는 중이면 그동안은 세지 않는다. 보는 중에 넘어가면 안 된다.
+  // mouseenter/leave 를 상태로 들면 넘길 때마다 안쪽을 새로 그려서 나간 걸 놓친다. 그래서 그때그때 :hover 를 본다.
+  useEffect(() => {
+    if (total < 2) return;
+    let elapsed = 0;
+    const timer = setInterval(() => {
+      if (heroRef.current?.matches(':hover, :focus-within')) return;
+      elapsed += AUTOPLAY_TICK_MS;
+      if (elapsed < AUTOPLAY_MS) return;
+      setSlide((current) => ({ index: (current.index + 1) % total, dir: 'next' }));
+    }, AUTOPLAY_TICK_MS);
+    return () => clearInterval(timer);
+  }, [slide, total]);
+
   if (!pick) return null;
 
   const show = (next: number, dir: Slide['dir'], how: 'arrow' | 'tick' | 'key') => {
@@ -98,6 +119,7 @@ function TodayPickHero({ todayPicks, proInUse, onUsePro }: Props) {
   return (
     <>
       <section
+        ref={heroRef}
         className='csa-hero'
         aria-label={t.champSelect.todayPick}
         aria-roledescription='carousel'
@@ -161,6 +183,8 @@ function TodayPickHero({ todayPicks, proInUse, onUsePro }: Props) {
               {picks.map((other, at) => (
                 <li key={todayPickKey(other)}>
                   <button
+                    // 지금 칸은 다시 그려서 차오르는 애니메이션을 처음부터 시작한다
+                    key={at === index ? `on-${todayPickKey(pick)}` : 'off'}
                     type='button'
                     tabIndex={-1}
                     className={at === index ? 'csa-tick-on' : ''}

@@ -414,8 +414,37 @@
 }
 
 .csa-ticks .csa-tick-on::before {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: 0 0 6px rgb(230 57 80 / 45%);
+}
+
+/* 지금 칸은 다음 선수로 넘어갈 때까지 5초 동안 차오른다. 멈추면 같이 멈춘다 */
+.csa-ticks .csa-tick-on {
+  position: relative;
+}
+
+.csa-ticks .csa-tick-on::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 0;
+  left: 0;
+  height: 4px;
   background: var(--accent);
-  box-shadow: 0 0 6px rgb(230 57 80 / 70%);
+  transform: skewX(-25deg) scaleX(0);
+  transform-origin: left;
+  animation: csa-autoplay 5s linear forwards;
+}
+
+/* 타이머와 같은 조건(:hover, :focus-within)에서 같이 멈춘다 */
+.csa-hero:is(:hover, :focus-within) .csa-ticks .csa-tick-on::after {
+  animation-play-state: paused;
+}
+
+@keyframes csa-autoplay {
+  to {
+    transform: skewX(-25deg) scaleX(1);
+  }
 }
 
 .csa-count {
@@ -442,6 +471,12 @@
   .csa-arrow,
   .csa-ticks button::before {
     transition: none;
+  }
+
+  /* 차오르는 움직임 대신 칸을 바로 채워 둔다. 넘어가는 건 그대로 */
+  .csa-ticks .csa-tick-on::after {
+    animation: none;
+    transform: skewX(-25deg) scaleX(1);
   }
 }
 
