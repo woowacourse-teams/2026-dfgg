@@ -202,6 +202,12 @@
   color: var(--ink-2);
 }
 
+/* 남길 장면이 없거나 지워졌을 때: 영상이 들어올 자리가 아니라서 낮게 */
+.hl-notice-compact {
+  aspect-ratio: auto;
+  padding: 28px 24px;
+}
+
 .hl-notice-making {
   border-style: solid;
 }

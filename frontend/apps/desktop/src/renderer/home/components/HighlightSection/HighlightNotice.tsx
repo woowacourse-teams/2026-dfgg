@@ -42,7 +42,7 @@ function HighlightNotice(props: Props) {
       : { title: t.highlight.deletedTitle, desc: t.highlight.deletedDesc };
 
   return (
-    <div className='hl-notice'>
+    <div className='hl-notice hl-notice-compact'>
       <strong>{copy.title}</strong>
       <small>{copy.desc}</small>
     </div>

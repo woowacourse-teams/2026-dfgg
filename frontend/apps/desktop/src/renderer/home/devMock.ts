@@ -332,6 +332,13 @@ if (!window.lcu) {
     getEndedGame: async () => null,
     getDfScores: async (gameId) => dfScores(gameId),
   };
+  // 클립 주소(dfgg-media://)는 앱 안에서만 열린다. 브라우저 미리보기에서는 랜딩의 게임 영상으로 바꿔 끼운다
+  const PREVIEW_VIDEO = 'https://dfgg.pro/media/gameplay.mp4';
+  const setAttribute = Element.prototype.setAttribute;
+  Element.prototype.setAttribute = function (name: string, value: string) {
+    const isClip = name === 'src' && value.startsWith('dfgg-media://');
+    return setAttribute.call(this, name, isClip ? PREVIEW_VIDEO : value);
+  };
   window.highlight = {
     list: async () => (postgame && postgameMode !== 'making' ? [postgame] : []),
     // 첫 전적 카드에 하이라이트 버튼이 보이게 한다
