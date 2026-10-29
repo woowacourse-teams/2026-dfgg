@@ -294,23 +294,35 @@
 .match-highlight {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  padding: 8px 14px;
+  padding: 9px 14px;
   border: 0;
   border-top: 1px solid var(--line);
   background: transparent;
-  color: var(--accent);
+  color: var(--ink-2);
   font-size: 12px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  transition: background var(--duration-fast) ease;
+  transition:
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+/* 왼쪽 레드 기울인 칸. 하이라이트가 있는 판이라는 표시 */
+.match-highlight::before {
+  content: '';
+  width: 4px;
+  height: 14px;
+  background: var(--accent);
+  transform: skewX(-12deg);
 }
 
 @media (hover: hover) {
   .match-highlight:hover {
     background: var(--surface-2);
+    color: var(--ink);
   }
 }
 

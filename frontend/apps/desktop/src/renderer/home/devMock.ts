@@ -69,6 +69,7 @@ const BLUE_TEAM = 100;
 const RED_TEAM = 200;
 const TEAM_SIZE = 5;
 const PHASE_DELAY_MS = 300;
+const MAKING_STEP_MS = 1200;
 
 const summoner: Summoner = {
   puuid: 'mock-puuid',
@@ -287,15 +288,20 @@ function dfScores(gameId: number): DfScores | null {
 }
 
 // ?postgame=1 이면 첫 전적이 방금 끝난 판인 것처럼 하이라이트 완료 알림을 한 번 보낸다.
+//   ?postgame=making  클립을 만드는 중 (진행 칸이 하나씩 찬다)
+//   ?postgame=empty   다 만들었는데 남길 장면이 없었던 판
 const POSTGAME_SESSION_ID = 'mock-postgame';
-const postgame: HighlightGame | null = params.has('postgame')
-  ? {
-      id: POSTGAME_SESSION_ID,
-      gameId: matches[0].gameId,
-      startAt: Date.now(),
-      clips: [{ file: 'mock.mp4', start: 0, end: 12, events: [] }],
-    }
-  : null;
+const postgameMode = params.get('postgame');
+const MOCK_CLIPS = [16, 22, 9].map((length, index) => ({
+  file: `clip-0${index + 1}.mp4`,
+  start: index * 40,
+  end: index * 40 + length,
+  events: [],
+}));
+const postgame: HighlightGame | null =
+  postgameMode !== null && postgameMode !== 'empty'
+    ? { id: POSTGAME_SESSION_ID, gameId: matches[0].gameId, startAt: Date.now(), clips: MOCK_CLIPS }
+    : null;
 
 // Electron 안에서는 진짜 preload 가 이미 있으므로 건드리지 않는다.
 if (!window.lcu) {
@@ -327,16 +333,37 @@ if (!window.lcu) {
     getDfScores: async (gameId) => dfScores(gameId),
   };
   window.highlight = {
-    list: async () => (postgame ? [postgame] : []),
-    summary: async () => ({}),
+    list: async () => (postgame && postgameMode !== 'making' ? [postgame] : []),
+    // 첫 전적 카드에 하이라이트 버튼이 보이게 한다
+    summary: async () =>
+      postgame
+        ? {
+            [postgame.gameId as number]: {
+              id: postgame.id,
+              count: MOCK_CLIPS.length,
+              duration: 47,
+            },
+          }
+        : {},
     get: async (gameId) => (postgame?.gameId === gameId ? postgame : null),
     onProgress: (callback) => {
-      const timer = postgame
-        ? setTimeout(
-            () => callback({ id: postgame.id, done: 0, total: 0, finished: true }),
-            PHASE_DELAY_MS,
-          )
-        : undefined;
+      if (postgameMode === null) return unsubscribe;
+      const id = POSTGAME_SESSION_ID;
+      const total = MOCK_CLIPS.length;
+      // 만드는 중이면 진행 칸을 하나씩 채우고 마지막 칸 앞에서 멈춘다
+      if (postgameMode === 'making') {
+        let done = 0;
+        callback({ id, done, total, finished: false });
+        const timer = setInterval(() => {
+          done = (done + 1) % total;
+          callback({ id, done, total, finished: false });
+        }, MAKING_STEP_MS);
+        return () => clearInterval(timer);
+      }
+      const timer = setTimeout(
+        () => callback({ id, done: total, total, finished: true }),
+        PHASE_DELAY_MS,
+      );
       return () => clearTimeout(timer);
     },
   };

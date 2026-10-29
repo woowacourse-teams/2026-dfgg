@@ -1,30 +1,233 @@
+/*
+ * 하이라이트 플레이어. 오늘의 픽과 같은 중계 그래픽 딱지, 앱 곳곳의 빗금·기울기를 그대로 쓴다.
+ * 레드는 '지금 보는 클립', 흐린 흰색은 '본 클립'.
+ */
+.hl-stage {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-l);
+  background: #000;
+}
+
 .hl-video {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 10; /* 녹화 해상도 1280x800 */
-  border-radius: var(--radius-m);
   background: #000;
 }
 
-.hl-clips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+/* 'HIGHLIGHT 2 / 3'. 영상 위 왼쪽 위 코너 */
+.hl-tag {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 18px;
+  letter-spacing: 0.04em;
+  transform: skewX(-12deg);
+  pointer-events: none;
 }
 
-.hl-clips button {
-  min-width: 32px;
-  padding: 4px 10px;
+.hl-tag b {
+  padding: 0 7px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.hl-tag span {
+  padding: 0 7px;
+  background: rgb(10 11 13 / 80%);
+  color: var(--ink);
+  letter-spacing: 0;
+}
+
+/* ---------- 클립 고르는 줄 ---------- */
+.hl-rail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.hl-step {
+  flex: none;
+  width: 28px;
+  height: 28px;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-s);
+  border-radius: 8px;
   background: var(--surface-2);
+  font-size: 16px;
+  line-height: 1;
   color: var(--ink-2);
-  font-size: 12px;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    transform var(--duration-press) var(--ease-out);
+}
+
+.hl-step:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  color: var(--ink);
+}
+
+.hl-step:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.hl-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* 클립 길이만큼 칸 폭을 나눈다 (li 의 flex-grow 를 길이로 준다) */
+.hl-segments {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hl-segments li {
+  flex-basis: 0;
+  min-width: 28px;
+}
+
+.hl-segment {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
   cursor: pointer;
 }
 
-.hl-clips button.active {
-  border-color: var(--accent);
+/* 칸 하나. 빗금 막대와 같은 -25도 기울기 */
+.hl-segment-bar {
+  position: relative;
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  background: rgb(255 255 255 / 12%);
+  transform: skewX(-25deg);
+  transition: background var(--duration-fast) ease;
+}
+
+.hl-segment:hover .hl-segment-bar {
+  background: rgb(255 255 255 / 22%);
+}
+
+.hl-segment-done .hl-segment-bar {
+  background: rgb(255 255 255 / 38%);
+}
+
+.hl-segment-on .hl-segment-bar {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* 재생한 만큼 차오른다. JS 가 scaleX 만 바꾼다 */
+.hl-segment-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.hl-segment-text {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  overflow: hidden;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hl-segment-text b {
+  font-size: 11px;
+  font-weight: 800;
+  font-style: italic;
+}
+
+.hl-segment-on {
   color: var(--ink);
+}
+
+.hl-segment-on .hl-segment-text b {
+  color: var(--accent);
+}
+
+.hl-segment:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- 영상 대신 보이는 자리 ---------- */
+.hl-notice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  aspect-ratio: 16 / 10;
+  padding: 24px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-l);
+  background:
+    radial-gradient(circle at 50% 120%, rgb(230 57 80 / 12%), transparent 60%), var(--surface);
+  text-align: center;
+}
+
+.hl-notice strong {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.hl-notice small {
+  max-width: 280px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.hl-notice-making {
+  border-style: solid;
+}
+
+/* 만드는 중: 클립 수만큼 칸, 다 만든 칸은 레드 */
+.hl-notice-cells {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.hl-notice-cells i {
+  width: 22px;
+  height: 7px;
+  background: rgb(255 255 255 / 12%);
+  transform: skewX(-25deg);
+}
+
+.hl-notice-cells .hl-notice-cell-done {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgb(230 57 80 / 60%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hl-step,
+  .hl-segment-bar {
+    transition: none;
+  }
 }
