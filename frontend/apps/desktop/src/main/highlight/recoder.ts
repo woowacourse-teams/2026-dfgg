@@ -23,6 +23,9 @@ let proc: ChildProcess | null = null; // 실행 중인 ffmpeg 프로세스
 let current: RecordingSession | null = null; // 진행 중인 세션 정보
 let stopping = false; // 정지 요청을 이미 보냈는지
 
+// 녹화 중인 ffmpeg 의 PID (성능 측정용). 녹화 중이 아니면 null
+export const getRecorderPid = () => proc?.pid ?? null;
+
 // 녹화 시작, 사용처: 다음 단계에서 게임이 InProgress가 되면 호출
 // 반환: 세션 정보
 export async function startRecording(): Promise<RecordingSession | null> {
@@ -136,12 +139,19 @@ export function readCaptureStats(dir: string) {
     const last = all.at(-1); // 진행 줄이 계속 갱신되므로 마지막이 최종 값
     if (!last) return {};
 
-    const frames = Number(last[1]);
-    const dup = Number(last[2]);
+    const frames = Number(last[1]); // 저장된 프레임 (dup 포함)
+    const dup = Number(last[2]); // 30fps 를 채우려고 복제한 프레임
+    const drop = Number(last[3]); // 30fps 를 넘어서 버린 프레임
+    const input = frames - dup + drop; // 캡처에서 실제로 들어온 프레임
+    // 비율은 모두 0~1 (소수 셋째 자리). 2.1.2 전 dupRatio 는 % 였다.
+    const ratio = (n: number, total: number) =>
+      total > 0 ? Math.round((n / total) * 1000) / 1000 : 0;
     return {
       frames,
-      dupRatio: frames > 0 ? Math.round((dup / frames) * 1000) / 10 : 0, // % (소수 한 자리)
-      drop: Number(last[3]),
+      dup,
+      drop,
+      dupRatio: ratio(dup, frames), // 저장된 프레임 중 복제 비율 → 높으면 캡처가 30fps 를 못 줌
+      dropRatio: ratio(drop, input), // 들어온 프레임 중 버린 비율 → 높으면 캡처가 30fps 보다 많이 줌
       speed: Number(last[4]), // 1보다 작으면 인코딩이 실시간을 못 따라감
     };
   } catch {
