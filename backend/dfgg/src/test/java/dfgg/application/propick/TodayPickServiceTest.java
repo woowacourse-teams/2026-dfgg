@@ -1,11 +1,8 @@
 package dfgg.application.propick;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
-import dfgg.common.exception.ChampionNotFoundException;
-import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.image.ImageUrls;
@@ -21,7 +18,6 @@ import dfgg.presentation.dto.response.TodayPickResponse.PickResponse;
 import dfgg.presentation.dto.response.TodayPickResponse.RunesResponse;
 import dfgg.presentation.dto.response.TodayPickResponse.TreeResponse;
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,7 +72,7 @@ class TodayPickServiceTest {
     @DisplayName("최근 대회의 이름·리그·시작일과 요청한 포지션을 담는다")
     void recommend_WhenPicksExist_IncludeLatestTournament() {
         // when
-        TodayPickResponse response = todayPickService.recommend(ChampionPosition.MID, List.of(), Language.KO_KR);
+        TodayPickResponse response = todayPickService.recommend(ChampionPosition.MID, Language.KO_KR);
 
         // then
         assertThat(response.tournament().name()).isEqualTo("2026 Worlds Main Event");
@@ -89,22 +85,11 @@ class TodayPickServiceTest {
     @DisplayName("최근 대회의 내 라인 픽만 뽑는다 — 다른 라인과 예전 대회 픽은 나오지 않는다")
     void recommend_WhenOtherPositionOrOlderTournamentExists_DrawOnlyLatestTournamentPosition() {
         // when
-        TodayPickResponse response = todayPickService.recommend(ChampionPosition.MID, List.of(), Language.KO_KR);
+        TodayPickResponse response = todayPickService.recommend(ChampionPosition.MID, Language.KO_KR);
 
         // then
         assertThat(response.picks()).extracting(pick -> pick.player().name())
                 .containsExactlyInAnyOrder("Faker", "Chovy");
-    }
-
-    @Test
-    @DisplayName("밴된 챔피언의 픽은 빠진다")
-    void recommend_WhenChampionBanned_ExcludePick() {
-        // when
-        TodayPickResponse response = todayPickService.recommend(ChampionPosition.MID, List.of(9002, 9002),
-                Language.KO_KR);
-
-        // then
-        assertThat(response.picks()).extracting(pick -> pick.champion().id()).containsExactly(9001L);
     }
 
     @Test
@@ -200,7 +185,7 @@ class TodayPickServiceTest {
         jdbcTemplate.update("DELETE FROM pro_picks");
 
         // when
-        TodayPickResponse response = todayPickService.recommend(ChampionPosition.MID, List.of(), Language.KO_KR);
+        TodayPickResponse response = todayPickService.recommend(ChampionPosition.MID, Language.KO_KR);
 
         // then
         assertThat(response.tournament()).isNull();
@@ -208,33 +193,12 @@ class TodayPickServiceTest {
         assertThat(response.picks()).isEmpty();
     }
 
-    @Test
-    @DisplayName("밴이 11개 이상이면 거부한다 — 양 팀이 같은 챔피언을 밴한 중복도 개수에 든다")
-    void recommend_WhenElevenBans_Throw() {
-        // given
-        List<Integer> bans = Collections.nCopies(11, 9001);
-
-        // when & then
-        assertThatThrownBy(() -> todayPickService.recommend(ChampionPosition.MID, bans, Language.KO_KR))
-                .isInstanceOf(InvalidRecommendationRequestException.class)
-                .hasMessageContaining("11");
-    }
-
-    @Test
-    @DisplayName("등록되지 않은 챔피언을 밴하면 그 id를 담아 거부한다")
-    void recommend_WhenUnknownChampionBanned_Throw() {
-        assertThatThrownBy(() -> todayPickService.recommend(ChampionPosition.MID, List.of(9001, 99999),
-                Language.KO_KR))
-                .isInstanceOf(ChampionNotFoundException.class)
-                .hasMessageContaining("99999");
-    }
-
     private PickResponse fakerPick(Language language) {
         return pickOf("Faker", language);
     }
 
     private PickResponse pickOf(String playerName, Language language) {
-        return todayPickService.recommend(ChampionPosition.MID, List.of(), language).picks().stream()
+        return todayPickService.recommend(ChampionPosition.MID, language).picks().stream()
                 .filter(pick -> pick.player().name().equals(playerName))
                 .findFirst()
                 .orElseThrow();

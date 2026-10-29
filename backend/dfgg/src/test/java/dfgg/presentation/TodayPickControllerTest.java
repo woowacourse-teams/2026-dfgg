@@ -2,11 +2,12 @@ package dfgg.presentation;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 
 import io.restassured.RestAssured;
@@ -71,6 +72,7 @@ class TodayPickControllerTest {
                 .body("position", equalTo("MID"))
                 .body("picks.player.name", containsInAnyOrder("Faker", "Chovy"))
                 .body("picks.find { it.player.name == 'Faker' }.playedAt", equalTo("2026-10-27"))
+                .body("picks.find { it.player.name == 'Faker' }.setNumber", equalTo(2))
                 .body("picks.find { it.player.name == 'Faker' }.champion.name", equalTo("테스트챔피언"))
                 .body("picks.find { it.player.name == 'Faker' }.spells.name", contains("점멸", "점화"))
                 .body("picks.find { it.player.name == 'Faker' }.items.id", contains(9001, 9002))
@@ -79,8 +81,8 @@ class TodayPickControllerTest {
     }
 
     @Test
-    @DisplayName("밴은 중복을 허용하고, 밴된 챔피언의 픽은 빠진다")
-    void todayPicks_WhenBansGiven_ExcludeBannedChampions() {
+    @DisplayName("밴을 보내도 빼지 않는다 — 밴된 챔피언의 픽도 나온다")
+    void todayPicks_WhenBansSent_IgnoreBans() {
         given()
                 .contentType(ContentType.JSON)
                 .body("""
@@ -88,7 +90,48 @@ class TodayPickControllerTest {
                         """)
                 .when().post("/api/today-picks")
                 .then().statusCode(200)
-                .body("picks.champion.id", contains(9001));
+                .body("picks.champion.id", containsInAnyOrder(9001, 9002));
+    }
+
+    @Test
+    @DisplayName("진 경기의 픽은 응답하지 않는다")
+    void todayPicks_WhenLostPickExists_ExcludeLostPick() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"position": "MID"}
+                        """)
+                .when().post("/api/today-picks")
+                .then().statusCode(200)
+                .body("picks.champion.id", not(hasItem(9003)))
+                .body("picks.player.name", containsInAnyOrder("Faker", "Chovy"));
+    }
+
+    @Test
+    @DisplayName("후보가 많으면 20개까지 응답한다")
+    void todayPicks_WhenManyCandidates_RespondTwenty() {
+        // given
+        jdbcTemplate.update("""
+                INSERT INTO champions (champion_id, riot_key, name)
+                SELECT 9100 + n, 'ProManyChampion' || n, jsonb_build_object('ko-KR', '챔피언' || n, 'en-US', 'Champion ' || n)
+                FROM generate_series(1, 25) n
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO pro_picks (tournament_id, player_id, source_game_id, played_at, team, side, position,
+                                       champion_id, win)
+                SELECT 1, 2, 'many' || n, '2026-10-26 08:00:00+00', 'Gen.G', 'RED', 'MID', 9100 + n, true
+                FROM generate_series(1, 25) n
+                """);
+
+        // when & then
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"position": "MID"}
+                        """)
+                .when().post("/api/today-picks")
+                .then().statusCode(200)
+                .body("picks", hasSize(20));
     }
 
     @Test
@@ -127,30 +170,21 @@ class TodayPickControllerTest {
                 """.formatted(position));
     }
 
-    @Test
-    @DisplayName("밴이 11개 이상이면 400이다 — 양 팀 5개씩 10개까지다")
-    void todayPicks_WhenElevenBans_Respond400() {
-        badRequest("""
-                {"position": "MID", "bans": [9001, 9001, 9001, 9001, 9001, 9001, 9001, 9001, 9001, 9001, 9001]}
-                """)
-                .body("detail", containsString("bans"));
-    }
-
-    @Test
-    @DisplayName("알 수 없는 챔피언을 밴하면 400이고, 그 id를 알려준다")
-    void todayPicks_WhenUnknownChampionBanned_Respond400WithId() {
-        badRequest("""
-                {"position": "MID", "bans": [9001, 99999]}
-                """)
-                .body("detail", containsString("99999"));
-    }
-
-    @Test
-    @DisplayName("밴이 숫자가 아니면 400이다")
-    void todayPicks_WhenBanNotNumber_Respond400() {
-        badRequest("""
-                {"position": "MID", "bans": ["Ahri"]}
-                """);
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "[9001, 9001, 9001, 9001, 9001, 9001, 9001, 9001, 9001, 9001, 9001]",
+            "[9001, 99999]",
+            "[\"Ahri\"]"})
+    @DisplayName("밴은 보지 않으므로 개수·알 수 없는 챔피언·숫자 아님과 상관없이 200이다 — 예전 클라이언트가 보내도 된다")
+    void todayPicks_WhenAnyBansSent_Respond200(String bans) {
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"position": "MID", "bans": %s}
+                        """.formatted(bans))
+                .when().post("/api/today-picks")
+                .then().statusCode(200)
+                .body("picks", hasSize(2));
     }
 
     @Test

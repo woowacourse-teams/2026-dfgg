@@ -18,26 +18,13 @@ class ProPickDrawTest {
     private final ProPickDraw draw = new ProPickDraw(SIZE);
 
     @Test
-    @DisplayName("밴된 챔피언의 픽은 뽑지 않는다 — 양 팀이 같은 챔피언을 밴해 중복돼도 된다")
-    void draw_WhenBansGiven_ExcludeBannedChampions() {
-        // given
-        List<ProPick> candidates = List.of(pick("g1", 1L), pick("g2", 2L), pick("g3", 3L));
-
-        // when
-        List<ProPick> drawn = draw.draw(candidates, List.of(2, 2, 3), new Random(SEED));
-
-        // then
-        assertThat(drawn).extracting(ProPick::getChampionId).containsExactly(1L);
-    }
-
-    @Test
     @DisplayName("같은 챔피언은 한 번만 뽑는다")
     void draw_WhenSameChampionPickedSeveralTimes_DrawOnce() {
         // given
         List<ProPick> candidates = List.of(pick("g1", 1L), pick("g2", 1L), pick("g3", 1L), pick("g4", 2L));
 
         // when
-        List<ProPick> drawn = draw.draw(candidates, List.of(), new Random(SEED));
+        List<ProPick> drawn = draw.draw(candidates, new Random(SEED));
 
         // then
         assertThat(drawn).extracting(ProPick::getChampionId).containsExactlyInAnyOrder(1L, 2L);
@@ -50,7 +37,7 @@ class ProPickDrawTest {
         List<ProPick> candidates = IntStream.rangeClosed(1, 20).mapToObj(id -> pick("g" + id, (long) id)).toList();
 
         // when
-        List<ProPick> drawn = draw.draw(candidates, List.of(), new Random(SEED));
+        List<ProPick> drawn = draw.draw(candidates, new Random(SEED));
 
         // then
         assertThat(drawn).hasSize(SIZE);
@@ -64,8 +51,8 @@ class ProPickDrawTest {
         List<ProPick> candidates = List.of(pick("g1", 1L), pick("g2", 2L));
 
         // when & then
-        assertThat(draw.draw(candidates, List.of(), new Random(SEED))).hasSize(2);
-        assertThat(draw.draw(List.of(), List.of(), new Random(SEED))).isEmpty();
+        assertThat(draw.draw(candidates, new Random(SEED))).hasSize(2);
+        assertThat(draw.draw(List.of(), new Random(SEED))).isEmpty();
     }
 
     @Test
@@ -75,8 +62,8 @@ class ProPickDrawTest {
         List<ProPick> candidates = IntStream.rangeClosed(1, 20).mapToObj(id -> pick("g" + id, (long) id % 8)).toList();
 
         // when
-        List<ProPick> first = draw.draw(candidates, List.of(3), new Random(SEED));
-        List<ProPick> second = draw.draw(candidates, List.of(3), new Random(SEED));
+        List<ProPick> first = draw.draw(candidates, new Random(SEED));
+        List<ProPick> second = draw.draw(candidates, new Random(SEED));
 
         // then
         assertThat(first).containsExactlyElementsOf(second);
@@ -90,7 +77,7 @@ class ProPickDrawTest {
 
         // when
         long distinctResults = IntStream.range(0, 10)
-                .mapToObj(seed -> draw.draw(candidates, List.of(), new Random(seed)))
+                .mapToObj(seed -> draw.draw(candidates, new Random(seed)))
                 .distinct()
                 .count();
 

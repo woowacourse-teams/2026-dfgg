@@ -127,6 +127,19 @@ public class ProPick {
         return sourceGameId;
     }
 
+    /** 세트 번호. Leaguepedia GameId(대회 페이지_탭_매치 번호_세트 번호)의 마지막 숫자다. 숫자가 아니면 null. */
+    public Integer getSetNumber() {
+        int separator = sourceGameId.lastIndexOf('_');
+        if (separator < 0) {
+            return null;
+        }
+        String last = sourceGameId.substring(separator + 1);
+        if (last.isEmpty() || !last.chars().allMatch(Character::isDigit)) {
+            return null;
+        }
+        return Integer.valueOf(last);
+    }
+
     public OffsetDateTime getPlayedAt() {
         return playedAt;
     }

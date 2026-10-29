@@ -9,16 +9,16 @@ import org.springframework.data.repository.query.Param;
 
 public interface ProPickRepository extends JpaRepository<ProPick, Long> {
 
-    /** (대회, 포지션) 픽을 최근 경기 순으로 읽는다. 선수·대회는 함께, 주문·아이템·룬은 컬렉션별 한 번씩 읽는다. */
+    /** (대회, 포지션)의 이긴 경기 픽을 최근 경기 순으로 읽는다. 선수·대회는 함께, 주문·아이템·룬은 컬렉션별 한 번씩 읽는다. */
     @Query("""
             SELECT pick FROM ProPick pick
             JOIN FETCH pick.player
             JOIN FETCH pick.tournament
-            WHERE pick.tournament.id = :tournamentId AND pick.position = :position
+            WHERE pick.tournament.id = :tournamentId AND pick.position = :position AND pick.win = true
             ORDER BY pick.playedAt DESC, pick.id DESC
             """)
-    List<ProPick> findByTournamentAndPosition(@Param("tournamentId") Long tournamentId,
-                                              @Param("position") ChampionPosition position);
+    List<ProPick> findWinsByTournamentAndPosition(@Param("tournamentId") Long tournamentId,
+                                                  @Param("position") ChampionPosition position);
 
     List<ProPick> findBySourceGameIdIn(Collection<String> sourceGameIds);
 }
