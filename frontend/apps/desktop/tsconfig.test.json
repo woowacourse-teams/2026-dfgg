@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.main.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": ["src/main/**/*", "src/shared/**/*", "test/**/*"],
+  "exclude": []
+}
