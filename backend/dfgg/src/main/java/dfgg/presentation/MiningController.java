@@ -1,0 +1,106 @@
+package dfgg.presentation;
+
+import dfgg.application.counter.ChampionPositionAggregationResult;
+import dfgg.application.counter.ChampionPositionAggregationService;
+import dfgg.application.itemstats.ItemStatsAggregationResult;
+import dfgg.application.itemstats.ItemStatsAggregationService;
+import dfgg.application.mining.EmbeddingTrainingResult;
+import dfgg.application.mining.MiningTriggerService;
+import dfgg.application.mining.SequentialPatternMiningResult;
+import dfgg.application.propick.ProPickCollectionResult;
+import dfgg.application.propick.ProPickCollectionService;
+import dfgg.domain.embedding.TrainingConfig;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/admin/mining")
+public class MiningController {
+
+    private final MiningTriggerService miningTriggerService;
+    private final ItemStatsAggregationService itemStatsAggregationService;
+    private final ChampionPositionAggregationService championPositionAggregationService;
+    private final ProPickCollectionService proPickCollectionService;
+
+    public MiningController(
+            MiningTriggerService miningTriggerService,
+            ItemStatsAggregationService itemStatsAggregationService,
+            ChampionPositionAggregationService championPositionAggregationService,
+            ProPickCollectionService proPickCollectionService
+    ) {
+        this.miningTriggerService = miningTriggerService;
+        this.itemStatsAggregationService = itemStatsAggregationService;
+        this.championPositionAggregationService = championPositionAggregationService;
+        this.proPickCollectionService = proPickCollectionService;
+    }
+
+    /**
+     * 4개 generator가 읽을 통계 테이블을 원본 참가자 데이터에서 전량 재계산한다. 멱등하다.
+     *
+     * <p>{@code recentPatchWindowSize}는 최신 몇 개 패치를 "최근"으로 볼지다. 기본 3(약 6주) —
+     * 실측상 최근 3패치가 현재 패치 대비 오차를 절반(0.302pp → 0.164pp)으로 줄이면서
+     * 삼중항 지지도의 89%를 유지한다.
+     */
+    @PostMapping("/item-stats")
+    public ResponseEntity<ItemStatsAggregationResult> aggregateItemStats(
+            @RequestParam(defaultValue = "3") @Min(1) @Max(20) int recentPatchWindowSize
+    ) {
+        return ResponseEntity.ok(itemStatsAggregationService.aggregate(recentPatchWindowSize));
+    }
+
+    /** 현재 패치의 챔피언별 라인 분포를 집계한다. 상대 픽 분석 응답의 라인 분포 %가 이 값을 쓴다. */
+    @PostMapping("/champion-positions")
+    public ResponseEntity<ChampionPositionAggregationResult> aggregateChampionPositions() {
+        return ResponseEntity.ok(championPositionAggregationService.aggregate());
+    }
+
+    /** 주요 리그의 최근 대회 픽을 Leaguepedia에서 받아 저장한다. 요청 사이 12초라 수 분 걸린다. 멱등하다. */
+    @PostMapping("/pro-picks")
+    public ResponseEntity<ProPickCollectionResult> collectProPicks() {
+        return ResponseEntity.ok(proPickCollectionService.collect());
+    }
+
+    @PostMapping("/embeddings")
+    public ResponseEntity<EmbeddingTrainingResult> trainEmbeddings(
+            @RequestParam @NotBlank String algorithmVersion,
+            @RequestParam(defaultValue = "2.0") @DecimalMin("0.1") @DecimalMax("10.0") double winWeight,
+            @RequestParam(defaultValue = "64") @Min(1) @Max(256) int dimensions,
+            @RequestParam(defaultValue = "5") @Min(0) @Max(20) int negativeSamples,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int epochs,
+            @RequestParam(defaultValue = "0.025") @DecimalMin("0.0001") @DecimalMax("1.0") double learningRate,
+            @RequestParam(defaultValue = "42") long randomSeed
+    ) {
+        TrainingConfig config = new TrainingConfig(dimensions, negativeSamples, epochs, learningRate, randomSeed);
+        return ResponseEntity.ok(miningTriggerService.trainEmbeddings(winWeight, config, algorithmVersion));
+    }
+
+    @PostMapping("/counter-embeddings")
+    public ResponseEntity<EmbeddingTrainingResult> trainCounterEmbeddings(
+            @RequestParam @NotBlank String algorithmVersion,
+            @RequestParam(defaultValue = "2.0") @DecimalMin("0.1") @DecimalMax("10.0") double winWeight,
+            @RequestParam(defaultValue = "64") @Min(1) @Max(256) int dimensions,
+            @RequestParam(defaultValue = "5") @Min(0) @Max(20) int negativeSamples,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int epochs,
+            @RequestParam(defaultValue = "0.025") @DecimalMin("0.0001") @DecimalMax("1.0") double learningRate,
+            @RequestParam(defaultValue = "42") long randomSeed
+    ) {
+        TrainingConfig config = new TrainingConfig(dimensions, negativeSamples, epochs, learningRate, randomSeed);
+        return ResponseEntity.ok(miningTriggerService.trainCounterEmbeddings(winWeight, config, algorithmVersion));
+    }
+
+    @PostMapping("/patterns")
+    public ResponseEntity<SequentialPatternMiningResult> minePatterns(
+            @RequestParam @NotBlank String algorithmVersion,
+            @RequestParam(defaultValue = "10") @Min(1) int minSupport
+    ) {
+        return ResponseEntity.ok(miningTriggerService.mineSequentialPatterns(minSupport, algorithmVersion));
+    }
+}

@@ -1,0 +1,207 @@
+package dfgg.application.match;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dfgg.application.item.ItemPurchaseTypeClassifier;
+import dfgg.domain.match.ItemPurchaseType;
+import dfgg.domain.match.RawMatch;
+import dfgg.domain.match.RawMatchRepository;
+import dfgg.infrastructure.external.client.DataDragonClient;
+import dfgg.infrastructure.external.dto.ItemResponse;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+
+/** 저장된 Raw Match와 Timeline의 모든 구매를 경기 패치에 맞춰 정규화한다. */
+@Service
+public class StoredParticipantItemPurchaseNormalizationService {
+
+    private static final Logger log = LoggerFactory.getLogger(StoredParticipantItemPurchaseNormalizationService.class);
+    private static final Pattern GAME_VERSION = Pattern.compile("^([0-9]+\\.[0-9]+)\\.[0-9]+(?:\\..*)?$");
+    private static final Predicate<String> ANY_PATCH = patch -> true;
+
+    private final RawMatchRepository rawMatchRepository;
+    private final DataDragonClient dataDragonClient;
+    private final ItemPurchaseTypeClassifier classifier;
+    private final ParticipantItemPurchaseNormalizationService normalizationService;
+    private final ObjectMapper objectMapper;
+    // 수집 경로가 경기마다 카탈로그를 받지 않도록 패치별로 보관한다. 받지 못한 패치는 담기지 않아 다음 경기에서 다시 받는다.
+    private final Map<String, ClassifiedCatalog> collectedCatalogsByPatch = new ConcurrentHashMap<>();
+
+    public StoredParticipantItemPurchaseNormalizationService(RawMatchRepository rawMatchRepository,
+                                               DataDragonClient dataDragonClient,
+                                               ItemPurchaseTypeClassifier classifier,
+                                               ParticipantItemPurchaseNormalizationService normalizationService,
+                                               ObjectMapper objectMapper) {
+        this.rawMatchRepository = rawMatchRepository;
+        this.dataDragonClient = dataDragonClient;
+        this.classifier = classifier;
+        this.normalizationService = normalizationService;
+        this.objectMapper = objectMapper;
+    }
+
+    /** Raw와 Timeline이 모두 저장된 경기를 조회하고, 한 경기씩 독립적으로 정규화한다. */
+    public PurchaseNormalizationResult normalizeAll() {
+        Map<String, ClassifiedCatalog> catalogsByPatch = new HashMap<>();
+        PurchaseNormalizationSummary summary = new PurchaseNormalizationSummary();
+        List<String> matchIds = rawMatchRepository.findMatchIdsWithTimeline();
+        matchIds.forEach(matchId -> normalizeMatch(matchId, ANY_PATCH, catalogsByPatch, summary));
+        return summary.toResult(matchIds.size());
+    }
+
+    /**
+     * 지정한 패치의 경기만 커서 이후부터 limit개 정규화한다.
+     * 응답의 nextCursor를 afterMatchId로 넘겨 이어서 돌린다.
+     */
+    public PurchaseNormalizationBatchResult normalizePatch(String patch, String afterMatchId, int limit) {
+        Map<String, ClassifiedCatalog> catalogsByPatch = new HashMap<>();
+        PurchaseNormalizationSummary summary = new PurchaseNormalizationSummary();
+        List<String> matchIds = rawMatchRepository.findMatchIdsWithTimelineForPatchAfter(
+                afterMatchId, patch, PageRequest.of(0, limit));
+        matchIds.forEach(matchId -> normalizeMatch(matchId, patch::equals, catalogsByPatch, summary));
+        PurchaseNormalizationBatchResult result = summary.toBatchResult(matchIds.size(),
+                nextCursor(matchIds, afterMatchId), matchIds.size() == limit);
+        log.info("패치 구매 정규화 배치 완료: patch={}, processed={}, failed={}, nextCursor={}",
+                patch, result.processed(), result.failed(), result.nextCursor());
+        return result;
+    }
+
+    /**
+     * 방금 수집한 한 경기의 구매를 정규화하고 저장한 구매 수를 돌려준다.
+     * 원천·카탈로그·적재 실패는 호출자가 경기 단위로 격리할 수 있도록 그대로 전달한다.
+     */
+    public int normalizeMatch(String matchId) {
+        MatchContext context = acceptedContext(matchId, ANY_PATCH);
+        ClassifiedCatalog catalog = collectedCatalogsByPatch.computeIfAbsent(context.patch(), this::loadCatalog);
+        return normalizationService.normalize(matchId, context.patch(), catalog.purchaseTypes(), catalog.response(),
+                context.positionsByParticipant());
+    }
+
+    /** 실패한 경기가 있어도 이번 배치의 마지막 경기 다음부터 이어간다. */
+    private String nextCursor(List<String> matchIds, String afterMatchId) {
+        if (matchIds.isEmpty()) {
+            return afterMatchId;
+        }
+        return matchIds.getLast();
+    }
+
+    /** 원천을 읽지 못했거나 허용하지 않는 패치의 경기는 정규화하지 않고 실패로 기록한다. */
+    private void normalizeMatch(String matchId, Predicate<String> acceptsPatch,
+                                Map<String, ClassifiedCatalog> catalogsByPatch, PurchaseNormalizationSummary summary) {
+        readContext(matchId, acceptsPatch, summary)
+                .ifPresent(context -> normalize(matchId, context, catalogsByPatch, summary));
+    }
+
+    private Optional<MatchContext> readContext(String matchId, Predicate<String> acceptsPatch,
+                                               PurchaseNormalizationSummary summary) {
+        try {
+            return Optional.of(acceptedContext(matchId, acceptsPatch));
+        } catch (RuntimeException exception) {
+            recordFailure(matchId, exception, summary);
+            return Optional.empty();
+        }
+    }
+
+    private MatchContext acceptedContext(String matchId, Predicate<String> acceptsPatch) {
+        RawMatch rawMatch = rawMatchRepository.findById(matchId)
+                .orElseThrow(() -> new IllegalStateException("저장된 Raw Match가 없습니다."));
+        MatchContext context = contextOf(rawMatch);
+        if (acceptsPatch.test(context.patch())) {
+            return context;
+        }
+        throw new IllegalStateException("Raw Match 패치 " + context.patch() + "가 요청 패치와 다릅니다.");
+    }
+
+    /** 카탈로그 장애는 모든 경기에 영향을 주므로 경기 실패로 기록하지 않고 즉시 전달한다. */
+    private void normalize(String matchId, MatchContext context, Map<String, ClassifiedCatalog> catalogsByPatch,
+                           PurchaseNormalizationSummary summary) {
+        ClassifiedCatalog catalog = catalogsByPatch.computeIfAbsent(context.patch(), this::loadCatalog);
+        try {
+            int savedPurchases = normalizationService.normalize(matchId, context.patch(), catalog.purchaseTypes(),
+                    catalog.response(), context.positionsByParticipant());
+            log.info("구매 정규화 완료: matchId={}, savedPurchases={}", matchId, savedPurchases);
+            summary.succeed(savedPurchases);
+        } catch (RuntimeException exception) {
+            recordFailure(matchId, exception, summary);
+        }
+    }
+
+    /** 원천 데이터가 잘못된 경기는 기록하고 다음 경기로 넘어간다. */
+    private void recordFailure(String matchId, RuntimeException exception, PurchaseNormalizationSummary summary) {
+        summary.fail(matchId, exception.getMessage());
+        log.warn("구매 정규화 실패: {}: {}", matchId, exception.getMessage(), exception);
+    }
+
+    /** 해당 패치의 빌드·아이템 분류를 한 번만 준비해 모든 경기에서 공유한다. */
+    private ClassifiedCatalog loadCatalog(String patch) {
+        String dataVersion = dataDragonClient.resolveItemDataVersionForPatch(patch);
+        ItemResponse response = dataDragonClient.getItems(dataVersion);
+        if (response == null || response.data() == null || response.data().isEmpty()
+                || !patch.equals(response.version()) || !dataVersion.equals(response.dataVersion())) {
+            throw new IllegalStateException("패치 " + patch + "의 Data Dragon 아이템 카탈로그가 일치하지 않습니다.");
+        }
+        log.info("구매 정규화 카탈로그 선택: patch={}, dataVersion={}", patch, dataVersion);
+        return new ClassifiedCatalog(response, classifier.classify(response.data()));
+    }
+
+    /** Raw Match에서 경기 패치와 구매 참가자의 Riot 원시 포지션을 읽는다. */
+    private MatchContext contextOf(RawMatch rawMatch) {
+        try {
+            JsonNode info = objectMapper.readTree(rawMatch.getRawData()).path("info");
+            JsonNode versionNode = info.path("gameVersion");
+            if (!versionNode.isTextual()) {
+                throw new IllegalArgumentException("Raw Match에 gameVersion이 없습니다.");
+            }
+            Matcher matcher = GAME_VERSION.matcher(versionNode.textValue());
+            if (!matcher.matches()) {
+                throw new IllegalArgumentException("Raw Match의 gameVersion 형식이 올바르지 않습니다.");
+            }
+            return new MatchContext(matcher.group(1), positionsOf(info.path("participants")));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("Raw Match JSON을 읽을 수 없습니다.", exception);
+        }
+    }
+
+    private Map<Integer, String> positionsOf(JsonNode participants) {
+        if (!participants.isArray() || participants.isEmpty()) {
+            throw new IllegalArgumentException("Raw Match의 참가자 목록이 없습니다.");
+        }
+        Map<Integer, String> positions = new HashMap<>();
+        for (JsonNode participant : participants) {
+            JsonNode id = participant.path("participantId");
+            if (!id.isIntegralNumber() || !id.canConvertToInt() || id.intValue() <= 0) {
+                throw new IllegalArgumentException("Raw Match의 참가자 ID가 유효하지 않습니다.");
+            }
+            JsonNode teamPosition = participant.path("teamPosition");
+            if (!teamPosition.isMissingNode() && !teamPosition.isNull() && !teamPosition.isTextual()) {
+                throw new IllegalArgumentException("Raw Match의 참가자 포지션이 문자열이 아닙니다.");
+            }
+            String position = teamPosition.isTextual() ? teamPosition.textValue() : null;
+            if (position != null && position.length() > 32) {
+                throw new IllegalArgumentException("Raw Match의 참가자 포지션이 32자를 초과합니다.");
+            }
+            if (positions.containsKey(id.intValue())) {
+                throw new IllegalArgumentException("Raw Match의 참가자 ID가 중복됩니다: " + id.intValue());
+            }
+            positions.put(id.intValue(), position);
+        }
+        return Collections.unmodifiableMap(positions);
+    }
+
+    private record MatchContext(String patch, Map<Integer, String> positionsByParticipant) {
+    }
+
+    private record ClassifiedCatalog(ItemResponse response, Map<Integer, ItemPurchaseType> purchaseTypes) {
+    }
+}

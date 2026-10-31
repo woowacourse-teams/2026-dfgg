@@ -1,0 +1,792 @@
+package dfgg.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import dfgg.application.match.MatchNormalizationService;
+import dfgg.application.match.RiotMatchSyncService;
+import dfgg.application.match.StoredParticipantItemPurchaseNormalizationService;
+import dfgg.application.player.RiotPlayerSyncService;
+import dfgg.application.rune.ParticipantRuneNormalizationService;
+import dfgg.application.stats.ChampionBuildStatsMatchService;
+import dfgg.domain.match.NormalizedMatch;
+import dfgg.infrastructure.config.RiotSchedulerProperties;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
+
+@ExtendWith(OutputCaptureExtension.class)
+class RiotCollectionOrchestratorTest {
+
+    private static final Instant NOW = Instant.parse("2026-10-25T00:00:00Z");
+    // 기본 조회 기간 14일을 뺀 시각이다.
+    private static final Instant START_TIME = Instant.parse("2026-10-11T00:00:00Z");
+
+    private RiotPlayerSyncService playerSyncService;
+    private RiotMatchSyncService matchSyncService;
+    private MatchNormalizationService matchNormalizationService;
+    private ChampionBuildStatsMatchService statsMatchService;
+    private ParticipantRuneNormalizationService runeNormalizationService;
+    private StoredParticipantItemPurchaseNormalizationService purchaseNormalizationService;
+    private SimpleMeterRegistry meterRegistry;
+    private RiotSchedulerProperties properties;
+    private RiotCollectionOrchestrator orchestrator;
+
+    @BeforeEach
+    void setUp() {
+        playerSyncService = mock(RiotPlayerSyncService.class);
+        matchSyncService = mock(RiotMatchSyncService.class);
+        matchNormalizationService = mock(MatchNormalizationService.class);
+        statsMatchService = mock(ChampionBuildStatsMatchService.class);
+        runeNormalizationService = mock(ParticipantRuneNormalizationService.class);
+        purchaseNormalizationService = mock(StoredParticipantItemPurchaseNormalizationService.class);
+        meterRegistry = new SimpleMeterRegistry();
+        properties = new RiotSchedulerProperties();
+        properties.setPlayerPageSize(2);
+        properties.setPlayerLimit(100);
+        properties.setRecoverMissingTimelines(true);
+        when(playerSyncService.syncLeagueEntries(
+                anyString(), anyString(), anyString(), anyInt()
+        )).thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of()));
+        when(playerSyncService.syncApexLeague(anyString(), anyString()))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of()));
+        when(matchSyncService.findMatchIdsSince(anyString(), anyInt(), any()))
+                .thenReturn(List.of());
+
+        orchestrator = new RiotCollectionOrchestrator(
+                properties,
+                playerSyncService,
+                matchSyncService,
+                matchNormalizationService,
+                statsMatchService,
+                runeNormalizationService,
+                purchaseNormalizationService,
+                meterRegistry,
+                Clock.fixed(NOW, ZoneOffset.UTC)
+        );
+    }
+
+    @Test
+    void 플레이어부터_통계까지_순서대로_실행하고_결과를_합산한다() {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(
+                        2,
+                        List.of("puuid-1", "puuid-2")
+                ));
+        when(matchSyncService.findMatchIdsSince("puuid-1", 20, START_TIME))
+                .thenReturn(List.of("KR_1"));
+        when(matchSyncService.syncMatch("KR_1")).thenReturn(true);
+        NormalizedMatch normalized = normalizedMatch("KR_1");
+        when(matchNormalizationService.normalizeAsTierSample("KR_1", "PLATINUM")).thenReturn(normalized);
+        orchestrator.runOnce();
+
+        InOrder order = inOrder(
+                playerSyncService,
+                matchSyncService,
+                matchNormalizationService,
+                statsMatchService
+        );
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
+        order.verify(matchSyncService).findMatchIdsSince("puuid-1", 20, START_TIME);
+        order.verify(matchSyncService).syncMatch("KR_1");
+        order.verify(matchNormalizationService).normalizeAsTierSample("KR_1", "PLATINUM");
+        order.verify(matchNormalizationService).save(normalized);
+        order.verify(statsMatchService).registerMatchStats(normalized, "PLATINUM");
+        order.verify(matchSyncService).findMatchIdsSince("puuid-2", 20, START_TIME);
+        order.verify(matchSyncService).syncMissingTimelines();
+    }
+
+    @Test
+    void 새로_수집한_매치는_통계_집계_뒤_룬과_구매를_정규화한다() {
+        NormalizedMatch normalized = collectSingleMatch("KR_1");
+
+        orchestrator.runOnce();
+
+        InOrder order = inOrder(statsMatchService, runeNormalizationService, purchaseNormalizationService);
+        order.verify(statsMatchService).registerMatchStats(normalized, "PLATINUM");
+        order.verify(runeNormalizationService).normalize("KR_1");
+        order.verify(purchaseNormalizationService).normalizeMatch("KR_1");
+    }
+
+    @Test
+    void 룬_정규화가_실패해도_구매_정규화와_다음_매치를_계속한다() {
+        collectMatches("KR_1", "KR_2");
+        when(runeNormalizationService.normalize("KR_1"))
+                .thenThrow(new IllegalArgumentException("Raw Match 참가자의 룬(perks)이 없습니다: 1"));
+
+        orchestrator.runOnce();
+
+        verify(purchaseNormalizationService).normalizeMatch("KR_1");
+        verify(runeNormalizationService).normalize("KR_2");
+        verify(purchaseNormalizationService).normalizeMatch("KR_2");
+    }
+
+    @Test
+    void 구매_정규화가_실패해도_다음_매치를_계속한다() {
+        collectMatches("KR_1", "KR_2");
+        when(purchaseNormalizationService.normalizeMatch("KR_1"))
+                .thenThrow(new IllegalStateException("패치 16.15에 해당하는 Data Dragon 빌드가 없습니다."));
+
+        orchestrator.runOnce();
+
+        verify(matchNormalizationService).normalizeAsTierSample("KR_2", "PLATINUM");
+        verify(runeNormalizationService).normalize("KR_2");
+        verify(purchaseNormalizationService).normalizeMatch("KR_2");
+    }
+
+    @Test
+    void 원본이_이미_있던_매치는_룬과_구매를_정규화하지_않는다() {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
+        when(matchSyncService.findMatchIdsSince("puuid-1", 20, START_TIME)).thenReturn(List.of("KR_EXISTING"));
+        when(matchSyncService.syncMatch("KR_EXISTING")).thenReturn(false);
+
+        orchestrator.runOnce();
+
+        verifyNoInteractions(runeNormalizationService, purchaseNormalizationService);
+    }
+
+    @Test
+    void 참가자_정규화가_실패한_매치는_룬과_구매를_정규화하지_않는다() {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
+        when(matchSyncService.findMatchIdsSince("puuid-1", 20, START_TIME)).thenReturn(List.of("KR_FAILED"));
+        when(matchSyncService.syncMatch("KR_FAILED")).thenReturn(true);
+        when(matchNormalizationService.normalizeAsTierSample("KR_FAILED", "PLATINUM"))
+                .thenThrow(new IllegalStateException("Timeline 형식 오류"));
+
+        orchestrator.runOnce();
+
+        verifyNoInteractions(runeNormalizationService, purchaseNormalizationService);
+    }
+
+    @Test
+    void 실행이_끝나면_매치_결과와_정규화_실패를_요약_로그와_메트릭으로_남긴다(CapturedOutput output) {
+        collectMatches("KR_NEW", "KR_DUPLICATE", "KR_UNREACHABLE", "KR_BROKEN");
+        when(matchSyncService.syncMatch("KR_DUPLICATE")).thenReturn(false);
+        when(matchSyncService.syncMatch("KR_UNREACHABLE")).thenThrow(new IllegalStateException("Riot timeout"));
+        when(matchNormalizationService.normalizeAsTierSample("KR_BROKEN", "PLATINUM"))
+                .thenThrow(new IllegalStateException("Timeline 형식 오류"));
+        when(purchaseNormalizationService.normalizeMatch("KR_NEW"))
+                .thenThrow(new IllegalStateException("Data Dragon 접속 실패"));
+
+        orchestrator.runOnce();
+
+        assertThat(output).contains("Riot 데이터 수집 실행 요약: tier=PLATINUM, collected=1, duplicate=1, "
+                + "collectionFailed=1, normalizationFailed=1, runeFailed=0, purchaseFailed=1");
+        assertThat(matches("collected")).isEqualTo(1);
+        assertThat(matches("duplicate")).isEqualTo(1);
+        assertThat(matches("collection_failed")).isEqualTo(1);
+        assertThat(matches("normalization_failed")).isEqualTo(1);
+        assertThat(normalizationFailures("rune")).isZero();
+        assertThat(normalizationFailures("purchase")).isEqualTo(1);
+    }
+
+    @Test
+    void 메트릭은_실행마다_누적되고_수집할_매치가_없어도_모든_결과를_0으로_남긴다() {
+        orchestrator.runOnce();
+        assertThat(matches("collected")).isZero();
+        assertThat(normalizationFailures("purchase")).isZero();
+
+        collectSingleMatch("KR_1");
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+
+        assertThat(matches("collected")).isEqualTo(1);
+        assertThat(matches("duplicate")).isZero();
+    }
+
+    @Test
+    void 여러_플레이어가_같은_매치를_조회해도_한_번만_끝까지_처리한다() {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(
+                        2,
+                        List.of("puuid-1", "puuid-2")
+                ));
+        when(matchSyncService.findMatchIdsSince(anyString(), eq(20), eq(START_TIME)))
+                .thenReturn(List.of("KR_SHARED"));
+        when(matchSyncService.syncMatch("KR_SHARED")).thenReturn(true);
+        NormalizedMatch normalized = normalizedMatch("KR_SHARED");
+        when(matchNormalizationService.normalizeAsTierSample("KR_SHARED", "PLATINUM")).thenReturn(normalized);
+        orchestrator.runOnce();
+
+        verify(matchSyncService, times(2)).findMatchIdsSince(anyString(), eq(20), eq(START_TIME));
+        verify(matchSyncService).syncMatch("KR_SHARED");
+        verify(matchNormalizationService).normalizeAsTierSample("KR_SHARED", "PLATINUM");
+        verify(matchNormalizationService).save(normalized);
+        verify(statsMatchService).registerMatchStats(normalized, "PLATINUM");
+    }
+
+    @Test
+    void 설정한_플레이어_수까지만_매치를_수집한다() {
+        properties.setPlayerLimit(1);
+        properties.setMatchCount(47);
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(
+                        2,
+                        List.of("puuid-1", "puuid-2")
+                ));
+
+        orchestrator.runOnce();
+
+        verify(matchSyncService).findMatchIdsSince("puuid-1", 47, START_TIME);
+        verify(matchSyncService, never()).findMatchIdsSince("puuid-2", 47, START_TIME);
+    }
+
+    @Test
+    void Master_리그는_디비전과_페이지_없이_수집한다() {
+        properties.setTiers(List.of("MASTER"));
+        properties.setDivisions(List.of());
+        properties.setPlayerLimit(2);
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "MASTER"))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(
+                        3,
+                        List.of("puuid-c", "puuid-a", "puuid-b")
+                ));
+
+        orchestrator.runOnce();
+
+        verify(playerSyncService).syncApexLeague("RANKED_SOLO_5x5", "MASTER");
+        verify(matchSyncService).findMatchIdsSince("puuid-a", 20, START_TIME);
+        verify(matchSyncService).findMatchIdsSince("puuid-b", 20, START_TIME);
+        verify(matchSyncService, never()).findMatchIdsSince("puuid-c", 20, START_TIME);
+    }
+
+    @Test
+    void Master_리그_플레이어를_실행마다_순환한다() {
+        properties.setTiers(List.of("MASTER"));
+        properties.setPlayerLimit(2);
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "MASTER"))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(
+                        3,
+                        List.of("puuid-c", "puuid-a", "puuid-b")
+                ));
+
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+
+        verify(matchSyncService, times(2)).findMatchIdsSince("puuid-a", 20, START_TIME);
+        verify(matchSyncService).findMatchIdsSince("puuid-b", 20, START_TIME);
+        verify(matchSyncService).findMatchIdsSince("puuid-c", 20, START_TIME);
+    }
+
+    @Test
+    void Master_매치를_Master_표본으로_정규화하고_집계한다() {
+        properties.setTiers(List.of("MASTER"));
+        properties.setPlayerLimit(1);
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "MASTER"))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("master-puuid")));
+        when(matchSyncService.findMatchIdsSince("master-puuid", 20, START_TIME))
+                .thenReturn(List.of("KR_MASTER"));
+        when(matchSyncService.syncMatch("KR_MASTER")).thenReturn(true);
+        NormalizedMatch normalized = normalizedMatch("KR_MASTER");
+        when(matchNormalizationService.normalizeAsTierSample("KR_MASTER", "MASTER"))
+                .thenReturn(normalized);
+
+        orchestrator.runOnce();
+
+        verify(matchNormalizationService).normalizeAsTierSample("KR_MASTER", "MASTER");
+        verify(matchNormalizationService).save(normalized);
+        verify(statsMatchService).registerMatchStats(normalized, "MASTER");
+    }
+
+    @Test
+    void Grandmaster_매치를_Grandmaster_표본으로_정규화하고_집계한다() {
+        properties.setTiers(List.of("GRANDMASTER"));
+        properties.setDivisions(List.of());
+        properties.setPlayerLimit(1);
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "GRANDMASTER"))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("grandmaster-puuid")));
+        when(matchSyncService.findMatchIdsSince("grandmaster-puuid", 20, START_TIME))
+                .thenReturn(List.of("KR_GRANDMASTER"));
+        when(matchSyncService.syncMatch("KR_GRANDMASTER")).thenReturn(true);
+        NormalizedMatch normalized = normalizedMatch("KR_GRANDMASTER");
+        when(matchNormalizationService.normalizeAsTierSample("KR_GRANDMASTER", "GRANDMASTER"))
+                .thenReturn(normalized);
+
+        orchestrator.runOnce();
+
+        verify(playerSyncService).syncApexLeague("RANKED_SOLO_5x5", "GRANDMASTER");
+        verify(matchNormalizationService).normalizeAsTierSample("KR_GRANDMASTER", "GRANDMASTER");
+        verify(matchNormalizationService).save(normalized);
+        verify(statsMatchService).registerMatchStats(normalized, "GRANDMASTER");
+    }
+
+    @Test
+    void Challenger_매치를_Challenger_표본으로_정규화하고_집계한다() {
+        properties.setTiers(List.of("CHALLENGER"));
+        properties.setDivisions(List.of());
+        properties.setPlayerLimit(1);
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "CHALLENGER"))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("challenger-puuid")));
+        when(matchSyncService.findMatchIdsSince("challenger-puuid", 20, START_TIME))
+                .thenReturn(List.of("KR_CHALLENGER"));
+        when(matchSyncService.syncMatch("KR_CHALLENGER")).thenReturn(true);
+        NormalizedMatch normalized = normalizedMatch("KR_CHALLENGER");
+        when(matchNormalizationService.normalizeAsTierSample("KR_CHALLENGER", "CHALLENGER"))
+                .thenReturn(normalized);
+
+        orchestrator.runOnce();
+
+        verify(playerSyncService).syncApexLeague("RANKED_SOLO_5x5", "CHALLENGER");
+        verify(matchNormalizationService).normalizeAsTierSample("KR_CHALLENGER", "CHALLENGER");
+        verify(matchNormalizationService).save(normalized);
+        verify(statsMatchService).registerMatchStats(normalized, "CHALLENGER");
+    }
+
+    @Test
+    void 자동_Timeline_복구가_꺼져_있으면_누락_Timeline을_조회하지_않는다() {
+        properties.setRecoverMissingTimelines(false);
+
+        orchestrator.runOnce();
+
+        verify(matchSyncService, never()).syncMissingTimelines();
+    }
+
+    @Test
+    void 스케줄러는_기존_미처리_매치를_자동_재집계하지_않는다() {
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of("KR_PENDING"));
+
+        orchestrator.runOnce();
+
+        verify(matchNormalizationService, never()).findPendingMatchIdsAfter(anyString());
+        verify(matchNormalizationService, never())
+                .normalizeAsTierSample("KR_PENDING", "PLATINUM");
+        verifyNoInteractions(statsMatchService);
+    }
+
+    @Test
+    void 관리자_재집계는_Riot_API_갱신_없이_표본_티어를_사용한다() {
+        NormalizedMatch normalized = normalizedMatch("KR_1");
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of("KR_1"));
+        when(matchNormalizationService.findPendingMatchIdsAfter("KR_1"))
+                .thenReturn(List.of());
+        when(matchNormalizationService.normalizeAsTierSample("KR_1", "PLATINUM"))
+                .thenReturn(normalized);
+
+        orchestrator.normalizeAndAggregatePendingMatches("PLATINUM");
+
+        InOrder order = inOrder(matchNormalizationService, statsMatchService);
+        order.verify(matchNormalizationService).normalizeAsTierSample("KR_1", "PLATINUM");
+        order.verify(matchNormalizationService).save(normalized);
+        order.verify(statsMatchService).registerMatchStats(normalized, "PLATINUM");
+        verify(matchNormalizationService, never()).normalize("KR_1");
+        verifyNoInteractions(playerSyncService, matchSyncService);
+    }
+
+    @Test
+    void 관리자_재집계에서_실패한_매치는_전체_조회_후_한_번_재시도한다() {
+        NormalizedMatch retried = normalizedMatch("KR_RETRY");
+        NormalizedMatch succeeded = normalizedMatch("KR_SUCCEEDED");
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of("KR_RETRY", "KR_SUCCEEDED"));
+        when(matchNormalizationService.findPendingMatchIdsAfter("KR_SUCCEEDED"))
+                .thenReturn(List.of());
+        when(matchNormalizationService.normalizeAsTierSample("KR_RETRY", "PLATINUM"))
+                .thenThrow(new IllegalStateException("temporary Riot failure"))
+                .thenReturn(retried);
+        when(matchNormalizationService.normalizeAsTierSample("KR_SUCCEEDED", "PLATINUM"))
+                .thenReturn(succeeded);
+
+        orchestrator.normalizeAndAggregatePendingMatches("PLATINUM");
+
+        InOrder order = inOrder(matchNormalizationService, statsMatchService);
+        order.verify(matchNormalizationService).normalizeAsTierSample("KR_RETRY", "PLATINUM");
+        order.verify(matchNormalizationService).normalizeAsTierSample("KR_SUCCEEDED", "PLATINUM");
+        order.verify(matchNormalizationService).save(succeeded);
+        order.verify(statsMatchService).registerMatchStats(succeeded, "PLATINUM");
+        order.verify(matchNormalizationService).normalizeAsTierSample("KR_RETRY", "PLATINUM");
+        order.verify(matchNormalizationService).save(retried);
+        order.verify(statsMatchService).registerMatchStats(retried, "PLATINUM");
+    }
+
+    @Test
+    void 관리자_재집계의_재시도도_실패하면_원래_원인을_보존한다() {
+        IllegalStateException failure = new IllegalStateException("Riot rate limit");
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of("KR_FAILED"));
+        when(matchNormalizationService.findPendingMatchIdsAfter("KR_FAILED"))
+                .thenReturn(List.of());
+        when(matchNormalizationService.normalizeAsTierSample("KR_FAILED", "PLATINUM"))
+                .thenThrow(failure);
+
+        assertThatThrownBy(() -> orchestrator.normalizeAndAggregatePendingMatches("PLATINUM"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasCause(failure);
+
+        verify(matchNormalizationService, times(2))
+                .normalizeAsTierSample("KR_FAILED", "PLATINUM");
+        verifyNoInteractions(statsMatchService);
+    }
+
+    @Test
+    void Retry_After가_없는_429는_매치를_재시도하지_않는다() {
+        HttpClientErrorException rateLimit = new HttpClientErrorException(HttpStatus.TOO_MANY_REQUESTS);
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of("KR_RATE_LIMITED"));
+        when(matchNormalizationService.findPendingMatchIdsAfter("KR_RATE_LIMITED"))
+                .thenReturn(List.of());
+        when(matchNormalizationService.normalizeAsTierSample("KR_RATE_LIMITED", "PLATINUM"))
+                .thenThrow(rateLimit);
+
+        assertThatThrownBy(() -> orchestrator.normalizeAndAggregatePendingMatches("PLATINUM"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasCause(rateLimit);
+
+        verify(matchNormalizationService).normalizeAsTierSample("KR_RATE_LIMITED", "PLATINUM");
+        verifyNoInteractions(statsMatchService);
+    }
+
+    @Test
+    void 관리자_재집계에서_통계_집계가_실패하면_한_번_재시도한다() {
+        NormalizedMatch normalized = normalizedMatch("KR_STATS_RETRY");
+        when(matchNormalizationService.findPendingMatchIdsAfter(""))
+                .thenReturn(List.of("KR_STATS_RETRY"));
+        when(matchNormalizationService.findPendingMatchIdsAfter("KR_STATS_RETRY"))
+                .thenReturn(List.of());
+        when(matchNormalizationService.normalizeAsTierSample("KR_STATS_RETRY", "PLATINUM"))
+                .thenReturn(normalized);
+        doThrow(new IllegalStateException("temporary database failure"))
+                .doNothing()
+                .when(statsMatchService)
+                .registerMatchStats(normalized, "PLATINUM");
+
+        orchestrator.normalizeAndAggregatePendingMatches("PLATINUM");
+
+        verify(matchNormalizationService).normalizeAsTierSample("KR_STATS_RETRY", "PLATINUM");
+        verify(matchNormalizationService).save(normalized);
+        verify(statsMatchService, times(2)).registerMatchStats(normalized, "PLATINUM");
+    }
+
+    @Test
+    void 한_매치의_정규화_저장이_실패해도_다음_매치와_통계_집계를_계속한다() {
+        NormalizedMatch failed = normalizedMatch("KR_FAILED");
+        NormalizedMatch succeeded = normalizedMatch("KR_SUCCEEDED");
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
+        when(matchSyncService.findMatchIdsSince("puuid-1", 20, START_TIME))
+                .thenReturn(List.of("KR_FAILED", "KR_SUCCEEDED"));
+        when(matchSyncService.syncMatch("KR_FAILED")).thenReturn(true);
+        when(matchSyncService.syncMatch("KR_SUCCEEDED")).thenReturn(true);
+        when(matchNormalizationService.normalizeAsTierSample("KR_FAILED", "PLATINUM"))
+                .thenReturn(failed);
+        when(matchNormalizationService.normalizeAsTierSample("KR_SUCCEEDED", "PLATINUM"))
+                .thenReturn(succeeded);
+        doThrow(new IllegalStateException("database unavailable"))
+                .when(matchNormalizationService).save(failed);
+        orchestrator.runOnce();
+
+        InOrder order = inOrder(matchNormalizationService, statsMatchService);
+        order.verify(matchNormalizationService).normalizeAsTierSample("KR_FAILED", "PLATINUM");
+        order.verify(matchNormalizationService).save(failed);
+        order.verify(matchNormalizationService).normalizeAsTierSample("KR_SUCCEEDED", "PLATINUM");
+        order.verify(matchNormalizationService).save(succeeded);
+        order.verify(statsMatchService).registerMatchStats(succeeded, "PLATINUM");
+        verify(statsMatchService, never()).registerMatchStats(failed, "PLATINUM");
+    }
+
+    @Test
+    void 한_매치의_통계_집계가_실패해도_다음_매치의_정규화와_통계_집계를_계속한다() {
+        NormalizedMatch failed = normalizedMatch("KR_FAILED");
+        NormalizedMatch succeeded = normalizedMatch("KR_SUCCEEDED");
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
+        when(matchSyncService.findMatchIdsSince("puuid-1", 20, START_TIME))
+                .thenReturn(List.of("KR_FAILED", "KR_SUCCEEDED"));
+        when(matchSyncService.syncMatch("KR_FAILED")).thenReturn(true);
+        when(matchSyncService.syncMatch("KR_SUCCEEDED")).thenReturn(true);
+        when(matchNormalizationService.normalizeAsTierSample("KR_FAILED", "PLATINUM"))
+                .thenReturn(failed);
+        when(matchNormalizationService.normalizeAsTierSample("KR_SUCCEEDED", "PLATINUM"))
+                .thenReturn(succeeded);
+        doThrow(new IllegalStateException("statistics unavailable"))
+                .when(statsMatchService).registerMatchStats(failed, "PLATINUM");
+
+        orchestrator.runOnce();
+
+        InOrder order = inOrder(matchNormalizationService, statsMatchService);
+        order.verify(matchNormalizationService).normalizeAsTierSample("KR_FAILED", "PLATINUM");
+        order.verify(matchNormalizationService).save(failed);
+        order.verify(statsMatchService).registerMatchStats(failed, "PLATINUM");
+        order.verify(matchNormalizationService).normalizeAsTierSample("KR_SUCCEEDED", "PLATINUM");
+        order.verify(matchNormalizationService).save(succeeded);
+        order.verify(statsMatchService).registerMatchStats(succeeded, "PLATINUM");
+    }
+
+    @Test
+    void 한_단계가_실패해도_후속_단계를_계속한다() {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenThrow(new IllegalStateException("league unavailable"));
+        orchestrator.runOnce();
+        verify(matchSyncService, never()).findMatchIdsSince(anyString(), eq(20), eq(START_TIME));
+        verify(matchSyncService).syncMissingTimelines();
+        verifyNoInteractions(statsMatchService);
+    }
+
+    @Test
+    void 스케줄이_성공할_때마다_다음_리그_페이지의_PUUID만_매치_수집에_전달한다() {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 2))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-2")));
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+
+        verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
+        verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 2);
+        verify(matchSyncService).findMatchIdsSince("puuid-1", 20, START_TIME);
+        verify(matchSyncService).findMatchIdsSince("puuid-2", 20, START_TIME);
+    }
+
+    @Test
+    void 페이지의_플레이어를_puuid_순으로_실행마다_이어서_쓰고_페이지는_다_쓸_때까지_다시_조회하지_않는다() {
+        properties.setPlayerLimit(1);
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(3, List.of("puuid-c", "puuid-a", "puuid-b")));
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 2))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-d")));
+
+        for (int execution = 0; execution < 4; execution++) {
+            orchestrator.runOnce();
+        }
+
+        InOrder order = inOrder(matchSyncService);
+        order.verify(matchSyncService).findMatchIdsSince("puuid-a", 20, START_TIME);
+        order.verify(matchSyncService).findMatchIdsSince("puuid-b", 20, START_TIME);
+        order.verify(matchSyncService).findMatchIdsSince("puuid-c", 20, START_TIME);
+        order.verify(matchSyncService).findMatchIdsSince("puuid-d", 20, START_TIME);
+        verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
+        verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 2);
+    }
+
+    @Test
+    void 수집이_실패하면_해당_범위를_다음_스케줄에서_다시_시도한다() {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenThrow(new IllegalStateException("league unavailable"));
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+
+        verify(playerSyncService, times(2))
+                .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
+        verify(matchSyncService, never()).findMatchIdsSince(anyString(), eq(20), eq(START_TIME));
+    }
+
+    @Test
+    void 시작_디비전부터_I까지_진행한_뒤_다음_리그_페이지로_이동한다() {
+        properties.setDivisions(List.of("IV"));
+        when(playerSyncService.syncLeagueEntries(
+                anyString(), anyString(), anyString(), anyInt()
+        )).thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of("puuid-1")));
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+
+        verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "IV", 1);
+        verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "III", 1);
+        verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "II", 1);
+        verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1);
+        verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "IV", 2);
+    }
+
+    @Test
+    void 모든_디비전의_현재_페이지가_비어_있으면_첫_페이지로_돌아간다() {
+        properties.setDivisions(List.of("IV"));
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+        orchestrator.runOnce();
+
+        verify(playerSyncService, times(2))
+                .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "IV", 1);
+        verify(playerSyncService, never())
+                .syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "IV", 2);
+    }
+
+    @Test
+    void 설정된_티어_순서대로_수집하고_첫_티어로_돌아온다() {
+        properties.setTiers(List.of("EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"));
+        properties.setDivisions(List.of("IV"));
+        properties.setRecoverMissingTimelines(false);
+
+        for (int execution = 0; execution < 6; execution++) {
+            orchestrator.runOnce();
+        }
+
+        InOrder order = inOrder(playerSyncService);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
+        order.verify(playerSyncService)
+                .syncApexLeague("RANKED_SOLO_5x5", "MASTER");
+        order.verify(playerSyncService)
+                .syncApexLeague("RANKED_SOLO_5x5", "GRANDMASTER");
+        order.verify(playerSyncService)
+                .syncApexLeague("RANKED_SOLO_5x5", "CHALLENGER");
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "III", 1);
+
+        order.verifyNoMoreInteractions();
+    }
+
+    @Test
+    void 티어_수집이_실패해도_다음_티어로_이동하고_실패한_위치를_유지한다() {
+        // given
+        properties.setTiers(List.of("EMERALD", "DIAMOND"));
+        properties.setDivisions(List.of("IV"));
+        properties.setRecoverMissingTimelines(false);
+
+        // when
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1))
+                .thenThrow(new IllegalStateException("리그 조회 실패"))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(0, List.of()));
+
+        for (int execution = 0; execution < 3; execution++) {
+            orchestrator.runOnce();
+        }
+
+        InOrder order = inOrder(playerSyncService);
+
+        // then
+        order.verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1);
+        order.verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
+        order.verify(playerSyncService).syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1);
+        order.verifyNoMoreInteractions();
+    }
+
+    @Test
+    void 상위_티어별_플레이어_수집_위치를_독립적으로_유지한다() {
+        // given
+        properties.setTiers(List.of("MASTER", "GRANDMASTER"));
+        properties.setPlayerLimit(1);
+        properties.setRecoverMissingTimelines(false);
+
+        // when
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "MASTER")).thenReturn(new RiotPlayerSyncService.SyncResult(
+                2, List.of("master-a", "master-b")
+        ));
+
+        when(playerSyncService.syncApexLeague("RANKED_SOLO_5x5", "GRANDMASTER")).thenReturn(new RiotPlayerSyncService.SyncResult(
+                2, List.of("grandmaster-a", "grandmaster-b")
+        ));
+
+        for (int execution = 0; execution < 4; execution++) {
+            orchestrator.runOnce();
+        }
+
+        // then
+        InOrder order = inOrder(matchSyncService);
+
+        order.verify(matchSyncService).findMatchIdsSince("master-a", 20, START_TIME);
+        order.verify(matchSyncService).findMatchIdsSince("grandmaster-a", 20, START_TIME);
+        order.verify(matchSyncService).findMatchIdsSince("master-b", 20, START_TIME);
+        order.verify(matchSyncService).findMatchIdsSince("grandmaster-b", 20, START_TIME);
+
+        order.verifyNoMoreInteractions();
+    }
+
+    @Test
+    void 일반_티어별_페이지와_플레이어_발견_여부를_독립적으로_유지한다() {
+        // given
+        properties.setTiers(List.of("EMERALD", "DIAMOND"));
+        properties.setDivisions(List.of("IV", "III"));
+        properties.setRecoverMissingTimelines(false);
+
+        // when
+        when(playerSyncService.syncLeagueEntries(
+                "RANKED_SOLO_5x5", "EMERALD", "IV", 1
+        )).thenReturn(new RiotPlayerSyncService.SyncResult(
+                1, List.of("emerald-player")
+        ));
+
+        for (int execution = 0; execution < 6; execution++) {
+            orchestrator.runOnce();
+        }
+
+        // then
+        InOrder order = inOrder(playerSyncService);
+
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "III", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "III", 1);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "EMERALD", "IV", 2);
+        order.verify(playerSyncService)
+                .syncLeagueEntries("RANKED_SOLO_5x5", "DIAMOND", "IV", 1);
+
+        order.verifyNoMoreInteractions();
+    }
+
+    private double matches(String result) {
+        return meterRegistry.get("riot.collection.matches").tag("result", result).counter().count();
+    }
+
+    private double normalizationFailures(String stage) {
+        return meterRegistry.get("riot.collection.normalization.failures").tag("stage", stage).counter().count();
+    }
+
+    private NormalizedMatch collectSingleMatch(String matchId) {
+        return collectMatches(matchId).getFirst();
+    }
+
+    /** 첫 리그 페이지의 플레이어 한 명이 주어진 매치들을 새로 수집하도록 준비한다. */
+    private List<NormalizedMatch> collectMatches(String... matchIds) {
+        when(playerSyncService.syncLeagueEntries("RANKED_SOLO_5x5", "PLATINUM", "I", 1))
+                .thenReturn(new RiotPlayerSyncService.SyncResult(1, List.of("puuid-1")));
+        when(matchSyncService.findMatchIdsSince("puuid-1", 20, START_TIME)).thenReturn(List.of(matchIds));
+        List<NormalizedMatch> normalizedMatches = new ArrayList<>();
+        for (String matchId : matchIds) {
+            NormalizedMatch normalized = normalizedMatch(matchId);
+            when(matchSyncService.syncMatch(matchId)).thenReturn(true);
+            when(matchNormalizationService.normalizeAsTierSample(matchId, "PLATINUM")).thenReturn(normalized);
+            normalizedMatches.add(normalized);
+        }
+        return normalizedMatches;
+    }
+
+    private NormalizedMatch normalizedMatch(String matchId) {
+        return new NormalizedMatch(matchId, "16.15", 420, List.of());
+    }
+
+}
