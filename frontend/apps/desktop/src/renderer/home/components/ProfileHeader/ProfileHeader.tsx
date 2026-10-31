@@ -1,0 +1,107 @@
+import './ProfileHeader.css';
+
+import type { Summoner } from '../../../../shared/types';
+import { t } from '../../../i18n';
+import { CloseIcon, MinimizeIcon } from '../../../icons';
+import { SettingsIcon } from '../Settings/SettingsIcon';
+
+const profileIconUrl = (id: number) =>
+  `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/${id}.jpg`;
+
+const PERCENT = 100;
+const RING_SIZE = 76;
+const RING_STROKE = 3;
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+
+type Props = {
+  summoner: Summoner | null;
+  /** 배너에 걸 그림 주소. 없으면 그림 없이 그린다. */
+  backdropUrl?: string;
+  onOpenSetting: () => void;
+};
+
+function ProfileHeader({ summoner, backdropUrl, onOpenSetting }: Props) {
+  return (
+    <>
+      <header className='title-bar'>
+        <img className='title-bar-logo' src='./icon.png' alt='' />
+        <span className='title-bar-name'>DFGG</span>
+
+        <div className='title-bar-controls'>
+          <button type='button' className='title-bar-button' onClick={onOpenSetting}>
+            <SettingsIcon />
+          </button>
+          <button
+            type='button'
+            className='title-bar-button'
+            aria-label={t.common.minimize}
+            onClick={() => window.windowControls.minimize()}
+          >
+            <MinimizeIcon />
+          </button>
+          <button
+            type='button'
+            className='title-bar-button title-bar-close'
+            aria-label={t.common.close}
+            onClick={() => window.windowControls.close()}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+      </header>
+
+      {summoner && (
+        <section className='hero'>
+          <div className='hero-banner'>
+            {backdropUrl && (
+              <img
+                // 그림이 바뀌면 새 그림이 다시 서서히 나타나야 한다
+                key={backdropUrl}
+                src={backdropUrl}
+                alt=''
+                onLoad={(event) => event.currentTarget.classList.add('hero-banner-loaded')}
+              />
+            )}
+          </div>
+
+          <div className='hero-body'>
+            <div
+              className='avatar'
+              role='progressbar'
+              aria-valuenow={summoner.percentCompleteForNextLevel}
+              aria-valuemin={0}
+              aria-valuemax={PERCENT}
+              aria-label={t.profile.expLabel}
+              title={`${summoner.xpSinceLastLevel} / ${summoner.xpUntilNextLevel} XP`}
+            >
+              {/* 경험치는 프로필 둘레 고리로 보여 준다 */}
+              <svg className='avatar-ring' viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`} aria-hidden>
+                <circle className='avatar-ring-track' cx='50%' cy='50%' r={RING_RADIUS} />
+                <circle
+                  className='avatar-ring-fill'
+                  cx='50%'
+                  cy='50%'
+                  r={RING_RADIUS}
+                  strokeDasharray={RING_LENGTH}
+                  strokeDashoffset={
+                    RING_LENGTH * (1 - summoner.percentCompleteForNextLevel / PERCENT)
+                  }
+                />
+              </svg>
+              <img className='avatar-image' src={profileIconUrl(summoner.profileIconId)} alt='' />
+              <span className='avatar-level'>{summoner.summonerLevel}</span>
+            </div>
+
+            <h1 className='identity'>
+              {summoner.gameName}
+              <span className='identity-tag'>#{summoner.tagLine}</span>
+            </h1>
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
+
+export default ProfileHeader;
