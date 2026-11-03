@@ -4,6 +4,12 @@ on:
   push:
     branches: [ "BE/dev" ]
   workflow_dispatch:
+    inputs:
+      image:
+        description: "dev에만 배포할 이미지 (ghcr.io/...@sha256:...). 롤백·시험용이며 비우면 현재 커밋을 빌드해 배포한다"
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -12,14 +18,18 @@ permissions:
 # dev는 컨테이너 이미지로, prod는 컨테이너 전환 전까지 기존 JAR 방식으로 배포한다.
 jobs:
   image:
-    if: github.ref == 'refs/heads/BE/dev'
+    if: github.ref == 'refs/heads/BE/dev' && !inputs.image
     permissions:
       contents: read
       packages: write
     uses: ./.github/workflows/be-image.yml
 
+  # 이미지를 지정해 수동 실행하면 빌드를 건너뛰고 그 이미지를 배포한다.
   deploy-dev:
     needs: image
+    if: >-
+      ${{ !cancelled() && github.ref == 'refs/heads/BE/dev'
+      && (needs.image.result == 'success' || (needs.image.result == 'skipped' && inputs.image)) }}
     concurrency:
       group: dfgg-backend-deployment-dev
       cancel-in-progress: false
@@ -30,9 +40,10 @@ jobs:
     with:
       runner-label: dfgg-dev
       profile: dev
-      image: ${{ needs.image.outputs.image }}
+      image: ${{ inputs.image || needs.image.outputs.image }}
   verify-dev:
     needs: deploy-dev
+    if: ${{ !cancelled() && needs.deploy-dev.result == 'success' }}
     runs-on: [ self-hosted, dfgg-dev ]
     timeout-minutes: 15
     steps:
@@ -90,8 +101,10 @@ jobs:
           rm -f /tmp/verify-dev.json
           echo "dev is still healthy after ${SOAK_SECONDS}s; requesting approval for prod"
 
+  # 이미지를 지정한 실행은 dev 롤백·시험용이라 prod로 가지 않는다.
   approve-prod:
     needs: deploy-dev
+    if: ${{ success() && !inputs.image }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment:
