@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron';
-import { GameflowPhase } from '../../shared/types';
+import type { GameflowPhase } from '../../shared/types';
 
 let overlayWindow: BrowserWindow | null = null;
 let enabled = true;

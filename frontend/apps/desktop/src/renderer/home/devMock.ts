@@ -1,6 +1,6 @@
 /**
  * 브라우저에서 home 화면을 바로 열어 볼 때 쓰는 가짜 preload API.
- * Electron 없이(= 롤 클라이언트 없이) 화면을 그리기 위한 것으로, 개발 서버에서만 번들에 들어간다(webpack.config.js).
+ * Electron 없이(= 롤 클라이언트 없이) 화면을 그리기 위한 것으로, 개발 서버에서만 번들에 들어간다(webpack.renderer.js).
  *
  * 주소에 값을 붙여 상태를 바꾼다.
  *   /home/index.html                      연결됨 · 로비 (기본)
