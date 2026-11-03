@@ -9,15 +9,28 @@ permissions:
   contents: read
 
 # dev 자동 배포 → 검증, 승인 → prod 자동 배포.
+# dev는 컨테이너 이미지로, prod는 컨테이너 전환 전까지 기존 JAR 방식으로 배포한다.
 jobs:
-  deploy-dev:
+  image:
     if: github.ref == 'refs/heads/BE/dev'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/be-image.yml
+
+  deploy-dev:
+    needs: image
     concurrency:
       group: dfgg-backend-deployment-dev
       cancel-in-progress: false
-    uses: ./.github/workflows/be-deploy.yml
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/be-deploy-container.yml
     with:
       runner-label: dfgg-dev
+      profile: dev
+      image: ${{ needs.image.outputs.image }}
   verify-dev:
     needs: deploy-dev
     runs-on: [ self-hosted, dfgg-dev ]
@@ -38,6 +51,12 @@ jobs:
             *) echo "::error::Unexpected upstream port: $port"; exit 1 ;;
           esac
           unit="dfgg@${slot}.service"
+          # 컨테이너 슬롯은 사용자 systemd에서, 기존 슬롯은 시스템 systemd에서 돈다.
+          XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          export XDG_RUNTIME_DIR
+          scope=--system
+          if [[ "$(systemctl --user show "$unit" -p ActiveState --value)" == active ]]; then scope=--user; fi
+          echo "verifying $unit ($scope)"
 
           probe() {
             local target=$1 path=$2 filter=$3 code
@@ -47,8 +66,8 @@ jobs:
             jq -e "$filter" /tmp/verify-dev.json > /dev/null
           }
 
-          pid_before=$(systemctl show "$unit" -p MainPID --value)
-          restarts_before=$(systemctl show "$unit" -p NRestarts --value)
+          pid_before=$(systemctl "$scope" show "$unit" -p MainPID --value)
+          restarts_before=$(systemctl "$scope" show "$unit" -p NRestarts --value)
           echo "watching $unit (pid=$pid_before, restarts=$restarts_before) for ${SOAK_SECONDS}s"
 
           probe "$port" /actuator/health/readiness '.status == "UP"'
@@ -57,9 +76,9 @@ jobs:
           sleep "$SOAK_SECONDS"
 
           # 재시작은 systemd가 조용히 해준다. 겉으로는 정상이지만 앱은 죽었다 살아난 것이다.
-          pid_after=$(systemctl show "$unit" -p MainPID --value)
-          restarts_after=$(systemctl show "$unit" -p NRestarts --value)
-          [[ "$(systemctl show "$unit" -p ActiveState --value)" == active ]] \
+          pid_after=$(systemctl "$scope" show "$unit" -p MainPID --value)
+          restarts_after=$(systemctl "$scope" show "$unit" -p NRestarts --value)
+          [[ "$(systemctl "$scope" show "$unit" -p ActiveState --value)" == active ]] \
             || { echo "::error::$unit is not active after soak"; exit 1; }
           [[ "$pid_after" == "$pid_before" ]] \
             || { echo "::error::$unit restarted during soak ($pid_before -> $pid_after)"; exit 1; }
@@ -91,8 +110,8 @@ jobs:
       runner-label: dfgg-prod
 
   notify-dev-failure:
-    needs: [ deploy-dev, verify-dev ]
-    if: ${{ always() && (contains(fromJSON('["failure","cancelled"]'), needs.deploy-dev.result) || contains(fromJSON('["failure","cancelled"]'), needs.verify-dev.result)) }}
+    needs: [ image, deploy-dev, verify-dev ]
+    if: ${{ always() && (contains(fromJSON('["failure","cancelled"]'), needs.image.result) || contains(fromJSON('["failure","cancelled"]'), needs.deploy-dev.result) || contains(fromJSON('["failure","cancelled"]'), needs.verify-dev.result)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -103,8 +122,8 @@ jobs:
         env:
           ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
           DEPLOY_ENV: dev
-          DEPLOY_STAGE: ${{ contains(fromJSON('["failure","cancelled"]'), needs.deploy-dev.result) && 'deploy' || 'verify' }}
-          JOB_RESULT: ${{ contains(fromJSON('["failure","cancelled"]'), needs.deploy-dev.result) && needs.deploy-dev.result || needs.verify-dev.result }}
+          DEPLOY_STAGE: ${{ contains(fromJSON('["failure","cancelled"]'), needs.verify-dev.result) && 'verify' || 'deploy' }}
+          JOB_RESULT: ${{ contains(fromJSON('["failure","cancelled"]'), needs.verify-dev.result) && needs.verify-dev.result || (contains(fromJSON('["failure","cancelled"]'), needs.deploy-dev.result) && needs.deploy-dev.result || needs.image.result) }}
           RECOVERY: ${{ needs.deploy-dev.outputs.recovery }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: .github/scripts/notify-deploy-failure.sh
