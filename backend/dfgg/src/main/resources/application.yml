@@ -67,6 +67,8 @@ mining:
     match-page-size: "${MINING_BATCH_MATCH_PAGE_SIZE:200}"
 
 recommendation:
+  ltr:
+    model-path: "${LTR_MODEL_PATH:ltr/model.json}"
   component-ltr:
     model-path: "${COMPONENT_LTR_MODEL_PATH:}"
     policy-lookup-path: "${COMPONENT_LTR_POLICY_LOOKUP_PATH:}"
