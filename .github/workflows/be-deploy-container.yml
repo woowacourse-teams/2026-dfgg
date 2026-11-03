@@ -362,7 +362,8 @@ jobs:
           # 2. 꺼진 슬롯에 이미지·설정·모델을 놓는다. 켜진 슬롯은 건드리지 않는다.
           test ! -L "/opt/dfgg/$DFGG_NEW"
           podman tag "$IMAGE" "localhost/dfgg:$DFGG_NEW"
-          install -m 0600 "$APP_CONFIG/.env" "/opt/dfgg/$DFGG_NEW/.env"
+          # 서버의 슬롯 .env는 app-config/.env를 가리키는 링크다. 복사하지 않고 링크를 유지한다.
+          ln -sfn "$APP_CONFIG/.env" "/opt/dfgg/$DFGG_NEW/.env"
           mkdir -p "/opt/dfgg/$DFGG_NEW/model"
           install -m 0644 "$APP_CONFIG/model.json" "/opt/dfgg/$DFGG_NEW/model/model.json"
           echo "Deploying $DFGG_OLD($DFGG_OLD_RUNTIME) -> $DFGG_NEW(container); image=$IMAGE"
