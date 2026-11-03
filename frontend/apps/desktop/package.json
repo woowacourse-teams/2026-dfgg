@@ -77,6 +77,10 @@
         }
       ]
     },
+    "electronLanguages": [
+      "ko",
+      "en-US"
+    ],
     "forceCodeSigning": false,
     "artifactName": "dfgg-setup.${ext}",
     "appx": {
