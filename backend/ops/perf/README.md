@@ -650,17 +650,17 @@ smoke는 에러 0건이어야 다음으로 간다. target과 ramp는 회차마�
 ./backend/ops/perf/prom-window.sh backend/ops/perf/results/<UTC>-before-1 2m
 ```
 
-**v4** — 같은 순서로 재되 `ENDPOINT=v4`를 export한다(`-e`로 넘기면 `run.sh`가 멈춘다). smoke 전에 요청 파일을 전수 검증한다:
+**v4** — 같은 순서로 재되 명령마다 앞에 `ENDPOINT=v4`를 붙인다(`-e`로 넘기면 `run.sh`가 멈춘다. export하면 뒤의 v3 회차까지 v4로 간다). smoke 전에 요청 파일을 전수 검증한다:
 
 ```bash
-export ENDPOINT=v4 && ./backend/ops/perf/run.sh v4-validate -e SCENARIO=validate
+ENDPOINT=v4 ./backend/ops/perf/run.sh v4-validate -e SCENARIO=validate
 ```
 
 400이 0건이어야 다음으로 간다(아니면 "8. 요청 파일"의 제외 절차). v4 smoke는 에러 0건에 더해 `v4_core_nonempty`·`v4_situational_nonempty`가 0보다 커야 한다 — 200이어도 Core·Situational이 비어 있으면 v4가 단계를 건너뛴 것이다.
 v3·v4 ramp는 같은 인자로 잰다:
 
 ```bash
-./backend/ops/perf/run.sh v4-ramp -e SCENARIO=ramp -e WARMUP=1m -e RAMP_MAX_RPS=30 -e RAMP_STEPS=15 -e RAMP_STEP=1m
+ENDPOINT=v4 ./backend/ops/perf/run.sh v4-ramp -e SCENARIO=ramp -e WARMUP=1m -e RAMP_MAX_RPS=30 -e RAMP_STEPS=15 -e RAMP_STEP=1m
 ```
 
 ## 개선 후 앱 배포 — [perf]
