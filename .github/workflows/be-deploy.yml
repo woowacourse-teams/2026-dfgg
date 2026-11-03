@@ -40,6 +40,9 @@ jobs:
           test -w /opt/dfgg/blue
           test -w /opt/dfgg/green
           test -r /etc/nginx/conf.d/dfgg-upstream.conf
+          test -L /etc/nginx/sites-enabled/dfgg-backend
+          # API 문서 관리자 계정. 저장소에 두지 않으므로 서버에서 먼저 만들어야 한다.
+          sudo -n test -s /etc/nginx/dfgg-admin.htpasswd
           sudo -n nginx -t
           # EC2의 dfgg@.service도 색상별 JAR 경로로 먼저 변경해야 한다.
           # 기존 app.jar를 실행하는 설정이면 새 버전 배포로 오인하지 않도록 중단한다.
@@ -64,15 +67,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          conf_dir=/etc/nginx/conf.d
+          declare -A targets=(
+            [dfgg-log-format.conf]=/etc/nginx/conf.d/dfgg-log-format.conf
+            [dfgg-metrics.conf]=/etc/nginx/conf.d/dfgg-metrics.conf
+            [dfgg-backend.conf]=/etc/nginx/sites-available/dfgg-backend
+          )
           backups="$RUNNER_TEMP/nginx-conf-backup"
           rm -rf "$backups"
           mkdir -p "$backups"
 
           changed=()
-          for name in dfgg-log-format.conf dfgg-metrics.conf; do
+          for name in "${!targets[@]}"; do
             source="backend/ops/nginx/$name"
-            target="$conf_dir/$name"
+            target="${targets[$name]}"
             test -r "$source"
             if cmp -s "$source" "$target"; then continue; fi
             if [[ -e "$target" ]]; then cp "$target" "$backups/$name"; fi
@@ -87,16 +94,16 @@ jobs:
 
           install_all() {
             for name in "${changed[@]}"; do
-              sudo -n install -o root -g root -m 0644 "backend/ops/nginx/$name" "$conf_dir/$name" || return 1
+              sudo -n install -o root -g root -m 0644 "backend/ops/nginx/$name" "${targets[$name]}" || return 1
             done
           }
           # 백업이 없던 파일은 새로 생긴 것이므로 지운다.
           restore() {
             for name in "${changed[@]}"; do
               if [[ -e "$backups/$name" ]]; then
-                sudo -n install -o root -g root -m 0644 "$backups/$name" "$conf_dir/$name"
+                sudo -n install -o root -g root -m 0644 "$backups/$name" "${targets[$name]}"
               else
-                sudo -n rm -f "$conf_dir/$name"
+                sudo -n rm -f "${targets[$name]}"
               fi
             done
           }
