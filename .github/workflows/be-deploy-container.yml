@@ -413,14 +413,11 @@ jobs:
           date -u '+deployment_completed=%Y-%m-%dT%H:%M:%SZ'
           echo "SUCCESS: $DFGG_NEW active (container); $DFGG_OLD stopped"
 
-      # 슬롯이 쓰는 이미지와 방금 받은 이미지만 남긴다.
+      # 두 슬롯 태그(localhost/dfgg:blue|green)가 현재와 직전 이미지를 붙잡는다.
+      # 태그가 떨어진 이미지만 지우면 롤백용 직전 이미지는 남는다.
       - name: Prune old images
         if: success()
         run: |
           set -euo pipefail
-          keep="${IMAGE%@*}"
-          podman images --format '{{.Repository}}@{{.Digest}}' \
-            | grep -F "$keep@" | grep -vxF "$IMAGE" \
-            | while IFS= read -r ref; do podman rmi "$ref" > /dev/null 2>&1 || true; done
           podman image prune -f > /dev/null
-          podman images --format '{{.Repository}}:{{.Tag}} {{.Digest}}' | grep -E 'dfgg|backend' || true
+          podman images --format '{{.Repository}}:{{.Tag}} {{.Digest}}'
