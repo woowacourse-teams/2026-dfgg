@@ -6,7 +6,9 @@
 #   export BASE_URL=http://<perf-ec2-private-ip>:8080
 #   export PERF_DB_URL=postgresql://<user>@<perf-rds-endpoint>:5432/<db>   # 비밀번호는 ~/.pgpass
 #   export PERF_DB_INSTANCE=dfgg-db-perf                                   # CloudWatch 지표용
-#   export APP_COMMIT=... PERF_DATA=serving-YYMMDD.dump                    # meta에 남길 앱·데이터 식별자
+#   export APP_COMMIT=<git 커밋> PERF_DATA=serving-YYMMDD.dump              # meta에 남길 앱·데이터 식별자
+#   export APP_JAR_SHA256=... JAVA_OPTS='-Xms128m -Xmx384m' LEAGUE_VERSION=16.21   # 같은 조건 확인용(perf에서 읽은 값)
+#   export ENDPOINT=v4                                                     # v3(기본) | v4. -e가 아니라 환경 변수로 넘긴다
 #   ./backend/ops/perf/run.sh before-1 -e SCENARIO=target -e TARGET_RPS=10
 
 set -Eeuo pipefail
@@ -22,9 +24,25 @@ shift
 PERF_DB_INSTANCE="${PERF_DB_INSTANCE:-}"
 AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 
+# 엔드포인트와 요청 파일은 meta에 남길 값과 k6에 넘길 값이 한 곳에서 나오도록 환경 변수로만 받는다.
+prev=""
+for arg in "$@"; do
+  if [[ ( "$prev" == -e || "$prev" == --env ) && ( "$arg" == ENDPOINT=* || "$arg" == REQUESTS=* ) ]] \
+     || [[ "$arg" == --env=ENDPOINT=* || "$arg" == --env=REQUESTS=* || "$arg" == -eENDPOINT=* || "$arg" == -eREQUESTS=* ]]; then
+    die "ENDPOINT·REQUESTS는 -e가 아니라 환경 변수로 넘긴다(meta와 어긋나지 않게): $arg"
+  fi
+  prev=$arg
+done
+
 PERF_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-REQUESTS="${REQUESTS:-$PERF_DIR/k6/data/requests.json}"
-[[ -r "$REQUESTS" ]] || die "요청 파일이 없다: $REQUESTS (k6/make-requests.sql로 만든다)"
+ENDPOINT="${ENDPOINT:-v3}"
+[[ "$ENDPOINT" == v3 || "$ENDPOINT" == v4 ]] || die "ENDPOINT는 v3|v4 중 하나다: $ENDPOINT"
+if [[ "$ENDPOINT" == v4 ]]; then
+  REQUESTS="${REQUESTS:-$PERF_DIR/k6/data/requests-v4.json}"
+else
+  REQUESTS="${REQUESTS:-$PERF_DIR/k6/data/requests.json}"
+fi
+[[ -r "$REQUESTS" ]] || die "요청 파일이 없다: $REQUESTS (k6/make-requests.sql로 만든다, v4는 k6/make-v4-requests.py)"
 command -v k6 > /dev/null || die "k6가 없다"
 command -v psql > /dev/null || die "psql이 없다"
 
@@ -43,7 +61,7 @@ fi
 
 say "k6 실행 → $OUT"
 set +e
-k6 run -e BASE_URL="$BASE_URL" -e REQUESTS="$REQUESTS" "$@" \
+k6 run -e BASE_URL="$BASE_URL" -e ENDPOINT="$ENDPOINT" -e REQUESTS="$REQUESTS" "$@" \
   --summary-export="$OUT/k6-summary.json" "$PERF_DIR/k6/v3-load.js" 2>&1 | tee "$OUT/k6.log"
 K6_EXIT=${PIPESTATUS[0]}
 set -e
@@ -125,11 +143,21 @@ fi
   echo "k6_version=$(k6 version 2>/dev/null | head -1)"
   echo "base_url=$BASE_URL"
   echo "db_instance=${PERF_DB_INSTANCE:-unset}"
+  echo "endpoint=$ENDPOINT"
+  echo "requests=${REQUESTS#"$PERF_DIR"/}"
   echo "requests_sha256=$( (sha256sum "$REQUESTS" 2>/dev/null || shasum -a 256 "$REQUESTS") | cut -d' ' -f1)"
   echo "repo_commit=$(git -C "$PERF_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  # 스크립트·요청 파일을 커밋하지 않고 고쳐서 쟀는지. 결과 폴더(추적 안 됨)는 세지 않는다.
+  echo "repo_dirty=$(git -C "$PERF_DIR" status --porcelain --untracked-files=no 2>/dev/null | wc -l | tr -d ' ')"
+  # prom-window.sh가 Prometheus에서 이 라벨로 앱 지표를 고른다.
+  echo "env=perf"
   echo "pg_stat_statements=$HAS_PGSS"
   # 앱이 어느 커밋으로 떠 있는지는 여기서 알 수 없다. 배포한 커밋을 APP_COMMIT으로 넘긴다.
   echo "app_commit=${APP_COMMIT:-unset}"
+  # 같은 커밋이어도 빌드한 JAR·JVM 옵션·운영 패치가 다르면 다른 조건이다. perf에서 읽어 넘긴다.
+  echo "app_jar_sha256=${APP_JAR_SHA256:-unset}"
+  echo "java_opts=${JAVA_OPTS:-unset}"
+  echo "league_version=${LEAGUE_VERSION:-unset}"
   # perf DB에 실은 고정 덤프. 전후 비교는 같은 덤프여야 한다(README "서빙 데이터 적재").
   echo "perf_data=${PERF_DATA:-unset}"
 } > "$OUT/meta.txt"
