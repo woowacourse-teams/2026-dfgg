@@ -1,0 +1,12 @@
+# 앱 런타임 이미지. JAR는 CI에서 bootJar로 먼저 만든다.
+# .env와 모델은 넣지 않는다. 서버가 읽기 전용으로 마운트한다.
+FROM docker.io/library/eclipse-temurin:21-jre@sha256:0b99b3376fbb50dbf9c0af8535fdd5b8eb0d3fdfc8b1e4967f383b6919f6901a
+
+# 앱은 작업 디렉터리의 .env를 읽는다(spring.config.import). 서버는 /app/.env로 마운트한다.
+WORKDIR /app
+COPY build/libs/dfgg-0.0.1-SNAPSHOT.jar app.jar
+
+USER 1000:1000
+
+# exec 형식이라 java가 PID 1로 SIGTERM을 직접 받아 graceful shutdown을 한다.
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
