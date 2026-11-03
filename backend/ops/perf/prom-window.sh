@@ -84,6 +84,13 @@ quantile() {
   query "histogram_quantile($1, sum by (le) (increase($2[$R])))"
 }
 
+# 한 줄씩 대입한 뒤 쓴다. echo "k=$(query …)"로 쓰면 질의 실패(die)가 서브셸만 끝내고 빈 값이 남는다.
+emit() {
+  local value
+  value=$("${@:2}")
+  echo "$1=$value"
+}
+
 # 측정 구간 요청 수. stage total 증가분과 맞춰 보면 지표 구간이 측정 구간과 맞는지 안다(회차 유효성).
 k6_measure_requests=none
 if [[ -r "$OUT/k6-summary.json" ]]; then
@@ -94,31 +101,32 @@ fi
 say "Prometheus 질의 → $OUT/prometheus.txt"
 {
   echo "# window=$(date -u -d "@$START" +%Y-%m-%dT%H:%M:%SZ)~$FINISHED_AT (워밍업 $WARMUP 제외, ${RANGE}초) prom=$PROM_URL selector={$APP}"
-  echo "app_cpu_max=$(query "max(max_over_time(process_cpu_usage{$APP}[$R]))")"
-  echo "heap_used_max_bytes=$(query "max_over_time(sum(jvm_memory_used_bytes{$APP,area=\"heap\"})[$R:15s])")"
-  echo "gc_pause_seconds_sum=$(query "sum(increase(jvm_gc_pause_seconds_sum{$APP}[$R]))")"
-  echo "hikari_active_max=$(query "max(max_over_time(hikaricp_connections_active{$APP}[$R]))")"
-  echo "hikari_pending_max=$(query "max(max_over_time(hikaricp_connections_pending{$APP}[$R]))")"
-  echo "hikari_acquire_avg_seconds=$(query "sum(increase(hikaricp_connections_acquire_seconds_sum{$APP}[$R])) / sum(increase(hikaricp_connections_acquire_seconds_count{$APP}[$R]))")"
-  echo "hikari_acquire_max_seconds=$(query "max(max_over_time(hikaricp_connections_acquire_seconds_max{$APP}[$R]))")"
+  emit "app_cpu_max" query "max(max_over_time(process_cpu_usage{$APP}[$R]))"
+  emit "heap_used_max_bytes" query "max_over_time(sum(jvm_memory_used_bytes{$APP,area=\"heap\"})[$R:15s])"
+  emit "gc_pause_seconds_sum" query "sum(increase(jvm_gc_pause_seconds_sum{$APP}[$R]))"
+  emit "hikari_active_max" query "max(max_over_time(hikaricp_connections_active{$APP}[$R]))"
+  emit "hikari_pending_max" query "max(max_over_time(hikaricp_connections_pending{$APP}[$R]))"
+  emit "hikari_acquire_avg_seconds" query "sum(increase(hikaricp_connections_acquire_seconds_sum{$APP}[$R])) / sum(increase(hikaricp_connections_acquire_seconds_count{$APP}[$R]))"
+  emit "hikari_acquire_max_seconds" query "max(max_over_time(hikaricp_connections_acquire_seconds_max{$APP}[$R]))"
   # 커넥션 점유. 평균은 대여 1회당이다. open-in-view가 꺼져 있어 요청 1건이 여러 번 빌릴 수 있으므로
   # 요청당 점유는 usage_sum_increase ÷ stage_total_count_increase로 따로 구한다.
-  echo "hikari_usage_avg_seconds=$(query "sum(increase(hikaricp_connections_usage_seconds_sum{$APP}[$R])) / sum(increase(hikaricp_connections_usage_seconds_count{$APP}[$R]))")"
-  echo "hikari_usage_max_seconds=$(query "max(max_over_time(hikaricp_connections_usage_seconds_max{$APP}[$R]))")"
-  echo "hikari_usage_sum_increase=$(query "sum(increase(hikaricp_connections_usage_seconds_sum{$APP}[$R]))")"
-  echo "hikari_usage_count_increase=$(query "sum(increase(hikaricp_connections_usage_seconds_count{$APP}[$R]))")"
-  echo "http_p95_seconds=$(quantile 0.95 "http_server_requests_seconds_bucket{$APP,uri=\"/api/recommendations/$ENDPOINT\"}")"
+  emit "hikari_usage_avg_seconds" query "sum(increase(hikaricp_connections_usage_seconds_sum{$APP}[$R])) / sum(increase(hikaricp_connections_usage_seconds_count{$APP}[$R]))"
+  emit "hikari_usage_max_seconds" query "max(max_over_time(hikaricp_connections_usage_seconds_max{$APP}[$R]))"
+  emit "hikari_usage_sum_increase" query "sum(increase(hikaricp_connections_usage_seconds_sum{$APP}[$R]))"
+  emit "hikari_usage_count_increase" query "sum(increase(hikaricp_connections_usage_seconds_count{$APP}[$R]))"
+  emit "http_p95_seconds" quantile 0.95 "http_server_requests_seconds_bucket{$APP,uri=\"/api/recommendations/$ENDPOINT\"}"
   # v4 단계별 시간. v3 회차나 계측 전 JAR에서는 none이다.
   for stage in prepare core situational component total; do
-    echo "stage_p50_$stage=$(quantile 0.5 "recommendation_v4_stage_seconds_bucket{$APP,stage=\"$stage\"}")"
-    echo "stage_p95_$stage=$(quantile 0.95 "recommendation_v4_stage_seconds_bucket{$APP,stage=\"$stage\"}")"
+    emit "stage_p50_$stage" quantile 0.5 "recommendation_v4_stage_seconds_bucket{$APP,stage=\"$stage\"}"
+    emit "stage_p95_$stage" quantile 0.95 "recommendation_v4_stage_seconds_bucket{$APP,stage=\"$stage\"}"
   done
-  echo "stage_total_count_increase=$(query "sum(increase(recommendation_v4_stage_seconds_count{$APP,stage=\"total\"}[$R]))")"
-  echo "empty_core_increase=$(query "sum(increase(recommendation_v4_empty_core_total{$APP}[$R]))")"
+  emit "stage_total_count_increase" query "sum(increase(recommendation_v4_stage_seconds_count{$APP,stage=\"total\"}[$R]))"
+  emit "empty_core_increase" query "sum(increase(recommendation_v4_empty_core_total{$APP}[$R]))"
   echo "k6_measure_requests=$k6_measure_requests"
-  echo "perf_node_cpu_avg=$(query "1 - avg(rate(node_cpu_seconds_total{job=\"dfgg-node\",env=\"$ENV_LABEL\",mode=\"idle\"}[$R]))")"
+  emit "perf_node_cpu_avg" query "1 - avg(rate(node_cpu_seconds_total{job=\"dfgg-node\",env=\"$ENV_LABEL\",mode=\"idle\"}[$R]))"
   # 부하 발생기 포화 확인용. k6 프로세스만이 아니라 같은 EC2의 Prometheus·Grafana까지 합친 CPU다.
-  echo "monitoring_node_cpu_max=$(query "max_over_time((1 - avg(rate(node_cpu_seconds_total{env=\"monitoring\",mode=\"idle\"}[1m])))[$R:30s])")"
-} > "$OUT/prometheus.txt"
+  emit "monitoring_node_cpu_max" query "max_over_time((1 - avg(rate(node_cpu_seconds_total{env=\"monitoring\",mode=\"idle\"}[1m])))[$R:30s])"
+} > "$OUT/prometheus.txt.tmp"
+mv "$OUT/prometheus.txt.tmp" "$OUT/prometheus.txt"
 
 cat "$OUT/prometheus.txt"
