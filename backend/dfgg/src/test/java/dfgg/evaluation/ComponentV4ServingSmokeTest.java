@@ -95,7 +95,8 @@ class ComponentV4ServingSmokeTest {
                             new LeagueOfLegendsVersionProperties(patch),
                             dfgg.application.recommend.situational.SituationalComponentRuntime.disabled(),
                             new dfgg.application.recommend.situational.SituationalItemMapper(new ImageUrls("smoke-test", "ap-northeast-2", patch),
-                                    new dfgg.domain.item.trait.ItemTraitCatalog()));
+                                    new dfgg.domain.item.trait.ItemTraitCatalog()),
+                            new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
                     var mvc = MockMvcBuilders.standaloneSetup(new RecommendationController(
                             mock(RecommendationService.class), mock(MultiBuildRecommendationService.class), core, service))
                             .setControllerAdvice(new GlobalExceptionHandler()).build();

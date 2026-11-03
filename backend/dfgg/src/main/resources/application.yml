@@ -143,10 +143,13 @@ management:
     distribution:
       percentiles-histogram:
         "[http.server.requests]": true
+        "[recommendation.v4.stage]": true
       minimum-expected-value:
         "[http.server.requests]": 10ms
+        "[recommendation.v4.stage]": 1ms
       maximum-expected-value:
         "[http.server.requests]": 10s
+        "[recommendation.v4.stage]": 10s
 
 logging:
   file:
