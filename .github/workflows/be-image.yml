@@ -3,9 +3,12 @@ name: be-image
 # 서버가 받아 실행할 arm64 이미지를 만든다. PR에서는 빌드와 기동만 확인하고,
 # BE/dev push에서만 GHCR에 올린다. 배포는 이 digest를 그대로 쓴다.
 on:
-  push:
-    branches: [BE/dev]
-    paths: ["backend/dfgg/**", ".github/workflows/be-image.yml"]
+  # BE/dev 배포는 be-cd가 이 워크플로를 불러 만든 digest를 쓴다.
+  workflow_call:
+    outputs:
+      image:
+        description: "배포할 이미지 (ghcr.io/...@sha256:...)"
+        value: ${{ jobs.image.outputs.image }}
   pull_request:
     branches: [main, dev, BE/dev]
     paths: ["backend/dfgg/**", ".github/workflows/be-image.yml"]
@@ -30,7 +33,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 20
     outputs:
-      digest: ${{ steps.push.outputs.digest }}
+      image: ${{ steps.push.outputs.image }}
 
     services:
       postgres:
@@ -120,5 +123,5 @@ jobs:
           echo "$GH_TOKEN" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
           podman push --digestfile "$RUNNER_TEMP/digest" "$IMAGE"
           digest=$(cat "$RUNNER_TEMP/digest")
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE%:*}@$digest" >> "$GITHUB_OUTPUT"
           echo "pushed ${IMAGE%:*}@$digest" | tee -a "$GITHUB_STEP_SUMMARY"
