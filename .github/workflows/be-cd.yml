@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 # dev 자동 배포 → 검증, 승인 → prod 자동 배포.
-# dev는 컨테이너 이미지로, prod는 컨테이너 전환 전까지 기존 JAR 방식으로 배포한다.
+# 한 번 빌드한 같은 컨테이너 이미지로 배포한다.
 jobs:
   image:
     if: github.ref == 'refs/heads/BE/dev' && !inputs.image
@@ -113,14 +113,20 @@ jobs:
       - name: Record approval
         run: echo "prod 배포 승인됨. 체류 검증이 끝나면 배포가 시작된다."
 
+  # dev에서 5분 검증을 통과한 것과 같은 digest를 prod에 올린다.
   deploy-prod:
-    needs: [ approve-prod, verify-dev ]
+    needs: [ image, approve-prod, verify-dev ]
     concurrency:
       group: dfgg-backend-deployment-prod
       cancel-in-progress: false
-    uses: ./.github/workflows/be-deploy.yml
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/be-deploy-container.yml
     with:
       runner-label: dfgg-prod
+      profile: prod
+      image: ${{ needs.image.outputs.image }}
 
   notify-dev-failure:
     needs: [ image, deploy-dev, verify-dev ]

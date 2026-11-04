@@ -414,10 +414,18 @@ jobs:
           echo "SUCCESS: $DFGG_NEW active (container); $DFGG_OLD stopped"
 
       # 두 슬롯 태그(localhost/dfgg:blue|green)가 현재와 직전 이미지를 붙잡는다.
-      # 태그가 떨어진 이미지만 지우면 롤백용 직전 이미지는 남는다.
+      # digest로 받은 이미지는 ghcr 이름이 남아 prune만으로는 지워지지 않으므로,
+      # 슬롯이 쓰지 않는 ghcr 이미지를 직접 지운다.
       - name: Prune old images
         if: success()
         run: |
           set -euo pipefail
+          keep=$(for slot in blue green; do podman image inspect -f '{{.Id}}' "localhost/dfgg:$slot" 2> /dev/null || true; done)
+          podman images --no-trunc --format '{{.ID}} {{.Repository}}' \
+            | awk '$2 ~ /^ghcr\.io\/.+\/backend$/ { sub(/^sha256:/, "", $1); print $1 }' | sort -u \
+            | while IFS= read -r id; do
+                if grep -qxF "$id" <<< "$keep"; then continue; fi
+                podman rmi "$id" > /dev/null 2>&1 || true
+              done
           podman image prune -f > /dev/null
           podman images --format '{{.Repository}}:{{.Tag}} {{.Digest}}'
