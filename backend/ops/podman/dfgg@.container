@@ -19,6 +19,7 @@ Volume=/opt/dfgg/%i/model:/models:ro
 # LOGGING_FILE_NAME(/home/ubuntu/logs/dfgg-<slot>.log)을 서버의 같은 경로에 남긴다.
 Volume=%h/logs:%h/logs
 Environment=LTR_MODEL_PATH=file:/models/model.json
+Environment=TZ=Asia/Seoul
 LogDriver=journald
 StopTimeout=35
 
