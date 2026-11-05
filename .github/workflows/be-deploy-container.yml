@@ -1,12 +1,11 @@
 name: BE Deploy Container (reusable)
 
-# 컨테이너 슬롯 블루-그린 배포. 전환 기간에는 이전 슬롯이 기존 systemd 유닛(JAR)일 수 있어
-# 슬롯마다 실행 방식을 확인한다. 모든 서버가 옮겨지면 be-deploy.yml과 systemd 분기를 지운다.
+# 컨테이너 슬롯 블루-그린 배포. 두 슬롯 모두 Quadlet이 사용자 systemd에서 띄운다.
 on:
   workflow_call:
     inputs:
       runner-label:
-        description: "대상 self-hosted 러너 라벨 (dfgg-dev | dfgg-prod)"
+        description: "대상 self-hosted 러너 라벨 (dfgg-dev | dfgg-scheduling | dfgg-prod)"
         required: true
         type: string
       profile:
@@ -71,7 +70,7 @@ jobs:
           test -s "$APP_CONFIG/.env"
           jq -e -s 'length == 1 and (.[0] | type == "object")' "$APP_CONFIG/model.json" > /dev/null
 
-      # 저장소가 관리하는 nginx 설정만 설치한다. (be-deploy.yml과 같은 단계)
+      # 저장소가 관리하는 nginx 설정만 설치한다.
       - name: Install nginx configuration
         run: |
           set -euo pipefail
@@ -186,20 +185,8 @@ jobs:
 
           property() { systemctl show "$1" -p "$2" --value; }
           user_property() { systemctl --user show "$1" -p "$2" --value; }
-          stopped() {
-            [[ "$(property "$1" ActiveState)" == inactive && "$(property "$1" MainPID)" == 0 ]]
-          }
           user_stopped() {
             [[ "$(user_property "$1" ActiveState)" =~ ^(inactive|failed)$ && "$(user_property "$1" MainPID)" == 0 ]]
-          }
-          # 슬롯이 컨테이너(container)로 도는지 기존 유닛(systemd)으로 도는지 판단한다.
-          runtime_of() {
-            local unit="dfgg@$1.service" system user
-            system=$(property "$unit" ActiveState)
-            user=$(user_property "$unit" ActiveState)
-            if [[ "$user" == active && "$system" == inactive ]]; then echo container; return; fi
-            if [[ "$system" == active && "$user" =~ ^(inactive|failed)$ ]]; then echo systemd; return; fi
-            echo unknown
           }
 
           probe() {
@@ -258,22 +245,11 @@ jobs:
 
           # 부팅 때 이전 슬롯이 다시 뜨도록 되돌린다.
           restore_old_autostart() {
-            if [[ "$DFGG_OLD_RUNTIME" == container ]]; then
-              bash "$AUTOSTART" "$DFGG_OLD" > /dev/null
-              return
-            fi
-            bash "$AUTOSTART" none > /dev/null || return 1
-            sudo -n systemctl enable "$DFGG_OLD_UNIT" > /dev/null
+            bash "$AUTOSTART" "$DFGG_OLD" > /dev/null
           }
           stop_old() {
-            if [[ "$DFGG_OLD_RUNTIME" == container ]]; then
-              systemctl --user stop "$DFGG_OLD_UNIT" || return 1
-              user_stopped "$DFGG_OLD_UNIT"
-              return
-            fi
-            sudo -n systemctl disable "$DFGG_OLD_UNIT" > /dev/null || return 1
-            sudo -n systemctl stop "$DFGG_OLD_UNIT" || return 1
-            stopped "$DFGG_OLD_UNIT"
+            systemctl --user stop "$DFGG_OLD_UNIT" || return 1
+            user_stopped "$DFGG_OLD_UNIT"
           }
 
           rollback() {
@@ -338,16 +314,11 @@ jobs:
           esac
           DFGG_OLD_UNIT="dfgg@${DFGG_OLD}.service"
           DFGG_NEW_UNIT="dfgg@${DFGG_NEW}.service"
-          DFGG_OLD_RUNTIME=$(runtime_of "$DFGG_OLD")
-          [[ "$DFGG_OLD_RUNTIME" != unknown ]] || { echo "Cannot tell how $DFGG_OLD_UNIT runs"; exit 1; }
+          [[ "$(user_property "$DFGG_OLD_UNIT" ActiveState)" == active ]] \
+            || { echo "$DFGG_OLD_UNIT is not running as a container"; exit 1; }
           [[ "$(property nginx.service ActiveState)" == active ]] || exit 1
           [[ "$(property nginx.service UnitFileState)" == enabled ]] || exit 1
-          stopped dfgg.service
-          [[ "$(property dfgg.service UnitFileState)" != enabled ]] || exit 1
-          # 새 슬롯은 두 방식 모두 꺼져 있고, 기존 유닛으로 자동 시작되지 않아야 한다.
-          stopped "$DFGG_NEW_UNIT"
           user_stopped "$DFGG_NEW_UNIT"
-          [[ "$(property "$DFGG_NEW_UNIT" UnitFileState)" != enabled ]] || exit 1
           DFGG_MASTER=$(property nginx.service MainPID)
           [[ "$DFGG_MASTER" =~ ^[1-9][0-9]*$ ]] || exit 1
           current_workers=$(workers)
@@ -368,7 +339,7 @@ jobs:
           ln -sfn "$APP_CONFIG/.env" "/opt/dfgg/$DFGG_NEW/.env"
           mkdir -p "/opt/dfgg/$DFGG_NEW/model"
           install -m 0644 "$APP_CONFIG/model.json" "/opt/dfgg/$DFGG_NEW/model/model.json"
-          echo "Deploying $DFGG_OLD($DFGG_OLD_RUNTIME) -> $DFGG_NEW(container); image=$IMAGE"
+          echo "Deploying $DFGG_OLD -> $DFGG_NEW; image=$IMAGE"
 
           # 3. 기동·Readiness를 확인한다. 준비에 실패하면 경로를 바꾸지 않는다.
           DFGG_STARTED=true

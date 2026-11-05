@@ -79,12 +79,11 @@ jobs:
             *) echo "::error::Unexpected upstream port: $port"; exit 1 ;;
           esac
           unit="dfgg@${slot}.service"
-          # 컨테이너 슬롯은 사용자 systemd에서, 기존 슬롯은 시스템 systemd에서 돈다.
+          # 앱 슬롯은 사용자 systemd(Quadlet)에서 돈다.
           XDG_RUNTIME_DIR="/run/user/$(id -u)"
           export XDG_RUNTIME_DIR
-          scope=--system
-          if [[ "$(systemctl --user show "$unit" -p ActiveState --value)" == active ]]; then scope=--user; fi
-          echo "verifying $unit ($scope)"
+          scope=--user
+          echo "verifying $unit"
 
           probe() {
             local target=$1 path=$2 filter=$3 code
