@@ -71,6 +71,10 @@ public class Augment {
                 .anyMatch(normalizedCandidate::equals);
     }
 
+    public boolean sharesNameWith(Augment other) {
+        return name.values().stream().anyMatch(other::isNamed);
+    }
+
     private static String normalize(String text) {
         return text.strip().toLowerCase(Locale.ROOT);
     }

@@ -5,6 +5,8 @@ import dfgg.domain.aram.ChampionAugment;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 검증을 마친 한 패치의 판 수.
@@ -17,6 +19,12 @@ public record AramhexPatchData(
         Map<Integer, AramhexGames> heroes,
         Map<Integer, Map<Integer, AramhexGames>> heroAugments
 ) {
+
+    public Set<Integer> augmentIds() {
+        return heroAugments.values().stream()
+                .flatMap(augments -> augments.keySet().stream())
+                .collect(Collectors.toSet());
+    }
 
     public List<ChampionAugment> toChampionAugments() {
         List<ChampionAugment> championAugments = new ArrayList<>();

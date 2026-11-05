@@ -233,6 +233,18 @@ class AramhexClientTest {
     }
 
     @Test
+    @DisplayName("챔피언들의 증강 ID를 중복 없이 모은다")
+    void augmentIds_CollectsDistinctIds() {
+        // given
+        AramhexPatchData data = new AramhexPatchData("16.21", Map.of(), Map.of(
+                22, Map.of(1373, new AramhexGames(1), 1402, new AramhexGames(1)),
+                86, Map.of(1373, new AramhexGames(1))));
+
+        // when & then
+        assertThat(data.augmentIds()).containsExactlyInAnyOrder(1373, 1402);
+    }
+
+    @Test
     @DisplayName("증강 값이 있는 챔피언의 판 수가 없으면 거부한다")
     void toChampionAugments_WhenChampionGamesMissing_Rejects() {
         // given
