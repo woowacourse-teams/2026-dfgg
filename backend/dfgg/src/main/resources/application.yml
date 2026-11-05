@@ -146,7 +146,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: readinessState,db
+          include: readinessState,db,componentRecommendation
   metrics:
     distribution:
       percentiles-histogram:

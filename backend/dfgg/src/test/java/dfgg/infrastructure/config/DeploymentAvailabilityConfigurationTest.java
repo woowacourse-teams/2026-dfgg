@@ -17,7 +17,8 @@ class DeploymentAvailabilityConfigurationTest {
         assertThat(property("management.endpoint.health.probes.enabled"))
                 .isEqualTo(true);
         assertThat(property("management.endpoint.health.group.readiness.include"))
-                .isEqualTo("readinessState,db");
+                .as("Component 모델이 깨진 슬롯으로 전환하지 않는다")
+                .isEqualTo("readinessState,db,componentRecommendation");
         assertThat(property("management.endpoints.web.exposure.include"))
                 .asString()
                 .as("CD의 readiness 검사가 이 노출에 의존한다")
