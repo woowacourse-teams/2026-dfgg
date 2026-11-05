@@ -54,7 +54,8 @@ sudo ROLE=prod RUNNER_TOKEN=<토큰> SENTRY_HOOK_PATH=/hooks/sentry/<...> bash s
 같은 이름표 러너가 둘이면 배포가 옛 서버로 갈 수 있다. 옛 서버에서:
 
 ```bash
-sudo systemctl stop 'actions.runner.*' && sudo systemctl disable 'actions.runner.*'
+# disable 은 * 를 못 받아서 이름을 찾아 하나씩 끈다
+for u in $(systemctl list-unit-files 'actions.runner.*' --no-legend | awk '{print $1}'); do sudo systemctl disable --now "$u"; done
 ```
 
 그리고 GitHub Runners 목록에서 옛 러너(`ip-10-0-...`)를 지운다.
