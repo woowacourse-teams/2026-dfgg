@@ -35,6 +35,10 @@ public record ImageUrls(
         return origin() + ImageKeys.rune(patch, runeId);
     }
 
+    public String augmentOf(String patch, int augmentId) {
+        return origin() + ImageKeys.augment(patch, augmentId);
+    }
+
     public String summonerSpellOf(String riotKey) {
         return origin() + ImageKeys.summonerSpell(version, riotKey);
     }

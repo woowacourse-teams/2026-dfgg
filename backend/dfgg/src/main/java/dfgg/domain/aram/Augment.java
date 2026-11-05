@@ -50,6 +50,10 @@ public class Augment {
         return id;
     }
 
+    public int augmentId() {
+        return augmentId;
+    }
+
     public AugmentRarity rarity() {
         return rarity;
     }

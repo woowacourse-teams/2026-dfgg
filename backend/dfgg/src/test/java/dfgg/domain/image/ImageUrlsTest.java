@@ -73,4 +73,18 @@ class ImageUrlsTest {
         assertThat(imageUrls.summonerSpellOf("SummonerFlash")).isEqualTo(
                 "https://bucket.s3.region.amazonaws.com/dfgg/images/16.18/summoner-spells/SummonerFlash.png");
     }
+
+    @Test
+    @DisplayName("증강 이미지 URL은 설정 버전이 아니라 데이터의 패치 폴더 아래 증강 id로 만든다")
+    void augmentOf_WhenPatchGiven_BuildS3UrlByPatchAndAugmentId() {
+        // given
+        ImageUrls imageUrls = new ImageUrls("bucket", "region", "16.18");
+
+        // when
+        String url = imageUrls.augmentOf("16.21", 1373);
+
+        // then
+        assertThat(url).isEqualTo(
+                "https://bucket.s3.region.amazonaws.com/dfgg/images/16.21/augments/1373.png");
+    }
 }

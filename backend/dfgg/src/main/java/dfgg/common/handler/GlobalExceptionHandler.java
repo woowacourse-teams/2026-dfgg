@@ -1,5 +1,6 @@
 package dfgg.common.handler;
 
+import dfgg.common.exception.AugmentDataUnavailableException;
 import dfgg.common.exception.ChampionNotFoundException;
 import dfgg.common.exception.ComponentRecommendationUnavailableException;
 import dfgg.common.exception.InvalidDfScoreRequestException;
@@ -40,6 +41,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ComponentRecommendationUnavailableException.class)
     public ProblemDetail handleComponentUnavailable(ComponentRecommendationUnavailableException exception) {
         log.warn("503 추천 준비 불가: {}", exception.getMessage());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+    }
+
+    @ExceptionHandler(AugmentDataUnavailableException.class)
+    public ProblemDetail handleAugmentDataUnavailable(AugmentDataUnavailableException exception) {
+        log.warn("503 증강 데이터 없음: {}", exception.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
     }
 

@@ -46,6 +46,10 @@ public class ChampionAugment {
         return id;
     }
 
+    public int augmentId() {
+        return augmentId;
+    }
+
     public double pickRate() {
         return pickRate;
     }
