@@ -10,31 +10,38 @@ scrape_configs:
     metrics_path: /blue
     static_configs:
       # production
-      - targets: [ "10.0.0.221:9090" ]
+      - targets: [ "10.0.0.101:9090" ]
         labels: { env: prod, slot: blue }
-      # 수집용
-      - targets: [ "10.0.0.114:9090" ]
+      # dev
+      - targets: [ "10.0.0.141:9090" ]
         labels: { env: dev, slot: blue }
+      # scheduling
+      - targets: [ "10.0.0.74:9090" ]
+        labels: { env: scheduling, slot: blue }
       # 부하 테스트
-      - targets: [ "10.0.0.231:9090" ]
+      - targets: [ "10.0.0.160:9090" ]
         labels: { env: perf, slot: blue }
 
   - job_name: dfgg-app-green
     metrics_path: /green
     static_configs:
-      - targets: [ "10.0.0.221:9090" ]
+      - targets: [ "10.0.0.101:9090" ]
         labels: { env: prod, slot: green }
-      - targets: [ "10.0.0.114:9090" ]
+      - targets: [ "10.0.0.141:9090" ]
         labels: { env: dev, slot: green }
+      - targets: [ "10.0.0.74:9090" ]
+        labels: { env: scheduling, slot: green }
 
   - job_name: dfgg-node
     metrics_path: /node
     static_configs:
-      - targets: [ "10.0.0.221:9090" ]
+      - targets: [ "10.0.0.101:9090" ]
         labels: { env: prod }
-      - targets: [ "10.0.0.114:9090" ]
+      - targets: [ "10.0.0.141:9090" ]
         labels: { env: dev }
-      - targets: [ "10.0.0.231:9090" ]
+      - targets: [ "10.0.0.74:9090" ]
+        labels: { env: scheduling }
+      - targets: [ "10.0.0.160:9090" ]
         labels: { env: perf }
 
   - job_name: dfgg-monitoring
