@@ -16,11 +16,16 @@ import dfgg.presentation.dto.response.AugmentLookupResponse;
 import dfgg.presentation.dto.response.ChampionAugmentsResponse;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 저장된 가장 높은 패치의 증강 픽률을 응답으로 만든다. 사용자 요청에서 외부 서버를 부르지 않는다. */
+/**
+ * 저장된 가장 높은 패치의 증강 픽률을 응답으로 만든다. 사용자 요청에서 외부 서버를 부르지 않는다.
+ * <p>
+ * 증강과 픽률을 나눠 읽으므로 그 사이에 재수집이 커밋되면 서로 다른 시점을 보게 된다. 한 시점으로 읽도록 격리 수준을 올린다.
+ */
 @Service
-@Transactional(readOnly = true)
+@Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
 public class AramMayhemQueryService {
 
     private final ChampionRepository championRepository;
