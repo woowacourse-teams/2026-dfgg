@@ -3,12 +3,12 @@
 프론트 서버는 nginx 로 랜딩(`/var/www/dfgg`)을 내주고, GitHub Actions 러너가 `fe-deploy.yaml` 의 결과물을 그 폴더로 `rsync` 한다.
 러너 이름표(`dfgg-fe-dev`, `dfgg-fe-prod`)만 같으면 **CD 파일은 바꿀 필요가 없다.**
 
-| | dev | prod |
-| --- | --- | --- |
-| 인스턴스 | t4g.micro | t4g.small |
-| 도메인 | 없음 (IP 로 접속) | dfgg.pro, www.dfgg.pro (HTTPS) |
-| 백엔드 프록시 | 없음 | `/api/recommendations`, `/feedback` → `43.203.222.190:8080` |
-| 그 밖에 | 없음 | Sentry → Slack 중계 (`dfgg-sentry-relay`, 127.0.0.1:9100) |
+|               | dev               | prod                                                        |
+| ------------- | ----------------- | ----------------------------------------------------------- |
+| 인스턴스      | t4g.micro         | t4g.small                                                   |
+| 도메인        | 없음 (IP 로 접속) | dfgg.pro, www.dfgg.pro (HTTPS)                              |
+| 백엔드 프록시 | 없음              | `/api/recommendations`, `/feedback` → `43.203.222.190:8080` |
+| 그 밖에       | 없음              | Sentry → Slack 중계 (`dfgg-sentry-relay`, 127.0.0.1:9100)   |
 
 AMI 는 arm64 라서 **t4g** 계열만 뜬다.
 
