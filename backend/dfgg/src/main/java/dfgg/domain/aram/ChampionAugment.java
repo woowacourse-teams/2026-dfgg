@@ -42,6 +42,16 @@ public class ChampionAugment {
         this.pickRate = pickRate;
     }
 
+    /** 픽률은 챔피언 판 수 중 게임 종료 시 증강을 가진 판 수의 비율(%)이다. 비율이 될 수 없는 값은 받지 않는다. */
+    public static ChampionAugment fromGames(String patch, int championId, int augmentId, long games,
+                                            long championGames) {
+        if (championGames <= 0 || games < 0 || games > championGames) {
+            throw new IllegalArgumentException(
+                    "판 수가 올바르지 않습니다: games=" + games + ", championGames=" + championGames);
+        }
+        return new ChampionAugment(patch, championId, augmentId, games, games * 100.0 / championGames);
+    }
+
     public Long id() {
         return id;
     }
