@@ -7,7 +7,7 @@
       "files": {
         "collect_list": [
           {
-            "file_path": "/home/ubuntu/logs/dfgg-blue.log",
+            "file_path": "__LOG_DIR__/dfgg-blue.log",
             "log_group_name": "/dfgg/__ENV__",
             "log_stream_name": "{instance_id}/app-blue",
             "timestamp_format": "%Y-%m-%d %H:%M:%S.%f",
@@ -16,7 +16,7 @@
             "retention_in_days": __RETENTION__
           },
           {
-            "file_path": "/home/ubuntu/logs/dfgg-green.log",
+            "file_path": "__LOG_DIR__/dfgg-green.log",
             "log_group_name": "/dfgg/__ENV__",
             "log_stream_name": "{instance_id}/app-green",
             "timestamp_format": "%Y-%m-%d %H:%M:%S.%f",

@@ -6,7 +6,7 @@
 # default.target에 걸린다.
 #
 #   사용법: set-autostart-slot.sh blue|green|none
-#   none은 두 슬롯 모두 자동 시작하지 않는다. 기존 systemd 슬롯이 남아 있는 전환 기간에 쓴다.
+#   none은 두 슬롯 모두 자동 시작하지 않는다. 서버를 점검하거나 내릴 때 쓴다.
 #   QUADLET_DIR  Quadlet 파일 위치 (기본값 ~/.config/containers/systemd)
 
 set -Eeuo pipefail

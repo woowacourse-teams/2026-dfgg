@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # CloudWatch Agent를 설치하고 앱·nginx 로그를 CloudWatch Logs로 보낸다.
-# 앱 서버(dev/prod)에서 ubuntu 사용자로 실행한다.
+# 앱 서버(dev/prod)에서 앱을 띄우는 사용자로 실행한다. 앱 로그는 그 사용자의 ~/logs에 있다.
 #
 #   ./install-agent.sh dev
 #   ./install-agent.sh prod
@@ -21,26 +21,32 @@ TEMPLATE="$SCRIPT_DIR/amazon-cloudwatch-agent.json.template"
 AGENT_DIR=/opt/aws/amazon-cloudwatch-agent
 AGENT_CONFIG="$AGENT_DIR/etc/amazon-cloudwatch-agent.json"
 CTL="$AGENT_DIR/bin/amazon-cloudwatch-agent-ctl"
+LOG_DIR="$HOME/logs"
 
 [[ -r "$TEMPLATE" ]] || { echo "설정 템플릿이 없다: $TEMPLATE" >&2; exit 1; }
 
-for f in /home/ubuntu/logs/dfgg-blue.log /home/ubuntu/logs/dfgg-green.log; do
+for f in "$LOG_DIR/dfgg-blue.log" "$LOG_DIR/dfgg-green.log"; do
   [[ -e "$f" ]] || echo "경고: $f 가 아직 없다. 그 슬롯이 한 번도 안 떴다면 정상이다." >&2
 done
 
 if [[ ! -x "$CTL" ]]; then
   echo "== CloudWatch Agent 설치 (arm64) =="
-  TMP=$(mktemp -d)
-  trap 'rm -rf "$TMP"' EXIT
-  curl -fsSL -o "$TMP/agent.deb" \
-    "https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb"
-  sudo -n dpkg -i -E "$TMP/agent.deb"
+  if command -v dnf > /dev/null; then
+    # Amazon Linux는 기본 저장소에 패키지가 있다.
+    sudo -n dnf install -y -q amazon-cloudwatch-agent
+  else
+    TMP=$(mktemp -d)
+    trap 'rm -rf "$TMP"' EXIT
+    curl -fsSL -o "$TMP/agent.deb" \
+      "https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb"
+    sudo -n dpkg -i -E "$TMP/agent.deb"
+  fi
 else
   echo "== 이미 설치돼 있다. 설정만 갱신한다 =="
 fi
 
 echo "== 설정 적용 (환경: $ENV_NAME) =="
-sed -e "s/__ENV__/$ENV_NAME/g" -e "s/__RETENTION__/$RETENTION/g" "$TEMPLATE" | sudo -n tee "$AGENT_CONFIG" > /dev/null
+sed -e "s/__ENV__/$ENV_NAME/g" -e "s/__RETENTION__/$RETENTION/g" -e "s#__LOG_DIR__#$LOG_DIR#g" "$TEMPLATE" | sudo -n tee "$AGENT_CONFIG" > /dev/null
 sudo -n "$CTL" -a fetch-config -m ec2 -s -c "file:$AGENT_CONFIG"
 
 echo "== 상태 =="

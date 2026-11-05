@@ -1,5 +1,5 @@
-# 앱 슬롯 컨테이너. 기존 systemd 유닛(dfgg@.service)을 대체한다.
-# 설치 위치: ~/.config/containers/systemd/dfgg@.container (ubuntu 계정 rootless)
+# 앱 슬롯 컨테이너.
+# 설치 위치: ~/.config/containers/systemd/dfgg@.container (앱 계정 rootless)
 # 메모리와 힙은 환경마다 달라 dfgg@.container.d/{dev,prod}.conf에 둔다.
 [Unit]
 Description=DFGG Spring Boot (%i)
@@ -11,12 +11,12 @@ Image=localhost/dfgg:%i
 ContainerName=dfgg-%i
 # 포트(8081/8082)와 IMDS를 기존과 같게 쓴다.
 Network=host
-# 컨테이너 사용자를 서버의 ubuntu와 같은 uid로 맞춰 마운트한 파일을 읽는다.
+# 컨테이너 사용자를 서버의 앱 계정과 같은 uid로 맞춰 마운트한 파일을 읽는다.
 UserNS=keep-id
 EnvironmentFile=/etc/dfgg/%i.env
 Volume=/opt/dfgg/%i/.env:/app/.env:ro
 Volume=/opt/dfgg/%i/model:/models:ro
-# LOGGING_FILE_NAME(/home/ubuntu/logs/dfgg-<slot>.log)을 서버의 같은 경로에 남긴다.
+# LOGGING_FILE_NAME(~/logs/dfgg-<slot>.log)을 서버의 같은 경로에 남긴다.
 Volume=%h/logs:%h/logs
 Environment=LTR_MODEL_PATH=file:/models/model.json
 Environment=TZ=Asia/Seoul

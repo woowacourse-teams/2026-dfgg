@@ -15,7 +15,7 @@
 # 저장소에 없는 것 — 서버에서 직접 관리한다
 #   /etc/grafana/secrets/slack-webhook     알림 웹훅 (비밀값)
 #   /etc/grafana/grafana.ini               기본값에서 http_addr = 127.0.0.1
-#   /home/ubuntu/secrets/grafana-admin.env 관리자 계정
+#   ~/secrets/grafana-admin.env            관리자 계정
 
 set -Eeuo pipefail
 die() { echo "❌ $*" >&2; exit 1; }

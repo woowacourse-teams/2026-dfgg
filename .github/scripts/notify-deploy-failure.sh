@@ -2,10 +2,10 @@
 # 배포 실패를 Slack으로 알린다.
 #
 #   ALERT_WEBHOOK_URL  Slack Incoming Webhook (GitHub Secret)
-#   DEPLOY_ENV         dev | prod
+#   DEPLOY_ENV         dev | scheduling | prod
 #   DEPLOY_STAGE       deploy | verify
 #   JOB_RESULT         failure | cancelled
-#   RECOVERY           be-deploy.yml의 recovery 출력 (restored | new-slot-active | uncertain | 빈 값)
+#   RECOVERY           be-deploy-container.yml의 recovery 출력 (restored | new-slot-active | uncertain | 빈 값)
 #   RUN_URL            실행 링크
 
 set -euo pipefail
