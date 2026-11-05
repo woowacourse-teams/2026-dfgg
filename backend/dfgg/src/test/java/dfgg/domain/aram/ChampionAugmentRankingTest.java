@@ -87,6 +87,30 @@ class ChampionAugmentRankingTest {
         assertThat(ranking.augments()).isEmpty();
     }
 
+    @Test
+    @DisplayName("증강 ID로 그 증강의 순위를 찾는다")
+    void find_WhenRanked_ReturnsRankedAugment() {
+        // given
+        ChampionAugmentRanking ranking = ChampionAugmentRanking.of(
+                List.of(augment(1, AugmentRarity.GOLD), augment(2, AugmentRarity.GOLD)),
+                List.of(pick(1, 5.0), pick(2, 16.8)));
+
+        // when & then
+        assertThat(ranking.find(1)).get().extracting(RankedAugment::rank).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("이 챔피언의 값이 없는 증강은 찾지 못한다")
+    void find_WhenNotRanked_IsEmpty() {
+        // given
+        ChampionAugmentRanking ranking = ChampionAugmentRanking.of(
+                List.of(augment(1, AugmentRarity.GOLD), augment(2, AugmentRarity.GOLD)),
+                List.of(pick(1, 5.0)));
+
+        // when & then
+        assertThat(ranking.find(2)).isEmpty();
+    }
+
     private Augment augment(int augmentId, AugmentRarity rarity) {
         return new Augment(PATCH, augmentId, Map.of("ko-KR", "증강" + augmentId), rarity);
     }

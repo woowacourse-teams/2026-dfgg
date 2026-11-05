@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -46,5 +47,12 @@ public final class ChampionAugmentRanking {
 
     public List<RankedAugment> augments() {
         return augments;
+    }
+
+    /** 챔피언마다 값이 있는 증강이 달라서 카탈로그에 있어도 비어 있을 수 있다. */
+    public Optional<RankedAugment> find(int augmentId) {
+        return augments.stream()
+                .filter(ranked -> ranked.augment().augmentId() == augmentId)
+                .findFirst();
     }
 }

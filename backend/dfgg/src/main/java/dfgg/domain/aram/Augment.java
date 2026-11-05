@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.util.Locale;
 import java.util.Map;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -60,5 +61,17 @@ public class Augment {
 
     public String nameIn(Language language) {
         return language.pick(name);
+    }
+
+    /** 어느 언어든 이름이 같으면 이 증강이다. 앞뒤 공백과 대소문자만 무시한다. */
+    public boolean isNamed(String candidate) {
+        String normalizedCandidate = normalize(candidate);
+        return name.values().stream()
+                .map(Augment::normalize)
+                .anyMatch(normalizedCandidate::equals);
+    }
+
+    private static String normalize(String text) {
+        return text.strip().toLowerCase(Locale.ROOT);
     }
 }

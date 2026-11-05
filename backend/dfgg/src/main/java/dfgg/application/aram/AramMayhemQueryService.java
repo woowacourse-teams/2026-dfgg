@@ -2,6 +2,8 @@ package dfgg.application.aram;
 
 import dfgg.common.exception.AugmentDataUnavailableException;
 import dfgg.common.exception.ChampionNotFoundException;
+import dfgg.domain.aram.Augment;
+import dfgg.domain.aram.AugmentNameLookup;
 import dfgg.domain.aram.AugmentRepository;
 import dfgg.domain.aram.ChampionAugmentRanking;
 import dfgg.domain.aram.ChampionAugmentRepository;
@@ -10,6 +12,7 @@ import dfgg.domain.image.ImageUrls;
 import dfgg.domain.language.Language;
 import dfgg.domain.match.PatchVersion;
 import dfgg.presentation.dto.AugmentPickRateDto;
+import dfgg.presentation.dto.response.AugmentLookupResponse;
 import dfgg.presentation.dto.response.ChampionAugmentsResponse;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -44,6 +47,28 @@ public class AramMayhemQueryService {
                         ranked, imageUrls.augmentOf(patch, ranked.augment().augmentId()), language))
                 .toList();
         return new ChampionAugmentsResponse(patch, augments);
+    }
+
+    /** 화면에서 읽은 후보의 픽률을 준다. 후보 중 하나를 고르라는 뜻이 되지 않게 받은 순서를 유지한다. */
+    public AugmentLookupResponse lookup(int championId, List<String> names, Language language) {
+        validateChampion(championId);
+        String patch = latestPatch();
+        List<Augment> catalog = augmentRepository.findByPatch(patch);
+        ChampionAugmentRanking ranking = ChampionAugmentRanking.of(
+                catalog, championAugmentRepository.findByPatchAndChampionId(patch, championId));
+        AugmentNameLookup lookup = AugmentNameLookup.of(catalog, names);
+        List<AugmentPickRateDto> augments = lookup.augments().stream()
+                .map(augment -> pickRateOf(augment, ranking, patch, language))
+                .toList();
+        return new AugmentLookupResponse(patch, augments, lookup.unmatchedNames());
+    }
+
+    private AugmentPickRateDto pickRateOf(Augment augment, ChampionAugmentRanking ranking, String patch,
+                                          Language language) {
+        String iconUrl = imageUrls.augmentOf(patch, augment.augmentId());
+        return ranking.find(augment.augmentId())
+                .map(ranked -> AugmentPickRateDto.of(ranked, iconUrl, language))
+                .orElseGet(() -> AugmentPickRateDto.unranked(augment, iconUrl, language));
     }
 
     private void validateChampion(int championId) {
