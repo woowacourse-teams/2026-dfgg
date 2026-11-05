@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.nullValue;
 
 import dfgg.domain.aram.Augment;
@@ -231,6 +232,8 @@ class AramMayhemControllerTest {
                 .then().statusCode(200)
                 .body("augments[0].augmentId", equalTo(1402))
                 .body("augments[0].rarity", equalTo("prismatic"))
+                .body("augments[0]", hasKey("rank"))
+                .body("augments[0]", hasKey("pickRate"))
                 .body("augments[0].rank", nullValue())
                 .body("augments[0].pickRate", nullValue())
                 .body("unmatchedNames", empty());

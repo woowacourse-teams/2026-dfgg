@@ -53,7 +53,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(AugmentDataRejectedException.class)
     public ProblemDetail handleAugmentDataRejected(AugmentDataRejectedException exception) {
-        log.warn("502 증강 데이터 거부: {}", exception.getMessage());
+        log.warn("502 증강 데이터 거부: {}", exception.getMessage(), exception);
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, exception.getMessage());
     }
 

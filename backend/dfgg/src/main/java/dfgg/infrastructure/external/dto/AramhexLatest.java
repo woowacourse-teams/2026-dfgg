@@ -18,7 +18,7 @@ public record AramhexLatest(
         Map<String, FileEntry> files
 ) {
 
-    private static final Pattern PATCH_FORMAT = Pattern.compile("[0-9]+\\.[0-9]+");
+    private static final Pattern PATCH_FORMAT = Pattern.compile("(0|[1-9][0-9]{0,3})\\.(0|[1-9][0-9]{0,3})");
     private static final String EXPECTED_MODE = "normal";
     private static final int EXPECTED_SCHEMA_VERSION = 1;
 
@@ -26,7 +26,7 @@ public record AramhexLatest(
         files = files == null ? Map.of() : Map.copyOf(files);
     }
 
-    /** 패치는 파일 주소와 S3 키에 들어가는 외부 값이라 형식을 먼저 확인한다. */
+    /** 패치는 파일 주소와 S3 키에 들어가는 외부 값이다. {@code PatchVersion}과 표기가 어긋나지 않게 앞자리 0도 막는다. */
     public void validate() {
         if (patch == null || !PATCH_FORMAT.matcher(patch).matches()) {
             throw new AugmentDataRejectedException("aramhex-data 패치 형식이 다릅니다: " + patch);

@@ -9,7 +9,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 검증을 마친 한 패치의 판 수.
+ * 파일 검증을 통과한 한 패치의 판 수. 판 수 자체의 검증은 {@link #toChampionAugments()}가 한다.
  *
  * @param heroes       챔피언 ID별 판 수
  * @param heroAugments 챔피언 ID, 증강 ID별 판 수

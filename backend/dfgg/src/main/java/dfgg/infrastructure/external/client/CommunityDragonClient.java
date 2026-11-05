@@ -38,7 +38,8 @@ public class CommunityDragonClient {
     }
 
     private List<CherryAugment> fetchAugments(String patch, String locale) {
-        CherryAugment[] augments = fetch(GAME_DATA + "{locale}/v1/cherry-augments.json", CherryAugment[].class,
+        String file = locale + "/v1/cherry-augments.json";
+        CherryAugment[] augments = fetch(file, GAME_DATA + "{locale}/v1/cherry-augments.json", CherryAugment[].class,
                 patch, locale);
         if (augments == null || Arrays.stream(augments).anyMatch(Objects::isNull)) {
             throw new AugmentDataRejectedException("CommunityDragon 증강 목록이 비정상입니다: " + locale);
@@ -48,7 +49,7 @@ public class CommunityDragonClient {
 
     /** 경로는 외부 값이고 주소에 그대로 붙으므로 게임 자산 경로만 받는다. 파일 주소는 소문자다. */
     public byte[] getAugmentIcon(String patch, String iconPath) {
-        byte[] image = fetch(GAME_DATA + "default/" + assetPathOf(iconPath), byte[].class, patch);
+        byte[] image = fetch(iconPath, GAME_DATA + "default/" + assetPathOf(iconPath), byte[].class, patch);
         if (image == null || !startsWithPngSignature(image)) {
             throw new AugmentDataRejectedException("증강 아이콘이 PNG 형식이 아닙니다: " + iconPath);
         }
@@ -68,14 +69,14 @@ public class CommunityDragonClient {
                 && Arrays.equals(PNG_SIGNATURE, Arrays.copyOf(image, PNG_SIGNATURE.length));
     }
 
-    private <T> T fetch(String uri, Class<T> type, Object... variables) {
+    private <T> T fetch(String file, String uri, Class<T> type, Object... variables) {
         try {
             return restClient.get()
                     .uri(uri, variables)
                     .retrieve()
                     .body(type);
         } catch (RestClientException exception) {
-            throw new AugmentDataRejectedException("CommunityDragon 파일을 받지 못했습니다: " + uri, exception);
+            throw new AugmentDataRejectedException("CommunityDragon 파일을 받지 못했습니다: " + file, exception);
         }
     }
 }

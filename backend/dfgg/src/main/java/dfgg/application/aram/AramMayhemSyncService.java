@@ -12,7 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-/** 최신 패치의 증강 픽률을 받아 저장한다. 어느 단계든 실패하면 저장까지 가지 않아 직전 데이터가 남는다. */
+/** 최신 패치의 증강 픽률을 받아 저장한다. 값을 모두 검증한 뒤 아이콘을 올리고, 어느 단계든 실패하면 직전 데이터가 남는다. */
 @Service
 public class AramMayhemSyncService {
 
@@ -34,8 +34,9 @@ public class AramMayhemSyncService {
     public void sync() {
         AramhexPatchData data = aramhexClient.getLatestPatchData();
         rejectOlderThanStored(data.patch());
+        List<ChampionAugment> calculated = data.toChampionAugments();
         AugmentCatalog catalog = augmentCatalogService.link(data.patch(), data.augmentIds());
-        List<ChampionAugment> championAugments = data.toChampionAugments().stream()
+        List<ChampionAugment> championAugments = calculated.stream()
                 .filter(championAugment -> catalog.contains(championAugment.augmentId()))
                 .toList();
         snapshotWriter.replace(data.patch(), catalog, championAugments);

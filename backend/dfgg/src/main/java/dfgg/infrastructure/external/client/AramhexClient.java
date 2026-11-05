@@ -3,7 +3,11 @@ package dfgg.infrastructure.external.client;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import dfgg.common.exception.AugmentDataRejectedException;
 import dfgg.infrastructure.external.dto.AramhexGames;
 import dfgg.infrastructure.external.dto.AramhexLatest;
@@ -18,75 +22,91 @@ import org.springframework.web.client.RestClientException;
 /**
  * 공개 저장소 czgreat/aramhex-data에서 최신 패치의 판 수를 받는다.
  * <p>
- * 개인 저장소의 파일이라 믿지 않는다. 해시를 먼저 확인한 바이트만 파싱하고, 어떤 실패든 {@link AugmentDataRejectedException}으로 끝낸다.
+ * 해시를 확인한 바이트만 파싱하고, 받기와 파싱의 실패는 {@link AugmentDataRejectedException}으로 끝낸다.
+ * 해시와 파일이 같은 저장소에 있어서 전송 손상과 파일 불일치만 잡는다. 저장소에서 함께 바뀐 값은 막지 못한다.
  */
 @Component
 public class AramhexClient {
 
     private static final String BASE_URL = "https://raw.githubusercontent.com/czgreat/aramhex-data/main";
+    private static final String LATEST_FILE = "latest.json";
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
     public AramhexClient(RestClient.Builder builder, ObjectMapper objectMapper) {
         this.restClient = builder.baseUrl(BASE_URL).build();
-        this.objectMapper = objectMapper.copy()
-                .setDefaultSetterInfo(JsonSetter.Value.forContentNulls(Nulls.FAIL));
+        this.objectMapper = strict(objectMapper);
+    }
+
+    /** 판 수가 빠지거나 다른 형식이면 0이나 잘린 값으로 바뀌어 틀린 픽률이 조용히 저장되므로 변환을 허용하지 않는다. */
+    private static ObjectMapper strict(ObjectMapper objectMapper) {
+        ObjectMapper strict = objectMapper.copy()
+                .setDefaultSetterInfo(JsonSetter.Value.forContentNulls(Nulls.FAIL))
+                .configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, true)
+                .configure(DeserializationFeature.ACCEPT_FLOAT_AS_INT, false)
+                .configure(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, true);
+        strict.coercionConfigFor(LogicalType.Integer)
+                .setCoercion(CoercionInputShape.String, CoercionAction.Fail)
+                .setCoercion(CoercionInputShape.EmptyString, CoercionAction.Fail);
+        return strict;
     }
 
     public AramhexPatchData getLatestPatchData() {
-        AramhexLatest latest = parse(download("/latest.json"), new TypeReference<>() {
+        AramhexLatest latest = parse(LATEST_FILE, download(LATEST_FILE, "/" + LATEST_FILE), new TypeReference<>() {
         });
         latest.validate();
-        AramhexMeta meta = parse(downloadVerified(latest, "meta.json"), new TypeReference<>() {
+        AramhexMeta meta = readVerified(latest, "meta.json", new TypeReference<>() {
         });
-        meta.validate();
-        Map<Integer, AramhexGames> heroes = parse(downloadVerified(latest, "heroes.json"), new TypeReference<>() {
+        meta.validate(latest);
+        Map<Integer, AramhexGames> heroes = readVerified(latest, "heroes.json", new TypeReference<>() {
         });
-        Map<Integer, Map<Integer, AramhexGames>> heroAugments = parse(
-                downloadVerified(latest, "hero_augments.json"), new TypeReference<>() {
+        Map<Integer, Map<Integer, AramhexGames>> heroAugments = readVerified(latest, "hero_augments.json",
+                new TypeReference<>() {
                 });
+        meta.validateChampionCount(heroes.size());
+        meta.validateChampionCount(heroAugments.size());
         return new AramhexPatchData(latest.patch(), heroes, heroAugments);
     }
 
-    private byte[] downloadVerified(AramhexLatest latest, String file) {
-        byte[] content = download("/patches/{patch}/normal/{file}", latest.patch(), file);
+    private <T> T readVerified(AramhexLatest latest, String file, TypeReference<T> type) {
+        byte[] content = download(file, "/patches/{patch}/normal/{file}", latest.patch(), file);
         latest.verify(file, content);
-        return content;
+        return parse(file, content, type);
     }
 
-    private byte[] download(String uri, Object... variables) {
-        byte[] content = fetch(uri, variables);
+    private byte[] download(String file, String uri, Object... variables) {
+        byte[] content = fetch(file, uri, variables);
         if (content == null) {
-            throw new AugmentDataRejectedException("aramhex-data 파일이 비어 있습니다: " + uri);
+            throw new AugmentDataRejectedException("aramhex-data 파일이 비어 있습니다: " + file);
         }
         return content;
     }
 
-    private byte[] fetch(String uri, Object... variables) {
+    private byte[] fetch(String file, String uri, Object... variables) {
         try {
             return restClient.get()
                     .uri(uri, variables)
                     .retrieve()
                     .body(byte[].class);
         } catch (RestClientException exception) {
-            throw new AugmentDataRejectedException("aramhex-data 파일을 받지 못했습니다: " + uri, exception);
+            throw new AugmentDataRejectedException("aramhex-data 파일을 받지 못했습니다: " + file, exception);
         }
     }
 
-    private <T> T parse(byte[] content, TypeReference<T> type) {
-        T value = read(content, type);
+    private <T> T parse(String file, byte[] content, TypeReference<T> type) {
+        T value = read(file, content, type);
         if (value == null) {
-            throw new AugmentDataRejectedException("aramhex-data 파일 내용이 null입니다.");
+            throw new AugmentDataRejectedException("aramhex-data 파일 내용이 null입니다: " + file);
         }
         return value;
     }
 
-    private <T> T read(byte[] content, TypeReference<T> type) {
+    private <T> T read(String file, byte[] content, TypeReference<T> type) {
         try {
             return objectMapper.readValue(content, type);
         } catch (IOException exception) {
-            throw new AugmentDataRejectedException("aramhex-data 파일을 읽지 못했습니다.", exception);
+            throw new AugmentDataRejectedException("aramhex-data 파일을 읽지 못했습니다: " + file, exception);
         }
     }
 }
