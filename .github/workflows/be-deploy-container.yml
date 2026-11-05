@@ -35,7 +35,6 @@ jobs:
     env:
       IMAGE: ${{ inputs.image }}
       PROFILE: ${{ inputs.profile }}
-      APP_CONFIG: /home/ubuntu/app-config
     defaults:
       run:
         shell: bash
@@ -54,6 +53,9 @@ jobs:
             command -v "$tool" > /dev/null
           done
           echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "$GITHUB_ENV"
+          # 앱 설정은 러너 계정의 홈에 둔다. 서버 사용자 이름을 가정하지 않는다.
+          APP_CONFIG="$HOME/app-config"
+          echo "APP_CONFIG=$APP_CONFIG" >> "$GITHUB_ENV"
           [[ "$(loginctl show-user "$(id -un)" -p Linger --value)" == yes ]] \
             || { echo "::error::Linger must be enabled for $(id -un)"; exit 1; }
           XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user is-system-running > /dev/null \

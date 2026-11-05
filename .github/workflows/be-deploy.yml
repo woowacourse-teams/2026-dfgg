@@ -118,12 +118,12 @@ jobs:
           sudo -n systemctl reload nginx.service
 
       - name: Copy .env file
-        run: cp /home/ubuntu/app-config/.env ./.env
+        run: cp "$HOME/app-config/.env" ./.env
 
       - name: Copy LTR model resource
         run: |
           set -euo pipefail
-          model_source=/home/ubuntu/app-config/model.json
+          model_source="$HOME/app-config/model.json"
           model_target=src/main/resources/ltr/model.json
           if [[ ! -r "$model_source" || ! -s "$model_source" ]]; then
             echo '::error::LTR model file is missing, empty, or unreadable in app-config'
