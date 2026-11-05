@@ -11,7 +11,7 @@ on:
         type: string
         default: ''
       target:
-        description: "image를 지정했을 때 배포할 환경. prod는 dev를 거치지 않고 승인 후 바로 배포한다"
+        description: "image를 지정했을 때 배포할 환경. dev는 검증을 통과하면 scheduling까지 간다. prod는 dev를 거치지 않고 승인 후 바로 배포한다"
         required: false
         type: choice
         options: [ dev, prod ]
@@ -20,7 +20,7 @@ on:
 permissions:
   contents: read
 
-# dev 자동 배포 → 검증, 승인 → prod 자동 배포.
+# dev 자동 배포 → 검증 → scheduling 자동 배포, 승인 → prod 자동 배포.
 # 한 번 빌드한 같은 컨테이너 이미지로 배포한다.
 jobs:
   # prod 롤백은 이미지가 꼭 있어야 한다. 비우면 최신 코드를 빌드하게 되므로 바로 멈춘다.
@@ -118,6 +118,23 @@ jobs:
           rm -f /tmp/verify-dev.json
           echo "dev is still healthy after ${SOAK_SECONDS}s; requesting approval for prod"
 
+  # 수집 스케줄러 서버. dev 검증을 통과한 같은 digest를 승인 없이 올린다.
+  # 이미지를 지정한 dev 실행(롤백)도 따라가야 수집이 dev와 같은 버전으로 돌아온다.
+  deploy-scheduling:
+    needs: [ image, verify-dev ]
+    if: ${{ !cancelled() && needs.verify-dev.result == 'success' }}
+    concurrency:
+      group: dfgg-backend-deployment-scheduling
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/be-deploy-container.yml
+    with:
+      runner-label: dfgg-scheduling
+      profile: dev
+      image: ${{ inputs.image || needs.image.outputs.image }}
+
   # push는 dev 배포가 성공해야 승인을 기다린다. prod 롤백은 dev를 거치지 않고 바로 승인을 기다린다.
   # 이미지를 지정한 dev 실행은 prod로 가지 않는다.
   approve-prod:
@@ -168,6 +185,25 @@ jobs:
           DEPLOY_STAGE: ${{ contains(fromJSON('["failure","cancelled"]'), needs.verify-dev.result) && 'verify' || 'deploy' }}
           JOB_RESULT: ${{ contains(fromJSON('["failure","cancelled"]'), needs.verify-dev.result) && needs.verify-dev.result || (contains(fromJSON('["failure","cancelled"]'), needs.deploy-dev.result) && needs.deploy-dev.result || needs.image.result) }}
           RECOVERY: ${{ needs.deploy-dev.outputs.recovery }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: .github/scripts/notify-deploy-failure.sh
+
+  notify-scheduling-failure:
+    needs: [ deploy-scheduling ]
+    if: ${{ always() && contains(fromJSON('["failure","cancelled"]'), needs.deploy-scheduling.result) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Notify Slack
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          DEPLOY_ENV: scheduling
+          DEPLOY_STAGE: deploy
+          JOB_RESULT: ${{ needs.deploy-scheduling.result }}
+          RECOVERY: ${{ needs.deploy-scheduling.outputs.recovery }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: .github/scripts/notify-deploy-failure.sh
 
