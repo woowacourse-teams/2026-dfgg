@@ -1,0 +1,63 @@
+package dfgg.application.recommend.component;
+
+import dfgg.application.recommend.NextItemRecommendationService;
+import dfgg.application.ChampionPositionNormalizer;
+import dfgg.domain.language.Language;
+import dfgg.domain.match.ItemInventory;
+import dfgg.infrastructure.external.dto.ItemResponse;
+import dfgg.presentation.dto.RecommendedItemDto;
+import dfgg.presentation.dto.request.NextItemRecommendationRequest;
+import java.util.ArrayList;
+import java.util.List;
+import dfgg.application.recommend.context.CompositionFeatureCalculator;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Service;
+
+/** 기존 Core 유스케이스의 Top-5와 명시적으로 제공된 현재 Inventory/예산을 연결한다. */
+@Service
+@Lazy // 평가용 연결 서비스는 모델을 기동 실패 격리 구간 밖에서 먼저 로딩하지 않는다.
+@ConditionalOnProperty(name = "recommendation.component-ltr.model-path")
+public class CoreComponentRecommendationService {
+    private final dfgg.application.champion.ChampionService champions;
+    private final NextItemRecommendationService coreRecommendations;
+    private final ComponentRecommendationService componentRecommendations;
+    private final CompositionFeatureCalculator compositions;
+
+    public CoreComponentRecommendationService(NextItemRecommendationService coreRecommendations,
+            ComponentRecommendationService componentRecommendations, dfgg.application.champion.ChampionService champions, CompositionFeatureCalculator compositions) {
+        this.compositions = compositions;
+        this.champions = champions;
+        this.coreRecommendations = coreRecommendations;
+        this.componentRecommendations = componentRecommendations;
+    }
+
+    public List<TargetRecommendation> recommend(NextItemRecommendationRequest request, ItemInventory inventory,
+            long availableGold, long gameTimeMs, ItemResponse catalog) {
+        String version = catalog.dataVersion() == null ? catalog.version() : catalog.dataVersion();
+        if (version == null || !version.matches("\\d+\\.\\d+\\.\\d+") || request.patch() == null
+                || !request.patch().equals(version.substring(0, version.lastIndexOf('.')))) {
+            throw new IllegalArgumentException("Core 요청과 Component 카탈로그의 명시적인 동일 패치가 필요합니다.");
+        }
+        // 목표 ID만 쓰므로 표시 언어는 결과에 영향이 없다.
+        var cores = coreRecommendations.recommendNextItem(request, Language.KO_KR).recommendedItems();
+        var targets = cores.stream().map(core -> Math.toIntExact(core.id())).toList();
+        var allyIds = request.allies().stream().map(ally -> champions.findChampionByName(ally.name()).getChampionId()).toList();
+        var enemyIds = request.enemies().stream().map(enemy -> champions.findChampionByName(enemy.name()).getChampionId()).toList();
+        var composition = compositions.calculate(allyIds, enemyIds);
+        var query = new ComponentRecommendationQuery(
+                Math.toIntExact(champions.findChampionByName(request.myChampion().name()).getChampionId()),
+                targets, inventory, availableGold, gameTimeMs,
+                new ChampionPositionNormalizer().normalize(request.myChampion().position()).orElse(null),
+                request.patch(), composition);
+        var components = componentRecommendations.recommend(query, catalog);
+        var results = new ArrayList<TargetRecommendation>();
+        for (int i = 0; i < cores.size(); i++) {
+            results.add(new TargetRecommendation(cores.get(i), i + 1, components.get(i)));
+        }
+        return List.copyOf(results);
+    }
+
+    public record TargetRecommendation(RecommendedItemDto target, int coreRank,
+                                       ComponentRecommendationService.TargetRecommendation component) {}
+}

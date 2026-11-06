@@ -1,0 +1,2 @@
+ALTER TABLE champions DROP COLUMN url;
+ALTER TABLE items DROP COLUMN url;

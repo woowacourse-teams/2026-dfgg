@@ -1,0 +1,93 @@
+package dfgg.common.handler;
+
+import dfgg.common.exception.AugmentDataRejectedException;
+import dfgg.common.exception.AugmentDataUnavailableException;
+import dfgg.common.exception.ChampionNotFoundException;
+import dfgg.common.exception.ComponentRecommendationUnavailableException;
+import dfgg.common.exception.InvalidDfScoreRequestException;
+import dfgg.common.exception.InvalidRecommendationRequestException;
+import dfgg.common.exception.NextItemRecommendationNotFoundException;
+import dfgg.common.exception.StatsAggregationFailedException;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler({ChampionNotFoundException.class, InvalidRecommendationRequestException.class,
+            InvalidDfScoreRequestException.class})
+    public ProblemDetail handleBadRequest(RuntimeException exception) {
+        log.warn("400 잘못된 요청: {}", exception.getMessage());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
+    @ExceptionHandler(NextItemRecommendationNotFoundException.class)
+    public ProblemDetail handleNotFound(NextItemRecommendationNotFoundException exception) {
+        log.warn("404 찾지 못함: {}", exception.getMessage());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
+
+    @ExceptionHandler(ComponentRecommendationUnavailableException.class)
+    public ProblemDetail handleComponentUnavailable(ComponentRecommendationUnavailableException exception) {
+        log.warn("503 추천 준비 불가: {}", exception.getMessage());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+    }
+
+    @ExceptionHandler(AugmentDataUnavailableException.class)
+    public ProblemDetail handleAugmentDataUnavailable(AugmentDataUnavailableException exception) {
+        log.warn("503 증강 데이터 없음: {}", exception.getMessage());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+    }
+
+    @ExceptionHandler(AugmentDataRejectedException.class)
+    public ProblemDetail handleAugmentDataRejected(AugmentDataRejectedException exception) {
+        log.warn("502 증강 데이터 거부: {}", exception.getMessage(), exception);
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, exception.getMessage());
+    }
+
+    /** 내부 오류 문구는 로그에만 남기고, 응답에는 실패한 단계와 끝난 단계만 담는다. */
+    @ExceptionHandler(StatsAggregationFailedException.class)
+    public ProblemDetail handleStatsAggregationFailed(StatsAggregationFailedException exception) {
+        log.error("500 집계 실패: step={}, completed={}", exception.failedStep(), exception.completedSteps(),
+                exception);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+                exception.getMessage());
+        problem.setProperty("failedStep", exception.failedStep());
+        problem.setProperty("completedSteps", exception.completedSteps());
+        return problem;
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException exception, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        ProblemDetail problem = exception.getBody();
+        String reasons = fieldErrorMessages(exception);
+        log.warn("400 검증 실패: {}", reasons);
+        problem.setDetail(reasons);
+        return handleExceptionInternal(exception, problem, headers, status, request);
+    }
+
+    /**
+     * 순서를 고정한다. 검증기의 순회 순서가 새어 나오면 같은 요청에 다른 본문이 나간다.
+     */
+    private String fieldErrorMessages(MethodArgumentNotValidException exception) {
+        return exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .sorted()
+                .collect(Collectors.joining(", "));
+    }
+}

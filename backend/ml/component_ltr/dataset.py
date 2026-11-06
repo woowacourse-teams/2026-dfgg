@@ -1,0 +1,183 @@
+"""Java JSONL의 계약을 검증하고 Query별 연속 후보 배열을 만든다.
+
+Label 1은 관측 구매, Label 0은 비관측 대안이다. 구매 품질이나 최적성의 등급이 아니다.
+각 READY Query에 관측 구매와 수량이 일치하는 Label 1 후보가 정확히 하나 있어야 한다.
+"""
+from __future__ import annotations
+
+import math
+import json
+import hashlib
+from collections import Counter
+from pathlib import Path
+
+import numpy as np
+from dfgg_ltr.dataset import Dataset
+from component_ltr.feature_schema import FEATURE_NAMES, SCHEMA_VERSION, SCHEMA_FINGERPRINT, COMPOSITION_FEATURE_START, COMPOSITION_FEATURE_END, POLICY_FEATURE_START
+
+# Java PreparedComponentPolicy의 화이트리스트와 같아야 한다.
+POLICY_ITEMS = {"PREPARED": {3070}}
+POLICY_LOOKUP_FILE = "component-policy-lookup.json"
+POLICY_LOOKUP_SCHEMA = "component-policy-lookup-v2"
+
+
+class DatasetValidationError(ValueError):
+    """실패 건수와 위치를 유지한다. 오류 행을 버리고 학습을 계속하지 않는다."""
+    def __init__(self, report):
+        self.report = report
+        super().__init__("학습 데이터 검증 실패 (정답·후보·계약): " + json.dumps(report, ensure_ascii=False))
+
+
+def validate_row(row, seen):
+    """한 Query의 불변식을 검증한다. 오류 분류는 첫 실패 규칙 기준이다."""
+    if not isinstance(row, dict):
+        raise ValueError("ROW_FORMAT")
+    if row["schemaVersion"] != SCHEMA_VERSION:
+        raise ValueError("SCHEMA_VERSION")
+    if row["featureNames"] != FEATURE_NAMES:
+        raise ValueError("FEATURE_ORDER")
+    if row["targetSource"] != "OBSERVED_FUTURE_TARGET_ITEM":
+        raise ValueError("TARGET_SOURCE")
+    if row["status"] != "READY":
+        raise ValueError("NOT_READY")
+    if type(row["targetItemId"]) is not int or row["targetItemId"] <= 0:
+        raise ValueError("TARGET_ITEM")
+    qid = f"{row['matchId']}:{row['participantId']}:{row['startPurchaseOrder']}:{row['endPurchaseOrder']}:{row['targetItemId']}"
+    if qid in seen:
+        raise ValueError("DUPLICATE_QUERY")
+    seen.add(qid)
+    candidates = row["candidates"]
+    if not isinstance(candidates, list) or len(candidates) < 2:
+        raise ValueError("QUERY_SIZE")
+    if any(type(c["label"]) is not int or c["label"] not in (0, 1) for c in candidates):
+        raise ValueError("LABEL")
+    if sum(c["label"] == 1 for c in candidates) != 1:
+        raise ValueError("POSITIVE_COUNT")
+    quantities = [tuple(sorted(c["itemQuantities"].items())) for c in candidates]
+    if len(set(quantities)) != len(quantities):
+        raise ValueError("DUPLICATE_CANDIDATE")
+    for candidate in candidates:
+        if (not candidate["itemQuantities"]
+                or any(type(v) is not int or v <= 0 for v in candidate["itemQuantities"].values())):
+            raise ValueError("ITEM_QUANTITY")
+        source = candidate.get("candidateSource", "TARGET_PATH")
+        if source not in ("TARGET_PATH", *POLICY_ITEMS):
+            raise ValueError("CANDIDATE_SOURCE")
+        policy_item = candidate.get("policyItemId")
+        if source != "TARGET_PATH" and (policy_item not in POLICY_ITEMS[source]
+                                        or str(policy_item) not in candidate["itemQuantities"]):
+            raise ValueError("POLICY_ITEM")
+        vector = candidate["features"]
+        if not isinstance(vector, list) or len(vector) != len(FEATURE_NAMES):
+            raise ValueError("FEATURE_COUNT")
+        if any(type(v) not in (int, float) or not np.isfinite(v) for v in vector):
+            raise ValueError("FEATURE_NUMERIC")
+        evidence = vector[POLICY_FEATURE_START:]
+        if source == "TARGET_PATH" and evidence != [0] * 3:
+            raise ValueError("POLICY_FEATURES")
+        if source == "PREPARED" and (evidence[0] != 1 or not .3 <= evidence[1] <= 1 or evidence[2] < math.log1p(50)):
+            raise ValueError("POLICY_FEATURES")
+        if candidate["label"] == 1 and candidate["itemQuantities"] != row["observedItems"]:
+            raise ValueError("POSITIVE_ITEMS")
+    contexts = [candidate["features"][COMPOSITION_FEATURE_START:COMPOSITION_FEATURE_END] for candidate in row["candidates"]]
+    if any(value < 0 or value != int(value) for context in contexts for value in context):
+        raise ValueError("COMPOSITION_COUNT")
+    if any(context != contexts[0] for context in contexts[1:]):
+        raise ValueError("COMPOSITION_QUERY_MISMATCH")
+    return qid
+
+
+def load_dataset(path: Path, report=None) -> Dataset:
+    """전 행을 검사해 사유별 오류를 집계한다. 한 행이라도 오류가 있으면 전체 학습을 중단한다."""
+    features, labels, groups, qids = [], [], [], []
+    seen, reasons, examples = set(), Counter(), []
+    rows = 0
+    candidate_sources, data_versions = Counter(), set()
+    with path.open(encoding="utf-8") as source:
+        for rows, line in enumerate(source, 1):
+            try:
+                row = json.loads(line)
+                qid = validate_row(row, seen)
+            except (ValueError, KeyError, TypeError, AttributeError, OverflowError) as error:
+                reason = ("JSON_PARSE" if isinstance(error, json.JSONDecodeError)
+                          else "MISSING_FIELD" if isinstance(error, KeyError)
+                          else str(error) if type(error) is ValueError else "ROW_FORMAT")
+                reasons[reason] += 1
+                if len(examples) < 20:
+                    examples.append({"line": rows, "reason": reason})
+                continue
+            if row.get("dataVersion"):
+                data_versions.add(row["dataVersion"])
+            for candidate in row["candidates"]:
+                candidate_sources[candidate.get("candidateSource", "TARGET_PATH")] += 1
+                features.append(candidate["features"])
+                labels.append(candidate["label"])
+            groups.append(len(row["candidates"]))
+            qids.append(qid)
+    if rows == 0:
+        reasons["EMPTY_DATASET"] += 1
+    summary = {"path": str(path), "rows": rows, "validGroups": len(groups),
+               "invalidGroups": sum(reasons.values()), "excludedGroups": 0,
+               "errorCounts": dict(reasons), "errorExamples": examples,
+               "candidateSources": dict(candidate_sources), "dataVersions": sorted(data_versions)}
+    if report is not None:
+        report.update(summary)
+    if reasons:
+        raise DatasetValidationError(summary)
+    return Dataset(np.asarray(features, dtype=np.float64), np.asarray(labels, dtype=np.int32),
+                   np.asarray(groups, dtype=np.int32), qids, FEATURE_NAMES.copy(), SCHEMA_FINGERPRINT)
+
+
+def load_splits(directory: Path, report_path: Path):
+    """모든 분할과 저장된 manifest를 검증한 뒤 학습으로 넘긴다."""
+    datasets, reports = {}, {}
+    errors = []
+    for split in ("train", "validation", "test"):
+        reports[split] = {}
+        try:
+            datasets[split] = load_dataset(directory / f"{split}.jsonl", reports[split])
+        except DatasetValidationError as error:
+            errors.append(str(error))
+    split_errors = []
+    if not errors:
+        matches = {s: {qid.split(":")[0] for qid in d.qids} for s, d in datasets.items()}
+        for a, b in (("train", "validation"), ("train", "test"), ("validation", "test")):
+            overlap = matches[a] & matches[b]
+            if overlap:
+                split_errors.append({"reason": "MATCH_OVERLAP", "splits": [a, b], "count": len(overlap),
+                                     "examples": sorted(overlap)[:20]})
+        manifest = json.loads((directory / "manifest.json").read_text())
+        champion_hash = manifest.get("championMetadataSha256")
+        if champion_hash:
+            snapshot = directory / "champion-tags.json"
+            if not snapshot.is_file() or hashlib.sha256(snapshot.read_bytes()).hexdigest() != champion_hash:
+                split_errors.append({"reason": "CHAMPION_METADATA_HASH"})
+        lookup_hash = manifest.get("policyLookupSha256")
+        if not lookup_hash and any(r["candidateSources"].get(s, 0) for r in reports.values() for s in POLICY_ITEMS):
+            split_errors.append({"reason": "POLICY_LOOKUP_MISSING"})
+        if lookup_hash:
+            lookup_bytes = (directory / POLICY_LOOKUP_FILE).read_bytes()
+            lookup = json.loads(lookup_bytes)
+            expected_train = sorted(m for m, e in manifest["matches"].items() if e["split"] == "train")
+            if (hashlib.sha256(lookup_bytes).hexdigest() != lookup_hash or lookup.get("miningSplit") != "train"
+                    or lookup.get("trainMatchIds") != expected_train
+                    or lookup.get("schemaVersion") != POLICY_LOOKUP_SCHEMA
+                    or any(not r["dataVersions"] or any(v.rsplit(".", 1)[0] != lookup.get("patch")
+                           for v in r["dataVersions"]) for r in reports.values())):
+                split_errors.append({"reason": "POLICY_LOOKUP_CONTRACT"})
+        for split, dataset in datasets.items():
+            counts = Counter(qid.split(":")[0] for qid in dataset.qids)
+            for match_id, count in counts.items():
+                entry = manifest["matches"].get(match_id)
+                if entry is None or entry.get("split") != split or entry.get("rankingGroups") != count:
+                    split_errors.append({"reason": "MANIFEST_MISMATCH", "matchId": match_id, "split": split})
+            expected = {m for m, e in manifest["matches"].items()
+                        if e["split"] == split and e["rankingGroups"] > 0}
+            if expected != set(counts):
+                split_errors.append({"reason": "MANIFEST_MISSING_GROUPS", "split": split})
+    summary = {"splits": reports, "splitErrors": split_errors, "passed": not errors and not split_errors}
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2))
+    if not summary["passed"]:
+        raise ValueError("학습 데이터 검증 실패: " + str(report_path))
+    return datasets["train"], datasets["validation"], datasets["test"]
