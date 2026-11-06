@@ -194,6 +194,18 @@ jobs:
                 echo "Volume=$dir:$dir:ro"
               done >> "$mounts"
           install -m 0644 "$mounts" "$dropins/external-models.conf"
+
+          # 템플릿이 슬롯의 model.env를 읽으므로 두 슬롯 모두 파일이 있어야 다시 뜬다.
+          # 묶음 링크인 슬롯은 묶음 경로를, 아니면 빈 파일을 둔다. 예전 슬롯 drop-in은 지운다.
+          for slot in blue green; do
+            rm -f "$quadlet/dfgg@$slot.container.d/model.conf"
+            [[ ! -e "/opt/dfgg/$slot/model.env" ]] || continue
+            if [[ -L "/opt/dfgg/$slot/model" ]]; then
+              install -m 0644 backend/ops/podman/model-bundle.env "/opt/dfgg/$slot/model.env"
+              continue
+            fi
+            : > "/opt/dfgg/$slot/model.env"
+          done
           systemctl --user daemon-reload
           systemctl --user cat dfgg@blue.service > /dev/null
 
@@ -390,22 +402,19 @@ jobs:
           podman tag "$DEPLOY_IMAGE" "localhost/dfgg:$DFGG_NEW"
           # 서버의 슬롯 .env는 app-config/.env를 가리키는 링크다. 복사하지 않고 링크를 유지한다.
           ln -sfn "$APP_CONFIG/.env" "/opt/dfgg/$DFGG_NEW/.env"
-          # 묶음이면 슬롯의 model을 묶음 링크로 두고 Component 경로를 슬롯 drop-in으로 지정한다.
+          # 묶음이면 슬롯의 model을 묶음 링크로 두고 Component 경로를 슬롯의 model.env로 지정한다.
           # 묶음이 아니면 기존처럼 app-config/model.json을 복사하고 Component는 .env 경로를 따른다.
           slot_model="/opt/dfgg/$DFGG_NEW/model"
-          slot_dropins="$HOME/.config/containers/systemd/dfgg@$DFGG_NEW.container.d"
           if [[ -n "$MODEL_DIR" ]]; then
             rm -rf -- "$slot_model"
             ln -s "$MODEL_DIR" "$slot_model"
-            mkdir -p "$slot_dropins"
-            install -m 0644 backend/ops/podman/model-bundle.conf "$slot_dropins/model.conf"
+            install -m 0644 backend/ops/podman/model-bundle.env "/opt/dfgg/$DFGG_NEW/model.env"
           else
-            rm -f "$slot_dropins/model.conf"
             if [[ -L "$slot_model" ]]; then rm -f "$slot_model"; fi
             mkdir -p "$slot_model"
             install -m 0644 "$APP_CONFIG/model.json" "$slot_model/model.json"
+            : > "/opt/dfgg/$DFGG_NEW/model.env"
           fi
-          systemctl --user daemon-reload
           echo "Deploying $DFGG_OLD -> $DFGG_NEW; image=$DEPLOY_IMAGE; model=${MODEL_DIR:-app-config}"
 
           # 3. 기동·Readiness를 확인한다. 준비에 실패하면 경로를 바꾸지 않는다.

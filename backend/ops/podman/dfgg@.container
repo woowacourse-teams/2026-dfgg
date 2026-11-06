@@ -14,6 +14,7 @@ Network=host
 # 컨테이너 사용자를 서버의 앱 계정과 같은 uid로 맞춰 마운트한 파일을 읽는다.
 UserNS=keep-id
 EnvironmentFile=/etc/dfgg/%i.env
+EnvironmentFile=/opt/dfgg/%i/model.env
 Volume=/opt/dfgg/%i/.env:/app/.env:ro
 Volume=/opt/dfgg/%i/model:/models:ro
 # LOGGING_FILE_NAME(~/logs/dfgg-<slot>.log)을 서버의 같은 경로에 남긴다.
