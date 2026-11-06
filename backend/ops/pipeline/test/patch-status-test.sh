@@ -104,19 +104,18 @@ check "대상 챔피언은 현재·직전 패치에 나온 챔피언이다" has 
 check "주 포지션 100건 이상 비율 (MIDDLE+MID 합산, 미완료·무포지션·빈 순서 제외)" has "coverage100: 50.0%" "$out"
 check "주 포지션 300건 이상 비율" has "coverage300: 25.0%" "$out"
 
-# 2. 재학습 준비 판단
-check "300건 커버리지가 하한(기본 70%) 미만이면 재학습하지 않는다" has "retrain_ready: no (coverage300 25.0% < 70%)" "$out"
-check "하한을 넘으면 재학습한다" has "retrain_ready: yes" "$(status --date 2026-11-08 --min-coverage300 20)"
-check "하한 미달은 실패가 아니다 (종료 코드 0)" succeeds status --date 2026-11-08
+# 2. 재학습 판단을 하지 않는다
+check "커버리지가 낮아도 실패하지 않는다 (종료 코드 0)" succeeds status --date 2026-11-08
+check "재학습 가능 여부를 출력하지 않는다" fails has "retrain" "$out"
+check "하한 옵션은 없다" fails status --min-coverage300 70
 
 # 3. JSON과 입력 검사
 json=$(status --date 2026-11-08 --json)
-check "JSON으로도 출력한다" has '"patch":"16.21","previous":"16.20","started":"2026-11-05","day":4,"champions":4,"coverage100":50.0,"coverage300":25.0' "$json"
+check "JSON으로도 출력한다" has '{"patch":"16.21","previous":"16.20","started":"2026-11-05","day":4,"champions":4,"coverage100":50.0,"coverage300":25.0}' "$json"
 check "--patch로 다른 패치를 볼 수 있다" has "patch: 16.20" "$(status --date 2026-10-21 --patch 16.20)"
 check "데이터가 없는 패치는 실패한다" fails status --patch 99.1
 check "날짜 형식이 틀리면 실패한다" fails status --date 2026/11/08
 check "시작일보다 이른 날짜는 실패한다" fails status --date 2026-11-01
-check "하한 값이 틀리면 실패한다" fails status --min-coverage300 seventy
 
 # 4. 읽기 전용
 before=$(psql -X -A -t -c "SELECT count(*) FROM normalized_match_participants")
