@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# replicate.sh를 로컬 Postgres의 두 데이터베이스(main 역할, 대상 역할)로 시험한다.
+# 두 DB 모두 저장소의 Flyway 마이그레이션을 그대로 적용해 실제와 같은 테이블·인덱스를 만든다.
+#
+#   사용법 (Docker, 저장소 루트에서):
+#   docker run --rm -e POSTGRES_PASSWORD=test \
+#     -v "$PWD/backend/ops/pipeline:/w:ro" -v "$PWD/backend/dfgg/src/main/resources/db/migration:/m:ro" postgres:16 \
+#     bash -c 'docker-entrypoint.sh postgres -c autovacuum=off > /dev/null 2>&1 & until pg_isready -q -h localhost; do sleep 1; done; sleep 2;
+#              PGHOST=localhost PGUSER=postgres PGPASSWORD=test MIGRATIONS=/m /w/test/replicate-test.sh'
+
+set -Eeuo pipefail
+
+# autovacuum이 돌면 VACUUM 단계를 빼먹어도 Heap Fetches가 0으로 보인다. 시험은 autovacuum을 끈 서버에서 돌린다.
+[[ "$(psql -X -A -t -d postgres -c 'SHOW autovacuum')" == off ]] || { echo "run postgres with -c autovacuum=off" >&2; exit 1; }
+
+here=$(cd "$(dirname "$0")" && pwd)
+pipeline=$(dirname "$here")
+migrations=${MIGRATIONS:?MIGRATIONS must point to db/migration}
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+sql() { psql -X -q -A -t -v ON_ERROR_STOP=1 -d "$1" -c "$2"; }
+
+# 서비스 이름으로 접속한다(실서버의 ~/.pg_service.conf와 같은 방식). dev와 prod는 같은 시험 DB를 가리킨다.
+cat > "$work/pg_service.conf" <<EOF
+[main]
+host=$PGHOST
+dbname=repl_main
+user=$PGUSER
+[dev]
+host=$PGHOST
+dbname=repl_target
+user=$PGUSER
+[prod]
+host=$PGHOST
+dbname=repl_target
+user=$PGUSER
+EOF
+export PGSERVICEFILE="$work/pg_service.conf"
+
+for db in repl_main repl_target; do
+  sql postgres "DROP DATABASE IF EXISTS $db" > /dev/null 2>&1
+  sql postgres "CREATE DATABASE $db" > /dev/null
+  for file in $(find "$migrations" -name "V*.sql" | sort -V); do
+    psql -X -q -v ON_ERROR_STOP=1 -d "$db" -f "$file" > /dev/null
+  done
+  sql "$db" "CREATE TABLE flyway_schema_history (installed_rank int PRIMARY KEY, version varchar(50), success boolean NOT NULL)"
+  latest=$(find "$migrations" -name "V*.sql" | sed -E 's#.*/V([0-9]+)__.*#\1#' | sort -n | tail -1)
+  sql "$db" "INSERT INTO flyway_schema_history SELECT v, v::text, true FROM generate_series(1, $latest) v"
+done
+
+# main: 수집·집계된 값
+psql -X -q -v ON_ERROR_STOP=1 -d repl_main <<'SQL'
+INSERT INTO normalized_match_participants (champion_id, core_item_purchase_order, core_item_purchase_order_complete,
+    final_core_item_ids, match_id, participant_id, patch, position, puuid, queue_id, team_id, win, tier)
+SELECT 1 + g % 20, '3031,3006,3094', g % 3 <> 0, '3031', 'KR_' || g, 1 + g % 10, '16.21',
+       (ARRAY['TOP','JUNGLE','MIDDLE','BOTTOM','UTILITY'])[1 + g % 5], 'p' || g, 420, 100, g % 2 = 0, 'EMERALD'
+FROM generate_series(1, 3000) g;
+INSERT INTO normalized_match_participant_runes (match_id, participant_id, patch, champion_id, team_id, position, win,
+    primary_style_id, keystone_id, primary_perk1_id, primary_perk2_id, primary_perk3_id, sub_style_id, sub_perk1_id,
+    sub_perk2_id, stat_offense_id, stat_flex_id, stat_defense_id)
+SELECT 'KR_' || g, 1, '16.21', 1, 100, 'MIDDLE', true, 8100, 8112, 8126, 8138, 8135, 8300, 8304, 8345, 5005, 5008, 5001
+FROM generate_series(1, 500) g;
+INSERT INTO champion_position_stats (patch, champion_id, position, games)
+SELECT '16.21', g, 'MID', 100 + g FROM generate_series(1, 10) g;
+INSERT INTO champion_item_stats (champion_game_count_all, champion_game_count_recent, champion_id, item_id, position,
+    purchase_count_all, purchase_count_recent, win_count_all, win_count_recent, champion_win_count_all)
+SELECT 1000, 300, g, 3031, 'MID', 500, 150, 260, 80, 520 FROM generate_series(1, 20) g;
+SQL
+
+# 대상: 예전 값과, 대상이 직접 쓰는 feedback
+psql -X -q -v ON_ERROR_STOP=1 -d repl_target <<'SQL'
+INSERT INTO normalized_match_participants (champion_id, core_item_purchase_order, core_item_purchase_order_complete,
+    final_core_item_ids, match_id, participant_id, patch, position, puuid, queue_id, team_id, win, tier)
+SELECT 1, '1001', true, '1001', 'OLD_' || g, 1, '16.20', 'TOP', 'old' || g, 420, 100, true, 'EMERALD'
+FROM generate_series(1, 5) g;
+INSERT INTO champion_position_stats (patch, champion_id, position, games) VALUES ('16.20', 99, 'TOP', 1);
+INSERT INTO feedback (feedback_id, content, date) VALUES (1, 'keep me', '2026-11-01');
+SQL
+
+passed=0
+failed=0
+check() {
+  local name=$1
+  shift
+  if "$@"; then
+    passed=$((passed + 1)); echo "ok   $name"
+    return
+  fi
+  failed=$((failed + 1)); echo "FAIL $name"
+}
+eq() { [[ "$1" == "$2" ]] || { echo "     expected [$2] got [$1]"; return 1; }; }
+has() { grep -qF -- "$1" <<< "$2"; }
+target() { sql repl_target "$1"; }
+indexes() { target "SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'public' AND tablename IN ('normalized_match_participants','normalized_match_participant_runes','champion_position_stats','champion_item_stats')"; }
+replicate() { "$pipeline/replicate.sh" "$@"; }
+
+indexes_before=$(indexes)
+
+# 1. 덤프
+dump="$work/dump-1"
+out=$(replicate dump --out "$dump" 2>&1)
+check "덤프가 끝난다" has "dumped 7 tables" "$out"
+check "덤프에 main의 Flyway 버전과 행 수가 남는다" has "normalized_match_participants 3000" "$(cat "$dump/manifest")"
+
+# 2. dry-run은 대상을 바꾸지 않는다
+out=$(replicate load --target dev --dump "$dump" --dry-run 2>&1)
+check "dry-run은 검사만 하고 끝난다" has "dry-run: checks passed" "$out"
+check "dry-run 뒤 대상은 그대로다" eq "$(target 'SELECT count(*) FROM normalized_match_participants')" 5
+
+# 3. prod는 같은 덤프의 dev 복제가 먼저 성공해야 한다
+check "dev 복제 전에는 prod 복제를 거부한다" bash -c "! '$pipeline/replicate.sh' load --target prod --dump '$dump' > /dev/null 2>&1"
+
+# 4. dev 복제
+out=$(replicate load --target dev --dump "$dump" 2>&1)
+while IFS= read -r line; do echo "     | $line"; done <<< "$out"
+check "dev 복제가 성공한다" has "load done: dev" "$out"
+check "참가자가 main 값으로 바뀐다" eq "$(target 'SELECT count(*) FROM normalized_match_participants')" 3000
+check "룬 기록이 바뀐다" eq "$(target 'SELECT count(*) FROM normalized_match_participant_runes')" 500
+check "예전 라인 분포는 사라진다" eq "$(target "SELECT count(*) FROM champion_position_stats WHERE patch = '16.20'")" 0
+check "대상이 쓰는 feedback은 그대로다" eq "$(target 'SELECT content FROM feedback')" "keep me"
+check "인덱스 이름이 교체 전과 같다" eq "$(indexes)" "$indexes_before"
+check "커버링 인덱스가 남아 있다" eq "$(target "SELECT count(*) FROM pg_indexes WHERE indexname = 'idx_nmp_build_transition' AND schemaname = 'public'")" 1
+check "모든 인덱스가 정상이다" eq "$(target "SELECT count(*) FROM pg_index i JOIN pg_class c ON c.oid = i.indrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND NOT (i.indisvalid AND i.indisready)")" 0
+check "작업용 스키마가 남지 않는다" eq "$(target "SELECT count(*) FROM pg_namespace WHERE nspname IN ('replica_stage','replica_old')")" 0
+check "id 자동 증가가 이어진다" eq "$(target "INSERT INTO champion_position_stats (patch, champion_id, position, games) VALUES ('t', 1, 'TOP', 1) RETURNING id > 10")" t
+target "DELETE FROM champion_position_stats WHERE patch = 't'"
+plan=$(target "SET enable_seqscan = off; SET enable_bitmapscan = off; EXPLAIN (ANALYZE, COSTS OFF) SELECT core_item_purchase_order, patch, win FROM normalized_match_participants WHERE champion_id = 3 AND position = 'MIDDLE' AND core_item_purchase_order_complete")
+check "조회 대상 행이 있다 (Heap Fetches 0이 빈 결과 때문이 아니다)" has "rows=100 " "$plan"
+check "전이 쿼리가 Index Only Scan이다" has "Index Only Scan using idx_nmp_build_transition" "$plan"
+check "VACUUM이 끝나 Heap Fetches가 0이다" has "Heap Fetches: 0" "$plan"
+
+# 5. 같은 덤프의 prod 복제
+check "dev가 성공한 덤프는 prod 복제가 된다" has "load done: prod" "$(replicate load --target prod --dump "$dump" 2>&1)"
+
+# 6. Flyway 버전이 다르면 대기
+target "INSERT INTO flyway_schema_history VALUES (999, '999', true)"
+set +e
+out=$(replicate load --target dev --dump "$dump" 2>&1)
+code=$?
+set -e
+check "Flyway 버전이 다르면 교체하지 않고 대기(종료 코드 3)로 끝난다" eq "$code" 3
+check "대기 메시지를 남긴다" has "wait:" "$out"
+target "DELETE FROM flyway_schema_history WHERE installed_rank = 999"
+
+# 7. 적재 중 실패하면 기존 테이블이 남는다
+sql repl_main "INSERT INTO champion_position_stats (patch, champion_id, position, games) VALUES ('16.21', 11, 'TOP', 7)"
+broken="$work/dump-2"
+replicate dump --out "$broken" > /dev/null 2>&1
+printf 'not gzip' > "$broken/normalized_match_participants.copy.gz"
+check "덤프가 깨지면 복제가 실패한다" bash -c "! '$pipeline/replicate.sh' load --target dev --dump '$broken' > /dev/null 2>&1"
+check "실패해도 기존 참가자가 남는다" eq "$(target 'SELECT count(*) FROM normalized_match_participants')" 3000
+check "실패해도 다른 테이블도 바뀌지 않는다 (한꺼번에 교체)" eq "$(target 'SELECT count(*) FROM champion_position_stats')" 10
+check "실패 뒤 작업용 스키마가 남지 않는다" eq "$(target "SELECT count(*) FROM pg_namespace WHERE nspname IN ('replica_stage','replica_old')")" 0
+
+echo "passed=$passed failed=$failed"
+[[ "$failed" == 0 ]]
