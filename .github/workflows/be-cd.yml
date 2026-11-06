@@ -6,7 +6,12 @@ on:
   workflow_dispatch:
     inputs:
       image:
-        description: "배포할 이미지 (ghcr.io/...@sha256:...). 롤백·시험용이며 비우면 현재 커밋을 빌드해 배포한다"
+        description: "배포할 이미지 (ghcr.io/...@sha256:... | current). current는 각 서버의 켜진 슬롯 이미지를 다시 쓴다(재기동·모델만 교체). 비우면 현재 커밋을 빌드해 배포한다"
+        required: false
+        type: string
+        default: ''
+      model:
+        description: "모델 묶음 (ltr-YYMMDD[-N] | current). 비우면 각 서버의 켜진 슬롯 묶음을 그대로 쓴다"
         required: false
         type: string
         default: ''
@@ -58,6 +63,7 @@ jobs:
       runner-label: dfgg-dev
       profile: dev
       image: ${{ inputs.image || needs.image.outputs.image }}
+      model: ${{ inputs.model }}
   verify-dev:
     needs: deploy-dev
     if: ${{ !cancelled() && needs.deploy-dev.result == 'success' }}
@@ -133,6 +139,7 @@ jobs:
       runner-label: dfgg-scheduling
       profile: dev
       image: ${{ inputs.image || needs.image.outputs.image }}
+      model: ${{ inputs.model }}
 
   # push는 dev 배포가 성공해야 승인을 기다린다. prod 롤백은 dev를 거치지 않고 바로 승인을 기다린다.
   # 이미지를 지정한 dev 실행은 prod로 가지 않는다.
@@ -167,6 +174,7 @@ jobs:
       runner-label: dfgg-prod
       profile: prod
       image: ${{ inputs.image || needs.image.outputs.image }}
+      model: ${{ inputs.model }}
 
   notify-dev-failure:
     needs: [ image, deploy-dev, verify-dev ]
