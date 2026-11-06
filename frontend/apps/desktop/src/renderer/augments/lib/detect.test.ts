@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { type Box, detectCards, fingerprint, type Frame, isSameCard } from './detect';
+import {
+  CARD_BOXES,
+  CARD_SCREENS,
+  loadFrame,
+  NO_CARD_SCREEN,
+} from '../../../../test/fixtures/augments/frames';
+import {
+  type Box,
+  detectCards,
+  fingerprint,
+  type Frame,
+  isSameCard,
+  region,
+  TITLE_REGION,
+} from './detect';
 
 /**
  * 실제 화면 대신 증강 선택 화면을 흉내 낸 프레임을 그린다.
@@ -110,6 +124,50 @@ describe('증강 카드 찾기', () => {
 
   it('카드가 세 장이 아니면 찾지 않는다', () => {
     expect(detectCards(makeFrame(1920, 1080, 1, 2))).toBeNull();
+  });
+});
+
+describe('실제 게임 화면에서 카드 찾기', () => {
+  it.each(CARD_SCREENS)('%s 화면에서 세 장의 자리를 맞힌다', (name) => {
+    const frame = loadFrame(name);
+
+    const boxes = detectCards(frame);
+
+    expect(boxes).not.toBeNull();
+    boxes!.forEach((box, slot) => {
+      const card = CARD_BOXES[slot];
+      // 제목 글자는 몇 픽셀만 밀려도 잘리므로 가로는 카드 폭의 1%, 세로는 화면 높이의 0.3% 안이어야 한다
+      expect(Math.abs(box.x - card.x)).toBeLessThan(card.width * 0.01);
+      expect(Math.abs(box.width - card.width)).toBeLessThan(card.width * 0.01);
+      expect(Math.abs(box.y - card.y)).toBeLessThan(frame.height * 0.003);
+      expect(Math.abs(box.height - card.height)).toBeLessThan(frame.height * 0.003);
+    });
+  });
+
+  it.each(CARD_SCREENS)('%s 화면의 제목 칸에 테두리와 등급 태그가 걸리지 않는다', (name) => {
+    const frame = loadFrame(name);
+    const brightness = (x: number, y: number) =>
+      frame.data[(Math.round(y) * frame.width + Math.round(x)) * 4];
+
+    CARD_BOXES.forEach((card) => {
+      const title = region(card, TITLE_REGION);
+      const right = title.x + title.width;
+      const bottom = title.y + title.height;
+      const edge = [];
+      for (let y = title.y; y <= bottom; y++) {
+        edge.push(brightness(title.x, y), brightness(right, y));
+      }
+      for (let x = title.x; x <= right; x++) {
+        edge.push(brightness(x, bottom));
+      }
+
+      // 테두리와 태그는 160 이 넘는다. 강조 빛이 번진 가운데 카드는 안쪽도 70 쯤까지 밝아진다
+      expect(Math.max(...edge)).toBeLessThan(100);
+    });
+  });
+
+  it('카드가 없는 게임 화면에서는 찾지 않는다', () => {
+    expect(detectCards(loadFrame(NO_CARD_SCREEN))).toBeNull();
   });
 });
 
