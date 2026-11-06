@@ -89,8 +89,10 @@ jobs:
 
           resolved=$IMAGE
           if [[ "$resolved" == current ]]; then
-            resolved=$(podman image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "localhost/dfgg:$active" \
-              | grep -m1 -E '^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$') \
+            # 목록을 먼저 다 받은 뒤 고른다. 파이프로 grep -m1에 넘기면 grep이 먼저 끝날 때
+            # podman이 SIGPIPE(141)로 끝나 pipefail에 걸린다.
+            digests=$(podman image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "localhost/dfgg:$active")
+            resolved=$(grep -m1 -E '^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$' <<< "$digests") \
               || { echo "::error::Cannot find the image of the active slot ($active)"; exit 1; }
           fi
           echo "DEPLOY_IMAGE=$resolved" >> "$GITHUB_ENV"
@@ -373,7 +375,8 @@ jobs:
           [[ "$DFGG_MASTER" =~ ^[1-9][0-9]*$ ]] || exit 1
           current_workers=$(workers)
           [[ -n "$current_workers" ]] || exit 1
-          if ps -eo args= | grep -q '[n]ginx: worker process is shutting down'; then
+          processes=$(ps -eo args=)
+          if grep -q '[n]ginx: worker process is shutting down' <<< "$processes"; then
             echo 'Previous reload is still draining'; exit 1
           fi
           sudo -n nginx -t

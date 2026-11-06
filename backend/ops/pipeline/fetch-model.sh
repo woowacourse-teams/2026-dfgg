@@ -39,14 +39,16 @@ current_name() {
 
 # 필수 파일이 모두 있고 SHA256SUMS에 올라 있으며, 목록의 해시가 모두 맞아야 한다.
 verify() {
-  local dir=$1 file
+  local dir=$1 file listed
   test -s "$dir/SHA256SUMS" || { echo "SHA256SUMS missing" >&2; return 1; }
-  if awk '{ print $2 }' "$dir/SHA256SUMS" | grep -qE '^/|(^|/)\.\.(/|$)'; then
+  # 목록을 변수에 담아 검사한다. awk | grep -q는 grep이 먼저 끝나면 SIGPIPE로 판정이 뒤집힌다.
+  listed=$(awk '{ print $2 }' "$dir/SHA256SUMS")
+  if grep -qE '^/|(^|/)\.\.(/|$)' <<< "$listed"; then
     echo "SHA256SUMS has a path outside the bundle" >&2; return 1
   fi
   for file in "${required[@]}"; do
     test -s "$dir/$file" || { echo "missing $file" >&2; return 1; }
-    awk '{ print $2 }' "$dir/SHA256SUMS" | grep -qxF "$file" || { echo "$file not in SHA256SUMS" >&2; return 1; }
+    grep -qxF "$file" <<< "$listed" || { echo "$file not in SHA256SUMS" >&2; return 1; }
     jq -e . "$dir/$file" > /dev/null || { echo "$file is not JSON" >&2; return 1; }
   done
   (cd "$dir" && sha256sum --quiet --strict -c SHA256SUMS)
