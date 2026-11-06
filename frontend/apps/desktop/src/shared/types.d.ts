@@ -426,3 +426,29 @@ export interface ChampSelectState {
   applied: number | `pro:${string}` | null;
   runeError: RuneApplyError | null;
 }
+
+// ---------- 아수라장 증강 ----------
+export type AugmentRarity = 'silver' | 'gold' | 'prismatic';
+
+/** GET /api/aram-mayhem/champions/{championId}/augments 의 한 줄 */
+export interface MayhemAugment {
+  augmentId: number;
+  /** 요청 언어의 이름 */
+  name: string;
+  rarity: AugmentRarity;
+  /** 같은 등급 안의 픽률 순위. 이 챔피언 값이 없으면 null */
+  rank: number | null;
+  /** 이 챔피언의 픽률(%). 값이 없으면 null */
+  pickRate: number | null;
+  iconUrl: string;
+}
+
+export interface MayhemAugments {
+  patch: string;
+  augments: MayhemAugment[];
+}
+
+/** 아수라장 한 판. 증강 창이 게임 화면을 캡처해 카드를 찾는 동안 쓴다 */
+export interface MayhemSession {
+  championId: number;
+}
