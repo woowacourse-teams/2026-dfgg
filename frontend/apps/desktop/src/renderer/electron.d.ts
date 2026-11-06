@@ -13,6 +13,8 @@ import type {
   LcuStatus,
   MatchDetail,
   MatchSummary,
+  MayhemAugment,
+  MayhemSession,
   OverlayClickTarget,
   Position,
   RecommendationUpdate,
@@ -75,6 +77,13 @@ declare global {
     analytics: {
       track: (name: string, data?: Record<string, string | number | boolean>) => void;
       overlayClick: (target: OverlayClickTarget) => void;
+    };
+    mayhem: {
+      /** 아수라장 판이 아니면 null */
+      getSession: () => Promise<MayhemSession | null>;
+      onSessionChange: (callback: (session: MayhemSession | null) => void) => Unsubscribe;
+      /** 카드 제목·아이콘 그림(PNG)으로 어떤 증강인지 찾는다. 확실하지 않으면 null */
+      readCard: (title: ArrayBuffer, icon: ArrayBuffer) => Promise<MayhemAugment | null>;
     };
     feedback: {
       submit: (rating: FeedbackRating, game: EndedGame) => Promise<Record<string, string>>;

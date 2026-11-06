@@ -36,6 +36,7 @@ import { cleanupOrphans, setMaxGames } from './highlight/storage';
 import { readSettings } from './settings';
 import { initOverlayVisibility, updateOverlayPhase } from './overlay/visibility';
 import { getTestEnv } from './testEnv';
+import { initMayhem } from './mayhem/mayhem';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
@@ -65,6 +66,32 @@ function detectClientStatus(home: BrowserWindow) {
     home.showInactive();
     shown = true;
   });
+}
+
+/**
+ * 아수라장 증강 카드 위에 픽률을 얹는 창. 게임 화면에 딱 겹치는 투명한 창이고,
+ * 마우스는 그대로 게임으로 지나가 사용자가 카드를 직접 고른다.
+ */
+function createAugmentWindow() {
+  const win = new BrowserWindow({
+    show: false,
+    title: 'augments',
+    frame: false,
+    transparent: true,
+    skipTaskbar: true,
+    focusable: false,
+    resizable: false,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      // 숨겨져 있거나 뒤에 있어도 화면 캡처와 카드 찾기가 멈추지 않게 한다
+      backgroundThrottling: false,
+    },
+  });
+  win.setIgnoreMouseEvents(true);
+  win.setAlwaysOnTop(true, 'screen-saver');
+  loadRenderer(win, 'augments');
+  return win;
 }
 
 function createWindow() {
@@ -112,6 +139,7 @@ function createWindow() {
 
   loadRenderer(home, 'home');
   loadRenderer(overlay, 'overlay');
+  initMayhem(createAugmentWindow());
 
   home.on('closed', () => {
     app.quit();

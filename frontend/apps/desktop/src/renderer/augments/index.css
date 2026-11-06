@@ -1,0 +1,20 @@
+@import '../tokens.css';
+
+/* 게임 위에 겹친 투명한 창이다. 카드 위 꾸밈 말고는 아무것도 그리지 않는다 */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+body {
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  pointer-events: none;
+}

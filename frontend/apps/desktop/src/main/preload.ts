@@ -7,6 +7,7 @@ import {
   GameflowPhase,
   HighlightProgress,
   LcuStatus,
+  MayhemSession,
   OverlayClickTarget,
   RecommendationUpdate,
   Summoner,
@@ -111,6 +112,19 @@ contextBridge.exposeInMainWorld('highlight', {
     ipcRenderer.on('highlight:progress', listener);
     return () => ipcRenderer.removeListener('highlight:progress', listener);
   },
+});
+
+contextBridge.exposeInMainWorld('mayhem', {
+  getSession: () => ipcRenderer.invoke('mayhem:get-session'),
+
+  onSessionChange: (callback: (session: MayhemSession | null) => void) => {
+    const listener = (_: IpcRendererEvent, session: MayhemSession | null) => callback(session);
+    ipcRenderer.on('mayhem:session', listener);
+    return () => ipcRenderer.removeListener('mayhem:session', listener);
+  },
+
+  readCard: (title: ArrayBuffer, icon: ArrayBuffer) =>
+    ipcRenderer.invoke('mayhem:read-card', title, icon),
 });
 
 contextBridge.exposeInMainWorld('appLocale', ipcRenderer.sendSync('locale:get'));
