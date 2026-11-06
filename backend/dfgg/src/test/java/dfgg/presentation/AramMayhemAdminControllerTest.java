@@ -3,13 +3,16 @@ package dfgg.presentation;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -44,6 +47,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -188,7 +192,7 @@ class AramMayhemAdminControllerTest {
         // given
         Map<Integer, AramhexGames> augments = new HashMap<>(picks(1679));
         augments.put(9999, new AramhexGames(10));
-        when(aramhexClient.getLatestPatchData()).thenReturn(new AramhexPatchData("16.21",
+        when(aramhexClient.getLatestPatchData()).thenReturn(new AramhexPatchData("16.21", Set.of(),
                 Map.of(ASHE, new AramhexGames(10000)), Map.of(ASHE, augments)));
         linkable("16.21");
 
@@ -197,6 +201,64 @@ class AramMayhemAdminControllerTest {
 
         // then
         assertThat(championAugmentRepository.count()).isEqualTo(ALL_AUGMENTS);
+    }
+
+    @Test
+    @DisplayName("임시 증강은 픽률 없이 저장되어 OCR 조회에서 이름과 아이콘만 준다")
+    void sync_WhenAugmentProvisional_StoresAugmentWithoutPickRate() {
+        // given
+        when(aramhexClient.getLatestPatchData()).thenReturn(new AramhexPatchData("16.21", Set.of(SHRINK_ENGINE),
+                Map.of(ASHE, new AramhexGames(10000)), Map.of(ASHE, picks(1679))));
+        linkable("16.21");
+
+        // when
+        sync().then().statusCode(204);
+
+        // then
+        assertThat(augmentRepository.count()).isEqualTo(ALL_AUGMENTS);
+        assertThat(championAugmentRepository.count()).isEqualTo(OTHER_AUGMENTS);
+        given().contentType(ContentType.JSON).accept(ContentType.JSON).header("Accept-Language", "ko")
+                .body("{\"names\": [\"축소 엔진\"]}")
+                .when().post("/api/aram-mayhem/champions/22/augments/lookup")
+                .then().statusCode(200)
+                .body("augments[0].augmentId", equalTo(SHRINK_ENGINE))
+                .body("augments[0].name", equalTo("축소 엔진"))
+                .body("augments[0].rank", nullValue())
+                .body("augments[0].pickRate", nullValue())
+                .body("unmatchedNames", empty());
+        given().accept(ContentType.JSON)
+                .when().get("/api/aram-mayhem/champions/22/augments")
+                .then().statusCode(200)
+                .body("augments.augmentId", not(hasItem(SHRINK_ENGINE)));
+    }
+
+    @Test
+    @DisplayName("챔피언 판 수가 0인 데이터는 아이콘을 올리기 전에 거부한다")
+    void sync_WhenChampionGamesZero_RejectsBeforeUpload() {
+        // given
+        when(aramhexClient.getLatestPatchData()).thenReturn(new AramhexPatchData("16.21", Set.of(),
+                Map.of(ASHE, new AramhexGames(10000), 86, new AramhexGames(0)), Map.of(ASHE, picks(1679))));
+        linkable("16.21");
+
+        // when & then
+        sync().then().statusCode(502);
+        verify(storage, never()).store(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("저장할 픽률이 없으면 아이콘을 올리지 않고 직전 데이터로 계속 응답한다")
+    void sync_WhenEveryAugmentProvisional_KeepsPreviousData() {
+        // given
+        patchAvailable("16.21", 1679);
+        sync().then().statusCode(204);
+        clearInvocations(storage);
+        when(aramhexClient.getLatestPatchData()).thenReturn(new AramhexPatchData("16.21", picks(1).keySet(),
+                Map.of(ASHE, new AramhexGames(10000)), Map.of(ASHE, picks(2000))));
+
+        // when & then
+        sync().then().statusCode(502);
+        verify(storage, never()).store(anyString(), any());
+        assertServedPickRate("16.21", 16.8f);
     }
 
     @Test
@@ -219,7 +281,7 @@ class AramMayhemAdminControllerTest {
     @DisplayName("판 수가 잘못된 데이터는 아이콘을 올리기 전에 거부한다")
     void sync_WhenGamesInvalid_RejectsBeforeUpload() {
         // given
-        when(aramhexClient.getLatestPatchData()).thenReturn(new AramhexPatchData("16.21",
+        when(aramhexClient.getLatestPatchData()).thenReturn(new AramhexPatchData("16.21", Set.of(),
                 Map.of(ASHE, new AramhexGames(100)), Map.of(ASHE, picks(101))));
         linkable("16.21");
 
@@ -373,7 +435,7 @@ class AramMayhemAdminControllerTest {
     private AramhexPatchData patchDataOf(int firstAugmentId, int lastAugmentId) {
         Map<Integer, AramhexGames> augments = IntStream.rangeClosed(firstAugmentId, lastAugmentId).boxed()
                 .collect(Collectors.toMap(Function.identity(), augmentId -> new AramhexGames(10)));
-        return new AramhexPatchData("16.21", Map.of(ASHE, new AramhexGames(1000)), Map.of(ASHE, augments));
+        return new AramhexPatchData("16.21", Set.of(), Map.of(ASHE, new AramhexGames(1000)), Map.of(ASHE, augments));
     }
 
     private Response sync() {
@@ -394,7 +456,7 @@ class AramMayhemAdminControllerTest {
     }
 
     private AramhexPatchData patchData(String patch, long games) {
-        return new AramhexPatchData(patch, Map.of(ASHE, new AramhexGames(10000)), Map.of(ASHE, picks(games)));
+        return new AramhexPatchData(patch, Set.of(), Map.of(ASHE, new AramhexGames(10000)), Map.of(ASHE, picks(games)));
     }
 
     private Map<Integer, AramhexGames> picks(long shrinkEngineGames) {

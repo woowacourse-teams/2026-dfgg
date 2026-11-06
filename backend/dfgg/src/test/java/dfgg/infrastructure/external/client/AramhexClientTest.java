@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -107,7 +108,7 @@ class AramhexClientTest {
     void getLatestPatchData_WhenFileNotListed_Rejects() {
         // given
         expectLatest("""
-                {"patch": "16.21", "mode": "normal", "schema_version": 1, "files": {}}
+                {"patch": "16.21", "mode": "normal", "schema_version": 1, "path": "patches/16.21/normal", "files": {}}
                 """);
         expectFile("meta.json", META);
 
@@ -186,16 +187,11 @@ class AramhexClientTest {
         );
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("championCountMismatches")
     @DisplayName("챔피언 수가 meta.json과 다르면 거부한다")
-    void getLatestPatchData_WhenChampionCountDiffers_Rejects() {
+    void getLatestPatchData_WhenChampionCountDiffers_Rejects(String label, String heroes, String heroAugments) {
         // given
-        String heroAugments = """
-                {"22": {"1373": {"games": 10}}, "86": {"1373": {"games": 10}}}
-                """;
-        String heroes = """
-                {"22": {"games": 100}, "86": {"games": 100}}
-                """;
         expectLatest(latest("16.21", "normal", 1, sha256(META), sha256(heroes), sha256(heroAugments)));
         expectFile("meta.json", META);
         expectFile("heroes.json", heroes);
@@ -203,6 +199,147 @@ class AramhexClientTest {
 
         // when & then
         assertRejected("챔피언 수");
+    }
+
+    private static Stream<Arguments> championCountMismatches() {
+        String oneHero = """
+                {"22": {"games": 100}}
+                """;
+        String twoHeroes = """
+                {"22": {"games": 100}, "86": {"games": 100}}
+                """;
+        String oneHeroAugments = """
+                {"22": {"1373": {"games": 10}}}
+                """;
+        String twoHeroAugments = """
+                {"22": {"1373": {"games": 10}}, "86": {"1373": {"games": 10}}}
+                """;
+        return Stream.of(
+                Arguments.of("heroes만 많음", twoHeroes, oneHeroAugments),
+                Arguments.of("hero_augments만 많음", oneHero, twoHeroAugments)
+        );
+    }
+
+    @Test
+    @DisplayName("임시 증강은 ID를 남기고 픽률은 만들지 않는다")
+    void getLatestPatchData_WhenAugmentProvisional_KeepsIdWithoutPickRate() {
+        // given
+        String meta = """
+                {"license": "CC BY-NC 4.0", "schema_version": 1, "mode": "normal", "patch": "16.21", "heroes": 1,
+                 "provisional_augments": {"3081": {"games": 17195, "source": "test", "win_rate": 0.5, "wins": 8000}}}
+                """;
+        String heroAugments = """
+                {"22": {"1373": {"games": 1679}, "3081": {"games": 17}}}
+                """;
+        expectLatest(latestWithProvisional(1, meta, HEROES, heroAugments));
+        expectFile("meta.json", meta);
+        expectFile("heroes.json", HEROES);
+        expectFile("hero_augments.json", heroAugments);
+
+        // when
+        AramhexPatchData data = client.getLatestPatchData();
+
+        // then
+        assertThat(data.augmentIds()).containsExactlyInAnyOrder(1373, 3081);
+        assertThat(data.toChampionAugments()).extracting(ChampionAugment::augmentId).containsExactly(1373);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("provisionalCountMismatches")
+    @DisplayName("임시 증강 수가 latest.json과 다르면 틀린 픽률이 저장되지 않게 거부한다")
+    void getLatestPatchData_WhenProvisionalCountDiffers_Rejects(String label, int latestCount, String meta) {
+        // given
+        expectLatest(latestWithProvisional(latestCount, meta, HEROES, HERO_AUGMENTS));
+        expectFile("meta.json", meta);
+
+        // when & then
+        assertRejected("임시 증강 수");
+    }
+
+    private static Stream<Arguments> provisionalCountMismatches() {
+        return Stream.of(
+                Arguments.of("meta의 값이 null", 1, """
+                        {"license": "CC BY-NC 4.0", "schema_version": 1, "mode": "normal", "patch": "16.21",
+                         "heroes": 1, "provisional_augments": null}
+                        """),
+                Arguments.of("meta의 키 이름이 바뀜", 1, """
+                        {"license": "CC BY-NC 4.0", "schema_version": 1, "mode": "normal", "patch": "16.21",
+                         "heroes": 1, "temporary_augments": {"1373": {"games": 10}}}
+                        """),
+                Arguments.of("latest에 없는 임시 증강", 0, """
+                        {"license": "CC BY-NC 4.0", "schema_version": 1, "mode": "normal", "patch": "16.21",
+                         "heroes": 1, "provisional_augments": {"1373": {"games": 10}}}
+                        """)
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"03081\": {\"games\": 10}}",
+            "{\"3081\": {\"games\": 10}, \"3081\": {\"games\": 20}}",
+            "{\"3081\": null}"
+    })
+    @DisplayName("임시 증강 목록에도 같은 파서 규칙을 적용한다")
+    void getLatestPatchData_WhenProvisionalMalformed_Rejects(String provisional) {
+        // given
+        String meta = """
+                {"license": "CC BY-NC 4.0", "schema_version": 1, "mode": "normal", "patch": "16.21", "heroes": 1,
+                 "provisional_augments": %s}
+                """.formatted(provisional);
+        expectLatest(latestWithProvisional(1, meta, HEROES, HERO_AUGMENTS));
+        expectFile("meta.json", meta);
+
+        // when & then
+        assertRejected("meta.json");
+    }
+
+    @Test
+    @DisplayName("픽률 파일에 없는 임시 증강도 ID를 남긴다")
+    void augmentIds_IncludesProvisionalAugmentWithoutPickRows() {
+        // given
+        AramhexPatchData data = new AramhexPatchData("16.21", Set.of(3039), Map.of(22, new AramhexGames(100)),
+                Map.of(22, Map.of(1373, new AramhexGames(10))));
+
+        // when & then
+        assertThat(data.augmentIds()).containsExactlyInAnyOrder(1373, 3039);
+    }
+
+    @Test
+    @DisplayName("모든 증강이 임시라 저장할 픽률이 없으면 거부한다")
+    void toChampionAugments_WhenEveryAugmentProvisional_Rejects() {
+        // given
+        AramhexPatchData data = new AramhexPatchData("16.21", Set.of(1373), Map.of(22, new AramhexGames(100)),
+                Map.of(22, Map.of(1373, new AramhexGames(10))));
+
+        // when & then
+        assertThatThrownBy(data::toChampionAugments)
+                .isInstanceOf(AugmentDataRejectedException.class)
+                .hasMessageContaining("저장할 픽률");
+    }
+
+    @Test
+    @DisplayName("안내 파일의 경로가 패치의 정식 폴더가 아니면 거부한다")
+    void getLatestPatchData_WhenPathNotPatchFolder_Rejects() {
+        // given
+        expectLatest("""
+                {"patch": "16.20", "mode": "normal", "schema_version": 1, "path": "patches/16.21-pbe/normal",
+                 "files": {}}
+                """);
+
+        // when & then
+        assertRejected("path");
+    }
+
+    @Test
+    @DisplayName("patch가 숫자면 문자열로 바꾸지 않고 거부한다")
+    void getLatestPatchData_WhenPatchIsNumber_Rejects() {
+        // given
+        expectLatest("""
+                {"patch": 16.21, "mode": "normal", "schema_version": 1, "path": "patches/16.21/normal", "files": {}}
+                """);
+
+        // when & then
+        assertRejected("읽지 못했습니다");
     }
 
     @Test
@@ -281,6 +418,29 @@ class AramhexClientTest {
                 Arguments.of("증강 값이 null", heroes, """
                         {"22": {"1373": null}}
                         """),
+                Arguments.of("증강 키가 0으로 시작", heroes, """
+                        {"22": {"01373": {"games": 10}}}
+                        """),
+                Arguments.of("증강 키에 부호", heroes, """
+                        {"22": {"+1373": {"games": 10}}}
+                        """),
+                Arguments.of("증강 키가 다른 문자의 숫자", heroes, """
+                        {"22": {"١٠": {"games": 10}}}
+                        """),
+                Arguments.of("증강 키가 중복", heroes, """
+                        {"22": {"1373": {"games": 1}, "1373": {"games": 10}}}
+                        """),
+                Arguments.of("증강 키가 0", heroes, """
+                        {"22": {"0": {"games": 10}}}
+                        """),
+                Arguments.of("챔피언 키가 음수", """
+                        {"-22": {"games": 100}}
+                        """, """
+                        {"-22": {"1373": {"games": 10}}}
+                        """),
+                Arguments.of("챔피언 키가 0으로 시작", """
+                        {"022": {"games": 100}}
+                        """, heroAugments),
                 Arguments.of("증강 games 누락", heroes, """
                         {"22": {"1373": {"count": 10}}}
                         """),
@@ -312,7 +472,7 @@ class AramhexClientTest {
     @DisplayName("챔피언들의 증강 ID를 중복 없이 모은다")
     void augmentIds_CollectsDistinctIds() {
         // given
-        AramhexPatchData data = new AramhexPatchData("16.21", Map.of(), Map.of(
+        AramhexPatchData data = new AramhexPatchData("16.21", Set.of(), Map.of(), Map.of(
                 22, Map.of(1373, new AramhexGames(1), 1402, new AramhexGames(1)),
                 86, Map.of(1373, new AramhexGames(1))));
 
@@ -320,11 +480,24 @@ class AramhexClientTest {
         assertThat(data.augmentIds()).containsExactlyInAnyOrder(1373, 1402);
     }
 
+    @ParameterizedTest
+    @ValueSource(longs = {0, -5})
+    @DisplayName("증강 값이 없는 챔피언도 판 수가 양수여야 한다")
+    void toChampionAugments_WhenChampionWithoutAugmentsHasInvalidGames_Rejects(long games) {
+        // given
+        AramhexPatchData data = new AramhexPatchData("16.21", Set.of(),
+                Map.of(1, new AramhexGames(100), 2, new AramhexGames(games)),
+                Map.of(1, Map.of(10, new AramhexGames(10)), 2, Map.of()));
+
+        // when & then
+        assertThatThrownBy(data::toChampionAugments).isInstanceOf(AugmentDataRejectedException.class);
+    }
+
     @Test
     @DisplayName("증강 값이 있는 챔피언의 판 수가 없으면 거부한다")
     void toChampionAugments_WhenChampionGamesMissing_Rejects() {
         // given
-        AramhexPatchData data = new AramhexPatchData("16.21", Map.of(),
+        AramhexPatchData data = new AramhexPatchData("16.21", Set.of(), Map.of(),
                 Map.of(22, Map.of(1373, new AramhexGames(100))));
 
         // when & then
@@ -352,12 +525,17 @@ class AramhexClientTest {
     private String latest(String patch, String mode, int schemaVersion, String metaHash, String heroesHash,
                           String heroAugmentsHash) {
         return """
-                {"patch": "%s", "mode": "%s", "schema_version": %d, "path": "ignored", "seq": 12, "files": {
+                {"patch": "%s", "mode": "%s", "schema_version": %d, "path": "patches/%s/normal", "seq": 12, "files": {
                   "meta.json": {"sha256": "%s", "size": 1},
                   "heroes.json": {"sha256": "%s", "size": 1},
                   "hero_augments.json": {"sha256": "%s", "size": 1}
                 }}
-                """.formatted(patch, mode, schemaVersion, metaHash, heroesHash, heroAugmentsHash);
+                """.formatted(patch, mode, schemaVersion, patch, metaHash, heroesHash, heroAugmentsHash);
+    }
+
+    private String latestWithProvisional(int count, String meta, String heroes, String heroAugments) {
+        return latest("16.21", "normal", 1, sha256(meta), sha256(heroes), sha256(heroAugments))
+                .replace("\"seq\": 12,", "\"seq\": 12, \"provisional\": {\"augments\": " + count + "},");
     }
 
     private String sha256(String content) {

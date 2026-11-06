@@ -15,6 +15,8 @@ public record AramhexLatest(
         String patch,
         String mode,
         @JsonProperty("schema_version") int schemaVersion,
+        String path,
+        Provisional provisional,
         Map<String, FileEntry> files
 ) {
 
@@ -37,6 +39,14 @@ public record AramhexLatest(
         if (schemaVersion != EXPECTED_SCHEMA_VERSION) {
             throw new AugmentDataRejectedException("aramhex-data schema_version이 바뀌었습니다: " + schemaVersion);
         }
+        if (!("patches/" + patch + "/normal").equals(path)) {
+            throw new AugmentDataRejectedException("aramhex-data path가 패치의 정식 폴더가 아닙니다.");
+        }
+    }
+
+    /** 임시 증강이 없는 스냅샷은 이 값이 비어 있다. */
+    public int provisionalAugmentCount() {
+        return provisional == null ? 0 : provisional.augments();
     }
 
     public void verify(String file, byte[] content) {
@@ -47,6 +57,10 @@ public record AramhexLatest(
         if (!entry.matches(content)) {
             throw new AugmentDataRejectedException("aramhex-data SHA-256이 다릅니다: " + file);
         }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Provisional(int augments) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

@@ -2,11 +2,15 @@ package dfgg.infrastructure.external.client;
 
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.KeyDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.CoercionAction;
 import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.type.LogicalType;
 import dfgg.common.exception.AugmentDataRejectedException;
 import dfgg.infrastructure.external.dto.AramhexGames;
@@ -15,6 +19,7 @@ import dfgg.infrastructure.external.dto.AramhexMeta;
 import dfgg.infrastructure.external.dto.AramhexPatchData;
 import java.io.IOException;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -30,6 +35,7 @@ public class AramhexClient {
 
     private static final String BASE_URL = "https://raw.githubusercontent.com/czgreat/aramhex-data/main";
     private static final String LATEST_FILE = "latest.json";
+    private static final Pattern ID_FORMAT = Pattern.compile("[1-9][0-9]{0,8}");
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -45,10 +51,15 @@ public class AramhexClient {
                 .setDefaultSetterInfo(JsonSetter.Value.forContentNulls(Nulls.FAIL))
                 .configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, true)
                 .configure(DeserializationFeature.ACCEPT_FLOAT_AS_INT, false)
-                .configure(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, true);
+                .configure(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, true)
+                .configure(JsonParser.Feature.STRICT_DUPLICATE_DETECTION, true)
+                .registerModule(new SimpleModule().addKeyDeserializer(Integer.class, new IdKeyDeserializer()));
         strict.coercionConfigFor(LogicalType.Integer)
                 .setCoercion(CoercionInputShape.String, CoercionAction.Fail)
                 .setCoercion(CoercionInputShape.EmptyString, CoercionAction.Fail);
+        strict.coercionConfigFor(LogicalType.Textual)
+                .setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
+                .setCoercion(CoercionInputShape.Float, CoercionAction.Fail);
         return strict;
     }
 
@@ -66,7 +77,7 @@ public class AramhexClient {
                 });
         meta.validateChampionCount(heroes.size());
         meta.validateChampionCount(heroAugments.size());
-        return new AramhexPatchData(latest.patch(), heroes, heroAugments);
+        return new AramhexPatchData(latest.patch(), meta.provisionalAugmentIds(), heroes, heroAugments);
     }
 
     private <T> T readVerified(AramhexLatest latest, String file, TypeReference<T> type) {
@@ -107,6 +118,18 @@ public class AramhexClient {
             return objectMapper.readValue(content, type);
         } catch (IOException exception) {
             throw new AugmentDataRejectedException("aramhex-data 파일을 읽지 못했습니다: " + file, exception);
+        }
+    }
+
+    /** 기본 변환은 {@code 010}, {@code +10}도 10으로 합쳐 다른 항목을 덮어쓰므로 양수 ID 표기만 받는다. */
+    private static final class IdKeyDeserializer extends KeyDeserializer {
+
+        @Override
+        public Object deserializeKey(String key, DeserializationContext context) throws IOException {
+            if (!ID_FORMAT.matcher(key).matches()) {
+                return context.handleWeirdKey(Integer.class, key, "숫자 ID 형식이 아닙니다");
+            }
+            return Integer.valueOf(key);
         }
     }
 }
