@@ -3,15 +3,8 @@ import { useEffect, useState } from 'react';
 
 import type { MayhemAugment, MayhemSession } from '../../shared/types';
 import { cropIcon, cropTitle, grabFrame, openGameStream } from './lib/capture';
-import {
-  type Box,
-  detectCards,
-  fingerprint,
-  ICON_REGION,
-  isSameCard,
-  region,
-  TITLE_REGION,
-} from './lib/detect';
+import { EMPTY_TRACKER, trackCards } from './lib/cardTracker';
+import { type Box, fingerprint, ICON_REGION, isSameCard, region, TITLE_REGION } from './lib/detect';
 
 /** 선택 창이 없을 때 확인 주기. 떠 있을 때는 리롤을 바로 따라가려고 더 자주 본다 */
 const IDLE_MS = 600;
@@ -54,6 +47,7 @@ export function useAugmentCards(session: MayhemSession | null): AugmentCard[] | 
     let timer: number | undefined;
     let closeStream: (() => void) | undefined;
     const slots: Slot[] = [0, 1, 2].map(() => ({ augment: undefined, version: 0 }));
+    let tracker = EMPTY_TRACKER;
 
     const readSlot = async (video: HTMLVideoElement, index: number, card: Box) => {
       const slot = slots[index];
@@ -80,12 +74,21 @@ export function useAugmentCards(session: MayhemSession | null): AugmentCard[] | 
     const tick = (video: HTMLVideoElement) => {
       if (stopped) return;
       const frame = grabFrame(video);
-      const boxes = frame && detectCards(frame);
+      if (frame) tracker = trackCards(tracker, frame);
+      const { boxes, candidate } = tracker;
 
       if (!frame || !boxes) {
-        slots.forEach((slot) => Object.assign(slot, { previous: undefined, read: undefined }));
+        // version 을 올려 창이 닫히기 전에 시작한 OCR 결과가 다음 카드에 붙지 않게 한다
+        slots.forEach((slot) => {
+          Object.assign(slot, {
+            previous: undefined,
+            read: undefined,
+            augment: undefined,
+            version: slot.version + 1,
+          });
+        });
         setCards(null);
-        timer = window.setTimeout(() => tick(video), IDLE_MS);
+        timer = window.setTimeout(() => tick(video), candidate ? OPEN_MS : IDLE_MS);
         return;
       }
 

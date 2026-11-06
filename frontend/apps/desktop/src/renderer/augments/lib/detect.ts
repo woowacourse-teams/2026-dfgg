@@ -72,7 +72,7 @@ function measure(frame: Frame, box: Box) {
   return { border: median(border), inside: median(inside) };
 }
 
-function isCard(frame: Frame, box: Box) {
+export function isCard(frame: Frame, box: Box) {
   const { border, inside } = measure(frame, box);
   return inside <= DARK_LUMA && border - inside >= MIN_CONTRAST;
 }
