@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react';
 
 import type { MayhemAugment, MayhemSession } from '../../shared/types';
 import { cropIcon, cropTitle, grabFrame, openGameStream } from './lib/capture';
+import { applyRead, type CardSlot, EMPTY_SLOT, observeSlot } from './lib/cardSlot';
 import { EMPTY_TRACKER, trackCards } from './lib/cardTracker';
-import { type Box, fingerprint, ICON_REGION, isSameCard, region, TITLE_REGION } from './lib/detect';
+import { type Box, fingerprint, ICON_REGION, region, TITLE_REGION } from './lib/detect';
 
 /** 선택 창이 없을 때 확인 주기. 떠 있을 때는 리롤을 바로 따라가려고 더 자주 본다 */
 const IDLE_MS = 600;
@@ -15,16 +16,6 @@ export type AugmentCard = {
   box: Box;
   /** undefined 는 읽는 중, null 은 읽었지만 모르는 증강 */
   augment: MayhemAugment | null | undefined;
-};
-
-type Slot = {
-  /** 직전 확인 때 지문. 카드가 날아 들어오는 동안은 계속 바뀌어서, 멈춘 뒤에만 읽는다 */
-  previous?: number[];
-  /** 마지막으로 읽은 지문. 이것과 달라지면(리롤·다음 선택) 다시 읽는다 */
-  read?: number[];
-  augment: MayhemAugment | null | undefined;
-  /** 늦게 끝난 옛 OCR 결과가 새 카드를 덮지 않게 */
-  version: number;
 };
 
 const relative = (box: Box, width: number, height: number): Box => ({
@@ -46,27 +37,25 @@ export function useAugmentCards(session: MayhemSession | null): AugmentCard[] | 
     let stopped = false;
     let timer: number | undefined;
     let closeStream: (() => void) | undefined;
-    const slots: Slot[] = [0, 1, 2].map(() => ({ augment: undefined, version: 0 }));
+    const slots: CardSlot[] = [EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT];
     let tracker = EMPTY_TRACKER;
 
     const readSlot = async (video: HTMLVideoElement, index: number, card: Box) => {
-      const slot = slots[index];
-      const version = ++slot.version;
-      slot.augment = undefined;
+      const { version } = slots[index];
       try {
         const [title, icon] = await Promise.all([
           cropTitle(video, region(card, TITLE_REGION)),
           cropIcon(video, region(card, ICON_REGION)),
         ]);
         const augment = await window.mayhem.readCard(title, icon);
-        if (stopped || slot.version !== version) return;
-        slot.augment = augment;
+        if (stopped || slots[index].version !== version) return;
+        slots[index] = applyRead(slots[index], version, augment);
         window.analytics.track('mayhem-card', {
           found: augment !== null,
           height: video.videoHeight,
         });
       } catch (error) {
-        if (slot.version === version) slot.augment = null;
+        slots[index] = applyRead(slots[index], version, null);
         Sentry.captureException(error);
       }
     };
@@ -79,13 +68,8 @@ export function useAugmentCards(session: MayhemSession | null): AugmentCard[] | 
 
       if (!frame || !boxes) {
         // version 을 올려 창이 닫히기 전에 시작한 OCR 결과가 다음 카드에 붙지 않게 한다
-        slots.forEach((slot) => {
-          Object.assign(slot, {
-            previous: undefined,
-            read: undefined,
-            augment: undefined,
-            version: slot.version + 1,
-          });
+        slots.forEach((slot, index) => {
+          slots[index] = { ...EMPTY_SLOT, version: slot.version + 1 };
         });
         setCards(null);
         timer = window.setTimeout(() => tick(video), candidate ? OPEN_MS : IDLE_MS);
@@ -93,14 +77,9 @@ export function useAugmentCards(session: MayhemSession | null): AugmentCard[] | 
       }
 
       boxes.forEach((box, index) => {
-        const slot = slots[index];
-        const print = fingerprint(frame, box);
-        const settled = isSameCard(slot.previous, print);
-        slot.previous = print;
-        if (settled && !isSameCard(slot.read, print)) {
-          slot.read = print;
-          void readSlot(video, index, relative(box, frame.width, frame.height));
-        }
+        const { slot, shouldRead } = observeSlot(slots[index], fingerprint(frame, box));
+        slots[index] = slot;
+        if (shouldRead) void readSlot(video, index, relative(box, frame.width, frame.height));
       });
 
       setCards(
