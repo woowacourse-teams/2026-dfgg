@@ -26,6 +26,11 @@ public final class ImageKeys {
         return ROOT + "/" + patch + "/runes/" + runeId + ".png";
     }
 
+    /** 증강은 픽률 데이터의 패치 폴더 아래 증강 id로 저장한다. 라이브 패치보다 늦을 수 있어 설정 버전을 쓰지 않는다. */
+    public static String augment(String patch, int augmentId) {
+        return ROOT + "/" + patch + "/augments/" + augmentId + ".png";
+    }
+
     public static String summonerSpell(String version, String riotKey) {
         return ROOT + "/" + version + "/summoner-spells/" + riotKey + ".png";
     }
