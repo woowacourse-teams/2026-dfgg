@@ -13,9 +13,14 @@ on:
         required: true
         type: string
       image:
-        description: "배포할 이미지 (ghcr.io/...@sha256:...)"
+        description: "배포할 이미지 (ghcr.io/...@sha256:...). current면 켜진 슬롯의 이미지를 다시 쓴다"
         required: true
         type: string
+      model:
+        description: "모델 묶음 (ltr-YYMMDD[-N] | current). 비우면 켜진 슬롯의 묶음을 그대로 쓰고, 묶음이 없으면 app-config/model.json을 쓴다"
+        required: false
+        type: string
+        default: ''
     outputs:
       recovery:
         description: "전환 단계 실패 시 복구 결과 (restored | new-slot-active | uncertain). 전환 전에 멈췄으면 비어 있다"
@@ -34,6 +39,7 @@ jobs:
     env:
       IMAGE: ${{ inputs.image }}
       PROFILE: ${{ inputs.profile }}
+      MODEL: ${{ inputs.model }}
     defaults:
       run:
         shell: bash
@@ -46,7 +52,8 @@ jobs:
       - name: Check deployment prerequisites
         run: |
           set -euo pipefail
-          [[ "$IMAGE" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] || { echo "::error::Invalid image reference"; exit 1; }
+          [[ "$IMAGE" == current || "$IMAGE" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] || { echo "::error::Invalid image reference"; exit 1; }
+          [[ -z "$MODEL" || "$MODEL" == current || "$MODEL" =~ ^ltr-[0-9]{6}(-[0-9]+)?$ ]] || { echo "::error::Invalid model bundle"; exit 1; }
           [[ "$PROFILE" =~ ^(dev|prod)$ ]] || { echo "::error::Invalid profile"; exit 1; }
           for tool in curl jq flock sha256sum systemctl nginx podman ps ss; do
             command -v "$tool" > /dev/null
@@ -68,7 +75,46 @@ jobs:
           sudo -n test -s /etc/nginx/dfgg-admin.htpasswd
           sudo -n nginx -t
           test -s "$APP_CONFIG/.env"
-          jq -e -s 'length == 1 and (.[0] | type == "object")' "$APP_CONFIG/model.json" > /dev/null
+
+      # current는 켜진 슬롯에서 찾는다. 모델은 묶음을 받아 검증해 두고, 슬롯 연결은 전환 단계에서 한다.
+      - name: Resolve image and model
+        run: |
+          set -euo pipefail
+          port=$(grep -oE '127\.0\.0\.1:[0-9]+' /etc/nginx/conf.d/dfgg-upstream.conf | cut -d: -f2)
+          case "$port" in
+            8081) active=blue ;;
+            8082) active=green ;;
+            *) echo "::error::Unexpected upstream port: $port"; exit 1 ;;
+          esac
+
+          resolved=$IMAGE
+          if [[ "$resolved" == current ]]; then
+            resolved=$(podman image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "localhost/dfgg:$active" \
+              | grep -m1 -E '^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$') \
+              || { echo "::error::Cannot find the image of the active slot ($active)"; exit 1; }
+          fi
+          echo "DEPLOY_IMAGE=$resolved" >> "$GITHUB_ENV"
+          echo "image: $resolved"
+
+          name=$MODEL
+          active_model="/opt/dfgg/$active/model"
+          if [[ -z "$name" && -L "$active_model" ]]; then
+            name=$(basename "$(readlink -f "$active_model")")
+            echo "keep the bundle of the active slot: $name"
+          fi
+          if [[ -z "$name" ]]; then
+            jq -e -s 'length == 1 and (.[0] | type == "object")' "$APP_CONFIG/model.json" > /dev/null
+            echo "MODEL_DIR=" >> "$GITHUB_ENV"
+            echo "model: $APP_CONFIG/model.json (no bundle)"
+            exit 0
+          fi
+          args=(--name "$name")
+          if [[ "$name" == current ]]; then args=(); fi
+          dir=$(bash backend/ops/pipeline/fetch-model.sh "${args[@]}" | tail -1)
+          [[ "$dir" =~ ^/opt/dfgg/models/ltr-[0-9]{6}(-[0-9]+)?$ && -d "$dir" ]] \
+            || { echo "::error::Model bundle was not installed: $dir"; exit 1; }
+          echo "MODEL_DIR=$dir" >> "$GITHUB_ENV"
+          echo "model: $dir"
 
       # 저장소가 관리하는 nginx 설정만 설치한다.
       - name: Install nginx configuration
@@ -157,8 +203,12 @@ jobs:
           set -euo pipefail
           auth="$RUNNER_TEMP/registry-auth.json"
           trap 'rm -f "$auth"' EXIT
+          if podman image exists "$DEPLOY_IMAGE"; then
+            echo "already present: $DEPLOY_IMAGE"
+            exit 0
+          fi
           echo "$GH_TOKEN" | podman login --authfile "$auth" ghcr.io -u "${{ github.actor }}" --password-stdin
-          podman pull --authfile "$auth" "$IMAGE"
+          podman pull --authfile "$auth" "$DEPLOY_IMAGE"
 
       - name: Deploy with Blue-Green switch
         id: switch
@@ -334,12 +384,26 @@ jobs:
 
           # 2. 꺼진 슬롯에 이미지·설정·모델을 놓는다. 켜진 슬롯은 건드리지 않는다.
           test ! -L "/opt/dfgg/$DFGG_NEW"
-          podman tag "$IMAGE" "localhost/dfgg:$DFGG_NEW"
+          podman tag "$DEPLOY_IMAGE" "localhost/dfgg:$DFGG_NEW"
           # 서버의 슬롯 .env는 app-config/.env를 가리키는 링크다. 복사하지 않고 링크를 유지한다.
           ln -sfn "$APP_CONFIG/.env" "/opt/dfgg/$DFGG_NEW/.env"
-          mkdir -p "/opt/dfgg/$DFGG_NEW/model"
-          install -m 0644 "$APP_CONFIG/model.json" "/opt/dfgg/$DFGG_NEW/model/model.json"
-          echo "Deploying $DFGG_OLD -> $DFGG_NEW; image=$IMAGE"
+          # 묶음이면 슬롯의 model을 묶음 링크로 두고 Component 경로를 슬롯 drop-in으로 지정한다.
+          # 묶음이 아니면 기존처럼 app-config/model.json을 복사하고 Component는 .env 경로를 따른다.
+          slot_model="/opt/dfgg/$DFGG_NEW/model"
+          slot_dropins="$HOME/.config/containers/systemd/dfgg@$DFGG_NEW.container.d"
+          if [[ -n "$MODEL_DIR" ]]; then
+            rm -rf -- "$slot_model"
+            ln -s "$MODEL_DIR" "$slot_model"
+            mkdir -p "$slot_dropins"
+            install -m 0644 backend/ops/podman/model-bundle.conf "$slot_dropins/model.conf"
+          else
+            rm -f "$slot_dropins/model.conf"
+            if [[ -L "$slot_model" ]]; then rm -f "$slot_model"; fi
+            mkdir -p "$slot_model"
+            install -m 0644 "$APP_CONFIG/model.json" "$slot_model/model.json"
+          fi
+          systemctl --user daemon-reload
+          echo "Deploying $DFGG_OLD -> $DFGG_NEW; image=$DEPLOY_IMAGE; model=${MODEL_DIR:-app-config}"
 
           # 3. 기동·Readiness를 확인한다. 준비에 실패하면 경로를 바꾸지 않는다.
           DFGG_STARTED=true
