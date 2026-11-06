@@ -31,6 +31,13 @@ const KO = {
     day: (n: number) => `${n}일 전`,
   },
   common: { close: '닫기', minimize: '최소화', loading: '불러오는 중...' },
+  mayhem: {
+    best: '추천',
+    rank: (tier: string, rank: number) => `${tier} ${rank}위`,
+    pickRate: (rate: string) => `픽률 ${rate}%`,
+    noData: '데이터 부족',
+    tiers: { silver: '실버', gold: '골드', prismatic: '프리즘' },
+  },
   overlay: {
     ally: '시너지',
     counter: '카운터',
@@ -228,6 +235,13 @@ const EN: typeof KO = {
   duration: { minutes: (n) => `${n} min` },
   ago: { min: (n) => `${n}m ago`, hour: (n) => `${n}h ago`, day: (n) => `${n}d ago` },
   common: { close: 'Close', minimize: 'Minimize', loading: 'Loading...' },
+  mayhem: {
+    best: 'Top pick',
+    rank: (tier: string, rank: number) => `${tier} #${rank}`,
+    pickRate: (rate: string) => `${rate}% pick`,
+    noData: 'Not enough data',
+    tiers: { silver: 'Silver', gold: 'Gold', prismatic: 'Prismatic' },
+  },
   overlay: {
     ally: 'Synergy',
     counter: 'Counter',

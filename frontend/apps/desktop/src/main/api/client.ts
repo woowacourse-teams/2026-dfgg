@@ -54,3 +54,22 @@ export async function apiPost<T>(
     throw error;
   }
 }
+
+/** GET 요청. 증강 이름처럼 화면 언어와 다른 언어로 받아야 할 때 language 를 넘긴다. */
+export async function apiGet<T>(path: string, language: string = mainLocale()): Promise<T> {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}${path}`, {
+      headers: { 'Accept-Language': language },
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new ApiError(response.status, `... ${response.status}: ${text.slice(0, 200)}`);
+    }
+    return (await response.json()) as T;
+  } catch (error) {
+    console.error(`GET ${path} 실패`, error);
+    reportError(`api-get ${path}`, error);
+    throw error;
+  }
+}

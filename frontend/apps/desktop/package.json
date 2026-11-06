@@ -29,6 +29,7 @@
     "electron-overlay-window": "^4.1.0",
     "electron-updater": "^6.8.9",
     "koffi": "^3.3.2",
+    "tesseract.js": "^6.0.1",
     "ws": "^8.21.3"
   },
   "devDependencies": {
@@ -144,6 +145,58 @@
       {
         "from": "../../node_modules/tiny-typed-emitter",
         "to": "node_modules/tiny-typed-emitter"
+      },
+      {
+        "from": "../../node_modules/tesseract.js",
+        "to": "node_modules/tesseract.js"
+      },
+      {
+        "from": "../../node_modules/tesseract.js-core",
+        "to": "node_modules/tesseract.js-core"
+      },
+      {
+        "from": "../../node_modules/bmp-js",
+        "to": "node_modules/bmp-js"
+      },
+      {
+        "from": "../../node_modules/idb-keyval",
+        "to": "node_modules/idb-keyval"
+      },
+      {
+        "from": "../../node_modules/is-url",
+        "to": "node_modules/is-url"
+      },
+      {
+        "from": "../../node_modules/node-fetch",
+        "to": "node_modules/node-fetch"
+      },
+      {
+        "from": "../../node_modules/whatwg-url",
+        "to": "node_modules/whatwg-url"
+      },
+      {
+        "from": "../../node_modules/tr46",
+        "to": "node_modules/tr46"
+      },
+      {
+        "from": "../../node_modules/webidl-conversions",
+        "to": "node_modules/webidl-conversions"
+      },
+      {
+        "from": "../../node_modules/opencollective-postinstall",
+        "to": "node_modules/opencollective-postinstall"
+      },
+      {
+        "from": "../../node_modules/regenerator-runtime",
+        "to": "node_modules/regenerator-runtime"
+      },
+      {
+        "from": "../../node_modules/wasm-feature-detect",
+        "to": "node_modules/wasm-feature-detect"
+      },
+      {
+        "from": "../../node_modules/zlibjs",
+        "to": "node_modules/zlibjs"
       }
     ],
     "asarUnpack": [

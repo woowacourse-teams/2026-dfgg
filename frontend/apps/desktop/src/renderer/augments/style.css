@@ -1,0 +1,192 @@
+/*
+ * 증강 카드 위 꾸밈. 크기는 모두 카드 크기(cqw·%)에 맞춰서 720p 든 4K 든 같은 비율로 보인다.
+ * 추천 카드는 브랜드 레드 → 골드로 도는 테두리와 반짝이는 별, 나머지는 순위·픽률 딱지만.
+ */
+@property --spin {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.aug-stage {
+  position: fixed;
+  inset: 0;
+}
+
+.aug-card {
+  position: absolute;
+  container-type: size;
+}
+
+/* ---------- 딱지: 카드 위 테두리에 걸친다 ---------- */
+.aug-badge {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  margin: 0;
+  padding: 0.45em 0.95em;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.35em;
+  background: rgb(10 11 13 / 90%);
+  box-shadow: 0 0.4em 1.4em rgb(0 0 0 / 55%);
+  font-size: clamp(11px, 6.2cqw, 24px);
+  line-height: 1;
+  white-space: nowrap;
+  transform: translate(-50%, -62%) skewX(-12deg);
+  animation: badge-in 360ms var(--ease-out) backwards;
+}
+
+/* 비스듬한 딱지 안의 글자는 바로 세운다 */
+.aug-badge > * {
+  display: inline-block;
+  transform: skewX(12deg);
+}
+
+@keyframes badge-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -30%) skewX(-12deg) scale(0.85);
+  }
+}
+
+.aug-rank {
+  font-weight: 700;
+  color: var(--tone);
+}
+
+.aug-rate {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.aug-tier-silver {
+  --tone: #c3cad6;
+}
+
+.aug-tier-gold {
+  --tone: var(--gold);
+}
+
+.aug-tier-prismatic {
+  --tone: #c9a6ff;
+}
+
+/* ---------- 추천 카드 ---------- */
+.aug-card-best .aug-badge {
+  border-color: rgb(255 255 255 / 22%);
+  background: linear-gradient(110deg, var(--accent-strong), var(--accent) 60%, #ef6a5a);
+  box-shadow:
+    0 0.4em 1.6em rgb(230 57 80 / 55%),
+    0 0 0 1px rgb(255 255 255 / 8%) inset;
+  font-size: clamp(12px, 6.8cqw, 26px);
+}
+
+.aug-card-best .aug-rank {
+  color: #fff;
+  opacity: 0.85;
+}
+
+.aug-card-best .aug-rate {
+  color: #fff;
+}
+
+.aug-best {
+  padding: 0.18em 0.45em;
+  border-radius: 0.2em;
+  background: #fff;
+  font-weight: 900;
+  color: var(--accent-strong);
+}
+
+/* 카드 테두리를 따라 도는 빛 */
+.aug-ring {
+  position: absolute;
+  inset: -1.8cqw;
+  padding: 1.4cqw;
+  border-radius: 5cqw;
+  background: conic-gradient(
+    from var(--spin),
+    transparent 0deg,
+    transparent 200deg,
+    var(--accent) 260deg,
+    var(--gold) 320deg,
+    #fff 350deg,
+    transparent 360deg
+  );
+  /* 가운데를 비워 테두리만 남긴다 */
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  animation: spin 2.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    --spin: 360deg;
+  }
+}
+
+/* 카드 둘레에 번지는 붉은 숨결 */
+.aug-glow {
+  position: absolute;
+  inset: -1cqw;
+  border-radius: 5cqw;
+  box-shadow:
+    0 0 10cqw 2.5cqw rgb(230 57 80 / 62%),
+    0 0 3cqw 0.6cqw rgb(255 190 120 / 45%),
+    inset 0 0 6cqw rgb(230 180 80 / 30%);
+  animation: breathe 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes breathe {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 네 갈래 별 */
+.aug-spark {
+  position: absolute;
+  width: 7cqw;
+  height: 7cqw;
+  margin: -3.5cqw 0 0 -3.5cqw;
+  background: radial-gradient(circle, #fff 0 18%, var(--gold) 45%, transparent 70%);
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  opacity: 0;
+  animation: twinkle 2.4s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1) rotate(45deg);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(0.5) rotate(90deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aug-ring,
+  .aug-glow,
+  .aug-spark,
+  .aug-badge {
+    animation: none;
+  }
+
+  .aug-spark {
+    display: none;
+  }
+}
