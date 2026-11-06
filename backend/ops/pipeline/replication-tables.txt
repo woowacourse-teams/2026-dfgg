@@ -1,0 +1,46 @@
+# main → dev·prod 복제 대상 분류. replicate.sh가 읽고, ReplicationTableClassificationTest가 Flyway 스키마와 비교한다.
+# 새 테이블을 만들면 replicate 또는 exclude 중 하나에 반드시 적는다. 어느 쪽에도 없으면 ./gradlew test가 실패한다.
+#   replicate <테이블>  main에서 계산·수집한 값을 대상 DB에 통째로 교체한다 (서빙이 읽고, 대상 DB에서 쓰지 않는 것)
+#   exclude <테이블>    복제하지 않는다 (대상 DB가 쓰거나, 서빙이 읽지 않거나, 관리 API로 따로 채우는 것)
+
+# 아이템 추천 통계 (U5 집계 결과)
+replicate champion_item_stats
+replicate champion_item_rollup
+replicate champion_pair_item_stats
+replicate item_meta_stats
+# 카운터 API 라인 분포 (U5 집계 결과)
+replicate champion_position_stats
+# 서빙 조회에 쓰는 참가자, 룬 추천
+replicate normalized_match_participants
+replicate normalized_match_participant_runes
+
+# 카탈로그: 대상 DB에서 관리 API(/admin/champions·items·runes·summoner-spells)로 채운다. 대회 픽 FK가 가리켜 교체할 수 없다
+exclude champions
+exclude champion_tags
+exclude items
+exclude runes
+exclude summoner_spells
+# 대상 DB가 직접 쓰거나 따로 관리하는 것
+exclude feedback
+exclude flyway_schema_history
+exclude champion_counters
+exclude pro_tournaments
+exclude pro_players
+exclude pro_picks
+exclude pro_pick_items
+exclude pro_pick_runes
+exclude pro_pick_spells
+exclude aram_mayhem_augments
+exclude aram_mayhem_champion_augments
+# 수집·학습 전용 (서빙이 읽지 않는다)
+exclude raw_matches
+exclude raw_match_timelines
+exclude players
+exclude stats_aggregation_completions
+exclude normalized_match_participant_item_events
+# v1/v2 추천 잔재 (복제하지 않는다)
+exclude composition_stats
+exclude composition_stats_items
+exclude composition_stats_samples
+exclude embeddings
+exclude mined_sequential_patterns
