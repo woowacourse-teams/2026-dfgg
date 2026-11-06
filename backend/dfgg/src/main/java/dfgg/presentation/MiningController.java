@@ -1,5 +1,7 @@
 package dfgg.presentation;
 
+import dfgg.application.aggregation.StatsAggregationReport;
+import dfgg.application.aggregation.StatsAggregationRunner;
 import dfgg.application.counter.ChampionPositionAggregationResult;
 import dfgg.application.counter.ChampionPositionAggregationService;
 import dfgg.application.itemstats.ItemStatsAggregationResult;
@@ -29,17 +31,29 @@ public class MiningController {
     private final ItemStatsAggregationService itemStatsAggregationService;
     private final ChampionPositionAggregationService championPositionAggregationService;
     private final ProPickCollectionService proPickCollectionService;
+    private final StatsAggregationRunner statsAggregationRunner;
 
     public MiningController(
             MiningTriggerService miningTriggerService,
             ItemStatsAggregationService itemStatsAggregationService,
             ChampionPositionAggregationService championPositionAggregationService,
-            ProPickCollectionService proPickCollectionService
+            ProPickCollectionService proPickCollectionService,
+            StatsAggregationRunner statsAggregationRunner
     ) {
         this.miningTriggerService = miningTriggerService;
         this.itemStatsAggregationService = itemStatsAggregationService;
         this.championPositionAggregationService = championPositionAggregationService;
         this.proPickCollectionService = proPickCollectionService;
+        this.statsAggregationRunner = statsAggregationRunner;
+    }
+
+    /**
+     * 등록된 통계 집계를 모두 순서대로 실행한다. 야간 파이프라인이 복제 전에 부른다.
+     * 오래 걸리므로 Nginx(60초)를 거치지 않고 활성 슬롯 포트로 부른다.
+     */
+    @PostMapping("/all")
+    public ResponseEntity<StatsAggregationReport> aggregateAll() {
+        return ResponseEntity.ok(statsAggregationRunner.runAll());
     }
 
     /**
