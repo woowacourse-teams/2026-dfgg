@@ -19,7 +19,8 @@ groups:
             datasourceUid: dfgg-prometheus
             model:
               refId: A
-              expr: sum(up{job=~"dfgg-app.*"}) by (env)
+              # perf는 부하 테스트 때만 켜므로 꺼져 있어도 장애가 아니다.
+              expr: sum(up{job=~"dfgg-app.*", env!="perf"}) by (env)
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
