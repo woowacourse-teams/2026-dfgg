@@ -62,7 +62,7 @@ describe('pickBest', () => {
   it('확실히 닯은 하나를 고른다', () => {
     const result = pickBest(card, [entry('A', 5), entry('B', 60), entry('C', 90)]);
     expect(result.kind).toBe('picked');
-    expect(result.picked).toBe('A');
+    expect(result.picked?.name).toBe('A');
   });
   it('1등도 충분히 앎지 않으면 고르지 않는다.', () => {
     // cos(50°) ≈ 0.64 < MIN_SIMILARITY
