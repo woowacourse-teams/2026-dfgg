@@ -40,3 +40,35 @@ export function similarity(a: Float32Array, b: Float32Array): number {
   for (let i = 0; i < a.length; i++) sum += a[i] * b[i];
   return sum;
 }
+
+/** 1등이 이 점수보다 낮으면 어떤 증강과도 안 닮았다고 본다 */
+export const MIN_SIMILARITY = 0.75;
+/** 1등이 2등보다 이만큼은 앞서야 고른다 */
+export const MIN_LEAD = 0.03;
+
+export type Scored<T> = { candidate: T; score: number };
+export type PickResult<T> =
+  | { kind: 'picked'; picked: T; top: Scored<T>[] }
+  | { kind: 'low' | 'same-icon' | 'close' | 'empty'; picked: null; top: Scored<T>[] };
+
+/**
+ * 카드 벡터와 후보 벡터들을 비교해 하나를 고른다. 확실하지 않으면 picked 가 null 이다.
+ * 틀린 픽률을 보여 주는 것보다 아무것도 안 보여 주는 게 낫다.
+ */
+export function pickBest<T extends { iconUrl: string }>(
+  card: Float32Array,
+  candidates: { candidate: T; vector: Float32Array }[],
+): PickResult<T> {
+  const scored = candidates
+    .map(({ candidate, vector }) => ({ candidate, score: similarity(card, vector) }))
+    .sort((a, b) => b.score - a.score);
+  const top = scored.slice(0, 3);
+  const [first, second] = scored;
+
+  if (!first) return { kind: 'empty', picked: null, top };
+  if (first.score < MIN_SIMILARITY) return { kind: 'low', picked: null, top };
+  if (second && second.candidate.iconUrl === first.candidate.iconUrl) {
+    return { kind: 'same-icon', picked: null, top };
+  }
+  return { kind: 'picked', picked: first.candidate, top };
+}

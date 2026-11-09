@@ -1,5 +1,5 @@
 import { nativeImage } from 'electron';
-import { toVector, VECTOR_SIZE } from './vector';
+import { pickBest, PickResult, toVector, VECTOR_SIZE } from './vector';
 
 const FETCH_TIMEOUT_MS = 5000;
 
@@ -36,4 +36,25 @@ export function iconVector(url: string): Promise<Float32Array | null> {
 export async function prepareIcons(icons: { iconUrl: string }[]): Promise<number> {
   const vectors = await Promise.all(icons.map((icon) => iconVector(icon.iconUrl)));
   return vectors.filter(Boolean).length;
+}
+
+/** 카드 아이콘 PNG 를 후보 증강들과 비교한다 */
+export async function matchIcon<T extends { iconUrl: string }>(
+  cardIconPng: Buffer,
+  candidates: T[],
+): Promise<PickResult<T>> {
+  const card = vectorOf(cardIconPng, false);
+  if (!card) return { kind: 'empty', picked: null, top: [] };
+
+  const loaded = await Promise.all(
+    candidates.map(async (candidate) => ({
+      candidate,
+      vector: await iconVector(candidate.iconUrl),
+    })),
+  );
+
+  const usable = loaded.filter(
+    (entry): entry is { candidate: T; vector: Float32Array } => entry.vector !== null,
+  );
+  return pickBest(card, usable);
 }

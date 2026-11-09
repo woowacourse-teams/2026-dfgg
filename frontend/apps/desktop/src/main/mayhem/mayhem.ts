@@ -4,7 +4,7 @@ import { getLcuState, onPhaseChange } from '../lcu/state';
 import { getDDragonData } from '../live/ddragon';
 import { getActivePlayer, getGameStats, getPlayerList } from '../live/endpoints';
 import { toChampionAlias } from '../live/payload';
-import { prepareIcons } from './iconMatch';
+import { matchIcon, prepareIcons } from './iconMatch';
 
 const MAYHEM_MODE = 'KIWI';
 const RETRY_MS = 3000;
@@ -14,6 +14,18 @@ let augments: MayhemAugments[] = [];
 let iconsReady: Promise<number> | null = null;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function readCard(iconPng: Buffer): Promise<MayhemAugments | null> {
+  await iconsReady; // 백엔드 아이콘 리스트를 받아서 캐시에 넣을 때까지 기다리기
+  // 증강 카드 한 장이 어떤 증강인지 결과
+  const result = await matchIcon(iconPng, augments);
+  console.log(
+    '[mayhem] card',
+    result.kind,
+    result.top.map(({ candidate, score }) => `${candidate.name} ${score.toFixed(3)}`),
+  );
+  return result.picked;
+}
 
 async function retry<T>(alive: () => boolean, load: () => Promise<T | null>): Promise<T | null> {
   while (alive()) {
