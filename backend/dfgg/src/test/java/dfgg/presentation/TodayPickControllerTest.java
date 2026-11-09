@@ -108,6 +108,27 @@ class TodayPickControllerTest {
     }
 
     @Test
+    @DisplayName("같은 챔피언을 고른 픽이 여럿이면 모두 응답한다 — 챔피언 중복을 거르지 않는다")
+    void todayPicks_WhenSameChampionPickedTwice_RespondBothPicks() {
+        // given
+        jdbcTemplate.update("""
+                INSERT INTO pro_picks (tournament_id, player_id, source_game_id, played_at, team, side, position,
+                                       champion_id, win)
+                VALUES (1, 2, 'same-champion', '2026-10-26 08:00:00+00', 'Gen.G', 'BLUE', 'MID', 9001, true)
+                """);
+
+        // when & then
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"position": "MID"}
+                        """)
+                .when().post("/api/today-picks")
+                .then().statusCode(200)
+                .body("picks.champion.id", containsInAnyOrder(9001, 9001, 9002));
+    }
+
+    @Test
     @DisplayName("후보가 많으면 20개까지 응답한다")
     void todayPicks_WhenManyCandidates_RespondTwenty() {
         // given

@@ -36,7 +36,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 오늘의 추천 픽. 최근 대회(마지막 경기가 가장 늦은 대회)의 내 라인에서 이긴 경기 픽을 챔피언이 겹치지 않게 무작위로 고른다.
+ * 오늘의 추천 픽. 최근 대회(마지막 경기가 가장 늦은 대회)의 내 라인에서 이긴 경기 픽을 무작위로 고른다. 같은 챔피언의 픽이 여럿 나올 수 있다.
  */
 @Service
 public class TodayPickService {

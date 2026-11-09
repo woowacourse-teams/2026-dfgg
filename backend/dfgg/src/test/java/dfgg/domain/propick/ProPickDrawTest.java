@@ -18,8 +18,8 @@ class ProPickDrawTest {
     private final ProPickDraw draw = new ProPickDraw(SIZE);
 
     @Test
-    @DisplayName("같은 챔피언은 한 번만 뽑는다")
-    void draw_WhenSameChampionPickedSeveralTimes_DrawOnce() {
+    @DisplayName("같은 챔피언을 고른 픽이 여러 개면 모두 뽑힐 수 있다 — 챔피언 중복을 거르지 않는다")
+    void draw_WhenSameChampionPickedSeveralTimes_DrawEachPick() {
         // given
         List<ProPick> candidates = List.of(pick("g1", 1L), pick("g2", 1L), pick("g3", 1L), pick("g4", 2L));
 
@@ -27,7 +27,7 @@ class ProPickDrawTest {
         List<ProPick> drawn = draw.draw(candidates, new Random(SEED));
 
         // then
-        assertThat(drawn).extracting(ProPick::getChampionId).containsExactlyInAnyOrder(1L, 2L);
+        assertThat(drawn).extracting(ProPick::getChampionId).containsExactlyInAnyOrder(1L, 1L, 1L, 2L);
     }
 
     @Test
@@ -41,7 +41,7 @@ class ProPickDrawTest {
 
         // then
         assertThat(drawn).hasSize(SIZE);
-        assertThat(drawn).extracting(ProPick::getChampionId).doesNotHaveDuplicates();
+        assertThat(drawn).doesNotHaveDuplicates();
     }
 
     @Test
