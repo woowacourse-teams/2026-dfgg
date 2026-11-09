@@ -13,6 +13,7 @@ import type {
   LcuStatus,
   MatchDetail,
   MatchSummary,
+  MayhemAugments,
   OverlayClickTarget,
   Position,
   RecommendationUpdate,
@@ -102,6 +103,10 @@ declare global {
       setHighlightMaxClipCount: (count: number) => Promise<number>;
       getAppVersion: () => string;
       openPrivacyPolicy: () => Promise<void>;
+    };
+    mayhem: {
+      getSession: () => Promise<MayhemAugments | null>;
+      readCard: (icon: ArrayBuffer) => Promise<MayhemAugments | null>;
     };
   }
 }

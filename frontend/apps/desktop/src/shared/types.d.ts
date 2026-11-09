@@ -1,5 +1,10 @@
 import type { LcuEventMap } from '../main/lcu/events';
 
+// 아수라장 한 판. 증강 창이 카드를 찾는 동안 쓴다.
+export interface MayhemSession {
+  championId: number;
+}
+
 // 아수라장 타입
 export type AugmentRarity = 'silver' | 'gold' | 'prismatic';
 

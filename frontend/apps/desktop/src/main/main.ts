@@ -38,6 +38,7 @@ import { initOverlayVisibility, updateOverlayPhase } from './overlay/visibility'
 import { getTestEnv } from './testEnv';
 
 import { startMemoryProbe } from './debug/memoryProbe';
+import { initMayhem } from './mayhem/mayhem';
 
 const DEV_SERVER_URL = 'http://localhost:3001';
 
@@ -67,6 +68,28 @@ function detectClientStatus(home: BrowserWindow) {
     home.showInactive();
     shown = true;
   });
+}
+
+function createAugmentWindow() {
+  const augment = new BrowserWindow({
+    show: false,
+    title: 'augments',
+    frame: false,
+    transparent: true,
+    skipTaskbar: true,
+    focusable: false,
+    resizable: false,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      // 게임이 앞에 있어도 화면 캡처와 카드 찾기가 느려지지 않게 한다
+      backgroundThrottling: false,
+    },
+  });
+  augment.setIgnoreMouseEvents(true);
+  augment.setAlwaysOnTop(true, 'screen-saver');
+  loadRenderer(augment, 'augments');
+  return augment;
 }
 
 function createWindow() {
@@ -114,6 +137,8 @@ function createWindow() {
 
   loadRenderer(home, 'home');
   loadRenderer(overlay, 'overlay');
+
+  initMayhem(createAugmentWindow);
 
   home.on('closed', () => {
     app.quit();
