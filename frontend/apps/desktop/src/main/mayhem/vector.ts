@@ -70,5 +70,8 @@ export function pickBest<T extends { iconUrl: string }>(
   if (second && second.candidate.iconUrl === first.candidate.iconUrl) {
     return { kind: 'same-icon', picked: null, top };
   }
+  if (second && first.score - second.score < MIN_LEAD) {
+    return { kind: 'close', picked: null, top };
+  }
   return { kind: 'picked', picked: first.candidate, top };
 }
