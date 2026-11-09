@@ -4,8 +4,10 @@ v3 추천(`POST /api/recommendations/v3`)에 동시 부하를 걸어 병목을 �
 
 | 파일 | 하는 일 |
 |---|---|
-| `k6/v3-load.js` | k6 시나리오. `smoke` / `target` / `ramp` |
+| `k6/v3-load.js` | k6 시나리오. v3·v4 겸용(`ENDPOINT`). `smoke` / `target` / `ramp` / `validate` |
+| `k6/make-v4-requests.py` | v3 요청 파일을 행 수·순서 그대로 v4 요청 파일(`k6/data/requests-v4.json`)로 늘린다 |
 | `run.sh` | 측정 1회 = pg_stat_statements 초기화 → k6 → 결과 수집. 결과는 `results/<UTC>-<tag>/` |
+| `prom-window.sh` | 측정 1회의 앱 지표(Hikari, v4 단계별 시간, CPU·힙)를 Prometheus에서 측정 구간만 잘라 `prometheus.txt`로 남긴다 |
 | `results/` | 측정 원자료. **커밋한다** — 서버 홈에만 두었다가 원자료를 잃은 적이 있다 |
 
 전후 비교의 "같은 조건"은 세 가지 고정물로 보인다: **요청 파일**(저장소), **서빙 데이터 덤프**(S3), **perf 환경 설정**(이 문서).
@@ -282,7 +284,8 @@ ssh dfgg-be-prod 'cat /opt/dfgg/blue/dfgg-blue.jar' | ssh dfgg-be-perf 'cat > /o
 ssh dfgg-be-prod 'sha256sum /opt/dfgg/blue/dfgg-blue.jar'; ssh dfgg-be-perf 'sha256sum /opt/dfgg/blue/dfgg-blue.jar'
 ```
 
-기대: 두 해시가 같다. 이 해시를 `APP_COMMIT`으로 남긴다(예: `prod-jar sha256:1104c290…`).
+기대: 두 해시가 같다. 이 해시를 `APP_JAR_SHA256`으로 남긴다. `APP_COMMIT`에는 그 JAR의 git 커밋을 남긴다.
+(2026-11-03 이전 결과의 `app_commit`에는 JAR 해시가 들어 있다(예: `prod-jar sha256:1104c290…`) — 대조할 때 주의한다.)
 
 **첫 기동 = 스키마 생성** — 빈 DB에서 앱이 뜨면 Flyway가 V1~V9를 적용한다(CI가 매번 하는 것과 같다). [perf]:
 
@@ -507,10 +510,31 @@ sudo ./backend/ops/monitoring/apply.sh
 
 만들어둔 /ops/perf/k6/data/requests.json 을 사용한다.
 
+v4 요청 파일은 v3 파일에서 만든다. 저장소 루트에서:
+
+```bash
+python3 backend/ops/perf/k6/make-v4-requests.py
+```
+
+기대: `rows=1000`. 행 수·순서와 v3 키는 v3 파일과 같고, 보유 아이템(구매 아이템 × 수량 1)·게임 시간(구매 k개 → (5 + 4k)분)·골드(고정 시드 난수 0~3,000)가 더해진다.
+v4가 운영 카탈로그에 없는 보유 아이템을 400으로 거절하면, `validate` 회차(아래 "측정 1회의 순서")의 로그에서 id를 뽑아 스크립트의 `EXCLUDED_ITEM_IDS`에 넣고 다시 만든다:
+
+```bash
+grep -o '확인할 수 없습니다: [0-9]\+' backend/ops/perf/results/<UTC>-v4-validate/k6.log | awk '{print $NF}' | sort -un
+```
+
+뺀 id는 `inventoryItems`에서만 빠지고 `purchasedItemIds`는 v3와 같다(Core 입력이 같아야 비교된다). 다시 만들면 `requests_sha256`이 바뀌므로 그 전에 잰 v4 결과는 비교에서 뺀다.
+
 ### 9. 원격 smoke — [모니터링]
 
 ```bash
-export BASE_URL=http://10.0.0.231:8080 PERF_DB_INSTANCE=dfgg-db-perf APP_COMMIT='prod-jar sha256:<해시 앞 8자리>' PERF_DATA=serving-<YYMMDD>.dump
+export BASE_URL=http://10.0.0.231:8080 PERF_DB_INSTANCE=dfgg-db-perf APP_COMMIT=<JAR의 git 커밋> PERF_DATA=serving-<YYMMDD>.dump
+```
+
+같은 조건인지 meta.txt로 대조할 값도 perf에서 읽어 넘긴다(JAR 해시, 유닛의 JVM 옵션, perf `.env`의 `LEAGUE_OF_LEGENDS_VERSION`):
+
+```bash
+export APP_JAR_SHA256=<sha256sum /opt/dfgg/blue/dfgg-blue.jar> JAVA_OPTS='<유닛의 JVM 옵션>' LEAGUE_VERSION=<운영 패치>
 ```
 
 ```bash
@@ -600,7 +624,7 @@ aws rds stop-db-instance --db-instance-identifier dfgg-db-perf --query 'DBInstan
 sudo systemctl restart dfgg@blue && for i in $(seq 1 90); do if curl -sf http://127.0.0.1:8081/actuator/health/readiness > /dev/null; then echo ready; break; fi; if systemctl is-failed --quiet dfgg@blue; then echo "기동 실패 — journalctl -u dfgg@blue -n 50"; break; fi; sleep 2; done
 ```
 
-**② [모니터링] 측정** (`BASE_URL`, `PERF_DB_URL`, `PERF_DB_INSTANCE`, `APP_COMMIT`, `PERF_DATA`가 잡혀 있어야 한다 — 9단계)
+**② [모니터링] 측정** (`BASE_URL`, `PERF_DB_URL`, `PERF_DB_INSTANCE`, `APP_COMMIT`, `PERF_DATA`, `APP_JAR_SHA256`, `JAVA_OPTS`, `LEAGUE_VERSION`이 잡혀 있어야 한다 — 9단계)
 
 ```bash
 ./backend/ops/perf/run.sh before-smoke -e SCENARIO=smoke
@@ -620,6 +644,24 @@ smoke는 에러 0건이어야 다음으로 간다. target과 ramp는 회차마�
 - 회차 사이에 RDS `BurstBalance`가 회복될 시간을 둔다.
 - `run.sh`의 종료 코드 99는 목표(threshold) 미달이다. 측정은 끝났고 결과도 다 남는다.
 - k6가 끝난 뒤 `run.sh`는 **CloudWatch 지표가 올라올 때까지 2~4분 더 기다린다**(`CloudWatch 지표 대기` 출력). RDS 지표는 늦게 올라와서, 바로 읽으면 측정 구간이 비어 엉뚱한 값이 남는다. `cloudwatch.txt`의 `points`가 구간 분 수보다 적으면 빠진 분이 있다는 뜻이다.
+- 회차가 끝날 때마다 앱 지표를 측정 구간으로 잘라 남긴다. 두 번째 인자는 그 회차의 워밍업(smoke는 `0s`):
+
+```bash
+./backend/ops/perf/prom-window.sh backend/ops/perf/results/<UTC>-before-1 2m
+```
+
+**v4** — 같은 순서로 재되 명령마다 앞에 `ENDPOINT=v4`를 붙인다(`-e`로 넘기면 `run.sh`가 멈춘다. export하면 뒤의 v3 회차까지 v4로 간다). smoke 전에 요청 파일을 전수 검증한다:
+
+```bash
+ENDPOINT=v4 ./backend/ops/perf/run.sh v4-validate -e SCENARIO=validate
+```
+
+400이 0건이어야 다음으로 간다(아니면 "8. 요청 파일"의 제외 절차). v4 smoke는 에러 0건에 더해 `v4_core_nonempty`·`v4_situational_nonempty`가 0보다 커야 한다 — 200이어도 Core·Situational이 비어 있으면 v4가 단계를 건너뛴 것이다.
+v3·v4 ramp는 같은 인자로 잰다:
+
+```bash
+ENDPOINT=v4 ./backend/ops/perf/run.sh v4-ramp -e SCENARIO=ramp -e WARMUP=1m -e RAMP_MAX_RPS=30 -e RAMP_STEPS=15 -e RAMP_STEP=1m
+```
 
 ## 개선 후 앱 배포 — [perf]
 
@@ -652,25 +694,29 @@ cp build/libs/dfgg-0.0.1-SNAPSHOT.jar /opt/dfgg/blue/dfgg-blue.jar && sha256sum 
 
 | 변수 | 기본값 | 의미 |
 |---|---|---|
-| `SCENARIO` | `smoke` | `smoke`(1 RPS × 1m) / `target` / `ramp` |
+| `ENDPOINT` | `v3` | `v3` / `v4`. `run.sh`에는 `-e`가 아니라 환경 변수로 넘긴다(meta와 같은 값이 k6에 간다) |
+| `REQUESTS` | v3 `data/requests.json`, v4 `data/requests-v4.json` | 요청 파일. `run.sh`에는 환경 변수로 넘긴다 |
+| `SCENARIO` | `smoke` | `smoke`(1 RPS × 1m) / `target` / `ramp` / `validate`(요청 파일 전 행을 한 번씩, 0.1초 간격) |
 | `TARGET_RPS` | `10` | target의 초당 요청 수 |
-| `WARMUP` | `2m` | target 측정 전 같은 RPS로 데우는 시간. 판정에서 뺀다 |
+| `WARMUP` | `2m` | target 측정 전 같은 RPS로 데우는 시간. ramp에서는 2 RPS로 데운 뒤 ramp를 시작한다(단계 번호는 ramp 시작 기준). 판정에서 뺀다. 끌 때는 `0s` |
 | `DURATION` | `5m` | target 측정 시간 |
 | `RAMP_MAX_RPS` | `TARGET_RPS × 3` | ramp가 올라갈 최대 RPS |
 | `RAMP_STEPS` | `6` | ramp 단계 수. 단계별 p95가 요약에 따로 나온다 |
 | `RAMP_STEP` | `1m` | 단계마다 유지하는 시간(앞에 5초 상승 구간이 붙는다) |
-| `V3_RATIO` | `1.0` | v3 비율. 나머지는 `GET /api/champions` |
-| `P95_MS` | `1000` | 목표 v3 p95(ms) |
+| `V3_RATIO` | `1.0` | `ENDPOINT` 요청 비율(이름은 기존 결과와 맞추려 그대로). 나머지는 `GET /api/champions`. validate에서는 무시 |
+| `P95_MS` | `1000` | 목표 `ENDPOINT` p95(ms) |
 | `ERROR_RATE` | `0.01` | 허용 에러율 |
 | `MAX_VUS` | `200` | VU 상한. `dropped_iterations`가 생기면 올린다 |
 
-판정은 측정 구간(`phase:measure`)만 본다: v3 p95, 에러율, `dropped_iterations == 0`.
+판정은 측정 구간(`phase:measure`)만 본다: `ENDPOINT` p95, 에러율, `dropped_iterations == 0`. v4 smoke는 `v4_core_nonempty`·`v4_situational_nonempty` > 0도 본다. validate는 에러율 0만 본다.
 
 ## 같은 조건 체크리스트
 
 전후 비교 전에 두 쪽 `meta.txt`를 대조한다. 다른 항목은 비교표에 표시한다.
 
-- [ ] `requests_sha256`이 같다
+- [ ] `requests_sha256`이 같다(v3·v4끼리는 `endpoint`별로 같다)
+- [ ] `app_commit`·`app_jar_sha256`·`java_opts`·`league_version`이 같다
+- [ ] `repo_dirty=0`이다(스크립트·요청 파일을 커밋하지 않고 고쳐서 재지 않았다)
 - [ ] `perf_data`(고정 덤프)가 같다. 다시 실었다면 행 수가 `<덤프>.counts.txt`와 같다
 - [ ] `k6_args`가 같다(tag 제외)
 - [ ] perf EC2 타입, Java 버전, 유닛(JVM 옵션), perf RDS 타입·파라미터 그룹이 같다
@@ -686,19 +732,25 @@ cp build/libs/dfgg-0.0.1-SNAPSHOT.jar /opt/dfgg/blue/dfgg-blue.jar && sha256sum 
 | ~~`dropped_iterations` > 0~~ 이면서 응답이 느리고 VU가 `MAX_VUS`까지 찼다 | **무효가 아니다 — 서버 포화가 측정된 것이다.** 결과로 남긴다(`MAX_VUS`를 올리면 동시 요청만 더 쌓인다) |
 | 측정 중 모니터링 EC2 CPU가 포화됐다 | 부하 발생기가 병목이다. Grafana와 같은 서버를 쓴다 |
 | `requests_sha256` 또는 `perf_data`가 다르다 | 다른 요청·다른 데이터로 쟀다 |
+| `requests-v4.json`의 제외 목록을 바꿨다 | 그 전에 잰 v4 결과는 다른 요청으로 잰 것이다(`requests_sha256`이 달라진다) |
 
 ## 결과 폴더
 
 ```
 results/20261015T053000Z-before-1/
-├── meta.txt                 # 시각, k6 인자·버전, requests sha256, 앱·데이터 식별자, 커밋, k6 종료 코드
+├── meta.txt                 # 시각, k6 인자·버전, 엔드포인트, 요청 파일·sha256, 앱 커밋·JAR 해시·JVM 옵션·운영 패치, 데이터, 저장소 커밋·변경 수, k6 종료 코드
 ├── k6-summary.json          # --summary-export (p50·p90·p95·p99·max, 에러율, RPS, 단계별 p95)
 ├── k6.log                   # k6 화면 출력
 ├── pg_stat_statements.csv   # 총 실행 시간 상위 20개 쿼리 (측정 직전에 초기화)
-└── cloudwatch.txt           # RDS 지표: BurstBalance 최소, CPU·ReadIOPS·ReadLatency·DiskQueueDepth 최대 등
+├── cloudwatch.txt           # RDS 지표: BurstBalance 최소, CPU·ReadIOPS·ReadLatency·DiskQueueDepth 최대 등
+└── prometheus.txt           # prom-window.sh: 앱 CPU·힙·GC, Hikari 대기·점유(평균·최대), 경로 p95, v4 단계별 p50·p95, 서버 CPU
 ```
 
-앱 쪽 지표(경로별 p95, Hikari, CPU, GC)는 Grafana에서 `env="perf"`로 같은 시각 구간을 본다.
+앱 쪽 지표는 `prom-window.sh`가 측정 구간(`started_at` + 워밍업 ~ `finished_at`)으로 잘라 `prometheus.txt`에 남긴다. 그래프는 Grafana에서 `env="perf"`로 같은 시각 구간을 본다.
+- `started_at`은 k6 시작보다 몇 초 이르다(pg_stat_statements 초기화가 먼저다). 수집 간격(30초)보다 작아 구간에는 영향이 없다.
+- Hikari 대기·점유는 히스토그램이 없어 평균·최대만 있다. 점유 평균은 커넥션 대여 1회당이라, 요청 1건당 점유는 `hikari_usage_sum_increase ÷ stage_total_count_increase`로 구한다.
+- `stage_total_count_increase`가 `k6_measure_requests`와 ±(RPS × 30초) 안에서 맞아야 지표 구간이 측정 구간과 맞다. `empty_core_increase`는 0이어야 한다.
+- `monitoring_node_cpu_max`는 k6만이 아니라 같은 EC2의 Prometheus·Grafana까지 합친 CPU다. 부하 발생기 포화를 보는 대리 지표다.
 
 결과는 모니터링 EC2에 생긴다. 회차가 끝날 때마다 [로컬]로 가져와 커밋한다:
 

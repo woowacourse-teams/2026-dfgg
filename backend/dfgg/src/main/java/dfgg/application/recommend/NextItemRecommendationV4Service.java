@@ -24,6 +24,8 @@ import dfgg.presentation.dto.RecommendedItemV4Dto;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.request.NextItemRecommendationV4Request;
 import dfgg.presentation.dto.response.NextItemRecommendationV4Response;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class NextItemRecommendationV4Service {
     private static final Logger log = LoggerFactory.getLogger(NextItemRecommendationV4Service.class);
+    static final String STAGE_METRIC = "recommendation.v4.stage";
+    static final String EMPTY_CORE_METRIC = "recommendation.v4.empty_core";
 
     private final NextItemRecommendationService coreRecommendations;
     private final ComponentRecommendationRuntime components;
@@ -48,12 +52,13 @@ public class NextItemRecommendationV4Service {
     private final LeagueOfLegendsVersionProperties version;
     private final SituationalComponentRuntime situational;
     private final SituationalItemMapper situationalItems;
+    private final MeterRegistry meterRegistry;
 
     public NextItemRecommendationV4Service(NextItemRecommendationService coreRecommendations,
             ComponentRecommendationRuntime components, ChampionService champions,
             CompositionFeatureCalculator compositions, ComponentPurchaseBundleMapper bundles,
             LeagueOfLegendsVersionProperties version, SituationalComponentRuntime situational,
-            SituationalItemMapper situationalItems) {
+            SituationalItemMapper situationalItems, MeterRegistry meterRegistry) {
         this.coreRecommendations = coreRecommendations;
         this.components = components;
         this.champions = champions;
@@ -62,28 +67,44 @@ public class NextItemRecommendationV4Service {
         this.version = version;
         this.situational = situational;
         this.situationalItems = situationalItems;
+        this.meterRegistry = meterRegistry;
     }
 
     public NextItemRecommendationV4Response recommendNextItem(NextItemRecommendationV4Request request, Language language) {
+        return stage("total").record(() -> recommend(request, language));
+    }
+
+    /** 부하 측정에서 어느 단계가 느린지 나누어 보도록 단계마다 이어지는 구간으로 시간을 잰다. */
+    private NextItemRecommendationV4Response recommend(NextItemRecommendationV4Request request, Language language) {
+        Timer.Sample prepare = Timer.start(meterRegistry);
         String patch = operatingPatch(request.patch());
         if (!components.isAvailable()) {
             throw new ComponentRecommendationUnavailableException();
         }
         ItemResponse catalog = components.catalog();
         ItemInventory inventory = inventory(request, catalog);
+        prepare.stop(stage("prepare"));
         var coreRequest = new NextItemRecommendationRequest(request.myChampion(), request.purchasedItemIds(),
                 request.allies(), request.enemies(), request.tier(), patch);
-        var cores = coreRecommendations.recommendNextItem(coreRequest, language).recommendedItems();
-        var situationalItems = situationalItems(request, inventory, catalog, language);
+        var cores = stage("core").record(() -> coreRecommendations.recommendNextItem(coreRequest, language).recommendedItems());
+        var situationalItems = stage("situational").record(() -> situationalItems(request, inventory, catalog, language));
         if (cores.isEmpty()) {
+            meterRegistry.counter(EMPTY_CORE_METRIC).increment();
             return new NextItemRecommendationV4Response(List.of(), situationalItems);
         }
+        Timer.Sample component = Timer.start(meterRegistry);
         var query = query(request, cores, inventory, patch);
         Map<Integer, ComponentRecommendationService.TargetRecommendation> byTarget = components.recommend(query).stream()
                 .collect(Collectors.toMap(ComponentRecommendationService.TargetRecommendation::targetItemId, Function.identity()));
-        return new NextItemRecommendationV4Response(cores.stream()
+        var response = new NextItemRecommendationV4Response(cores.stream()
                 .map(core -> RecommendedItemV4Dto.of(core, bundles.toDto(byTarget.get(Math.toIntExact(core.id())), catalog)))
                 .toList(), situationalItems);
+        component.stop(stage("component"));
+        return response;
+    }
+
+    private Timer stage(String name) {
+        return meterRegistry.timer(STAGE_METRIC, "stage", name);
     }
 
     /** 상대 조합에 대한 추천이라 Core 목표와 무관하게 요청당 한 번 계산한다. */

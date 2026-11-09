@@ -41,7 +41,9 @@ import dfgg.presentation.dto.request.InventoryItemRequest;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.request.NextItemRecommendationV4Request;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,6 +59,7 @@ class NextItemRecommendationV4ServiceTest {
     private final ChampionService champions = mock(ChampionService.class);
     private final CompositionFeatureCalculator compositions = mock(CompositionFeatureCalculator.class);
     private final ImageUrls images = new ImageUrls("assets", "ap-northeast-2", "16.18");
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
     private ItemResponse catalog;
     private NextItemRecommendationV4Service service;
 
@@ -260,6 +263,33 @@ class NextItemRecommendationV4ServiceTest {
     }
 
     @Test
+    void 단계별_시간을_한_번씩_기록하고_네_단계의_합은_전체를_넘지_않는다() {
+        prepareCore(List.of(coreItem(3133)));
+        when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
+                new TargetRecommendation(3133, Status.NO_CANDIDATE, List.of(), null)));
+
+        service.recommendNextItem(request(null, List.of()), Language.KO_KR);
+
+        var stages = List.of("prepare", "core", "situational", "component");
+        for (String stage : stages) assertThat(stageTimer(stage).count()).as(stage).isEqualTo(1);
+        assertThat(stageTimer("total").count()).isEqualTo(1);
+        double sum = stages.stream().mapToDouble(stage -> stageTimer(stage).totalTime(TimeUnit.NANOSECONDS)).sum();
+        assertThat(sum).isLessThanOrEqualTo(stageTimer("total").totalTime(TimeUnit.NANOSECONDS));
+        assertThat(meterRegistry.find(NextItemRecommendationV4Service.EMPTY_CORE_METRIC).counter()).isNull();
+    }
+
+    @Test
+    void Core가_빈_결과이면_Component_시간은_기록하지_않고_빈_Core_횟수를_센다() {
+        when(core.recommendNextItem(any(), any())).thenReturn(new NextItemRecommendationResponse(List.of()));
+
+        service.recommendNextItem(request(null, List.of()), Language.KO_KR);
+
+        assertThat(meterRegistry.find(NextItemRecommendationV4Service.STAGE_METRIC).tag("stage", "component").timer()).isNull();
+        assertThat(meterRegistry.get(NextItemRecommendationV4Service.EMPTY_CORE_METRIC).counter().count()).isEqualTo(1);
+        assertThat(stageTimer("total").count()).isEqualTo(1);
+    }
+
+    @Test
     void Core의_실패를_빈_정상_응답으로_바꾸지_않는다() {
         var failure = new NextItemRecommendationNotFoundException("Garen", "TOP");
         when(core.recommendNextItem(any(), any())).thenThrow(failure);
@@ -343,6 +373,10 @@ class NextItemRecommendationV4ServiceTest {
         assertThat(service.recommendNextItem(request(null, List.of()), Language.KO_KR).recommendedItems().getFirst().purchaseBundle()).isNull();
     }
 
+    private io.micrometer.core.instrument.Timer stageTimer(String stage) {
+        return meterRegistry.get(NextItemRecommendationV4Service.STAGE_METRIC).tag("stage", stage).timer();
+    }
+
     private void prepareCore(List<RecommendedItemDto> items) {
         when(core.recommendNextItem(any(), any())).thenReturn(new NextItemRecommendationResponse(items));
         for (int id = 1; id <= 9; id++) champion("champion" + id, id);
@@ -378,7 +412,8 @@ class NextItemRecommendationV4ServiceTest {
             dfgg.application.recommend.situational.SituationalComponentRuntime situational) {
         return new NextItemRecommendationV4Service(core, runtime, champions, compositions,
                 new ComponentPurchaseBundleMapper(images), new LeagueOfLegendsVersionProperties("16.18"),
-                situational, new dfgg.application.recommend.situational.SituationalItemMapper(images, new ItemTraitCatalog()));
+                situational, new dfgg.application.recommend.situational.SituationalItemMapper(images, new ItemTraitCatalog()),
+                meterRegistry);
     }
 
     private NextItemRecommendationV4Request request(String patch, List<InventoryItemRequest> inventory) {
