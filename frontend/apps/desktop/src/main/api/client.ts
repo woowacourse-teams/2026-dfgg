@@ -54,3 +54,26 @@ export async function apiPost<T>(
     throw error;
   }
 }
+
+export async function apiGet<T>(path: string): Promise<T> {
+  const baseUrl = getApiBaseUrl();
+
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      headers: {
+        AcceptLanguage: mainLocale(),
+      },
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new ApiError(response.status, `GET ${path} ${response.status}: ${text.slice(0, 200)}`);
+    }
+    const result = (await response.json()) as T;
+    return result;
+  } catch (error) {
+    console.error(`GET ${path} 실패`, error);
+    reportError(`api-get ${path}`, error);
+    throw error;
+  }
+}

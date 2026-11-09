@@ -1,5 +1,22 @@
 import type { LcuEventMap } from '../main/lcu/events';
 
+// 아수라장 타입
+export type AugmentRarity = 'silver' | 'gold' | 'prismatic';
+
+export interface MayhemAugments {
+  augmentId: number;
+  name: string;
+  rarity: AugmentRarity;
+  rank: number | null;
+  pickRate: number | null;
+  iconUrl: string;
+}
+
+export interface MayhemAugments {
+  patch: string;
+  augments: MayhemAugments[];
+}
+
 export type OverlayClickTarget = 'item' | 'situational' | 'collapse' | 'expand' | 'empty' | 'other';
 
 // 전적 카드에 하이라이트 보기 버튼을 그릴 때 필요
