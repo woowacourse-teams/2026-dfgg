@@ -14,6 +14,7 @@ import type {
   MatchDetail,
   MatchSummary,
   MayhemAugments,
+  MayhemSession,
   OverlayClickTarget,
   Position,
   RecommendationUpdate,
@@ -105,7 +106,7 @@ declare global {
       openPrivacyPolicy: () => Promise<void>;
     };
     mayhem: {
-      getSession: () => Promise<MayhemAugments | null>;
+      getSession: () => Promise<MayhemSession | null>;
       readCard: (icon: ArrayBuffer) => Promise<MayhemAugments | null>;
     };
   }
