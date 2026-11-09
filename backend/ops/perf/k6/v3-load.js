@@ -32,12 +32,24 @@ const RAMP_STEPS = Number(__ENV.RAMP_STEPS || 6);
 const RAMP_STEP = __ENV.RAMP_STEP || '1m';
 const V3_RATIO = Number(__ENV.V3_RATIO || 1.0);
 const P95_MS = Number(__ENV.P95_MS || 1000);
+// 줄 때만 p99도 판정한다. 주지 않으면 기존 회차와 판정이 같다.
+const P99_MS = __ENV.P99_MS ? Number(__ENV.P99_MS) : null;
+// true면 p95·p99를 성공 응답(기본 200~399, expected_response:true)만으로 잰다. 실패·타임아웃은 오류율로 따로 본다.
+const SUCCESS_LATENCY = __ENV.SUCCESS_LATENCY === 'true';
+// target 측정 구간의 성공 처리량 하한(초당). k6 Counter의 rate는 워밍업까지 포함한 테스트 전체 시간으로 나누므로
+// (2026-11-09 k6 v2.3.0에서 확인) rate 대신 측정 구간 성공 건수 >= MIN_SUCCESS_RPS × DURATION으로 판정한다.
+const MIN_SUCCESS_RPS = __ENV.MIN_SUCCESS_RPS ? Number(__ENV.MIN_SUCCESS_RPS) : null;
 const ERROR_RATE = Number(__ENV.ERROR_RATE || 0.01);
 const MAX_VUS = Number(__ENV.MAX_VUS || 200);
+// 이 시간 안에 응답이 없으면 k6가 요청을 끊고 실패로 센다(status 0, error_code 1050 → http_req_failed).
+const REQ_TIMEOUT = __ENV.REQ_TIMEOUT || '30s';
 const REQUESTS = __ENV.REQUESTS || (ENDPOINT === 'v4' ? './data/requests-v4.json' : './data/requests.json');
 
 if (!['v3', 'v4'].includes(ENDPOINT)) {
     throw new Error(`ENDPOINT는 v3|v4 중 하나다: ${ENDPOINT}`);
+}
+if (MIN_SUCCESS_RPS !== null && SCENARIO !== 'target') {
+    throw new Error(`MIN_SUCCESS_RPS는 측정 시간이 정해진 target에서만 쓴다: ${SCENARIO}`);
 }
 
 // 모든 VU가 한 벌을 나눠 쓴다. VU마다 1,000건을 복사하지 않는다.
@@ -52,7 +64,7 @@ const situationalNonEmpty = CHECK_V4_BODY ? new Rate('v4_situational_nonempty') 
 
 const PARAMS = {
     headers: { 'Content-Type': 'application/json', 'Accept-Language': 'ko-KR' },
-    timeout: '30s',
+    timeout: REQ_TIMEOUT,
 };
 
 function constantRate(rate, duration, phase, startTime = '0s') {
@@ -132,11 +144,22 @@ function thresholds() {
     if (SCENARIO === 'validate') {
         return { 'http_req_failed{scenario:validate}': ['rate==0'] };
     }
+    const latency = [`p(95)<${P95_MS}`];
+    if (P99_MS !== null) {
+        latency.push(`p(99)<${P99_MS}`);
+    }
+    const latencyTags = SUCCESS_LATENCY
+        ? `phase:measure,endpoint:${ENDPOINT},expected_response:true`
+        : `phase:measure,endpoint:${ENDPOINT}`;
     const base = {
-        [`http_req_duration{phase:measure,endpoint:${ENDPOINT}}`]: [`p(95)<${P95_MS}`],
+        [`http_req_duration{${latencyTags}}`]: latency,
         'http_req_failed{phase:measure}': [`rate<${ERROR_RATE}`],
         [`dropped_iterations{scenario:${MEASURE_SCENARIO}}`]: ['count==0'],
     };
+    if (MIN_SUCCESS_RPS !== null) {
+        const minSuccessCount = Math.ceil((MIN_SUCCESS_RPS * durationMillis(DURATION)) / 1000);
+        base[`http_reqs{phase:measure,endpoint:${ENDPOINT},expected_response:true}`] = [`count>=${minSuccessCount}`];
+    }
     if (CHECK_V4_BODY) {
         base.v4_core_nonempty = ['rate>0'];
         base.v4_situational_nonempty = ['rate>0'];
