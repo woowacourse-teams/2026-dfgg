@@ -1,0 +1,28 @@
+/* opacity 와 rotate 만 움직여 컴포지터에서 돈다. 빛줄기마다 각도·세기·주기를 변수로 받는다. */
+.light-ray {
+  animation: light-ray var(--ray-duration) ease-in-out var(--ray-delay) infinite;
+}
+
+/* 히어로가 화면 밖이면 멈춘다 */
+.light-rays[data-paused] .light-ray {
+  animation-play-state: paused;
+}
+
+@keyframes light-ray {
+  0%,
+  100% {
+    opacity: 0;
+    rotate: var(--ray-from);
+  }
+
+  50% {
+    opacity: var(--ray-intensity);
+    rotate: var(--ray-to);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .light-ray {
+    animation: none;
+  }
+}

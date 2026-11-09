@@ -1,0 +1,3 @@
+<desktop:Extension Category="windows.startupTask" Executable="app\dfgg.exe" EntryPoint="Windows.FullTrustApplication">
+  <desktop:StartupTask TaskId="DfggStartup" Enabled="false" DisplayName="dfgg" />
+</desktop:Extension>

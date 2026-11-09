@@ -1,0 +1,76 @@
+name: auto-pr
+
+on:
+  push:
+    branches: [dev, FE/dev, BE/dev]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  fe-dev-to-dev:
+    name: FE/dev → dev
+    if: github.ref_name == 'FE/dev'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: PR 생성
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "$(gh pr list --head 'FE/dev' --base 'dev' --state open --json number --jq '.[].number')" ]; then
+            echo "이미 열린 PR이 있어 건너뜁니다."
+            exit 0
+          fi
+          gh pr create \
+            --base dev \
+            --head FE/dev \
+            --title "[자동 PR] FE/dev → dev" \
+            --body-file .github/PULL_REQUEST_TEMPLATE.md
+
+  be-dev-to-dev:
+    name: BE/dev → dev
+    if: github.ref_name == 'BE/dev'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: PR 생성
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "$(gh pr list --head 'BE/dev' --base 'dev' --state open --json number --jq '.[].number')" ]; then
+            echo "이미 열린 PR이 있어 건너뜁니다."
+            exit 0
+          fi
+          gh pr create \
+            --base dev \
+            --head BE/dev \
+            --title "[자동 PR] BE/dev → dev" \
+            --body-file .github/PULL_REQUEST_TEMPLATE.md
+
+  dev-to-main:
+    name: dev → main
+    if: github.ref_name == 'dev'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: PR 생성
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "$(gh pr list --head 'dev' --base 'main' --state open --json number --jq '.[].number')" ]; then
+            echo "이미 열린 PR이 있어 건너뜁니다."
+            exit 0
+          fi
+          gh pr create \
+            --base main \
+            --head dev \
+            --title "[자동 PR] dev → main" \
+            --body-file .github/PULL_REQUEST_TEMPLATE.md

@@ -1,0 +1,82 @@
+name: fe-deploy
+
+# FE/dev push → 빌드 → dev 배포 → 5분 대기 → prod 배포
+# 핫픽스: Actions 탭에서 "Run workflow" 클릭 → 대기 중인 이전 실행을 취소하고 대기 없이 dev·prod 즉시 배포
+on:
+  push:
+    branches: [FE/dev]
+    paths: ["frontend/**", ".github/workflows/fe-deploy.yaml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 새 실행이 오면 이전 실행(대기 중 포함)을 취소한다. 최신 커밋만 prod에 간다.
+# rsync --delay-updates 로 파일을 마지막에 한 번에 교체하므로 중간 취소돼도 반쯤 배포된 상태가 거의 남지 않는다.
+concurrency:
+  group: fe-deploy
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: BUILD
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: frontend/dist
+          retention-days: 7
+
+  deploy-dev:
+    name: DEPLOY-DEV
+    needs: build
+    runs-on: [self-hosted, dfgg-fe-dev]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - run: rsync -a --delete-after --delay-updates dist/ /var/www/dfgg/
+
+  wait:
+    name: WAIT-5MIN
+    needs: deploy-dev
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - run: sleep 300
+
+  deploy-prod:
+    name: DEPLOY-PROD
+    needs: [deploy-dev, wait]
+    # wait가 skip(수동 실행)이어도 진행, 실패·취소면 중단
+    if: ${{ !cancelled() && needs.deploy-dev.result == 'success' && needs.wait.result != 'failure' }}
+    runs-on: [self-hosted, dfgg-fe-prod]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - run: rsync -a --delete-after --delay-updates dist/ /var/www/dfgg/
