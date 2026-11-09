@@ -49,6 +49,32 @@ for db in repl_main repl_target; do
   sql "$db" "INSERT INTO flyway_schema_history SELECT v, v::text, true FROM generate_series(1, $latest) v"
 done
 
+# 카탈로그: 두 DB에 공통으로 넣고, main에만 새 챔피언·아이템과 바뀐 이름을, 대상에만 따로 넣은 챔피언을 둔다.
+# 복제는 카탈로그를 지우지 않고 main 값을 추가·갱신한다(대회 픽·조합 통계의 외래 키가 가리키므로 바꿔 끼울 수 없다).
+for db in repl_main repl_target; do
+  psql -X -q -v ON_ERROR_STOP=1 -d "$db" <<'SQL'
+INSERT INTO champions (champion_id, name, riot_key) VALUES (1, '{"ko-KR":"가"}', 'A'), (2, '{"ko-KR":"나"}', 'B');
+INSERT INTO items (item_id, name) VALUES (3031, '{"ko-KR":"옛 이름"}');
+INSERT INTO runes (rune_id, kind, name) VALUES (8112, 'PERK', '{"ko-KR":"감전"}');
+INSERT INTO summoner_spells (spell_id, riot_key, name, icon_key) VALUES (4, 'SummonerFlash', '{"ko-KR":"점멸"}', 'flash');
+SQL
+done
+psql -X -q -v ON_ERROR_STOP=1 -d repl_main <<'SQL'
+INSERT INTO champions (champion_id, name, riot_key) VALUES (3, '{"ko-KR":"새 챔피언"}', 'C');
+INSERT INTO items (item_id, name) VALUES (3006, '{"ko-KR":"광전사의 군화"}');
+UPDATE items SET name = '{"ko-KR":"무한의 대검"}' WHERE item_id = 3031;
+INSERT INTO champion_tags (champion_id, tag) VALUES (1, 'MAGE'), (3, 'FIGHTER');
+INSERT INTO champion_counters (enemy_champion_id, position, counter_champion_id, rank) VALUES (1, 'MID', 2, 1), (1, 'MID', 3, 2);
+INSERT INTO aram_mayhem_augments (patch, augment_id, name, rarity) VALUES ('16.22', 1, '{"ko-KR":"증강"}', 'GOLD');
+INSERT INTO aram_mayhem_champion_augments (patch, champion_id, augment_id, games, pick_rate) VALUES ('16.22', 1, 1, 100, 12.5);
+SQL
+psql -X -q -v ON_ERROR_STOP=1 -d repl_target <<'SQL'
+INSERT INTO champions (champion_id, name, riot_key) VALUES (99, '{"ko-KR":"대상에만"}', 'Z');
+INSERT INTO champion_tags (champion_id, tag) VALUES (2, 'TANK');
+INSERT INTO champion_counters (enemy_champion_id, position, counter_champion_id, rank) VALUES (2, 'TOP', 1, 1);
+INSERT INTO aram_mayhem_augments (patch, augment_id, name, rarity) VALUES ('16.21', 9, '{"ko-KR":"옛 증강"}', 'SILVER');
+SQL
+
 # main: 수집·집계된 값
 psql -X -q -v ON_ERROR_STOP=1 -d repl_main <<'SQL'
 INSERT INTO normalized_match_participants (champion_id, core_item_purchase_order, core_item_purchase_order_complete,
@@ -68,6 +94,18 @@ INSERT INTO champion_item_stats (champion_game_count_all, champion_game_count_re
 SELECT 1000, 300, g, 3031, 'MID', 500, 150, 260, 80, 520 FROM generate_series(1, 20) g;
 SQL
 
+# main: 대회 픽 (서로, 그리고 카탈로그를 외래 키로 참조한다)
+psql -X -q -v ON_ERROR_STOP=1 -d repl_main <<'SQL'
+INSERT INTO pro_tournaments (overview_page, name, league) VALUES ('LCK/2026', 'LCK 2026', 'LCK');
+INSERT INTO pro_players (leaguepedia_page, name, updated_at) VALUES ('Faker', 'Faker', now()), ('Chovy', 'Chovy', now());
+INSERT INTO pro_picks (tournament_id, player_id, source_game_id, played_at, team, side, position, champion_id, win)
+SELECT 1, p, 'G' || g, now(), 'T1', 'BLUE', 'MID', 1 + g % 3, true FROM generate_series(1, 20) g, generate_series(1, 2) p;
+INSERT INTO pro_pick_items (pick_id, slot, item_id) SELECT id, 0, 3031 FROM pro_picks;
+INSERT INTO pro_pick_items (pick_id, slot, item_id) SELECT id, 1, 3006 FROM pro_picks WHERE id % 4 = 0;
+INSERT INTO pro_pick_runes (pick_id, slot, rune_id) SELECT id, 0, 8112 FROM pro_picks;
+INSERT INTO pro_pick_spells (pick_id, slot, spell_id) SELECT id, 0, 4 FROM pro_picks;
+SQL
+
 # 대상: 예전 값과, 대상이 직접 쓰는 feedback
 psql -X -q -v ON_ERROR_STOP=1 -d repl_target <<'SQL'
 INSERT INTO normalized_match_participants (champion_id, core_item_purchase_order, core_item_purchase_order_complete,
@@ -76,6 +114,10 @@ SELECT 1, '1001', true, '1001', 'OLD_' || g, 1, '16.20', 'TOP', 'old' || g, 420,
 FROM generate_series(1, 5) g;
 INSERT INTO champion_position_stats (patch, champion_id, position, games) VALUES ('16.20', 99, 'TOP', 1);
 INSERT INTO feedback (feedback_id, content, date) VALUES (1, 'keep me', '2026-11-01');
+INSERT INTO pro_tournaments (overview_page, name, league) VALUES ('OLD/2025', 'OLD', 'OLD');
+INSERT INTO pro_players (leaguepedia_page, name, updated_at) VALUES ('Old', 'Old', now());
+INSERT INTO pro_picks (tournament_id, player_id, source_game_id, played_at, team, side, position, champion_id, win)
+VALUES (1, 1, 'OLD1', now(), 'OLD', 'RED', 'TOP', 2, false);
 SQL
 
 passed=0
@@ -100,7 +142,7 @@ indexes_before=$(indexes)
 # 1. 덤프
 dump="$work/dump-1"
 out=$(replicate dump --out "$dump" 2>&1)
-check "덤프가 끝난다" has "dumped 7 tables" "$out"
+check "덤프가 끝난다" has "dumped 21 tables" "$out"
 check "덤프에 main의 Flyway 버전과 행 수가 남는다" has "normalized_match_participants 3000" "$(cat "$dump/manifest")"
 
 # 2. dry-run은 대상을 바꾸지 않는다
@@ -115,6 +157,19 @@ check "dev 복제 전에는 prod 복제를 거부한다" bash -c "! '$pipeline/r
 out=$(replicate load --target dev --dump "$dump" 2>&1)
 while IFS= read -r line; do echo "     | $line"; done <<< "$out"
 check "dev 복제가 성공한다" has "load done: dev" "$out"
+check "대회 픽이 main 값으로 바뀐다" eq "$(target 'SELECT count(*) FROM pro_picks')" 40
+check "대회 픽 아이템도 함께 바뀐다" eq "$(target 'SELECT count(*) FROM pro_pick_items')" 50
+check "예전 대회는 사라진다" eq "$(target "SELECT count(*) FROM pro_tournaments WHERE league = 'OLD'")" 0
+check "외래 키가 같은 이름으로 다시 생긴다" eq "$(target "SELECT string_agg(conname, ',' ORDER BY conname) FROM pg_constraint WHERE contype = 'f' AND conrelid = 'pro_picks'::regclass")" "pro_picks_champion_id_fkey,pro_picks_player_id_fkey,pro_picks_tournament_id_fkey"
+check "외래 키가 public의 새 테이블을 가리킨다" eq "$(target "SELECT count(*) FROM pg_constraint WHERE contype = 'f' AND conrelid = 'pro_pick_items'::regclass AND confrelid IN ('public.pro_picks'::regclass, 'public.items'::regclass)")" 2
+check "외래 키가 실제로 막는다" bash -c "! psql -X -q -d repl_target -c \"INSERT INTO pro_pick_items VALUES (999999, 0, 3031)\" > /dev/null 2>&1"
+check "main에만 있던 챔피언이 추가된다 (대회 픽보다 먼저)" eq "$(target "SELECT name->>'ko-KR' FROM champions WHERE champion_id = 3")" "새 챔피언"
+check "바뀐 아이템 이름이 갱신된다" eq "$(target "SELECT name->>'ko-KR' FROM items WHERE item_id = 3031")" "무한의 대검"
+check "대상에만 있던 카탈로그 행은 지우지 않는다" eq "$(target 'SELECT count(*) FROM champions WHERE champion_id = 99')" 1
+check "챔피언 태그가 main 값으로 바뀐다" eq "$(target "SELECT string_agg(champion_id || ':' || tag, ',' ORDER BY champion_id) FROM champion_tags")" "1:MAGE,3:FIGHTER"
+check "카운터가 main 값으로 바뀐다" eq "$(target "SELECT string_agg(enemy_champion_id || position || counter_champion_id, ',' ORDER BY rank) FROM champion_counters")" "1MID2,1MID3"
+check "칼바람 증강이 main 값으로 바뀐다" eq "$(target "SELECT string_agg(patch || '/' || augment_id, ',') FROM aram_mayhem_augments")" "16.22/1"
+check "칼바람 픽률이 함께 바뀐다" eq "$(target 'SELECT count(*) FROM aram_mayhem_champion_augments')" 1
 check "참가자가 main 값으로 바뀐다" eq "$(target 'SELECT count(*) FROM normalized_match_participants')" 3000
 check "룬 기록이 바뀐다" eq "$(target 'SELECT count(*) FROM normalized_match_participant_runes')" 500
 check "예전 라인 분포는 사라진다" eq "$(target "SELECT count(*) FROM champion_position_stats WHERE patch = '16.20'")" 0
@@ -152,6 +207,16 @@ check "덤프가 깨지면 복제가 실패한다" bash -c "! '$pipeline/replica
 check "실패해도 기존 참가자가 남는다" eq "$(target 'SELECT count(*) FROM normalized_match_participants')" 3000
 check "실패해도 다른 테이블도 바뀌지 않는다 (한꺼번에 교체)" eq "$(target 'SELECT count(*) FROM champion_position_stats')" 10
 check "실패 뒤 작업용 스키마가 남지 않는다" eq "$(target "SELECT count(*) FROM pg_namespace WHERE nspname IN ('replica_stage','replica_old')")" 0
+
+# 7-1. 원본이 비었는데 대상에 값이 있으면 지우지 않는다 (main 칼바람 동기화가 아직 안 된 경우 등)
+sql repl_main "DELETE FROM aram_mayhem_augments"
+empty="$work/dump-empty"
+replicate dump --out "$empty" > /dev/null 2>&1
+out=$(replicate load --target dev --dump "$empty" 2>&1 || true)
+check "원본이 빈 테이블로 대상을 비우지 않는다" has "empty in the dump" "$out"
+check "그 경우 대상 칼바람 값이 남는다" eq "$(target 'SELECT count(*) FROM aram_mayhem_augments')" 1
+sql repl_main "INSERT INTO aram_mayhem_augments (patch, augment_id, name, rarity) VALUES ('16.22', 1, '{\"ko-KR\":\"증강\"}', 'GOLD')"
+sql repl_main "INSERT INTO aram_mayhem_champion_augments (patch, champion_id, augment_id, games, pick_rate) VALUES ('16.22', 1, 1, 100, 12.5)"
 
 # 8. load-target.sh: S3에서 받아 넣고, 최근 패치 창이 바뀌면 재기동을 알린다 (가짜 aws가 로컬 폴더를 버킷처럼 쓴다)
 bucket="$work/bucket"

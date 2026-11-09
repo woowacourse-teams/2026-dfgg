@@ -1,7 +1,8 @@
 # main → dev·prod 복제 대상 분류. replicate.sh가 읽고, ReplicationTableClassificationTest가 Flyway 스키마와 비교한다.
 # 새 테이블을 만들면 replicate 또는 exclude 중 하나에 반드시 적는다. 어느 쪽에도 없으면 ./gradlew test가 실패한다.
-#   replicate <테이블>  main에서 계산·수집한 값을 대상 DB에 통째로 교체한다 (서빙이 읽고, 대상 DB에서 쓰지 않는 것)
-#   exclude <테이블>    복제하지 않는다 (대상 DB가 쓰거나, 서빙이 읽지 않거나, 관리 API로 따로 채우는 것)
+#   replicate <테이블>  main 값으로 대상 DB의 테이블을 통째로 바꿔 끼운다 (서빙이 읽고, 대상 DB에서 쓰지 않는 것)
+#   upsert <테이블>     main 행을 추가·갱신만 하고 지우지 않는다. 다른 테이블이 외래 키로 가리켜 바꿔 끼울 수 없는 카탈로그용
+#   exclude <테이블>    복제하지 않는다 (대상 DB가 쓰거나, 서빙이 읽지 않는 것)
 
 # 아이템 추천 통계 (U5 집계 결과)
 replicate champion_item_stats
@@ -13,32 +14,37 @@ replicate champion_position_stats
 # 서빙 조회에 쓰는 참가자, 룬 추천
 replicate normalized_match_participants
 replicate normalized_match_participant_runes
+# 오늘의 추천 픽 (scheduling이 Leaguepedia에서 main에 모은다. 카탈로그를 외래 키로 참조하므로 대상 카탈로그가 먼저 맞아야 한다)
+replicate pro_tournaments
+replicate pro_players
+replicate pro_picks
+replicate pro_pick_items
+replicate pro_pick_runes
+replicate pro_pick_spells
 
-# 카탈로그: 대상 DB에서 관리 API(/admin/champions·items·runes·summoner-spells)로 채운다. 대회 픽 FK가 가리켜 교체할 수 없다
-exclude champions
-exclude champion_tags
-exclude items
-exclude runes
-exclude summoner_spells
+# 카탈로그: 대회 픽·조합 통계가 외래 키로 가리키므로 추가·갱신만 한다. 대회 픽보다 먼저 들어간다
+upsert champions
+upsert items
+upsert runes
+upsert summoner_spells
+# 챔피언 태그는 챔피언을 가리키기만 하고 가리켜지지 않아 바꿔 끼운다
+replicate champion_tags
+# 카운터 API (사람이 main에 SQL로 넣는다)
+replicate champion_counters
+# 칼바람 API (scheduling이 main에 동기화한다)
+replicate aram_mayhem_augments
+replicate aram_mayhem_champion_augments
+
 # 대상 DB가 직접 쓰거나 따로 관리하는 것
 exclude feedback
 exclude flyway_schema_history
-exclude champion_counters
-exclude pro_tournaments
-exclude pro_players
-exclude pro_picks
-exclude pro_pick_items
-exclude pro_pick_runes
-exclude pro_pick_spells
-exclude aram_mayhem_augments
-exclude aram_mayhem_champion_augments
 # 수집·학습 전용 (서빙이 읽지 않는다)
 exclude raw_matches
 exclude raw_match_timelines
 exclude players
 exclude stats_aggregation_completions
 exclude normalized_match_participant_item_events
-# v1/v2 추천 잔재 (복제하지 않는다)
+# v1/v2 추천 (v2는 지금 쓰지 않아 보류, 11/9. 약 5.7GB)
 exclude composition_stats
 exclude composition_stats_items
 exclude composition_stats_samples
