@@ -1,0 +1,233 @@
+name: BE Patch Pipeline (nightly)
+
+# 매일 03:00 KST: main 집계 → 덤프 → dev 교체 → (패치 창이 바뀌면) dev 재기동 → prod 교체 → (바뀌면) prod 재기동 승인 요청.
+# 화·토에는 재학습 여부를 판단한다.
+# 예약 실행은 기본 브랜치(dev)의 이 파일로 돌지만, 스크립트와 배포는 항상 BE/dev 기준으로 쓴다.
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      retrain:
+        description: "재학습: auto(화·토) | force(오늘 바로) | skip"
+        required: false
+        type: choice
+        options: [ auto, force, skip ]
+        default: auto
+      skip-prod:
+        description: "dev까지만 하고 prod는 건너뛴다"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: dfgg-patch-pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_REF: BE/dev
+  DUMP_S3_PREFIX: s3://techcourse-project-2026/dfgg/backup
+  DUMP_ROOT: /opt/dfgg/replication
+
+jobs:
+  aggregate:
+    runs-on: [ self-hosted, dfgg-scheduling ]
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+      - name: Aggregate main statistics
+        run: backend/ops/pipeline/aggregate-main.sh
+
+  dump:
+    needs: aggregate
+    runs-on: [ self-hosted, dfgg-scheduling ]
+    timeout-minutes: 30
+    outputs:
+      name: ${{ steps.dump.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+      - name: Dump serving tables from main
+        id: dump
+        run: |
+          set -euo pipefail
+          name="pipeline-$(TZ=Asia/Seoul date +%y%m%d-%H%M)"
+          backend/ops/pipeline/replicate.sh dump --out "$DUMP_ROOT/$name"
+          aws s3 cp --recursive --only-show-errors "$DUMP_ROOT/$name/" "$DUMP_S3_PREFIX/$name/"
+          rm -rf "${DUMP_ROOT:?}/$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+      # 파이프라인이 만든 덤프(pipeline-*)만 최근 3개 남긴다. 손으로 만든 백업은 건드리지 않는다.
+      - name: Prune old pipeline dumps
+        run: |
+          set -euo pipefail
+          listing=$(aws s3 ls "$DUMP_S3_PREFIX/")
+          old=$(awk '$1 == "PRE" && $2 ~ /^pipeline-/ { print $2 }' <<< "$listing" | sort -r | tail -n +4)
+          for dir in $old; do aws s3 rm --recursive --only-show-errors "$DUMP_S3_PREFIX/$dir"; echo "removed $dir"; done
+
+  load-dev:
+    needs: dump
+    runs-on: [ self-hosted, dfgg-dev ]
+    timeout-minutes: 60
+    # 코드 배포와 같은 그룹이라 dev 배포와 겹치지 않는다.
+    concurrency:
+      group: dfgg-backend-deployment-dev
+      cancel-in-progress: false
+    outputs:
+      status: ${{ steps.load.outputs.status }}
+      restart: ${{ steps.load.outputs.restart }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+      - name: Replace dev tables
+        id: load
+        run: backend/ops/pipeline/load-target.sh --target dev --dump "${{ needs.dump.outputs.name }}"
+
+  # 같은 이미지·모델로 다시 띄운다(be-cd가 dev 검증 뒤 scheduling까지 이어서 재기동한다).
+  restart-dev:
+    needs: load-dev
+    if: needs.load-dev.outputs.status == 'done' && needs.load-dev.outputs.restart == 'yes'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Restart dev with the current image and model
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/dispatch-and-wait.sh be-cd.yml "$SOURCE_REF" -f image=current
+
+  load-prod:
+    needs: [ dump, load-dev, restart-dev ]
+    if: >-
+      ${{ !cancelled() && !inputs.skip-prod && needs.load-dev.outputs.status == 'done'
+      && contains(fromJSON('["success","skipped"]'), needs.restart-dev.result) }}
+    runs-on: [ self-hosted, dfgg-prod ]
+    timeout-minutes: 60
+    concurrency:
+      group: dfgg-backend-deployment-prod
+      cancel-in-progress: false
+    outputs:
+      status: ${{ steps.load.outputs.status }}
+      restart: ${{ steps.load.outputs.restart }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+      - name: Replace prod tables
+        id: load
+        run: backend/ops/pipeline/load-target.sh --target prod --dump "${{ needs.dump.outputs.name }}"
+
+  # prod 재기동은 승인이 필요하다. 새벽에는 실행만 걸어 두고, 사람이 아침에 승인한다.
+  restart-prod:
+    needs: load-prod
+    if: needs.load-prod.outputs.status == 'done' && needs.load-prod.outputs.restart == 'yes'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Request prod restart
+        id: dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run=$(.github/scripts/dispatch-and-wait.sh be-cd.yml "$SOURCE_REF" --no-wait -f image=current -f target=prod | tail -1)
+          echo "url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run" >> "$GITHUB_OUTPUT"
+      - name: Notify approval needed
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          LEVEL: notice
+          MESSAGE: "prod 통계를 교체했고 최근 패치 창이 바뀌었습니다. prod 재기동 승인이 필요합니다: ${{ steps.dispatch.outputs.url }}"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: .github/scripts/notify-pipeline.sh
+
+  retrain:
+    needs: [ dump, load-prod ]
+    if: ${{ !cancelled() && needs.dump.result == 'success' && inputs.retrain != 'skip' }}
+    runs-on: [ self-hosted, dfgg-scheduling ]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+      # 커버리지 하한은 두지 않는다(11/6 결정). 현재 패치·커버리지는 기록용으로 남기고,
+      # 새 패치 데이터가 아예 없어 patch-status.sh가 실패할 때만 건너뛴다.
+      - name: Decide retraining
+        id: decide
+        env:
+          RETRAIN: ${{ inputs.retrain || 'auto' }}
+        run: |
+          set -euo pipefail
+          weekday=$(TZ=Asia/Seoul date +%u)
+          if [[ "$RETRAIN" == auto && "$weekday" != 2 && "$weekday" != 6 ]]; then
+            echo "not a retraining day (KST weekday $weekday)"
+            echo "run=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! status=$(PGSERVICE=main backend/ops/pipeline/patch-status.sh --json 2>&1); then
+            echo "::warning::retraining skipped: no data for the current patch ($status)"
+            echo "run=no" >> "$GITHUB_OUTPUT"
+            echo "reason=$(head -1 <<< "$status" | tr -d '\r')" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "patch status: $status"
+          echo "run=yes" >> "$GITHUB_OUTPUT"
+      - name: Notify skipped retraining
+        if: steps.decide.outputs.run == 'no' && steps.decide.outputs.reason != ''
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          LEVEL: notice
+          MESSAGE: "오늘 재학습을 건너뛰었습니다. 현재 패치 데이터가 없습니다: ${{ steps.decide.outputs.reason }}"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: .github/scripts/notify-pipeline.sh
+      # 재학습 워크플로(U11)가 생기기 전에는 판단만 남긴다.
+      - name: Start retraining
+        if: steps.decide.outputs.run == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh workflow view be-retrain.yml --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "::notice::be-retrain.yml is not available yet (U11); retraining was not started"
+            exit 0
+          fi
+          .github/scripts/dispatch-and-wait.sh be-retrain.yml "$SOURCE_REF" --no-wait
+
+  notify-failure:
+    needs: [ aggregate, dump, load-dev, restart-dev, load-prod, restart-prod, retrain ]
+    if: ${{ always() && contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Notify Slack
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          LEVEL: failure
+          MESSAGE: |
+            집계 ${{ needs.aggregate.result }} · 덤프 ${{ needs.dump.result }} · dev 교체 ${{ needs.load-dev.result }} · dev 재기동 ${{ needs.restart-dev.result }}
+            prod 교체 ${{ needs.load-prod.result }} · prod 재기동 요청 ${{ needs.restart-prod.result }} · 재학습 판단 ${{ needs.retrain.result }}
+            실패한 단계 뒤는 진행하지 않았습니다. 교체 중 실패했다면 기존 테이블이 그대로 서비스 중입니다.
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: .github/scripts/notify-pipeline.sh
