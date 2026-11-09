@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
-import {
+import type {
   ChampSelectState,
   Position,
   EndedGame,
