@@ -2,27 +2,22 @@ name: BE Patch Pipeline (nightly)
 
 # 매일 03:00 KST: main 집계·칼바람 동기화 → 덤프 → dev 교체 → (패치 창이 바뀌면) dev 재기동 → prod 교체 → (바뀌면) prod 재기동 승인 요청.
 # 화·토에는 재학습 여부를 판단한다.
-# 예약 실행은 기본 브랜치(dev)의 이 파일로 돌지만, 스크립트와 배포는 항상 BE/dev 기준으로 쓴다.
+# 재사용 워크플로다. GitHub 예약 실행은 기본 브랜치(dev)의 파일만 돌기 때문에, dev에 둔 트리거
+# (be-patch-pipeline-trigger.yml)가 매일 이 파일을 BE/dev 기준으로 부른다. 파이프라인 수정은 BE/dev에서만 한다.
+# 같은 실행이 겹치지 않게 막는 concurrency는 트리거 쪽에 둔다(같은 그룹을 여기에도 두면 서로 기다린다).
 on:
-  schedule:
-    - cron: '0 18 * * *'
-  workflow_dispatch:
+  workflow_call:
     inputs:
       retrain:
         description: "재학습: auto(화·토) | force(오늘 바로) | skip"
         required: false
-        type: choice
-        options: [ auto, force, skip ]
+        type: string
         default: auto
       skip-prod:
         description: "dev까지만 하고 prod는 건너뛴다"
         required: false
         type: boolean
         default: false
-
-concurrency:
-  group: dfgg-patch-pipeline
-  cancel-in-progress: false
 
 permissions:
   contents: read
