@@ -153,5 +153,38 @@ check "실패해도 기존 참가자가 남는다" eq "$(target 'SELECT count(*)
 check "실패해도 다른 테이블도 바뀌지 않는다 (한꺼번에 교체)" eq "$(target 'SELECT count(*) FROM champion_position_stats')" 10
 check "실패 뒤 작업용 스키마가 남지 않는다" eq "$(target "SELECT count(*) FROM pg_namespace WHERE nspname IN ('replica_stage','replica_old')")" 0
 
+# 8. load-target.sh: S3에서 받아 넣고, 최근 패치 창이 바뀌면 재기동을 알린다 (가짜 aws가 로컬 폴더를 버킷처럼 쓴다)
+bucket="$work/bucket"
+mkdir -p "$bucket" "$work/bin"
+cat > "$work/bin/aws" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "\$1 \$2" == "s3 cp" ]] || exit 2
+shift 2
+[[ "\$1" == --recursive ]] && shift
+[[ "\$1" == --only-show-errors ]] && shift
+src=\${1/s3:\/\/test-bucket/$bucket} dst=\${2/s3:\/\/test-bucket/$bucket}
+if [[ -d "\$src" ]]; then mkdir -p "\$dst"; cp -R "\$src"/. "\$dst"/; exit 0; fi
+[[ -f "\$src" ]] || exit 1
+mkdir -p "\$(dirname "\$dst")"; cp "\$src" "\$dst"
+EOF
+chmod +x "$work/bin/aws"
+load_target() {
+  PATH="$work/bin:$PATH" DUMP_S3_PREFIX=s3://test-bucket DUMP_ROOT="$work/root" "$pipeline/load-target.sh" "$@" 2>&1
+}
+sql repl_main "UPDATE normalized_match_participants SET patch = '16.22' WHERE id % 10 = 0"
+replicate dump --out "$bucket/nightly-1" > /dev/null 2>&1
+out=$(load_target --target dev --dump nightly-1)
+check "load-target이 dev에 넣는다" has "status=done" "$out"
+check "새 패치가 생기면 재기동을 알린다" has "restart=yes" "$out"
+check "dev 성공 표시를 S3에 남긴다" test -f "$bucket/nightly-1/dev.ok"
+check "같은 덤프의 prod는 S3의 dev 성공 표시로 진행된다" has "status=done" "$(load_target --target prod --dump nightly-1)"
+out=$(load_target --target dev --dump nightly-1)
+check "패치 창이 그대로면 재기동하지 않는다" has "restart=no" "$out"
+target "INSERT INTO flyway_schema_history VALUES (999, '999', true)"
+out=$(load_target --target dev --dump nightly-1)
+check "버전이 다르면 대기로 끝나고 실패하지 않는다" has "status=wait" "$out"
+target "DELETE FROM flyway_schema_history WHERE installed_rank = 999"
+
 echo "passed=$passed failed=$failed"
 [[ "$failed" == 0 ]]
