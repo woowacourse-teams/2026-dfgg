@@ -7,6 +7,7 @@ import dfgg.common.exception.ComponentRecommendationUnavailableException;
 import dfgg.common.exception.InvalidDfScoreRequestException;
 import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.common.exception.NextItemRecommendationNotFoundException;
+import dfgg.common.exception.StatsAggregationFailedException;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +56,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleAugmentDataRejected(AugmentDataRejectedException exception) {
         log.warn("502 증강 데이터 거부: {}", exception.getMessage(), exception);
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, exception.getMessage());
+    }
+
+    /** 내부 오류 문구는 로그에만 남기고, 응답에는 실패한 단계와 끝난 단계만 담는다. */
+    @ExceptionHandler(StatsAggregationFailedException.class)
+    public ProblemDetail handleStatsAggregationFailed(StatsAggregationFailedException exception) {
+        log.error("500 집계 실패: step={}, completed={}", exception.failedStep(), exception.completedSteps(),
+                exception);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+                exception.getMessage());
+        problem.setProperty("failedStep", exception.failedStep());
+        problem.setProperty("completedSteps", exception.completedSteps());
+        return problem;
     }
 
     @Override
