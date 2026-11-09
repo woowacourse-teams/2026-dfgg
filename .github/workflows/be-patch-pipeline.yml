@@ -1,6 +1,6 @@
 name: BE Patch Pipeline (nightly)
 
-# 매일 03:00 KST: main 집계 → 덤프 → dev 교체 → (패치 창이 바뀌면) dev 재기동 → prod 교체 → (바뀌면) prod 재기동 승인 요청.
+# 매일 03:00 KST: main 집계·칼바람 동기화 → 덤프 → dev 교체 → (패치 창이 바뀌면) dev 재기동 → prod 교체 → (바뀌면) prod 재기동 승인 요청.
 # 화·토에는 재학습 여부를 판단한다.
 # 예약 실행은 기본 브랜치(dev)의 이 파일로 돌지만, 스크립트와 배포는 항상 BE/dev 기준으로 쓴다.
 on:
@@ -42,6 +42,15 @@ jobs:
           ref: ${{ env.SOURCE_REF }}
       - name: Aggregate main statistics
         run: backend/ops/pipeline/aggregate-main.sh
+      # 칼바람 증강 픽률을 외부(aramhex)에서 main으로 받는다. 실패해도 main의 직전 값이 남으므로 복제는 계속한다.
+      - name: Sync ARAM Mayhem data into main
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          port=$(grep -oE '127\.0\.0\.1:[0-9]+' /etc/nginx/conf.d/dfgg-upstream.conf | cut -d: -f2)
+          code=$(curl --noproxy '*' -sS --max-time 900 -o /tmp/aram-sync.json -w '%{http_code}' -X POST "http://127.0.0.1:$port/admin/aram-mayhem/sync")
+          [[ "$code" =~ ^2 ]] || { echo "::warning::ARAM Mayhem sync returned $code: $(head -c 300 /tmp/aram-sync.json)"; exit 1; }
+          echo "ARAM Mayhem sync: $code"
 
   dump:
     needs: aggregate
