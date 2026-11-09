@@ -1,4 +1,4 @@
-import { MayhemAugments } from '../../shared/types';
+import type { MayhemAugments } from '../../shared/types';
 import { apiGet } from './client';
 
 export function fetchMayhemAugments(championId: number) {
