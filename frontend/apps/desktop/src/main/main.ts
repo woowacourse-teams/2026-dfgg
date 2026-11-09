@@ -37,6 +37,8 @@ import { readSettings } from './settings';
 import { initOverlayVisibility, updateOverlayPhase } from './overlay/visibility';
 import { getTestEnv } from './testEnv';
 
+import { startMemoryProbe } from './debug/memoryProbe';
+
 const DEV_SERVER_URL = 'http://localhost:3001';
 
 // home 창을 저장하고, 이미 실행되고 있는 같은 프로그램 인스턴스를 확인하는 변수
@@ -179,6 +181,7 @@ if (!gotTheLock) {
       }
     });
   });
+  if (!app.isPackaged || process.env.DFGG_MEM_PROBE) startMemoryProbe();
 }
 
 app.on('will-quit', () => {
