@@ -4,12 +4,14 @@ import { getLcuState, onPhaseChange } from '../lcu/state';
 import { getDDragonData } from '../live/ddragon';
 import { getActivePlayer, getGameStats, getPlayerList } from '../live/endpoints';
 import { toChampionAlias } from '../live/payload';
+import { prepareIcons } from './iconMatch';
 
 const MAYHEM_MODE = 'KIWI';
 const RETRY_MS = 3000;
 
 let gameToken = 0;
 let augments: MayhemAugments[] = [];
+let iconsReady: Promise<number> | null = null;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -54,12 +56,16 @@ async function start() {
 
   if (!alive()) return;
   augments = loaded;
-  console.log('[mayhem] start', championId, augments.length);
+
+  iconsReady = prepareIcons(augments);
+  const icons = await iconsReady;
+  console.log('[mayhem] start', championId, augments.length, 'icons', icons);
 }
 
 async function stop() {
   gameToken++;
   augments = [];
+  iconsReady = null;
 }
 
 function syncWithPhase(phase: GameflowPhase | null) {
