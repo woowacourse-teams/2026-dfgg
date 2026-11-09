@@ -14,6 +14,7 @@ export default tseslint.config(
       '**/out/**',
       '**/release/**',
       'node_modules/**',
+      '**/*.config.js',
       '**/*.renderer.js',
       '**/*.main.js',
     ],
