@@ -7,7 +7,7 @@ import { getActivePlayer, getGameStats, getPlayerList } from '../live/endpoints'
 import { toChampionAlias } from '../live/payload';
 import { matchIcon, prepareIcons } from './iconMatch';
 import { closeWindow, openWindow, setWindowFactory } from './window';
-import { registerIpcHandlers } from '../ipc';
+import { startCaptureTest } from './captureTest';
 
 const MAYHEM_MODE = 'KIWI';
 const RETRY_MS = 3000;
@@ -83,6 +83,7 @@ async function start() {
   if (!alive()) return;
   current = { championId };
   openWindow();
+  startCaptureTest(alive);
   console.log('[mayhem] start', championId, augments.length, 'icons', icons);
 }
 
@@ -101,7 +102,6 @@ function syncWithPhase(phase: GameflowPhase | null) {
 
 export function initMayhem(create: () => BrowserWindow) {
   setWindowFactory(create);
-  registerIpcHandlers();
   syncWithPhase(getLcuState().phase);
   onPhaseChange(syncWithPhase);
 }
