@@ -10,8 +10,13 @@ const MIN_LINE = 0.01; // 이보다 얇은 묶음은 잡티
 const MIN_TITLE = 0.022; // 제목 글자 높이 범위
 const MAX_TITLE = 0.05;
 
+/** 글자 줄 묶음의 위·아래 줄 번호 */
 type Rows = { top: number; bottom: number };
 
+/**
+ * 캡처한 컬러 비트맵(픽셀당 B, G, R, A)을 밝기 하나짜리 흑백 그림으로 바꾼다.
+ * 사람 눈이 느끼는 밝기 공식(0.299R + 0.587G + 0.114B)을 쓴다.
+ */
 export function toLuma(bitmap: Uint8Array, width: number, height: number): Gray {
   const data = new Uint8Array(width * height);
   for (let i = 0; i < data.length; i++) {
@@ -21,6 +26,10 @@ export function toLuma(bitmap: Uint8Array, width: number, height: number): Gray 
   return { width, height, data };
 }
 
+/**
+ * 제목 영역을 위에서부터 훑어 글자가 있는 줄들을 묶음으로 모으고,
+ * 잡티를 건너뛴 첫 묶음이 제목 높이면 그 위·아래 줄을 돌려준다. 아니면 null.
+ */
 export function findTitleRows(image: Gray, cardHeight: number): Rows | null {
   const left = Math.floor(image.width * SIDE_CROP);
   const right = Math.ceil(image.width * (1 - SIDE_CROP));
@@ -45,6 +54,10 @@ export function findTitleRows(image: Gray, cardHeight: number): Rows | null {
   return first;
 }
 
+/**
+ * 제목 줄만 위아래 한 줄씩 여유를 두고 잘라낸다.
+ * 제목이 그림 맨 위나 맨 아래에 닿아 있으면 잘린 것으로 보고 null.
+ */
 export function cutTitle(image: Gray, cardHeight: number): Gray | null {
   const rows = findTitleRows(image, cardHeight);
   if (!rows) return null;
@@ -59,6 +72,10 @@ export function cutTitle(image: Gray, cardHeight: number): Gray | null {
   };
 }
 
+/**
+ * 화면에서 찍은 제목 영역을 비교용 마스크(높이 32)로 만든다.
+ * 제목을 못 찾았거나 잘렸으면 null.
+ */
 export function titleMask(image: Gray, cardHeight: number): Mask | null {
   const title = cutTitle(image, cardHeight);
   return title && toMask(title, SCREEN_THRESHOLD, { left: SIDE_CROP, right: SIDE_CROP, bottom: 0 });

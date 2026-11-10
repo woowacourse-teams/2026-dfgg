@@ -22,7 +22,7 @@ export function fetchMayhemAugments(championId: number) {
   return apiGet<MayhemAugments>(`/api/aram-mayhem/champions/${championId}/augments`);
 }
 
-export async function fetchAugmentTitles(patch: string, lang: string): Promise<AugmentTitles> {
-  const query = new URLSearchParams({ patch, lang });
+export async function fetchAugmentTitles(patch: string): Promise<AugmentTitles> {
+  const query = new URLSearchParams({ patch });
   return apiGet<AugmentTitles>(`/api/aram-mayhem/augment-titles?${query}`);
 }

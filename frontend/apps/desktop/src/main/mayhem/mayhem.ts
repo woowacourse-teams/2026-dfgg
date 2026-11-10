@@ -8,6 +8,7 @@ import { toChampionAlias } from '../live/payload';
 import { closeWindow, openWindow, setWindowFactory } from './window';
 import { startCaptureTest } from './captureTest';
 import { loadCandidates, type Candidate } from './titleImages';
+import { startCardReader } from './cardReader';
 
 const MAYHEM_MODE = 'KIWI';
 const RETRY_MS = 3000;
@@ -64,7 +65,12 @@ async function start() {
   if (!alive()) return;
   current = { championId };
   openWindow();
-  startCaptureTest(alive);
+  startCardReader(alive, (titles) => {
+    console.log(
+      '[mayhem] 카드 제목',
+      titles.map((m) => (m ? `${m.width}x${m.height}` : '없음')),
+    );
+  });
   candidatesReady = loadCandidates(loaded.augments, loaded.patch).catch((error) => {
     console.error('[mayhem] 제목 견본 실패', error);
     return [];
