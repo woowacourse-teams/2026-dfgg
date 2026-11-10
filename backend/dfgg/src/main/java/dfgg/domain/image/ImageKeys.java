@@ -31,6 +31,11 @@ public final class ImageKeys {
         return ROOT + "/" + patch + "/augments/" + augmentId + ".png";
     }
 
+    /** 패치 폴더의 그림을 모두 올렸다는 표시. 받는 서버는 이 파일이 있어야 서비스 패치를 바꾼다. */
+    public static String ready(String patch) {
+        return ROOT + "/" + patch + "/ready";
+    }
+
     public static String summonerSpell(String version, String riotKey) {
         return ROOT + "/" + version + "/summoner-spells/" + riotKey + ".png";
     }

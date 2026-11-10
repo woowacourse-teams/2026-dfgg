@@ -77,6 +77,41 @@ class S3ImageStorageTest {
     }
 
     @Test
+    void 있는_객체면_exists가_참이다() {
+        assertThat(storage.exists(key)).isTrue();
+    }
+
+    @Test
+    void 없는_객체면_exists가_거짓이다() {
+        when(client.headObject(any(HeadObjectRequest.class)))
+                .thenThrow(S3Exception.builder().statusCode(404).build());
+        assertThat(storage.exists(key)).isFalse();
+    }
+
+    @Test
+    void exists는_권한_오류를_없음으로_처리하지_않는다() {
+        when(client.headObject(any(HeadObjectRequest.class)))
+                .thenThrow(S3Exception.builder().statusCode(403).build());
+        assertThatThrownBy(() -> storage.exists(key)).isInstanceOf(S3Exception.class);
+    }
+
+    @Test
+    void 완료_표시는_캐시하지_않는_텍스트로_덮어쓴다() throws Exception {
+        String marker = "dfgg/images/16.22/ready";
+        storage.mark(marker, "16.22");
+        ArgumentCaptor<PutObjectRequest> request = ArgumentCaptor.forClass(PutObjectRequest.class);
+        ArgumentCaptor<RequestBody> body = ArgumentCaptor.forClass(RequestBody.class);
+        verify(client).putObject(request.capture(), body.capture());
+        verify(client, never()).headObject(any(HeadObjectRequest.class));
+        assertThat(request.getValue().key()).isEqualTo(marker);
+        assertThat(request.getValue().contentType()).isEqualTo("text/plain");
+        assertThat(request.getValue().cacheControl()).isEqualTo("no-cache");
+        try (var stream = body.getValue().contentStreamProvider().newStream()) {
+            assertThat(new String(stream.readAllBytes())).isEqualTo("16.22");
+        }
+    }
+
+    @Test
     void 설정_누락은_AWS_호출_전에_실패한다() {
         storage = new S3ImageStorage(client, "");
         assertThatThrownBy(() -> storage.store(key, () -> new byte[]{1}))
