@@ -8,7 +8,7 @@ export interface MayhemSession {
 // 아수라장 타입
 export type AugmentRarity = 'silver' | 'gold' | 'prismatic';
 
-export interface MayhemAugments {
+export interface MayhemAugment {
   augmentId: number;
   name: string;
   rarity: AugmentRarity;
@@ -19,7 +19,7 @@ export interface MayhemAugments {
 
 export interface MayhemAugments {
   patch: string;
-  augments: MayhemAugments[];
+  augments: MayhemAugment[];
 }
 
 export type OverlayClickTarget = 'item' | 'situational' | 'collapse' | 'expand' | 'empty' | 'other';

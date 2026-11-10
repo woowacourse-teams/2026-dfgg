@@ -13,7 +13,6 @@ import type {
   LcuStatus,
   MatchDetail,
   MatchSummary,
-  MayhemAugments,
   MayhemSession,
   OverlayClickTarget,
   Position,
@@ -107,7 +106,6 @@ declare global {
     };
     mayhem: {
       getSession: () => Promise<MayhemSession | null>;
-      readCard: (icon: ArrayBuffer) => Promise<MayhemAugments | null>;
     };
   }
 }

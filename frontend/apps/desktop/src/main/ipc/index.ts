@@ -45,7 +45,7 @@ import { getHighlightEnabled, setHighlightEnabled } from '../highlight/highlight
 import { getMaxGames, setMaxGames } from '../highlight/storage';
 import { reportError } from '../sentry';
 import { isAugmentWindow } from '../mayhem/window';
-import { getMayhemSession, readCard } from '../mayhem/mayhem';
+import { getMayhemSession } from '../mayhem/mayhem';
 
 const WEB_ORIGIN = 'https://dfgg.pro';
 
@@ -54,9 +54,6 @@ let overlayHeight = EXPANDED_HEIGHT;
 
 const CLICK_TARGETS = new Set(['item', 'collapse', 'expand', 'empty', 'other']);
 const POSITIONS = new Set(['TOP', 'JUNGLE', 'MID', 'BOTTOM', 'SUPPORT']);
-
-// 증강 창이 보내는 아이콘 상한 크기
-const MAX_ICON_BYTES = 2 * 1024 * 1024;
 
 // 창 크기를 바꾼다. 크기 조절을 막아 둔 창이라 잠깐 풀었다가 다시 잠근다.
 function resizeWindow(win: BrowserWindow, width: number, height: number, resizable: boolean) {
@@ -67,13 +64,6 @@ function resizeWindow(win: BrowserWindow, width: number, height: number, resizab
 
 function trackSettingChange(key: string, value: string | number | boolean) {
   trackEvent('desktop-setting-change', { key, value });
-}
-
-function toIconBuffer(value: unknown): Buffer | null {
-  if (!(value instanceof ArrayBuffer) && !(value instanceof Uint8Array)) return null;
-  const bytes = value instanceof ArrayBuffer ? new Uint8Array(value) : value;
-  if (bytes.byteLength === 0 || bytes.byteLength > MAX_ICON_BYTES) return null;
-  return Buffer.from(bytes);
 }
 
 // ipc로 보내기
@@ -225,14 +215,4 @@ export function registerIpcHandlers() {
   ipcMain.handle('mayhem:get-session', (event) =>
     isAugmentWindow(event.sender) ? getMayhemSession() : null,
   );
-  ipcMain.handle('mayhem:read-card', async (event, icon: unknown) => {
-    const iconPng = toIconBuffer(icon);
-    if (!isAugmentWindow(event.sender) || !iconPng) return null;
-    try {
-      return await readCard(iconPng);
-    } catch (error) {
-      reportError('mayhem-read-card', error);
-      return null;
-    }
-  });
 }

@@ -11,7 +11,6 @@ import type {
   RecommendationUpdate,
   Summoner,
   MayhemSession,
-  MayhemAugments,
 } from '../shared/types';
 import type { Locale } from '../shared/i18n';
 
@@ -138,8 +137,4 @@ contextBridge.exposeInMainWorld('settings', {
 contextBridge.exposeInMainWorld('mayhem', {
   // 아수라장 판이 아니면 null
   getSession: (): Promise<MayhemSession | null> => ipcRenderer.invoke('mayhem:get-session'),
-
-  // 화면 증강 카드 아이콘 그림(png)으로 어떤 증강이닞 묻는다.
-  readCard: (icon: ArrayBuffer): Promise<MayhemAugments | null> =>
-    ipcRenderer.invoke('mayhem:read-card', icon),
 });
