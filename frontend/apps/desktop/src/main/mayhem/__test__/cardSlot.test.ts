@@ -1,44 +1,55 @@
 import { describe, expect, it } from 'vitest';
 import type { MayhemAugment } from '../../../shared/types';
-import { applyRead, EMPTY_SLOT, observeSlot, type CardSlot } from '../cardSlot';
+import { applyRead, type CardSlot, EMPTY_SLOT, observeSlot } from '../cardSlot';
 
-const A = Array(144).fill(10);
-const B = Array(144).fill(200);
-const AUGMENT = { augmentId: 1, name: '핀볼' } as MayhemAugment;
+const print = (value: number) => Array(144).fill(value);
+const A = print(10);
+const HOVER = print(17); // 차이 7: 마우스 올림
+const SHIMMER = print(13); // 차이 3: 반짝임
+const B = print(40); // 차이 30: 다른 카드
+const X = { augmentId: 1, name: '핀볼' } as MayhemAugment;
+const Y = { augmentId: 2, name: '속행' } as MayhemAugment;
 
 /** 같은 지문을 두 번 보여 줘서 읽을 차례까지 간다 */
-function settle(print: number[]) {
-  const first = observeSlot(EMPTY_SLOT, print);
-  return observeSlot(first.slot, print);
+function settle(value: number[]) {
+  return observeSlot(observeSlot(EMPTY_SLOT, value, true).slot, value, true);
 }
 
 describe('observeSlot', () => {
-  it('처음 본 카드는 바로 읽지 않는다', () => {
-    expect(observeSlot(EMPTY_SLOT, A).shouldRead).toBe(false);
-  });
-
-  it('지문이 두 번 같으면 읽는다', () => {
+  it('처음 본 카드는 멈춘 뒤에 읽는다', () => {
+    expect(observeSlot(EMPTY_SLOT, A, true).shouldRead).toBe(false);
     expect(settle(A).shouldRead).toBe(true);
   });
 
-  it('읽은 뒤 같은 카드면 다시 읽지 않는다', () => {
-    const next = observeSlot(applyRead(settle(A).slot, AUGMENT), A);
-    expect(next.shouldRead).toBe(false);
-    expect(next.slot.augment).toBe(AUGMENT);
+  it('마우스를 올려도 라벨을 지키고 다시 읽는다', () => {
+    const next = observeSlot(applyRead(settle(A).slot, X), HOVER, true);
+    expect(next.slot.augment).toBe(X);
+    expect(next.shouldRead).toBe(true);
   });
 
-  it('카드가 바뀌면 그 순간 라벨을 지우고, 멈추면 다시 읽는다', () => {
-    const next = observeSlot(applyRead(settle(A).slot, AUGMENT), B);
-    expect(next.slot.augment).toBeUndefined();
-    expect(next.shouldRead).toBe(false);
-    expect(observeSlot(next.slot, B).shouldRead).toBe(true);
+  it('반짝임만으로는 다시 읽지 않는다', () => {
+    expect(observeSlot(applyRead(settle(A).slot, X), SHIMMER, true).shouldRead).toBe(false);
+  });
+
+  it('다른 카드로 바뀌면 멈출 때까지 옛 라벨을 두고, 읽으면 바꾼다', () => {
+    const moving = observeSlot(applyRead(settle(A).slot, X), B, true);
+    expect(moving.slot.augment).toBe(X);
+    expect(moving.shouldRead).toBe(false);
+
+    const settled = observeSlot(moving.slot, B, true);
+    expect(settled.shouldRead).toBe(true);
+    expect(applyRead(settled.slot, Y).augment).toBe(Y);
+  });
+
+  it('카드가 안 보이면 바로 지운다', () => {
+    expect(observeSlot(applyRead(settle(A).slot, X), B, false).slot.augment).toBeUndefined();
   });
 
   it('판정 못 하면 최대 세 번까지 읽는다', () => {
     let slot: CardSlot = applyRead(settle(A).slot, null);
     let reads = 1;
     for (let i = 0; i < 5; i++) {
-      const next = observeSlot(slot, A);
+      const next = observeSlot(slot, A, true);
       if (next.shouldRead) reads++;
       slot = next.shouldRead ? applyRead(next.slot, null) : next.slot;
     }

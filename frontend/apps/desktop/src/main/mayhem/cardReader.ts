@@ -6,7 +6,7 @@ import type { MayhemAugment, MayhemCard } from '../../shared/types';
 import { findWindowRect } from '../docking/clientWindow';
 import { type Rect } from '../docking/docking';
 import { GAME_WINDOW_TITLE } from '../highlight/highlight';
-import { type Box, fingerprint, region, TITLE_REGION } from './cardDetect';
+import { type Box, fingerprint, isCard, region, TITLE_REGION } from './cardDetect';
 import { applyRead, type CardSlot, EMPTY_SLOT, observeSlot } from './cardSlot';
 import { EMPTY_TRACKER, trackCards } from './cardTracker';
 import { captureRegion } from './screenCapture';
@@ -107,7 +107,11 @@ export function startCardReader(
     const scale = game.height / FRAME_HEIGHT;
     const boxes = tracker.boxes;
     slots = boxes.map((box, i) => {
-      const { slot, shouldRead } = observeSlot(slots[i], fingerprint(frame, box));
+      const { slot, shouldRead } = observeSlot(
+        slots[i],
+        fingerprint(frame, box),
+        isCard(frame, box),
+      );
       if (!shouldRead) return slot;
       const mask = readTitle(game, box, scale, i);
       return applyRead(slot, mask && judge(mask));

@@ -193,10 +193,8 @@ export function fingerprint(frame: Gray, card: Box): number[] {
   );
 }
 
-/** 지문 차이가 이보다 크면 다른 카드다 (픽셀당 평균 밝기 차) */
-const CHANGED_DIFF = 14;
-
-export function isSameCard(a: number[] | undefined, b: number[]): boolean {
-  if (!a || a.length !== b.length) return false;
-  return mean(a.map((v, i) => Math.abs(v - b[i]))) < CHANGED_DIFF;
+/** 두 지문의 픽셀당 평균 밝기 차이. 길이가 다르면 무한대 */
+export function printDiff(a: number[], b: number[]): number {
+  if (a.length !== b.length) return Infinity;
+  return mean(a.map((v, i) => Math.abs(v - b[i])));
 }
