@@ -49,6 +49,7 @@ function sendCards(cards: MayhemCard[]) {
   if (key === lastSent) return;
   lastSent = key;
   lastCards = cards;
+  console.log('[mayhem] 보냄', cards.map((c) => c.augment?.name ?? '-'));
   sendToAugmentWindow('mayhem:cards', cards);
 }
 

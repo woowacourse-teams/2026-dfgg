@@ -6,7 +6,7 @@ import type { MayhemAugment, MayhemCard } from '../../shared/types';
 import { findWindowRect } from '../docking/clientWindow';
 import { type Rect } from '../docking/docking';
 import { GAME_WINDOW_TITLE } from '../highlight/highlight';
-import { type Box, fingerprint, isCard, region, TITLE_REGION } from './cardDetect';
+import { type Box, fingerprint, isCardVisible, region, TITLE_REGION } from './cardDetect';
 import { applyRead, type CardSlot, EMPTY_SLOT, observeSlot } from './cardSlot';
 import { EMPTY_TRACKER, trackCards } from './cardTracker';
 import { captureRegion } from './screenCapture';
@@ -33,11 +33,17 @@ const debugDir = process.env.DFGG_CAPTURE_TEST
   ? path.join(app.getPath('userData'), 'capture-test')
   : null;
 
-// 판이 시작될 때 이전 판의 디버그 사진을 지운다.
+// 판이 시작될 때 이전 판의 디버그 그림을 지운다. 실패해도 인식은 계속한다.
 function resetDebugDir() {
   if (!debugDir) return;
-  fs.rmSync(debugDir, { recursive: true, force: true });
-  fs.mkdirSync(debugDir, { recursive: true });
+  try {
+    fs.mkdirSync(debugDir, { recursive: true });
+    for (const name of fs.readdirSync(debugDir)) {
+      if (name.endsWith('.png')) fs.rmSync(path.join(debugDir, name), { force: true });
+    }
+  } catch (error) {
+    console.warn('[mayhem] 디버그 폴더 정리 실패', error);
+  }
 }
 
 // 그림이 MAX_DEBUG_FILES를 넘으면 오래된 것부터 지운다.
@@ -58,8 +64,12 @@ function captureGray(rect: Rect, width: number, height: number, debugName?: stri
   const image = captureRegion(rect, width, height);
   if (!image) return null;
   if (debugDir && debugName) {
-    fs.writeFileSync(path.join(debugDir, `${debugName}.png`), image.toPNG());
-    pruneDebugDir();
+    try {
+      fs.writeFileSync(path.join(debugDir, `${debugName}.png`), image.toPNG());
+      pruneDebugDir();
+    } catch (error) {
+      console.warn('[mayhem] 디버그 그림 저장 실패', error);
+    }
   }
   return toLuma(image.toBitmap(), width, height);
 }
@@ -137,7 +147,7 @@ export function startCardReader(
       const { slot, shouldRead } = observeSlot(
         slots[i],
         fingerprint(frame, box),
-        isCard(frame, box),
+        isCardVisible(frame, box),
       );
       if (!shouldRead) return slot;
       const readStarted = performance.now();

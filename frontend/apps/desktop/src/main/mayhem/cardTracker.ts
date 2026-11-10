@@ -1,4 +1,4 @@
-import { type Box, detectCards, isCard } from './cardDetect';
+import { type Box, detectCards, isCardVisible } from './cardDetect';
 import type { Gray } from './titleMatch';
 
 // 카드 없음이 이만큼 이어져야 선택 창이 닫힌 것으로 본다. 스킬 효과 같은 한 번 가림은 넘긴다.
@@ -28,7 +28,7 @@ function sameBoxes(a: Box[], b: Box[]) {
 // 프레임 한 장을 보고 다음 상태를 준다. 리롤 중인 카드는 잠깐 안 보이므로 세 장이 다 안 보인다.
 export function trackCards(tracker: CardTracker, frame: Gray): CardTracker {
   if (tracker.boxes) {
-    if (tracker.boxes.some((box) => isCard(frame, box))) return { ...tracker, missing: 0 };
+    if (tracker.boxes.some((box) => isCardVisible(frame, box))) return { ...tracker, missing: 0 };
     const missing = tracker.missing + 1;
     return missing >= MISSING_TICKS_TO_RELEASE ? EMPTY_TRACKER : { ...tracker, missing };
   }

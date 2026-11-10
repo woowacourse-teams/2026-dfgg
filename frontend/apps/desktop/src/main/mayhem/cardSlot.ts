@@ -17,13 +17,14 @@ export type CardSlot = {
 
 export const EMPTY_SLOT: CardSlot = { augment: undefined, attempts: 0 };
 
-// 지문을 보고 다음 상태와 지금 읽을지를 준다. 카드가 바뀐 것 같아도 라벨은 두고 다시 읽어 확인한다. 카드가 안 보이면 바로 지운다.
+// 지문을 보고 다음 상태와 지금 읽을지를 준다. 카드가 바뀐 것 같아도 라벨은 두고 다시 읽어 확인한다.
+// 카드가 가려져 있으면(설명 창, 강조 빛, 리롤로 뒤집히는 중) 라벨을 그대로 두고 아무것도 하지 않는다.
 export function observeSlot(
   slot: CardSlot,
   print: number[],
   visible: boolean,
 ): { slot: CardSlot; shouldRead: boolean } {
-  if (!visible) return { slot: { ...EMPTY_SLOT, previous: print }, shouldRead: false };
+  if (!visible) return { slot, shouldRead: false };
 
   const settled = slot.previous !== undefined && printDiff(slot.previous, print) < SETTLE_DIFF; // 이번 지문이 직접 지문과 같다. 카드가 멈췄다.
   const changed = slot.read !== undefined && printDiff(slot.read, print) > CHANGE_DIFF; // 마지막으로 읽은 지문과 이번 지문이 다르다. 다음 증강 선택으로 넘어갔다.
@@ -42,7 +43,8 @@ export function observeSlot(
   return { slot: next, shouldRead: false };
 }
 
-// 판정 결과를 넣는다
+// 판정 결과를 넣는다. 다시 읽다 실패하면(가려진 제목 등) 이전 라벨을 그대로 둔다. 라벨은 다른 증강을 읽었을 때만 바뀐다.
 export function applyRead(slot: CardSlot, augment: MayhemAugment | null): CardSlot {
+  if (augment === null && slot.augment) return slot;
   return { ...slot, augment };
 }

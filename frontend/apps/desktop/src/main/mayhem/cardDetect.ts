@@ -6,6 +6,8 @@ type Span = { start: number; end: number };
 
 /** 안쪽은 이만큼 어둡고, 테두리는 안쪽보다 이만큼 밝아야 카드로 본다 (0~255) */
 const DARK_LUMA = 45;
+// 이미 찾은 카드가 아직 있는지 볼 때의 안쪽 밝기 상한. 마우스를 올리면 강조 빛으로 안쪽이 밝아진다
+const VISIBLE_INSIDE_LUMA = 80;
 const MIN_CONTRAST = 60;
 
 /** 카드 안쪽을 찾을 때 훑는 화면 높이 구간. 카드가 작아져도 카드 안에 드는 곳이다 */
@@ -16,6 +18,8 @@ const SCAN_ROWS = 33;
 const TOP_SCAN_START = 0.36;
 
 /** 카드 안쪽 폭의 범위 (화면 높이 비율) */
+// 카드 안쪽 사이에 끼어도 되는 밝은 세로줄 폭 (화면 높이 비율). 가운데 정렬된 설명 글이 길면 가운데 줄이 밝아진다.
+const MAX_DARK_GAP = 0.01;
 const MIN_INSIDE_WIDTH = 0.15;
 const MAX_INSIDE_WIDTH = 0.36;
 /** 강조 빛이 번진 카드는 안쪽이 좁게 잡혀 세 장의 폭이 이 배수까지 벌어질 수 있다 */
@@ -31,6 +35,8 @@ const MAX_CENTER_SHIFT = 0.03;
 const BORDER_REACH = 0.17;
 /** 카드 높이 / 폭 */
 const CARD_ASPECT = 1.65;
+// 윗변과 아랫변으로 잰 윗변 위치가 이만큼(카드 높이 비율) 넘게 다르면 아랫변을 믿는다.
+const MAX_TOP_DIFF = 0.06;
 
 /** 카드 안의 제목 영역 (카드 크기 비율). 태그까지 넉넉히 잡고 titleStrip 에서 제목만 고른다 */
 export const TITLE_REGION = { x: 0.06, y: 0.4, width: 0.88, height: 0.13 };
@@ -65,11 +71,14 @@ function measure(frame: Gray, box: Box) {
   return { border: median(border), inside: median(inside) };
 }
 
-/** 이 자리에 카드가 있는지. 밝은 테두리 + 어두운 안쪽 */
-export function isCard(frame: Gray, box: Box) {
+/** 이 자리에 카드가 있는지. 처음 찾을 때는 엄격하게, 이미 찾은 카드를 확인할 때는 느슨하게 본다 */
+export function isCard(frame: Gray, box: Box, maxInside = DARK_LUMA) {
   const { border, inside } = measure(frame, box);
-  return inside <= DARK_LUMA && border - inside >= MIN_CONTRAST;
+  return inside <= maxInside && border - inside >= MIN_CONTRAST;
 }
+
+/** 이미 찾은 카드가 아직 보이는지. 마우스 올림 강조 빛은 넘긴다 */
+export const isCardVisible = (frame: Gray, box: Box) => isCard(frame, box, VISIBLE_INSIDE_LUMA);
 
 /** 세로줄마다 밝기 중앙값 */
 function columnBrightness(frame: Gray) {
@@ -78,16 +87,21 @@ function columnBrightness(frame: Gray) {
 }
 
 /** 어두운 구간 중 minLength 이상인 것들 */
-function darkSpans(profile: number[], minLength: number) {
+function darkSpans(profile: number[], minLength: number, maxGap: number) {
   const spans: Span[] = [];
   let start: number | null = null;
+  let end = 0;
   profile.forEach((value, index) => {
-    if (value < DARK_LUMA) start ??= index;
-    else {
-      if (start !== null && index - start >= minLength) spans.push({ start, end: index });
+    if (value >= DARK_LUMA) return;
+    // 밝은 줄이 maxGap 보다 길게 이어졌으면 앞 덩어리를 끊는다
+    if (start !== null && index - end > maxGap) {
+      if (end - start >= minLength) spans.push({ start, end });
       start = null;
     }
+    start ??= index;
+    end = index + 1;
   });
+  if (start !== null && end - start >= minLength) spans.push({ start, end });
   return spans;
 }
 
@@ -144,12 +158,30 @@ function topEdge(frame: Gray, span: Span) {
   return outerEdge(profile, inner, -1, width * BORDER_REACH);
 }
 
+// 카드 아랫변. 윗변처럼 안쪽 양옆 줄을 보며 아래로 내려간다.
+function bottomEdge(frame: Gray, span: Span) {
+  const width = spanWidth(span);
+  const columns = [
+    ...steps(span.start + width * 0.15, span.start + width * 0.25, 6),
+    ...steps(span.start + width * 0.75, span.start + width * 0.85, 6),
+  ];
+  const start = Math.round(SCAN_BOTTOM * frame.height);
+  const length = frame.height - start;
+  const profile = Array.from({ length }, (_, i) =>
+    median(columns.map((x) => luma(frame, x, start + i))),
+  );
+  let inner = 0;
+  while (inner < length - 1 && profile[inner + 1] < DARK_LUMA) inner++;
+  return start + outerEdge(profile, inner, 1, width * BORDER_REACH);
+}
+
 /** 세 장이 모두 보이면 frame 픽셀 좌표로 돌려준다. 하나라도 아니면 null */
 export function detectCards(frame: Gray): Box[] | null {
   const profile = columnBrightness(frame);
   const minWidth = frame.height * MIN_INSIDE_WIDTH;
   const maxWidth = frame.height * MAX_INSIDE_WIDTH;
-  const spans = darkSpans(profile, minWidth).filter((span) => spanWidth(span) <= maxWidth);
+  const maxGap = Math.round(frame.height * MAX_DARK_GAP);
+  const spans = darkSpans(profile, minWidth, maxGap).filter((span) => spanWidth(span) <= maxWidth);
   const three = pickThree(spans, frame);
   if (!three) return null;
 
@@ -161,13 +193,18 @@ export function detectCards(frame: Gray): Box[] | null {
     };
   });
   const width = median(edges.map(({ left, right }) => right - left));
-  const top = median(three.map((span) => topEdge(frame, span)));
+  const height = width * CARD_ASPECT;
+  // 윗변 근처에 무늬(스킬 강화 증강의 고리 등)가 있으면 윗변을 너무 낮게 잡는다.
+  // 아랫변으로 잰 값과 크게 다르면 그쪽을 쓴다.
+  const fromTop = median(three.map((span) => topEdge(frame, span)));
+  const fromBottom = median(three.map((span) => bottomEdge(frame, span))) - height;
+  const top = Math.abs(fromTop - fromBottom) > height * MAX_TOP_DIFF ? fromBottom : fromTop;
 
   const boxes = edges.map(({ left, right }) => ({
     x: (left + right) / 2 - width / 2,
     y: top,
     width,
-    height: width * CARD_ASPECT,
+    height,
   }));
   return boxes.every((box) => isCard(frame, box)) ? boxes : null;
 }

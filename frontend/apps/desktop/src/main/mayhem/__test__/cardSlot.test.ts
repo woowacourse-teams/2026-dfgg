@@ -41,8 +41,22 @@ describe('observeSlot', () => {
     expect(applyRead(settled.slot, Y).augment).toBe(Y);
   });
 
-  it('카드가 안 보이면 바로 지운다', () => {
-    expect(observeSlot(applyRead(settle(A).slot, X), B, false).slot.augment).toBeUndefined();
+  it('카드가 가려져 있으면 라벨을 지키고 읽지 않는다', () => {
+    const covered = observeSlot(applyRead(settle(A).slot, X), B, false);
+    expect(covered.slot.augment).toBe(X);
+    expect(covered.shouldRead).toBe(false);
+  });
+
+  it('가려졌다 다시 보이면 같은 카드는 다시 읽지 않는다', () => {
+    const read = applyRead(settle(A).slot, X);
+    const covered = observeSlot(read, B, false);
+    expect(observeSlot(covered.slot, A, true).shouldRead).toBe(false);
+  });
+
+  it('다시 읽다 실패하면 이전 라벨을 지킨다', () => {
+    const rereading = observeSlot(applyRead(settle(A).slot, X), HOVER, true);
+    expect(rereading.shouldRead).toBe(true);
+    expect(applyRead(rereading.slot, null).augment).toBe(X);
   });
 
   it('판정 못 하면 최대 세 번까지 읽는다', () => {

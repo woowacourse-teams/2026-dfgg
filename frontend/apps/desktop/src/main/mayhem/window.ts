@@ -48,7 +48,10 @@ function followGameWindow(win: BrowserWindow) {
     if (!last || !sameRect(last, bounds)) win.setBounds(bounds);
     last = bounds;
 
-    if (!win.isVisible()) win.showInactive();
+    if (!win.isVisible()) {
+      win.showInactive();
+      console.log('[mayhem] 증강 창 표시', bounds);
+    }
   };
 
   follow();
