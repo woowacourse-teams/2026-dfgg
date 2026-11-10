@@ -23,6 +23,9 @@ test.beforeEach(async () => {
   // 롤 클라이언트: 게임 중, 패치 15.20
   league.lcu.setResponse('GET', '/lol-gameflow/v1/gameflow-phase', 'InProgress');
   league.lcu.setResponse('GET', '/lol-patch/v1/game-version', '15.20.700.1234');
+  league.lcu.setResponse('GET', '/lol-gameflow/v1/session', {
+    gameData: { gameId: 1, queue: { id: 420 } },
+  });
 
   // 게임: 나(가렌, 미드)와 상대(오공)
   league.live.setResponse('/liveclientdata/activeplayer', activePlayer({ currentGold: 1300 }));
