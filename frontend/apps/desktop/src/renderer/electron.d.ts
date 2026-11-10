@@ -13,7 +13,7 @@ import type {
   LcuStatus,
   MatchDetail,
   MatchSummary,
-  MayhemSession,
+  MayhemCard,
   OverlayClickTarget,
   Position,
   RecommendationUpdate,
@@ -27,6 +27,7 @@ type PhaseListener = (phase: GameflowPhase) => void;
 type ItemsListener = (items: RecommendationUpdate) => void;
 type HighlightProgressListener = (progress: HighlightProgress) => void;
 type Unsubscribe = () => void;
+type MayhemCardListener = (cards: MayhemCard[]) => void;
 
 declare global {
   interface Window {
@@ -105,7 +106,8 @@ declare global {
       openPrivacyPolicy: () => Promise<void>;
     };
     mayhem: {
-      getSession: () => Promise<MayhemSession | null>;
+      getCards: () => Promise<MayhemCard[]>;
+      onCards: (callback: MayhemCardListener) => Unsubscribe;
     };
   }
 }

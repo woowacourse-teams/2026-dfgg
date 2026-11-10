@@ -1,26 +1,28 @@
 import { BrowserWindow } from 'electron';
-import type { GameflowPhase, MayhemAugments, MayhemSession } from '../../shared/types';
+import type { GameflowPhase, MayhemAugments, MayhemCard } from '../../shared/types';
 import { fetchMayhemAugments } from '../api/augments';
 import { getLcuState, onPhaseChange } from '../lcu/state';
 import { getDDragonData } from '../live/ddragon';
 import { getActivePlayer, getGameStats, getPlayerList } from '../live/endpoints';
 import { toChampionAlias } from '../live/payload';
-import { closeWindow, openWindow, setWindowFactory } from './window';
-import { startCaptureTest } from './captureTest';
+import { closeWindow, openWindow, sendToAugmentWindow, setWindowFactory } from './window';
 import { loadCandidates, type Candidate } from './titleImages';
-import { startCardReader } from './cardReader';
+import { CardRead, startCardReader } from './cardReader';
+import { judgeCard, Slot } from './cardJudge';
 
 const MAYHEM_MODE = 'KIWI';
 const RETRY_MS = 3000;
 
 let gameToken = 0;
-let current: MayhemSession | null = null;
 let candidatesReady: Promise<Candidate[]> | null = null;
+let slots: (Slot | null)[] = [];
+let lastSent = '';
+let lastCards: MayhemCard[] = [];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function getMayhemSession() {
-  return current;
+export function getMayhemCards() {
+  return lastCards;
 }
 
 async function retry<T>(alive: () => boolean, load: () => Promise<T | null>): Promise<T | null> {
@@ -44,6 +46,30 @@ async function findMyChampionId() {
   return championKeys[toChampionAlias(player.rawChampionName, championNames)];
 }
 
+function sendCards(cards: MayhemCard[]) {
+  const key = JSON.stringify(cards.map((c) => c.augment?.augmentId ?? null));
+  if (key === lastSent) return;
+  lastSent = key;
+  lastCards = cards;
+  sendToAugmentWindow('mayhem:cards', cards);
+}
+
+async function handleCards(read: CardRead[] | null, alive: () => boolean) {
+  if (!read) {
+    slots = [];
+    sendCards([]);
+    return;
+  }
+
+  const candidates = await candidatesReady;
+  if (!alive() || !candidates) return;
+
+  slots = read.map((card, i) =>
+    card.mask ? judgeCard(card.mask, candidates, slots[i] ?? null) : null,
+  );
+  sendCards(read.map((card, i) => ({ box: card.box, augment: slots[i]?.augment ?? null })));
+}
+
 async function start() {
   const token = ++gameToken;
   const alive = () => token === gameToken && getLcuState().phase === 'InProgress';
@@ -63,25 +89,21 @@ async function start() {
   }
 
   if (!alive()) return;
-  current = { championId };
   openWindow();
-  startCardReader(alive, (titles) => {
-    console.log(
-      '[mayhem] 카드 제목',
-      titles.map((m) => (m ? `${m.width}x${m.height}` : '없음')),
-    );
-  });
   candidatesReady = loadCandidates(loaded.augments, loaded.patch).catch((error) => {
     console.error('[mayhem] 제목 견본 실패', error);
     return [];
   });
+  startCardReader(alive, (read) => void handleCards(read, alive));
   console.log('[mayhem] start', championId, loaded.augments.length);
 }
 
 function stop() {
   gameToken++;
-  current = null;
   candidatesReady = null;
+  slots = [];
+  lastSent = '';
+  lastCards = [];
   closeWindow();
 }
 

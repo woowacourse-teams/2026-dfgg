@@ -10,7 +10,7 @@ import type {
   OverlayClickTarget,
   RecommendationUpdate,
   Summoner,
-  MayhemSession,
+  MayhemCard,
 } from '../shared/types';
 import type { Locale } from '../shared/i18n';
 
@@ -136,5 +136,10 @@ contextBridge.exposeInMainWorld('settings', {
 
 contextBridge.exposeInMainWorld('mayhem', {
   // 아수라장 판이 아니면 null
-  getSession: (): Promise<MayhemSession | null> => ipcRenderer.invoke('mayhem:get-session'),
+  getCards: (): Promise<MayhemCard[]> => ipcRenderer.invoke('mayhem:get-cards'),
+  onCards: (callback: (cards: MayhemCard[]) => void) => {
+    const listener = (_event: IpcRendererEvent, cards: MayhemCard[]) => callback(cards);
+    ipcRenderer.on('mayhem:cards', listener);
+    return () => ipcRenderer.removeListener('mayhem:cards', listener);
+  },
 });

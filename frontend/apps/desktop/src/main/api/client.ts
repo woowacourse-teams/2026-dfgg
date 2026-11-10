@@ -61,7 +61,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   try {
     const response = await fetch(`${baseUrl}${path}`, {
       headers: {
-        AcceptLanguage: mainLocale(),
+        'Accept-Language': mainLocale(),
       },
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });

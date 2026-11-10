@@ -10,6 +10,13 @@ let createWindow: (() => BrowserWindow) | null = null; // 창 만드는 함수
 let augmentWindow: BrowserWindow | null = null; // 지금 떠 있는 증강 창
 let followTimer: NodeJS.Timeout | null = null; // 게임 창을 따라가는 타이머
 
+// 증강 창이 떠 있으면 메시지를 보낸다.
+export function sendToAugmentWindow(channel: string, payload: unknown) {
+  if (augmentWindow && !augmentWindow.isDestroyed()) {
+    augmentWindow.webContents.send(channel, payload);
+  }
+}
+
 export function setWindowFactory(create: () => BrowserWindow) {
   createWindow = create;
 }

@@ -45,7 +45,7 @@ import { getHighlightEnabled, setHighlightEnabled } from '../highlight/highlight
 import { getMaxGames, setMaxGames } from '../highlight/storage';
 import { reportError } from '../sentry';
 import { isAugmentWindow } from '../mayhem/window';
-import { getMayhemSession } from '../mayhem/mayhem';
+import { getMayhemCards } from '../mayhem/mayhem';
 
 const WEB_ORIGIN = 'https://dfgg.pro';
 
@@ -212,7 +212,7 @@ export function registerIpcHandlers() {
   });
 
   // 증강 창에서만 받는다.
-  ipcMain.handle('mayhem:get-session', (event) =>
-    isAugmentWindow(event.sender) ? getMayhemSession() : null,
+  ipcMain.handle('mayhem:get-cards', (event) =>
+    isAugmentWindow(event.sender) ? getMayhemCards() : [],
   );
 }

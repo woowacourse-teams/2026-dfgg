@@ -1,7 +1,7 @@
 import { nativeImage } from 'electron';
 import { fetchAugmentTitles, type TitleImage } from '../api/augments';
 import { toMask, type Gray, type Mask } from './titleMatch';
-import { MayhemAugment } from '../../shared/types';
+import type { MayhemAugment } from '../../shared/types';
 
 const TITLE_THRESHOLD = 128; // 견본 그림에서 이보다 밝으면 글자
 const MAX_WIDTH = 4000; // 견본 그림 크기 상한 (잘못된 데이터 거르기)
@@ -63,7 +63,7 @@ async function loadTitleMasks(patch: string): Promise<Map<number, Mask>> {
   const key = `${patch}:${TITLE_LANG}`;
   if (titleCache?.key === key) return titleCache.masks;
 
-  const titles = await fetchAugmentTitles(TITLE_LANG);
+  const titles = await fetchAugmentTitles(patch);
   const masks = titleMasks(titles.images);
   titleCache = { key, masks };
   console.info(`[mayhem] 제목 견본 ${masks.size}/${titles.images.length} (${titles.font})`);
