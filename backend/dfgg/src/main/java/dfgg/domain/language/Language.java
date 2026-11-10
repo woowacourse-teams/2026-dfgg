@@ -2,6 +2,7 @@ package dfgg.domain.language;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 응답에 싣는 이름의 언어. 챔피언·아이템 이름은 {@code {"ko-KR": ..., "en-US": ...}}로 저장돼 있다.
@@ -34,12 +35,19 @@ public enum Language {
         return EN_US;
     }
 
+    /** 게임 클라이언트 언어 표기({@code ko_KR}). 견본 응답에 어떤 언어로 그렸는지 싣는다. */
+    public String gameLanguage() {
+        return tag.replace('-', '_');
+    }
+
     /** 언어별 이름에서 이 언어의 이름을 고른다. 없으면 한글 이름으로 낸다. */
     public String pick(Map<String, String> names) {
-        String name = names.get(tag);
-        if (name == null || name.isBlank()) {
-            return names.get(FALLBACK.tag);
-        }
-        return name;
+        return find(names).orElseGet(() -> names.get(FALLBACK.tag));
+    }
+
+    /** 언어별 이름에서 이 언어의 이름만 고른다. 없거나 비어 있으면 다른 언어로 대신하지 않는다. */
+    public Optional<String> find(Map<String, String> names) {
+        return Optional.ofNullable(names.get(tag))
+                .filter(name -> !name.isBlank());
     }
 }

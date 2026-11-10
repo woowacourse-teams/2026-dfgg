@@ -2,7 +2,9 @@ package dfgg.domain.language;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -79,5 +81,46 @@ class LanguageTest {
 
         // then
         assertThat(name).isEqualTo("손오공");
+    }
+
+    @ParameterizedTest(name = "{0} → {1}")
+    @CsvSource({
+            "KO_KR, ko_KR",
+            "EN_US, en_US"
+    })
+    @DisplayName("게임 언어 값은 밑줄 표기로 낸다")
+    void gameLanguage_ReturnsUnderscoreTag(Language language, String expected) {
+        // when & then
+        assertThat(language.gameLanguage()).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("대체 없이 고르면 요청한 언어의 이름을 준다")
+    void find_WhenNameExists_ReturnsNameInLanguage() {
+        // given
+        Map<String, String> names = Map.of("ko-KR", "손오공", "en-US", "Wukong");
+
+        // when
+        Optional<String> name = Language.EN_US.find(names);
+
+        // then
+        assertThat(name).contains("Wukong");
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    @DisplayName("대체 없이 고르면 요청한 언어의 이름이 없거나 비었을 때 한글로 대신하지 않는다")
+    void find_WhenNameMissingOrBlank_ReturnsEmpty(String englishName) {
+        // given
+        Map<String, String> names = new HashMap<>();
+        names.put("ko-KR", "손오공");
+        names.put("en-US", englishName);
+
+        // when
+        Optional<String> name = Language.EN_US.find(names);
+
+        // then
+        assertThat(name).isEmpty();
     }
 }

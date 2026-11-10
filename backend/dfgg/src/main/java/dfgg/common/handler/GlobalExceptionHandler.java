@@ -2,9 +2,11 @@ package dfgg.common.handler;
 
 import dfgg.common.exception.AugmentDataRejectedException;
 import dfgg.common.exception.AugmentDataUnavailableException;
+import dfgg.common.exception.AugmentPatchNotFoundException;
 import dfgg.common.exception.ChampionNotFoundException;
 import dfgg.common.exception.ComponentRecommendationUnavailableException;
 import dfgg.common.exception.InvalidDfScoreRequestException;
+import dfgg.common.exception.InvalidPatchException;
 import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.common.exception.NextItemRecommendationNotFoundException;
 import dfgg.common.exception.StatsAggregationFailedException;
@@ -28,14 +30,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler({ChampionNotFoundException.class, InvalidRecommendationRequestException.class,
-            InvalidDfScoreRequestException.class})
+            InvalidDfScoreRequestException.class, InvalidPatchException.class})
     public ProblemDetail handleBadRequest(RuntimeException exception) {
         log.warn("400 잘못된 요청: {}", exception.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
-    @ExceptionHandler(NextItemRecommendationNotFoundException.class)
-    public ProblemDetail handleNotFound(NextItemRecommendationNotFoundException exception) {
+    @ExceptionHandler({NextItemRecommendationNotFoundException.class, AugmentPatchNotFoundException.class})
+    public ProblemDetail handleNotFound(RuntimeException exception) {
         log.warn("404 찾지 못함: {}", exception.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
     }

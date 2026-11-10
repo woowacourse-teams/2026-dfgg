@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -61,6 +62,11 @@ public class Augment {
 
     public String nameIn(Language language) {
         return language.pick(name);
+    }
+
+    /** 견본은 게임 화면 언어와 같아야 맞으므로 다른 언어 이름으로 대신하지 않는다. */
+    public Optional<String> exactNameIn(Language language) {
+        return language.find(name);
     }
 
     /** 어느 언어든 이름이 같으면 이 증강이다. 앞뒤 공백과 대소문자만 무시한다. */
