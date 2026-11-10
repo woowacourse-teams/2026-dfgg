@@ -5,7 +5,7 @@ import path from 'node:path';
 import { findWindowRect } from '../docking/clientWindow';
 import { type Rect } from '../docking/docking';
 import { GAME_WINDOW_TITLE } from '../highlight/highlight';
-import { detectCards, region, TITLE_REGION } from './cardDetect';
+import { type Box, detectCards, region, TITLE_REGION } from './cardDetect';
 import { captureRegion } from './screenCapture';
 import { titleMask, toLuma } from './titleStrip';
 import type { Mask } from './titleMatch';
@@ -13,8 +13,8 @@ import type { Mask } from './titleMatch';
 const READ_MS = 1000;
 const FRAME_HEIGHT = 720;
 
-// 카드 세 장의 제목 마스크
-export type CardTitles = (Mask | null)[];
+// 카드 한 장: 게임 창 대비 위치(0~1)와 제목 마스크.
+export type CardRead = { box: Box; mask: Mask | null };
 
 const debugDir = process.env.DFGG_CAPTURE_TEST
   ? path.join(app.getPath('userData'), 'capture-test')
@@ -32,7 +32,7 @@ function captureGray(rect: Rect, width: number, height: number, debugName?: stri
 }
 
 // 게임 화면 위에 증강 제목을 읽는다.
-export function readCardTitles(): CardTitles | null {
+export function readCardTitles(): CardRead[] | null {
   const game = findWindowRect(GAME_WINDOW_TITLE);
   if (!game) return null; // 게임 창이 안 보임 (알트탭 등)
 
@@ -54,22 +54,30 @@ export function readCardTitles(): CardTitles | null {
       height: Math.round(title.height * scale),
     };
     const strip = captureGray(rect, rect.width, rect.height, `${stamp}-${i}`);
-    return strip && titleMask(strip, card.height * scale);
+    return {
+      box: {
+        x: card.x / frame.width,
+        y: card.y / frame.height,
+        width: card.width / frame.width,
+        height: card.height / frame.height,
+      },
+      mask: strip && titleMask(strip, card.height * scale),
+    };
   });
 }
 
 // 게임 판이 진행되는 동안 1초마다 화면을 읽어서, 증강 카드가 보이면 세 장의 제목 마스크를 콜백으로 넘겨줌
-export function startCardReader(alive: () => boolean, onTitles: (titles: CardTitles) => void) {
+export function startCardReader(alive: () => boolean, onRead: (cards: CardRead[] | null) => void) {
   const timer = setInterval(() => {
     if (!alive()) {
       clearInterval(timer);
       return;
     }
     const started = performance.now();
-    const titles = readCardTitles();
-    if (titles) {
+    const cards = readCardTitles();
+    if (cards) {
       console.log('[mayhem] 읽기', `${(performance.now() - started).toFixed(0)}ms`);
-      onTitles(titles);
+      onRead(cards);
     }
   }, READ_MS);
 }

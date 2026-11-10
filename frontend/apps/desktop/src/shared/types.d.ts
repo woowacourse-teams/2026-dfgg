@@ -1,5 +1,11 @@
 import type { LcuEventMap } from '../main/lcu/events';
 
+// 화면 카드 한 장의 판정 결과.
+export interface MayhemCard {
+  box: { x: number; y: number; width: number; height: number };
+  augment: MayhemAugment | null;
+}
+
 // 아수라장 한 판. 증강 창이 카드를 찾는 동안 쓴다.
 export interface MayhemSession {
   championId: number;
