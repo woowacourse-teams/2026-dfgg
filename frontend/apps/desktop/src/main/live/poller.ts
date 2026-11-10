@@ -52,7 +52,7 @@ async function syncWithPhase(phase: GameflowPhase | null) {
 
 // 앱 첫 시작 시, phase 확인하고 구독하기
 export function initLivePolling() {
-  syncWithPhase(getLcuState().phase);
+  void syncWithPhase(getLcuState().phase);
   onPhaseChange(syncWithPhase);
 }
 
