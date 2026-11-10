@@ -6,7 +6,6 @@ import dfgg.common.exception.AugmentPatchNotFoundException;
 import dfgg.common.exception.ChampionNotFoundException;
 import dfgg.common.exception.ComponentRecommendationUnavailableException;
 import dfgg.common.exception.InvalidDfScoreRequestException;
-import dfgg.common.exception.InvalidLanguageException;
 import dfgg.common.exception.InvalidPatchException;
 import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.common.exception.NextItemRecommendationNotFoundException;
@@ -31,7 +30,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler({ChampionNotFoundException.class, InvalidRecommendationRequestException.class,
-            InvalidDfScoreRequestException.class, InvalidLanguageException.class, InvalidPatchException.class})
+            InvalidDfScoreRequestException.class, InvalidPatchException.class})
     public ProblemDetail handleBadRequest(RuntimeException exception) {
         log.warn("400 잘못된 요청: {}", exception.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());

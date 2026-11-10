@@ -3,6 +3,7 @@ package dfgg.presentation;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasKey;
@@ -126,35 +127,6 @@ class AramMayhemControllerTest {
                 .when().get("/api/aram-mayhem/champions/22/augments")
                 .then().statusCode(200)
                 .body("augments[0].name", equalTo("Shrink Engine"));
-    }
-
-    @Test
-    @DisplayName("게임 언어(lang)를 받으면 Accept-Language보다 먼저 쓴다")
-    void getAugments_WhenGameLanguageGiven_PrefersItOverAcceptLanguage() {
-        // given
-        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
-        savePick("16.21", 1373, 16.79);
-
-        // when & then
-        given().accept(ContentType.JSON)
-                .header("Accept-Language", "ko")
-                .queryParam("lang", "en_US")
-                .when().get("/api/aram-mayhem/champions/22/augments")
-                .then().statusCode(200)
-                .body("augments[0].name", equalTo("Shrink Engine"));
-    }
-
-    @Test
-    @DisplayName("지원하지 않는 게임 언어(lang)면 400이다")
-    void getAugments_WhenGameLanguageUnsupported_Returns400() {
-        // given
-        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
-
-        // when & then
-        given().accept(ContentType.JSON)
-                .queryParam("lang", "ja_JP")
-                .when().get("/api/aram-mayhem/champions/22/augments")
-                .then().statusCode(400);
     }
 
     @Test
@@ -288,38 +260,6 @@ class AramMayhemControllerTest {
     }
 
     @Test
-    @DisplayName("게임 언어(lang)를 받으면 Accept-Language보다 먼저 쓴다")
-    void lookup_WhenGameLanguageGiven_PrefersItOverAcceptLanguage() {
-        // given
-        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
-
-        // when & then
-        given().contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Accept-Language", "en")
-                .queryParam("lang", "ko_KR")
-                .body("{\"names\": [\"Shrink Engine\"]}")
-                .when().post("/api/aram-mayhem/champions/22/augments/lookup")
-                .then().statusCode(200)
-                .body("augments[0].name", equalTo("축소 엔진"));
-    }
-
-    @Test
-    @DisplayName("지원하지 않는 게임 언어(lang)면 400이다")
-    void lookup_WhenGameLanguageUnsupported_Returns400() {
-        // given
-        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
-
-        // when & then
-        given().contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .queryParam("lang", "ja_JP")
-                .body("{\"names\": [\"축소 엔진\"]}")
-                .when().post("/api/aram-mayhem/champions/22/augments/lookup")
-                .then().statusCode(400);
-    }
-
-    @Test
     @DisplayName("최신 패치에 없는 증강은 이전 패치에 있어도 찾지 못한다")
     void lookup_SearchesLatestPatchOnly() {
         // given
@@ -418,7 +358,7 @@ class AramMayhemControllerTest {
 
         // when & then
         given().accept(ContentType.JSON)
-                .queryParam("lang", "ko_KR")
+                .header("Accept-Language", "ko")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(200)
                 .body("patch", equalTo("16.21"))
@@ -440,7 +380,7 @@ class AramMayhemControllerTest {
 
         // when
         Response response = given().accept(ContentType.JSON)
-                .queryParam("lang", "ko_KR")
+                .header("Accept-Language", "ko")
                 .when().get("/api/aram-mayhem/augment-titles");
 
         // then
@@ -452,15 +392,14 @@ class AramMayhemControllerTest {
     }
 
     @Test
-    @DisplayName("제목 견본의 lang은 받은 표기와 상관없이 밑줄 표기로 내고 그 언어 이름을 그린다")
-    void getTitles_NormalizesLangAndDrawsNameInThatLanguage() {
+    @DisplayName("제목 견본은 Accept-Language로 언어를 고르고 응답 lang은 밑줄 표기로 낸다")
+    void getTitles_ChoosesLanguageByAcceptLanguage() {
         // given
         saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
 
         // when & then
         given().accept(ContentType.JSON)
-                .header("Accept-Language", "ko")
-                .queryParam("lang", "EN-us")
+                .header("Accept-Language", "en-US,en;q=0.9")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(200)
                 .body("lang", equalTo("en_US"))
@@ -476,7 +415,7 @@ class AramMayhemControllerTest {
 
         // when & then
         given().accept(ContentType.JSON)
-                .queryParam("lang", "ko_KR")
+                .header("Accept-Language", "ko")
                 .queryParam("patch", "16.9.1")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(200)
@@ -493,7 +432,7 @@ class AramMayhemControllerTest {
 
         // when & then
         given().accept(ContentType.JSON)
-                .queryParam("lang", "en_US")
+                .header("Accept-Language", "en")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(200)
                 .body("images.augmentId", contains(1373));
@@ -507,37 +446,40 @@ class AramMayhemControllerTest {
 
         // when & then
         given().accept(ContentType.JSON)
-                .queryParam("lang", "en_US")
+                .header("Accept-Language", "en")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(200)
                 .body("images", empty());
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "ja_JP", "ko"})
-    @DisplayName("제목 견본의 lang이 지원하지 않는 값이면 400이다")
-    void getTitles_WhenLangUnsupported_Returns400(String lang) {
+    @ValueSource(strings = {"ja", "fr-FR"})
+    @DisplayName("제목 견본은 Accept-Language가 ko가 아니면 다른 API처럼 영어로 그린다")
+    void getTitles_WhenAcceptLanguageNotKorean_DrawsEnglish(String acceptLanguage) {
         // given
         saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
 
         // when & then
         given().accept(ContentType.JSON)
-                .queryParam("lang", lang)
+                .header("Accept-Language", acceptLanguage)
                 .when().get("/api/aram-mayhem/augment-titles")
-                .then().statusCode(400);
+                .then().statusCode(200)
+                .body("lang", equalTo("en_US"))
+                .body("images.name", contains("Shrink Engine"));
     }
 
     @Test
-    @DisplayName("제목 견본의 lang이 없으면 Accept-Language로 대신하지 않고 400이다")
-    void getTitles_WhenLangMissing_Returns400() {
+    @DisplayName("제목 견본은 Accept-Language가 없으면 영어로 그린다")
+    void getTitles_WhenAcceptLanguageMissing_DrawsEnglish() {
         // given
         saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
 
         // when & then
         given().accept(ContentType.JSON)
-                .header("Accept-Language", "ko")
                 .when().get("/api/aram-mayhem/augment-titles")
-                .then().statusCode(400);
+                .then().statusCode(200)
+                .body("lang", equalTo("en_US"))
+                .body("images.name", contains("Shrink Engine"));
     }
 
     @Test
@@ -548,7 +490,7 @@ class AramMayhemControllerTest {
 
         // when & then
         given().accept(ContentType.JSON)
-                .queryParam("lang", "ko_KR")
+                .header("Accept-Language", "ko")
                 .queryParam("patch", "latest")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(400);
@@ -562,25 +504,26 @@ class AramMayhemControllerTest {
 
         // when & then
         given().accept(ContentType.JSON)
-                .queryParam("lang", "ko_KR")
+                .header("Accept-Language", "ko")
                 .queryParam("patch", "15.1")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(404);
     }
 
     @Test
-    @DisplayName("제목 견본은 강한 ETag를 주고 patch를 생략하면 매번 다시 확인하라고 한다")
+    @DisplayName("제목 견본은 강한 ETag와 Vary: Accept-Language를 주고 patch를 생략하면 매번 다시 확인하라고 한다")
     void getTitles_WhenPatchOmitted_CarriesEtagAndNoCache() {
         // given
         saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
 
         // when & then
         given().accept(ContentType.JSON)
-                .queryParam("lang", "ko_KR")
+                .header("Accept-Language", "ko")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(200)
                 .header("ETag", matchesPattern("^\"[0-9a-f]+\"$"))
-                .header("Cache-Control", equalTo("no-cache"));
+                .header("Cache-Control", equalTo("no-cache"))
+                .header("Vary", containsString("Accept-Language"));
     }
 
     @Test
@@ -591,7 +534,7 @@ class AramMayhemControllerTest {
 
         // when & then
         given().accept(ContentType.JSON)
-                .queryParam("lang", "ko_KR")
+                .header("Accept-Language", "ko")
                 .queryParam("patch", "16.21")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(200)
@@ -603,13 +546,13 @@ class AramMayhemControllerTest {
     void getTitles_WhenEtagMatches_Returns304WithHeaders() {
         // given
         saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
-        String etag = given().queryParam("lang", "ko_KR").queryParam("patch", "16.21")
+        String etag = given().header("Accept-Language", "ko").queryParam("patch", "16.21")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(200)
                 .extract().header("ETag");
 
         // when & then
-        String body = given().queryParam("lang", "ko_KR").queryParam("patch", "16.21")
+        String body = given().header("Accept-Language", "ko").queryParam("patch", "16.21")
                 .header("If-None-Match", etag)
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(304)
@@ -626,7 +569,7 @@ class AramMayhemControllerTest {
         saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
 
         // when & then
-        given().queryParam("lang", "ko_KR")
+        given().header("Accept-Language", "ko")
                 .header("If-None-Match", "\"stale\"")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(200)
@@ -638,12 +581,12 @@ class AramMayhemControllerTest {
     void getTitles_WhenNameChanges_ChangesEtag() {
         // given
         saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
-        String before = titlesEtag("ko_KR");
+        String before = titlesEtag("ko");
         augmentRepository.deleteAllInBatch();
         saveAugment("16.21", 1373, "축소 엔진!", "Shrink Engine", AugmentRarity.GOLD);
 
         // when
-        String after = titlesEtag("ko_KR");
+        String after = titlesEtag("ko");
 
         // then
         assertThat(after).isNotEqualTo(before);
@@ -656,7 +599,7 @@ class AramMayhemControllerTest {
         saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
 
         // when & then
-        assertThat(titlesEtag("ko_KR")).isNotEqualTo(titlesEtag("en_US"));
+        assertThat(titlesEtag("ko")).isNotEqualTo(titlesEtag("en"));
     }
 
     @Test
@@ -664,13 +607,13 @@ class AramMayhemControllerTest {
     void getTitles_WhenNoData_Returns503() {
         // when & then
         given().accept(ContentType.JSON)
-                .queryParam("lang", "ko_KR")
+                .header("Accept-Language", "ko")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(503);
     }
 
-    private String titlesEtag(String lang) {
-        return given().queryParam("lang", lang)
+    private String titlesEtag(String acceptLanguage) {
+        return given().header("Accept-Language", acceptLanguage)
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(200)
                 .extract().header("ETag");

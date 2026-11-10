@@ -1,7 +1,5 @@
 package dfgg.domain.language;
 
-import dfgg.common.exception.InvalidLanguageException;
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -37,28 +35,7 @@ public enum Language {
         return EN_US;
     }
 
-    /**
-     * 게임 클라이언트 언어({@code ko_KR}, {@code en-US} 등). 밑줄·하이픈과 대소문자는 가리지 않는다.
-     * <p>
-     * 앱 언어와 달리 모르는 값을 영어로 넘기지 않는다. 게임 화면과 다른 언어 이름을 주면 앱이 잘못 판별한다.
-     */
-    public static Language fromGameLanguage(String lang) {
-        String normalized = String.valueOf(lang).strip().replace('_', '-');
-        return Arrays.stream(values())
-                .filter(language -> language.tag.equalsIgnoreCase(normalized))
-                .findFirst()
-                .orElseThrow(() -> new InvalidLanguageException(lang));
-    }
-
-    /** 게임 언어를 받았으면 그 언어, 없으면 {@code Accept-Language}로 고른다. */
-    public static Language resolve(String gameLanguage, String acceptLanguage) {
-        if (gameLanguage == null) {
-            return fromAcceptLanguage(acceptLanguage);
-        }
-        return fromGameLanguage(gameLanguage);
-    }
-
-    /** 게임 클라이언트 언어 표기({@code ko_KR}). 받은 표기와 상관없이 이 형태로 돌려준다. */
+    /** 게임 클라이언트 언어 표기({@code ko_KR}). 견본 응답에 어떤 언어로 그렸는지 싣는다. */
     public String gameLanguage() {
         return tag.replace('-', '_');
     }

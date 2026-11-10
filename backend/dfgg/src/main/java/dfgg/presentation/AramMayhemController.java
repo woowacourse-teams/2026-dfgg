@@ -38,20 +38,23 @@ public class AramMayhemController {
     }
 
     /**
-     * 견본은 게임 화면 언어와 같아야 맞으므로 {@code Accept-Language}가 아니라 {@code lang}으로만 고른다.
+     * 언어는 다른 API와 같은 {@code Accept-Language} 규칙으로 고른다. 앱은 게임 클라이언트 언어를 이 헤더에 담는다.
      * <p>
+     * 같은 주소라도 헤더에 따라 응답이 달라지므로 {@code Vary}로 알린다. 그래야 중간 캐시가 다른 언어 견본을 내주지 않는다.
      * {@code If-None-Match}가 ETag와 같으면 Spring이 본문 없이 304로 바꾼다.
      */
     @GetMapping("/augment-titles")
     public ResponseEntity<AugmentTitlesResponse> getTitles(
             @RequestParam(required = false) String patch,
-            @RequestParam String lang
+            @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage
     ) {
-        AugmentTitlesResponse response = augmentTitleService.findTitles(patch, Language.fromGameLanguage(lang));
+        AugmentTitlesResponse response = augmentTitleService.findTitles(
+                patch, Language.fromAcceptLanguage(acceptLanguage));
 
         return ResponseEntity.ok()
                 .eTag(response.etag())
                 .cacheControl(titlesCacheControl(patch))
+                .varyBy(HttpHeaders.ACCEPT_LANGUAGE)
                 .body(response);
     }
 
@@ -63,15 +66,13 @@ public class AramMayhemController {
         return CacheControl.maxAge(TITLES_MAX_AGE).cachePublic();
     }
 
-    /** 이름 언어는 게임 언어({@code lang})가 있으면 그것, 없으면 앱 언어({@code Accept-Language})다. */
     @GetMapping("/champions/{championId}/augments")
     public ResponseEntity<ChampionAugmentsResponse> getAugments(
             @PathVariable int championId,
-            @RequestParam(required = false) String lang,
             @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage
     ) {
         ChampionAugmentsResponse response = aramMayhemQueryService.findByChampion(
-                championId, Language.resolve(lang, acceptLanguage));
+                championId, Language.fromAcceptLanguage(acceptLanguage));
 
         return ResponseEntity.ok(response);
     }
@@ -81,11 +82,10 @@ public class AramMayhemController {
     public ResponseEntity<AugmentLookupResponse> lookup(
             @PathVariable int championId,
             @Valid @RequestBody AugmentLookupRequest request,
-            @RequestParam(required = false) String lang,
             @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage
     ) {
         AugmentLookupResponse response = aramMayhemQueryService.lookup(
-                championId, request.names(), Language.resolve(lang, acceptLanguage));
+                championId, request.names(), Language.fromAcceptLanguage(acceptLanguage));
 
         return ResponseEntity.ok(response);
     }
