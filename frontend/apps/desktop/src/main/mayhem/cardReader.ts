@@ -140,8 +140,15 @@ export function startCardReader(
         isCard(frame, box),
       );
       if (!shouldRead) return slot;
+      const readStarted = performance.now();
       const mask = readTitle(game, box, scale, i);
-      return applyRead(slot, mask && judge(mask));
+      const next = applyRead(slot, mask && judge(mask));
+      console.log(
+        '[mayhem] 읽기',
+        `카드${i + 1}`,
+        `${(performance.now() - readStarted).toFixed(0)}ms`,
+      );
+      return next;
     });
 
     onCards(
