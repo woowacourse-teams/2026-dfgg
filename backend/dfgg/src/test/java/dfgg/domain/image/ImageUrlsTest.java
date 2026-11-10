@@ -2,6 +2,7 @@ package dfgg.domain.image;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -33,6 +34,24 @@ class ImageUrlsTest {
         // then
         assertThat(url).isEqualTo(
                 "https://bucket.s3.region.amazonaws.com/dfgg/images/16.18/items/3031.png");
+    }
+
+    @Test
+    @DisplayName("버전 폴더는 만들 때마다 현재 서비스 패치를 읽는다")
+    void championOf_WhenVersionSourceChanges_UsesCurrentVersion() {
+        // given
+        AtomicReference<String> version =
+                new AtomicReference<>("16.21");
+        ImageUrls imageUrls = new ImageUrls("bucket", "region", version::get);
+        String before = imageUrls.itemOf(3031L);
+
+        // when
+        version.set("16.22");
+
+        // then
+        assertThat(before).contains("/16.21/");
+        assertThat(imageUrls.itemOf(3031L)).contains("/16.22/");
+        assertThat(imageUrls.version()).isEqualTo("16.22");
     }
 
     @Test

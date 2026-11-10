@@ -24,7 +24,7 @@ import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.image.ImageUrls;
 import dfgg.domain.item.Item;
 import dfgg.domain.language.Language;
-import dfgg.infrastructure.config.LeagueOfLegendsVersionProperties;
+import dfgg.application.patch.ServicePatch;
 import dfgg.domain.item.trait.ItemTrait;
 import dfgg.domain.item.trait.ItemTraitCatalog;
 import dfgg.presentation.dto.ChampionDto;
@@ -76,7 +76,7 @@ public class NextItemRecommendationService {
     private final ChampionDirectory championDirectory;
     private final ItemTraitCatalog itemTraitCatalog;
     private final ImageUrls imageUrls;
-    private final LeagueOfLegendsVersionProperties leagueOfLegendsVersion;
+    private final ServicePatch servicePatch;
 
     public NextItemRecommendationService(
             ChampionService championService,
@@ -89,7 +89,7 @@ public class NextItemRecommendationService {
             ChampionDirectory championDirectory,
             ItemTraitCatalog itemTraitCatalog,
             ImageUrls imageUrls,
-            LeagueOfLegendsVersionProperties leagueOfLegendsVersion
+            ServicePatch servicePatch
     ) {
         this.championService = championService;
         this.itemService = itemService;
@@ -101,7 +101,7 @@ public class NextItemRecommendationService {
         this.championDirectory = championDirectory;
         this.itemTraitCatalog = itemTraitCatalog;
         this.imageUrls = imageUrls;
-        this.leagueOfLegendsVersion = leagueOfLegendsVersion;
+        this.servicePatch = servicePatch;
     }
 
     public NextItemRecommendationResponse recommendNextItem(
@@ -226,7 +226,7 @@ public class NextItemRecommendationService {
 
     private String patchOf(NextItemRecommendationRequest request) {
         if (request.patch() == null || request.patch().isBlank()) {
-            return leagueOfLegendsVersion.version();
+            return servicePatch.value();
         }
         return request.patch();
     }

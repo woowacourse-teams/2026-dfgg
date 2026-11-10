@@ -1,6 +1,7 @@
 package dfgg.infrastructure.config;
 
 import dfgg.domain.image.ImageUrls;
+import java.util.function.Supplier;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -18,6 +19,11 @@ public record AssetProperties(S3 s3) {
 
     /** @param version 이미지를 올린 버전 폴더({@code riot.version}) */
     public ImageUrls imageUrls(String version) {
+        return new ImageUrls(s3.bucket(), s3.region(), version);
+    }
+
+    /** @param version URL을 만들 때마다 읽는 버전 폴더(서비스 패치) */
+    public ImageUrls imageUrls(Supplier<String> version) {
         return new ImageUrls(s3.bucket(), s3.region(), version);
     }
 

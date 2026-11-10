@@ -90,7 +90,7 @@ class NextItemRecommendationServiceTest {
                 new dfgg.application.recommend.v3.explanation.ChampionDirectory(championRepository),
                 new dfgg.domain.item.trait.ItemTraitCatalog(),
                 new dfgg.domain.image.ImageUrls("test-bucket", "ap-northeast-2", "99.1"),
-                new dfgg.infrastructure.config.LeagueOfLegendsVersionProperties("99.1")
+                new dfgg.application.patch.ServicePatch(dfgg.domain.match.PatchVersion.of("99.1"))
         );
     }
 
