@@ -127,7 +127,7 @@ function createWindow() {
 
   overlay.hide();
   initOverlayVisibility(overlay, readSettings().showOverlay ?? true);
-  onPhaseChange((phase) => updateOverlayPhase(phase));
+  onPhaseChange((phase) => void updateOverlayPhase(phase));
 
   detectClientStatus(home);
 

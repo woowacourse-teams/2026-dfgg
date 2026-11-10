@@ -12,6 +12,7 @@ import {
   recordSkip,
 } from '../analytics/gameTracker';
 import { reportError } from '../sentry';
+import { isOverlayQueue } from '../lcu/queue';
 
 const POLL_INTERVAL_MS = 2000;
 // 추천 요청이 실패하면 서버 부하를 줄이려고 재시도 간격을 늘린다. (2초 → 4초 → … → 30초)
@@ -42,10 +43,11 @@ const purchasedItemIds = new Set<number>();
 let myRiotId: string | null = null;
 let patch: string | null = null;
 
-// phase가 InProgress면 live polling 시작하기
-function syncWithPhase(phase: GameflowPhase | null) {
-  if (phase === 'InProgress') startLivePolling();
-  else stopLivePolling();
+// phase가 InProgress이고 일반, 랭크 큐면 live polling 시작하기
+async function syncWithPhase(phase: GameflowPhase | null) {
+  if (phase !== 'InProgress') return stopLivePolling();
+  if (!(await isOverlayQueue())) return stopLivePolling();
+  if (getLcuState().phase === 'InProgress') startLivePolling();
 }
 
 // 앱 첫 시작 시, phase 확인하고 구독하기
@@ -132,6 +134,8 @@ async function tick() {
     });
     if (!body) return;
     recordChampion(body.myChampion);
+
+    void syncWithPhase(getLcuState().phase);
 
     let result;
     try {
