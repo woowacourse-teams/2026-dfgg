@@ -705,10 +705,20 @@ cp build/libs/dfgg-0.0.1-SNAPSHOT.jar /opt/dfgg/blue/dfgg-blue.jar && sha256sum 
 | `RAMP_STEP` | `1m` | 단계마다 유지하는 시간(앞에 5초 상승 구간이 붙는다) |
 | `V3_RATIO` | `1.0` | `ENDPOINT` 요청 비율(이름은 기존 결과와 맞추려 그대로). 나머지는 `GET /api/champions`. validate에서는 무시 |
 | `P95_MS` | `1000` | 목표 `ENDPOINT` p95(ms) |
+| `P99_MS` | 없음 | 줄 때만 p99(ms)도 판정한다 |
+| `SUCCESS_LATENCY` | `false` | `true`면 p95·p99를 성공 응답(`expected_response:true`, 기본 200~399)만으로 잰다. 실패·타임아웃은 에러율로 본다 |
+| `MIN_SUCCESS_RPS` | 없음 | target 측정 구간의 성공 처리량 하한(초당). `성공 건수 >= MIN_SUCCESS_RPS × DURATION`으로 판정한다. k6 Counter의 `rate`는 워밍업까지 포함한 전체 시간으로 나누어 쓰지 않는다. target에서만 쓴다 |
+| `REQ_TIMEOUT` | `30s` | 요청 타임아웃. 넘으면 k6가 끊고 실패로 센다(status 0, error_code 1050) |
 | `ERROR_RATE` | `0.01` | 허용 에러율 |
 | `MAX_VUS` | `200` | VU 상한. `dropped_iterations`가 생기면 올린다 |
 
-판정은 측정 구간(`phase:measure`)만 본다: `ENDPOINT` p95, 에러율, `dropped_iterations == 0`. v4 smoke는 `v4_core_nonempty`·`v4_situational_nonempty` > 0도 본다. validate는 에러율 0만 본다.
+판정은 측정 구간(`phase:measure`)만 본다: `ENDPOINT` p95, 에러율, `dropped_iterations == 0`. 새 변수(`P99_MS`, `SUCCESS_LATENCY`, `MIN_SUCCESS_RPS`)를 주면 그 판정이 더해지고, 주지 않으면 이전 회차와 판정이 같다. v4 smoke는 `v4_core_nonempty`·`v4_situational_nonempty` > 0도 본다. validate는 에러율 0만 본다.
+
+#277(동시 게임 1,000명 = 30 RPS) target 판정은 다음 인자로 한다. 성공 응답이 하나도 없으면 성공 응답 p95·p99는 표본이 없어 통과로 찍히지만, 에러율과 성공 건수가 실패를 잡는다.
+
+```bash
+ENDPOINT=v4 ./backend/ops/perf/run.sh before-1 -e SCENARIO=target -e TARGET_RPS=30 -e WARMUP=2m -e DURATION=10m -e P95_MS=500 -e P99_MS=1000 -e ERROR_RATE=0.01 -e SUCCESS_LATENCY=true -e MIN_SUCCESS_RPS=29.7 -e REQ_TIMEOUT=2s
+```
 
 ## 같은 조건 체크리스트
 

@@ -68,7 +68,9 @@ if (( wait_seconds > 0 )); then
   sleep "$wait_seconds"
 fi
 
-APP="job=\"dfgg-app\",env=\"$ENV_LABEL\""
+# blue(dfgg-app)·green(dfgg-app-green) 슬롯을 함께 고른다. 배포로 슬롯이 바뀌어도 지표가 none으로 비지 않는다
+# (2026-11-09 prod가 green으로 돌고 있었다). 평소에는 한 슬롯만 떠 있다. 배포 중 두 슬롯이 함께 뜬 구간은 값이 합쳐진다.
+APP="job=~\"dfgg-app(-green)?\",env=\"$ENV_LABEL\""
 R="${RANGE}s"
 
 # 값이 없거나 NaN이면 none. 질의 자체가 실패하면 멈춘다.
