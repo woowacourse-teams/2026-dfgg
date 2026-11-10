@@ -6,16 +6,14 @@ import { getDDragonData } from '../live/ddragon';
 import { getActivePlayer, getGameStats, getPlayerList } from '../live/endpoints';
 import { toChampionAlias } from '../live/payload';
 import { closeWindow, openWindow, sendToAugmentWindow, setWindowFactory } from './window';
-import { loadCandidates, type Candidate } from './titleImages';
-import { CardRead, startCardReader } from './cardReader';
-import { judgeCard, Slot } from './cardJudge';
+import { loadCandidates } from './titleImages';
+import { startCardReader } from './cardReader';
+import { judgeTitle } from './cardJudge';
 
 const MAYHEM_MODE = 'KIWI';
 const RETRY_MS = 3000;
 
 let gameToken = 0;
-let candidatesReady: Promise<Candidate[]> | null = null;
-let slots: (Slot | null)[] = [];
 let lastSent = '';
 let lastCards: MayhemCard[] = [];
 
@@ -54,22 +52,6 @@ function sendCards(cards: MayhemCard[]) {
   sendToAugmentWindow('mayhem:cards', cards);
 }
 
-async function handleCards(read: CardRead[] | null, alive: () => boolean) {
-  if (!read) {
-    slots = [];
-    sendCards([]);
-    return;
-  }
-
-  const candidates = await candidatesReady;
-  if (!alive() || !candidates) return;
-
-  slots = read.map((card, i) =>
-    card.mask ? judgeCard(card.mask, candidates, slots[i] ?? null) : null,
-  );
-  sendCards(read.map((card, i) => ({ box: card.box, augment: slots[i]?.augment ?? null })));
-}
-
 async function start() {
   const token = ++gameToken;
   const alive = () => token === gameToken && getLcuState().phase === 'InProgress';
@@ -89,19 +71,19 @@ async function start() {
   }
 
   if (!alive()) return;
-  openWindow();
-  candidatesReady = loadCandidates(loaded.augments, loaded.patch).catch((error) => {
+  const candidates = await loadCandidates(loaded.augments, loaded.patch).catch((error) => {
     console.error('[mayhem] 제목 견본 실패', error);
     return [];
   });
-  startCardReader(alive, (read) => void handleCards(read, alive));
+  if (!alive() || candidates.length === 0) return;
+
+  openWindow();
+  startCardReader(alive, (mask) => judgeTitle(mask, candidates), sendCards);
   console.log('[mayhem] start', championId, loaded.augments.length);
 }
 
 function stop() {
   gameToken++;
-  candidatesReady = null;
-  slots = [];
   lastSent = '';
   lastCards = [];
   closeWindow();
