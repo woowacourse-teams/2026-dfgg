@@ -12,6 +12,7 @@ import { EMPTY_TRACKER, trackCards } from './cardTracker';
 import { captureRegion } from './screenCapture';
 import { titleMask, toLuma } from './titleStrip';
 import type { Gray, Mask } from './titleMatch';
+import { reportError } from '../sentry';
 
 // 확인 시간을 모아서 한 줄로 찍는다.
 const STATS_EVERY = 20;
@@ -114,8 +115,7 @@ export function startCardReader(
     stats = emptyStats();
   };
 
-  const tick = () => {
-    if (!alive()) return;
+  const check = (): number => {
     const started = performance.now();
 
     const game = findWindowRect(GAME_WINDOW_TITLE);
@@ -128,9 +128,7 @@ export function startCardReader(
       slots = emptySlots();
       onCards([]);
       record(performance.now() - started, captured - started);
-
-      setTimeout(tick, tracker.candidate ? OPEN_MS : IDLE_MS);
-      return;
+      return tracker.candidate ? OPEN_MS : IDLE_MS;
     }
 
     const scale = game.height / FRAME_HEIGHT;
@@ -150,7 +148,19 @@ export function startCardReader(
       boxes.map((box, i) => ({ box: relative(box, frame), augment: slots[i].augment ?? null })),
     );
     record(performance.now() - started, captured - started);
-    setTimeout(tick, OPEN_MS);
+    return OPEN_MS;
+  };
+
+  const tick = () => {
+    if (!alive()) return;
+    let delay = OPEN_MS;
+    try {
+      delay = check();
+    } catch (error) {
+      console.error('[mayhem] 확인 실패', error);
+      reportError('mayhem-card-reader', error);
+    }
+    setTimeout(tick, delay);
   };
   tick();
 }
