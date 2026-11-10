@@ -1,8 +1,13 @@
 package dfgg.presentation.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import dfgg.domain.language.Language;
 import dfgg.infrastructure.image.AugmentTitleStyle;
 import dfgg.presentation.dto.AugmentTitleDto;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 
 /**
@@ -24,9 +29,39 @@ public record AugmentTitlesResponse(
         List<AugmentTitleDto> images
 ) {
 
+    /** ETag 길이. SHA-256 앞 16바이트(128비트)면 충돌을 걱정할 일이 없다. */
+    private static final int ETAG_BYTES = 16;
+
     public static AugmentTitlesResponse of(String patch, Language language, AugmentTitleStyle style,
                                            List<AugmentTitleDto> images) {
         return new AugmentTitlesResponse(patch, language.gameLanguage(), style.font(), style.fontSize(),
                 style.padding(), images);
+    }
+
+    /**
+     * 그림까지 포함한 응답 내용의 해시로 만든 강한 ETag.
+     * <p>
+     * 그리는 방식이 바뀌어도 규격 버전을 따로 올리지 않아도 ETag가 바뀐다. 앱은 이 값으로 다시 받을지 정한다.
+     */
+    @JsonIgnore
+    public String etag() {
+        MessageDigest digest = sha256();
+        update(digest, patch, lang, font, String.valueOf(fontSize), String.valueOf(padding));
+        images.forEach(image -> update(digest, String.valueOf(image.augmentId()), image.name(), image.png()));
+        return "\"" + HexFormat.of().formatHex(digest.digest(), 0, ETAG_BYTES) + "\"";
+    }
+
+    private static void update(MessageDigest digest, String... fields) {
+        for (String field : fields) {
+            digest.update((field + '\n').getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private static MessageDigest sha256() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256을 쓸 수 없습니다.", exception);
+        }
     }
 }

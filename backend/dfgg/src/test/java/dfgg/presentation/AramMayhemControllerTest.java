@@ -6,6 +6,8 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 
 import dfgg.domain.aram.Augment;
@@ -426,7 +428,8 @@ class AramMayhemControllerTest {
                 .body("padding", equalTo(10))
                 .body("images.augmentId", contains(1100, 1373, 1402))
                 .body("images.name", contains("민첩함", "축소 엔진", "되풀이"))
-                .body("images.height", contains(84, 84, 84));
+                .body("images.height", contains(84, 84, 84))
+                .body("$", not(hasKey("etag")));
     }
 
     @Test
@@ -566,6 +569,97 @@ class AramMayhemControllerTest {
     }
 
     @Test
+    @DisplayName("제목 견본은 강한 ETag를 주고 patch를 생략하면 매번 다시 확인하라고 한다")
+    void getTitles_WhenPatchOmitted_CarriesEtagAndNoCache() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .queryParam("lang", "ko_KR")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(200)
+                .header("ETag", matchesPattern("^\"[0-9a-f]+\"$"))
+                .header("Cache-Control", equalTo("no-cache"));
+    }
+
+    @Test
+    @DisplayName("제목 견본은 patch를 지정하면 하루 동안 캐시해도 된다고 한다")
+    void getTitles_WhenPatchGiven_AllowsCachingForADay() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .queryParam("lang", "ko_KR")
+                .queryParam("patch", "16.21")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(200)
+                .header("Cache-Control", equalTo("max-age=86400, public"));
+    }
+
+    @Test
+    @DisplayName("같은 ETag로 다시 요청하면 본문 없이 304와 ETag·Cache-Control을 준다")
+    void getTitles_WhenEtagMatches_Returns304WithHeaders() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+        String etag = given().queryParam("lang", "ko_KR").queryParam("patch", "16.21")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(200)
+                .extract().header("ETag");
+
+        // when & then
+        String body = given().queryParam("lang", "ko_KR").queryParam("patch", "16.21")
+                .header("If-None-Match", etag)
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(304)
+                .header("ETag", equalTo(etag))
+                .header("Cache-Control", equalTo("max-age=86400, public"))
+                .extract().asString();
+        assertThat(body).isEmpty();
+    }
+
+    @Test
+    @DisplayName("다른 ETag로 요청하면 200과 본문을 준다")
+    void getTitles_WhenEtagDiffers_Returns200() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().queryParam("lang", "ko_KR")
+                .header("If-None-Match", "\"stale\"")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(200)
+                .body("images.augmentId", contains(1373));
+    }
+
+    @Test
+    @DisplayName("저장된 이름이 바뀌면 ETag도 바뀐다")
+    void getTitles_WhenNameChanges_ChangesEtag() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+        String before = titlesEtag("ko_KR");
+        augmentRepository.deleteAllInBatch();
+        saveAugment("16.21", 1373, "축소 엔진!", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when
+        String after = titlesEtag("ko_KR");
+
+        // then
+        assertThat(after).isNotEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("언어가 다르면 ETag도 다르다")
+    void getTitles_WhenLanguageDiffers_ChangesEtag() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        assertThat(titlesEtag("ko_KR")).isNotEqualTo(titlesEtag("en_US"));
+    }
+
+    @Test
     @DisplayName("저장된 증강 데이터가 없으면 503이다")
     void getTitles_WhenNoData_Returns503() {
         // when & then
@@ -573,6 +667,13 @@ class AramMayhemControllerTest {
                 .queryParam("lang", "ko_KR")
                 .when().get("/api/aram-mayhem/augment-titles")
                 .then().statusCode(503);
+    }
+
+    private String titlesEtag(String lang) {
+        return given().queryParam("lang", lang)
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(200)
+                .extract().header("ETag");
     }
 
     private Response lookup(int championId, String body) {
