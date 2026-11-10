@@ -18,9 +18,14 @@ import dfgg.domain.champion.ChampionRepository;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -398,6 +403,176 @@ class AramMayhemControllerTest {
 
         // then
         assertThat(body.toLowerCase(Locale.ROOT)).doesNotContain("win");
+    }
+
+    @Test
+    @DisplayName("제목 견본은 최신 패치 증강 전체를 증강 ID 순으로 그 언어 이름으로 그려 준다")
+    void getTitles_ReturnsEveryAugmentOfLatestPatchInIdOrder() {
+        // given
+        saveAugment("16.9", 1001, "옛 증강", "Old Augment", AugmentRarity.SILVER);
+        saveAugment("16.21", 1402, "되풀이", "Recursion", AugmentRarity.PRISMATIC);
+        saveAugment("16.21", 1100, "민첩함", "Nimble", AugmentRarity.SILVER);
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .queryParam("lang", "ko_KR")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(200)
+                .body("patch", equalTo("16.21"))
+                .body("lang", equalTo("ko_KR"))
+                .body("font", equalTo("Spoqa Han Sans Neo Regular"))
+                .body("fontSize", equalTo(64))
+                .body("padding", equalTo(10))
+                .body("images.augmentId", contains(1100, 1373, 1402))
+                .body("images.name", contains("민첩함", "축소 엔진", "되풀이"))
+                .body("images.height", contains(84, 84, 84));
+    }
+
+    @Test
+    @DisplayName("제목 견본의 png는 폭과 높이가 응답 값과 같은 PNG의 base64다")
+    void getTitles_CarriesBase64PngMatchingSize() throws IOException {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when
+        Response response = given().accept(ContentType.JSON)
+                .queryParam("lang", "ko_KR")
+                .when().get("/api/aram-mayhem/augment-titles");
+
+        // then
+        response.then().statusCode(200);
+        byte[] png = Base64.getDecoder().decode(response.path("images[0].png").toString());
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
+        assertThat(image.getWidth()).isEqualTo((int) response.path("images[0].width"));
+        assertThat(image.getHeight()).isEqualTo(84);
+    }
+
+    @Test
+    @DisplayName("제목 견본의 lang은 받은 표기와 상관없이 밑줄 표기로 내고 그 언어 이름을 그린다")
+    void getTitles_NormalizesLangAndDrawsNameInThatLanguage() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .header("Accept-Language", "ko")
+                .queryParam("lang", "EN-us")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(200)
+                .body("lang", equalTo("en_US"))
+                .body("images.name", contains("Shrink Engine"));
+    }
+
+    @Test
+    @DisplayName("제목 견본은 지정한 패치를 major.minor로 맞춰 그 패치의 증강을 준다")
+    void getTitles_WhenPatchGiven_UsesThatPatch() {
+        // given
+        saveAugment("16.9", 1001, "옛 증강", "Old Augment", AugmentRarity.SILVER);
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .queryParam("lang", "ko_KR")
+                .queryParam("patch", "16.9.1")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(200)
+                .body("patch", equalTo("16.9"))
+                .body("images.augmentId", contains(1001));
+    }
+
+    @Test
+    @DisplayName("요청 언어의 이름이 없는 증강은 다른 언어로 대신 그리지 않고 뺀다")
+    void getTitles_WhenNameMissingInLanguage_SkipsAugment() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+        augmentRepository.save(new Augment("16.21", 1500, Map.of("ko-KR", "한글만"), AugmentRarity.GOLD));
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .queryParam("lang", "en_US")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(200)
+                .body("images.augmentId", contains(1373));
+    }
+
+    @Test
+    @DisplayName("그릴 견본이 없으면 200에 빈 목록이다")
+    void getTitles_WhenNothingToDraw_ReturnsEmptyList() {
+        // given
+        augmentRepository.save(new Augment("16.21", 1500, Map.of("ko-KR", "한글만"), AugmentRarity.GOLD));
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .queryParam("lang", "en_US")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(200)
+                .body("images", empty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "ja_JP", "ko"})
+    @DisplayName("제목 견본의 lang이 지원하지 않는 값이면 400이다")
+    void getTitles_WhenLangUnsupported_Returns400(String lang) {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .queryParam("lang", lang)
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(400);
+    }
+
+    @Test
+    @DisplayName("제목 견본의 lang이 없으면 Accept-Language로 대신하지 않고 400이다")
+    void getTitles_WhenLangMissing_Returns400() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .header("Accept-Language", "ko")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(400);
+    }
+
+    @Test
+    @DisplayName("제목 견본의 patch 형식이 틀리면 400이다")
+    void getTitles_WhenPatchMalformed_Returns400() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .queryParam("lang", "ko_KR")
+                .queryParam("patch", "latest")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(400);
+    }
+
+    @Test
+    @DisplayName("지정한 패치의 데이터가 없으면 404다")
+    void getTitles_WhenPatchNotStored_Returns404() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .queryParam("lang", "ko_KR")
+                .queryParam("patch", "15.1")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(404);
+    }
+
+    @Test
+    @DisplayName("저장된 증강 데이터가 없으면 503이다")
+    void getTitles_WhenNoData_Returns503() {
+        // when & then
+        given().accept(ContentType.JSON)
+                .queryParam("lang", "ko_KR")
+                .when().get("/api/aram-mayhem/augment-titles")
+                .then().statusCode(503);
     }
 
     private Response lookup(int championId, String body) {

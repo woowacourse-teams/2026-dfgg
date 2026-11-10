@@ -1,9 +1,11 @@
 package dfgg.presentation;
 
 import dfgg.application.aram.AramMayhemQueryService;
+import dfgg.application.aram.AugmentTitleService;
 import dfgg.domain.language.Language;
 import dfgg.presentation.dto.request.AugmentLookupRequest;
 import dfgg.presentation.dto.response.AugmentLookupResponse;
+import dfgg.presentation.dto.response.AugmentTitlesResponse;
 import dfgg.presentation.dto.response.ChampionAugmentsResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -22,9 +24,23 @@ import org.springframework.web.bind.annotation.RestController;
 public class AramMayhemController {
 
     private final AramMayhemQueryService aramMayhemQueryService;
+    private final AugmentTitleService augmentTitleService;
 
-    public AramMayhemController(AramMayhemQueryService aramMayhemQueryService) {
+    public AramMayhemController(AramMayhemQueryService aramMayhemQueryService,
+                                AugmentTitleService augmentTitleService) {
         this.aramMayhemQueryService = aramMayhemQueryService;
+        this.augmentTitleService = augmentTitleService;
+    }
+
+    /** 견본은 게임 화면 언어와 같아야 맞으므로 {@code Accept-Language}가 아니라 {@code lang}으로만 고른다. */
+    @GetMapping("/augment-titles")
+    public ResponseEntity<AugmentTitlesResponse> getTitles(
+            @RequestParam(required = false) String patch,
+            @RequestParam String lang
+    ) {
+        AugmentTitlesResponse response = augmentTitleService.findTitles(patch, Language.fromGameLanguage(lang));
+
+        return ResponseEntity.ok(response);
     }
 
     /** 이름 언어는 게임 언어({@code lang})가 있으면 그것, 없으면 앱 언어({@code Accept-Language})다. */

@@ -113,6 +113,17 @@ class LanguageTest {
                 .isInstanceOf(InvalidLanguageException.class);
     }
 
+    @ParameterizedTest(name = "{0} → {1}")
+    @CsvSource({
+            "KO_KR, ko_KR",
+            "EN_US, en_US"
+    })
+    @DisplayName("게임 언어 값은 밑줄 표기로 낸다")
+    void gameLanguage_ReturnsUnderscoreTag(Language language, String expected) {
+        // when & then
+        assertThat(language.gameLanguage()).isEqualTo(expected);
+    }
+
     @Test
     @DisplayName("게임 언어가 있으면 Accept-Language보다 먼저 쓴다")
     void resolve_WhenGameLanguageGiven_PrefersItOverAcceptLanguage() {

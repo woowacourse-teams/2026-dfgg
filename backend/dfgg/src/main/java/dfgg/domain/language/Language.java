@@ -58,6 +58,11 @@ public enum Language {
         return fromGameLanguage(gameLanguage);
     }
 
+    /** 게임 클라이언트 언어 표기({@code ko_KR}). 받은 표기와 상관없이 이 형태로 돌려준다. */
+    public String gameLanguage() {
+        return tag.replace('-', '_');
+    }
+
     /** 언어별 이름에서 이 언어의 이름을 고른다. 없으면 한글 이름으로 낸다. */
     public String pick(Map<String, String> names) {
         return find(names).orElseGet(() -> names.get(FALLBACK.tag));
