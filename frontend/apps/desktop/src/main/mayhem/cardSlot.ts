@@ -43,8 +43,12 @@ export function observeSlot(
   return { slot: next, shouldRead: false };
 }
 
-// 판정 결과를 넣는다. 다시 읽다 실패하면(가려진 제목 등) 이전 라벨을 그대로 둔다. 라벨은 다른 증강을 읽었을 때만 바뀐다.
+// 판정 결과를 넣는다. 제목을 읽고 판정했으니, 목록에 없는 카드(파편 등)면 null 로 이전 라벨을 지운다.
 export function applyRead(slot: CardSlot, augment: MayhemAugment | null): CardSlot {
-  if (augment === null && slot.augment) return slot;
   return { ...slot, augment };
+}
+
+// 제목을 못 읽었을 때(설명 창이나 강조 빛에 가려짐). 같은 카드일 수 있으니 이전 라벨이 있으면 그대로 둔다.
+export function applyUnreadable(slot: CardSlot): CardSlot {
+  return slot.augment ? slot : { ...slot, augment: null };
 }

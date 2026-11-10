@@ -7,7 +7,7 @@ import { findWindowRect } from '../docking/clientWindow';
 import { type Rect } from '../docking/docking';
 import { GAME_WINDOW_TITLE } from '../highlight/highlight';
 import { type Box, fingerprint, isCardVisible, region, TITLE_REGION } from './cardDetect';
-import { applyRead, type CardSlot, EMPTY_SLOT, observeSlot } from './cardSlot';
+import { applyRead, applyUnreadable, type CardSlot, EMPTY_SLOT, observeSlot } from './cardSlot';
 import { EMPTY_TRACKER, trackCards } from './cardTracker';
 import { captureRegion } from './screenCapture';
 import { titleMask, toLuma } from './titleStrip';
@@ -152,7 +152,7 @@ export function startCardReader(
       if (!shouldRead) return slot;
       const readStarted = performance.now();
       const mask = readTitle(game, box, scale, i);
-      const next = applyRead(slot, mask && judge(mask));
+      const next = mask ? applyRead(slot, judge(mask)) : applyUnreadable(slot);
       console.log(
         '[mayhem] 읽기',
         `카드${i + 1}`,

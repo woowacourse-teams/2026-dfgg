@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MayhemAugment } from '../../../shared/types';
-import { applyRead, type CardSlot, EMPTY_SLOT, observeSlot } from '../cardSlot';
+import { applyRead, applyUnreadable, type CardSlot, EMPTY_SLOT, observeSlot } from '../cardSlot';
 
 const print = (value: number) => Array(144).fill(value);
 const A = print(10);
@@ -53,10 +53,17 @@ describe('observeSlot', () => {
     expect(observeSlot(covered.slot, A, true).shouldRead).toBe(false);
   });
 
-  it('다시 읽다 실패하면 이전 라벨을 지킨다', () => {
+  it('다시 읽다 제목을 못 읽으면 이전 라벨을 지킨다', () => {
     const rereading = observeSlot(applyRead(settle(A).slot, X), HOVER, true);
     expect(rereading.shouldRead).toBe(true);
-    expect(applyRead(rereading.slot, null).augment).toBe(X);
+    expect(applyUnreadable(rereading.slot).augment).toBe(X);
+  });
+
+  it('다른 카드로 바뀌었는데 목록에 없으면(파편 등) 이전 라벨을 지운다', () => {
+    const moving = observeSlot(applyRead(settle(A).slot, X), B, true);
+    const settled = observeSlot(moving.slot, B, true);
+    expect(settled.shouldRead).toBe(true);
+    expect(applyRead(settled.slot, null).augment).toBeNull();
   });
 
   it('판정 못 하면 최대 세 번까지 읽는다', () => {
