@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({ nativeImage: {} }));
+vi.mock('../../api/augments', () => ({ fetchAugmentTitles: vi.fn() }));
 
 import { bitmapToGray } from '../titleImages';
 
