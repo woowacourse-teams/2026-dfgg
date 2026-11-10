@@ -35,3 +35,6 @@ mining:
 collection:
   scheduler:
     enabled: false
+patch:
+  monitor:
+    enabled: false

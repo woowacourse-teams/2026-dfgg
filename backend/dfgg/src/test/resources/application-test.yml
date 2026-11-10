@@ -32,6 +32,10 @@ mining:
 collection:
   scheduler:
     enabled: false
+# 기동 직후 Data Dragon·S3를 부르지 않는다.
+patch:
+  monitor:
+    enabled: false
 recommendation:
   # 픽스처가 EMERALD로 들어간다. 운영 기본값이 바뀌어도 테스트가 흔들리지 않도록 한다.
   v3:
