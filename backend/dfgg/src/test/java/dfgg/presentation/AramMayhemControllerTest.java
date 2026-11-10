@@ -122,6 +122,35 @@ class AramMayhemControllerTest {
     }
 
     @Test
+    @DisplayName("게임 언어(lang)를 받으면 Accept-Language보다 먼저 쓴다")
+    void getAugments_WhenGameLanguageGiven_PrefersItOverAcceptLanguage() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+        savePick("16.21", 1373, 16.79);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .header("Accept-Language", "ko")
+                .queryParam("lang", "en_US")
+                .when().get("/api/aram-mayhem/champions/22/augments")
+                .then().statusCode(200)
+                .body("augments[0].name", equalTo("Shrink Engine"));
+    }
+
+    @Test
+    @DisplayName("지원하지 않는 게임 언어(lang)면 400이다")
+    void getAugments_WhenGameLanguageUnsupported_Returns400() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .queryParam("lang", "ja_JP")
+                .when().get("/api/aram-mayhem/champions/22/augments")
+                .then().statusCode(400);
+    }
+
+    @Test
     @DisplayName("저장된 패치 중 가장 높은 패치만 쓴다")
     void getAugments_UsesLatestPatchOnly() {
         // given
@@ -249,6 +278,38 @@ class AramMayhemControllerTest {
         lookup(22, "{\"names\": [\"축소 엔진\"]}")
                 .then().statusCode(200)
                 .body("augments[0].name", equalTo("Shrink Engine"));
+    }
+
+    @Test
+    @DisplayName("게임 언어(lang)를 받으면 Accept-Language보다 먼저 쓴다")
+    void lookup_WhenGameLanguageGiven_PrefersItOverAcceptLanguage() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().contentType(ContentType.JSON)
+                .accept(ContentType.JSON)
+                .header("Accept-Language", "en")
+                .queryParam("lang", "ko_KR")
+                .body("{\"names\": [\"Shrink Engine\"]}")
+                .when().post("/api/aram-mayhem/champions/22/augments/lookup")
+                .then().statusCode(200)
+                .body("augments[0].name", equalTo("축소 엔진"));
+    }
+
+    @Test
+    @DisplayName("지원하지 않는 게임 언어(lang)면 400이다")
+    void lookup_WhenGameLanguageUnsupported_Returns400() {
+        // given
+        saveAugment("16.21", 1373, "축소 엔진", "Shrink Engine", AugmentRarity.GOLD);
+
+        // when & then
+        given().contentType(ContentType.JSON)
+                .accept(ContentType.JSON)
+                .queryParam("lang", "ja_JP")
+                .body("{\"names\": [\"축소 엔진\"]}")
+                .when().post("/api/aram-mayhem/champions/22/augments/lookup")
+                .then().statusCode(400);
     }
 
     @Test
