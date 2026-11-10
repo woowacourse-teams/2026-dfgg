@@ -13,6 +13,12 @@ import { captureRegion } from './screenCapture';
 import { titleMask, toLuma } from './titleStrip';
 import type { Gray, Mask } from './titleMatch';
 
+// 확인 시간을 모아서 한 줄로 찍는다.
+const STATS_EVERY = 20;
+
+type TickStats = { count: number; total: number; capture: number; max: number };
+const emptyStats = (): TickStats => ({ count: 0, total: 0, capture: 0, max: 0 });
+
 const OPEN_MS = 500; // 카드가 떠 있거나 뜨는 중일 때 확인 주기 500ms
 const IDLE_MS = 1000; // 카드가 없을 때 확인 주기 1초
 const FRAME_HEIGHT = 720; // 크기 720px
@@ -88,18 +94,41 @@ export function startCardReader(
 
   let tracker = EMPTY_TRACKER;
   let slots = emptySlots();
+  let stats = emptyStats();
+
+  /** 확인 한 번의 시간을 더하고, STATS_EVERY 번이 차면 찍고 비운다 */
+  const record = (total: number, capture: number) => {
+    stats = {
+      count: stats.count + 1,
+      total: stats.total + total,
+      capture: stats.capture + capture,
+      max: Math.max(stats.max, total),
+    };
+    if (stats.count < STATS_EVERY) return;
+    console.log(
+      '[mayhem] 확인',
+      `${stats.count}회 평균 ${(stats.total / stats.count).toFixed(0)}ms`,
+      `(캡처 ${(stats.capture / stats.count).toFixed(0)}ms)`,
+      `최대 ${stats.max.toFixed(0)}ms`,
+    );
+    stats = emptyStats();
+  };
 
   const tick = () => {
     if (!alive()) return;
+    const started = performance.now();
 
     const game = findWindowRect(GAME_WINDOW_TITLE);
     const frameWidth = game ? Math.round((game.width / game.height) * FRAME_HEIGHT) : 0;
     const frame = game && captureGray(game, frameWidth, FRAME_HEIGHT);
+    const captured = performance.now();
     if (frame) tracker = trackCards(tracker, frame);
 
     if (!game || !frame || !tracker.boxes) {
       slots = emptySlots();
       onCards([]);
+      record(performance.now() - started, captured - started);
+
       setTimeout(tick, tracker.candidate ? OPEN_MS : IDLE_MS);
       return;
     }
@@ -120,6 +149,7 @@ export function startCardReader(
     onCards(
       boxes.map((box, i) => ({ box: relative(box, frame), augment: slots[i].augment ?? null })),
     );
+    record(performance.now() - started, captured - started);
     setTimeout(tick, OPEN_MS);
   };
   tick();
