@@ -90,8 +90,6 @@ function createAugmentWindow() {
   augment.setAlwaysOnTop(true, 'screen-saver');
   augment.setContentProtection(true);
   loadRenderer(augment, 'augments');
-  // 진단용: 개발 중에는 증강 창의 개발자 도구를 따로 연다
-  if (!app.isPackaged) augment.webContents.openDevTools({ mode: 'detach' });
   return augment;
 }
 

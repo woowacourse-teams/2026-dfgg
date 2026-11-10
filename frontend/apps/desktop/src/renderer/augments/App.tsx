@@ -18,10 +18,7 @@ function App() {
 
   useEffect(() => {
     window.mayhem.getCards().then(setCards);
-    return window.mayhem.onCards((next) => {
-      console.log('[augments] 받음', next);
-      setCards(next);
-    });
+    return window.mayhem.onCards(setCards);
   }, []);
 
   return (
