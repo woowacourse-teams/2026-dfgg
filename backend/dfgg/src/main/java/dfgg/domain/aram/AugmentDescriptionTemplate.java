@@ -101,10 +101,10 @@ public final class AugmentDescriptionTemplate {
         String[] expression = placeholder.group(1).split("\\*", 2);
         boolean percentFollows = !placeholder.group(2).isEmpty();
         if (expression.length == 1) {
-            return values.format(expression[0], 1, percentFollows);
+            return values.format(expression[0], 1, percentFollows, language);
         }
         try {
-            return values.format(expression[0], Double.parseDouble(expression[1]), percentFollows);
+            return values.format(expression[0], Double.parseDouble(expression[1]), percentFollows, language);
         } catch (NumberFormatException exception) {
             return Optional.empty();
         }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import dfgg.common.exception.AugmentDataRejectedException;
+import dfgg.domain.aram.SpellCalculation;
 import dfgg.domain.aram.SpellValues;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,11 +24,11 @@ import java.util.stream.Collectors;
 public final class KiwiAugments {
 
     private final Map<Integer, KiwiAugment> augments;
-    private final Map<String, Map<String, Double>> spellDataValues;
+    private final Map<String, KiwiSpell> spells;
 
-    private KiwiAugments(Map<Integer, KiwiAugment> augments, Map<String, Map<String, Double>> spellDataValues) {
+    private KiwiAugments(Map<Integer, KiwiAugment> augments, Map<String, KiwiSpell> spells) {
         this.augments = augments;
-        this.spellDataValues = spellDataValues;
+        this.spells = spells;
     }
 
     public static KiwiAugments read(JsonParser parser) throws IOException {
@@ -35,7 +36,7 @@ public final class KiwiAugments {
             throw new AugmentDataRejectedException("kiwi.bin.json이 객체가 아닙니다.");
         }
         Map<Integer, KiwiAugment> augments = new HashMap<>();
-        Map<String, Map<String, Double>> spellDataValues = new HashMap<>();
+        Map<String, KiwiSpell> spells = new HashMap<>();
         while (parser.nextToken() == JsonToken.FIELD_NAME) {
             String path = parser.currentName();
             parser.nextToken();
@@ -45,10 +46,14 @@ public final class KiwiAugments {
                 augmentOf(entry).ifPresent(augment -> putUnique(augments, augment));
             }
             if (type.equals("SpellObject")) {
-                spellDataValues.put(path, dataValuesOf(entry.path("mSpell")));
+                spells.put(path, spellOf(entry.path("mSpell")));
             }
         }
-        return new KiwiAugments(Map.copyOf(augments), Map.copyOf(spellDataValues));
+        return new KiwiAugments(Map.copyOf(augments), Map.copyOf(spells));
+    }
+
+    private static KiwiSpell spellOf(JsonNode spell) {
+        return new KiwiSpell(dataValuesOf(spell), KiwiCalculations.of(spell.path("mSpellCalculations")));
     }
 
     /** 픽률 데이터의 증강 ID는 {@code AugmentPlatformId}다. ID나 설명 키가 없으면 설명을 만들 수 없다. */
@@ -95,13 +100,22 @@ public final class KiwiAugments {
 
     /** 주 주문 다음 추가 주문 순서로 합친다. 이름이 겹치면 뒤의 값을 쓴다. */
     public SpellValues valuesOf(int augmentId) {
-        Map<String, Double> values = new HashMap<>();
+        Map<String, Double> dataValues = new HashMap<>();
+        Map<String, SpellCalculation> calculations = new HashMap<>();
         Optional.ofNullable(augments.get(augmentId))
-                .ifPresent(augment -> augment.spellPaths().forEach(path ->
-                        values.putAll(spellDataValues.getOrDefault(path, Map.of()))));
-        return new SpellValues(values);
+                .ifPresent(augment -> augment.spellPaths().stream()
+                        .filter(spells::containsKey)
+                        .map(spells::get)
+                        .forEach(spell -> {
+                            dataValues.putAll(spell.dataValues());
+                            calculations.putAll(spell.calculations());
+                        }));
+        return new SpellValues(dataValues, calculations);
     }
 
     private record KiwiAugment(int id, String descriptionKey, List<String> spellPaths) {
+    }
+
+    private record KiwiSpell(Map<String, Double> dataValues, Map<String, SpellCalculation> calculations) {
     }
 }

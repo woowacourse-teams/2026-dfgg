@@ -110,6 +110,62 @@ class CommunityDragonClientDescriptionsTest {
     }
 
     @Test
+    @DisplayName("레벨에 따라 바뀌는 계산식은 범위로 쓴다")
+    void getAugmentDescriptions_WhenLevelInterpolation_WritesRange() {
+        // given
+        expectAllFiles();
+
+        // when
+        CommunityDragonDescriptions descriptions = client.getAugmentDescriptions("16.22");
+
+        // then
+        assertThat(descriptions.descriptionOf(1097)).isEqualTo(Map.of(
+                "ko-KR", "주문력이 20~80(레벨에 따라) 증가합니다.",
+                "en-US", "Gain 20~80 (based on level) Ability Power."));
+    }
+
+    @Test
+    @DisplayName("레벨 구간 계산식은 처음 값부터 모든 구간을 더한 값까지로 쓴다")
+    void getAugmentDescriptions_WhenLevelBreakpoints_WritesRange() {
+        // given
+        expectAllFiles();
+
+        // when
+        CommunityDragonDescriptions descriptions = client.getAugmentDescriptions("16.22");
+
+        // then
+        assertThat(descriptions.descriptionOf(2076)).containsEntry("ko-KR",
+                "해당 스킬로 적 챔피언에게 피해를 입히면 방어력 및 마법 저항력이 2~3(레벨에 따라) 증가합니다.");
+    }
+
+    @Test
+    @DisplayName("백분율 계산식은 퍼센트로 쓴다")
+    void getAugmentDescriptions_WhenPercentCalculation_WritesPercent() {
+        // given
+        expectAllFiles();
+
+        // when
+        CommunityDragonDescriptions descriptions = client.getAugmentDescriptions("16.22");
+
+        // then
+        assertThat(descriptions.descriptionOf(2010)).containsEntry("en-US",
+                "Your Critical Strikes apply On-Hit effects an additional time.\n\nGain 25% Crit chance.");
+    }
+
+    @Test
+    @DisplayName("능력치 계수는 아직 풀지 않아 설명이 없다")
+    void getAugmentDescriptions_WhenStatCoefficient_IsEmpty() {
+        // given
+        expectAllFiles();
+
+        // when
+        CommunityDragonDescriptions descriptions = client.getAugmentDescriptions("16.22");
+
+        // then
+        assertThat(descriptions.descriptionOf(1018)).isEmpty();
+    }
+
+    @Test
     @DisplayName("증강 정의 파일을 받지 못하면 거부한다")
     void getAugmentDescriptions_WhenDefinitionDownloadFails_Rejects() {
         // given

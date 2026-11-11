@@ -1,30 +1,35 @@
 package dfgg.domain.aram;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
+import dfgg.domain.language.Language;
 import java.util.Map;
 import java.util.Optional;
 
-/** 증강 주문들의 값표. 설명 원문의 자리표시자 이름으로 값을 찾아 화면에 쓸 표기로 만든다. */
+/** 증강 주문들의 값표. 설명 원문의 자리표시자 이름으로 데이터값이나 계산식을 찾아 화면에 쓸 표기로 만든다. */
 public final class SpellValues {
 
     private final Map<String, Double> dataValues;
+    private final Map<String, SpellCalculation> calculations;
 
     public SpellValues(Map<String, Double> dataValues) {
+        this(dataValues, Map.of());
+    }
+
+    public SpellValues(Map<String, Double> dataValues, Map<String, SpellCalculation> calculations) {
         this.dataValues = Map.copyOf(dataValues);
+        this.calculations = Map.copyOf(calculations);
     }
 
-    /** @param percentFollows 원문에서 자리표시자 바로 뒤에 {@code %}가 있었는지. 있으면 값 바로 뒤에 붙인다 */
-    public Optional<String> format(String name, double multiplier, boolean percentFollows) {
-        return Optional.ofNullable(dataValues.get(name))
-                .map(value -> displayed(value * multiplier) + (percentFollows ? "%" : ""));
-    }
-
-    /** 게임 데이터는 float이라 {@code 0.2}가 {@code 0.20000000298}로 들어 있다. 소수 첫째 자리까지만 쓴다. */
-    private static String displayed(double value) {
-        return BigDecimal.valueOf(value)
-                .setScale(1, RoundingMode.HALF_UP)
-                .stripTrailingZeros()
-                .toPlainString();
+    /**
+     * 같은 이름이 둘 다 있으면 데이터값을 쓴다.
+     *
+     * @param percentFollows 원문에서 자리표시자 바로 뒤에 {@code %}가 있었는지. 있으면 값 바로 뒤에 붙인다
+     */
+    public Optional<String> format(String name, double multiplier, boolean percentFollows, Language language) {
+        Double dataValue = dataValues.get(name);
+        if (dataValue != null) {
+            return Optional.of(DisplayNumber.of(dataValue * multiplier) + (percentFollows ? "%" : ""));
+        }
+        return Optional.ofNullable(calculations.get(name))
+                .flatMap(calculation -> calculation.format(dataValues, multiplier, percentFollows, language));
     }
 }
