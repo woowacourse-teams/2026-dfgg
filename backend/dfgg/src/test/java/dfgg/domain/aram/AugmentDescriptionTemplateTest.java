@@ -2,7 +2,9 @@ package dfgg.domain.aram;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dfgg.domain.aram.CalculationPart.LevelRange;
 import dfgg.domain.language.Language;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -41,6 +43,36 @@ class AugmentDescriptionTemplateTest {
 
         // then
         assertThat(description).contains("공격력이 20% 증가합니다.");
+    }
+
+    @Test
+    @DisplayName("자리표시자 바로 뒤의 아이콘 표시는 퍼센트로 읽지 않는다")
+    void render_WhenIconFollowsPlaceholder_DoesNotReadPercent() {
+        // given
+        AugmentDescriptionTemplate template = new AugmentDescriptionTemplate(Language.KO_KR,
+                "<scaleAD>공격력 @Amount@%i:scaleAD%</scaleAD>을 얻습니다.");
+
+        // when
+        Optional<String> description = template.render(Map.of(), new SpellValues(Map.of("Amount", 30.0)));
+
+        // then
+        assertThat(description).contains("공격력 30을 얻습니다.");
+    }
+
+    @Test
+    @DisplayName("계산식 자리표시자 바로 뒤의 아이콘 표시도 퍼센트로 읽지 않는다")
+    void render_WhenIconFollowsCalculation_DoesNotReadPercent() {
+        // given
+        AugmentDescriptionTemplate template = new AugmentDescriptionTemplate(Language.KO_KR,
+                "<scaleAP>주문력 @AP@%i:scaleAP%</scaleAP>을 얻습니다.");
+        SpellValues values = new SpellValues(Map.of(),
+                Map.of("AP", new SpellCalculation(List.of(new LevelRange(20.0, 80.0)), false)));
+
+        // when
+        Optional<String> description = template.render(Map.of(), values);
+
+        // then
+        assertThat(description).contains("주문력 20~80(레벨에 따라)을 얻습니다.");
     }
 
     @Test

@@ -26,7 +26,8 @@ public final class AugmentDescriptionTemplate {
     private static final Pattern SPELL_NAME = Pattern.compile("\\{\\{\\s*spellname\\s*}}", Pattern.CASE_INSENSITIVE);
     private static final Pattern KOREAN_SPELL_NAME = Pattern.compile("\\{\\{\\s*spellname\\s*}}( 스킬)?",
             Pattern.CASE_INSENSITIVE);
-    private static final Pattern PLACEHOLDER = Pattern.compile("@([^@]+)@(%?)");
+    /** 바로 뒤의 {@code %}가 아이콘 표시({@code %i:scaleAD%})의 시작이면 백분율이 아니다. */
+    private static final Pattern PLACEHOLDER = Pattern.compile("@([^@]+)@(%(?!i:))?");
     private static final Pattern ICON = Pattern.compile("%i:[^%]+%");
     private static final Pattern LINE_BREAK = Pattern.compile("<br\\s*/?>", Pattern.CASE_INSENSITIVE);
     private static final Pattern TAG = Pattern.compile("<[^>]+>");
@@ -99,7 +100,7 @@ public final class AugmentDescriptionTemplate {
     /** {@code @이름@} 또는 {@code @이름*배수@}. 바로 뒤의 {@code %}는 값 표기에 넘긴다. */
     private Optional<String> fill(MatchResult placeholder, SpellValues values) {
         String[] expression = placeholder.group(1).split("\\*", 2);
-        boolean percentFollows = !placeholder.group(2).isEmpty();
+        boolean percentFollows = placeholder.group(2) != null;
         if (expression.length == 1) {
             return values.format(expression[0], 1, percentFollows, language);
         }

@@ -24,9 +24,10 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 /**
- * CommunityDragon에서 패치별 증강 이름, 등급, 아이콘을 받는다.
+ * CommunityDragon에서 패치별 증강 이름, 등급, 아이콘, 요약 설명을 받는다.
  * <p>
  * {@code latest}가 아니라 패치 폴더를 쓴다. 픽률 데이터의 패치는 라이브보다 늦을 수 있어서 그 패치의 이름과 아이콘을 맞춘다.
+ * 이름·등급·아이콘은 클라이언트용 {@code cherry-augments.json}에서, 설명은 그 파일의 설명 칸이 비어 있어 게임 파일에서 받는다.
  */
 @Component
 public class CommunityDragonClient {
