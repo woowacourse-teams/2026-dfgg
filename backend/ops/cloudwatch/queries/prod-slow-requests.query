@@ -1,0 +1,8 @@
+# dfgg/prod 6. 느린 요청
+# 로그 그룹: /dfgg/prod
+# logging.slow-request-threshold-millis(기본 1000ms) 이상이면 RequestLoggingFilter가 WARN으로 남긴다.
+fields @timestamp, slot, traceId, installId, message
+| filter @logStream like "app-" and logger_name = "dfgg.common.logging.RequestLoggingFilter" and level = "WARN"
+| parse message "method=* uri=* status=* duration_ms=*" as method, uri, status, duration_ms
+| sort @timestamp desc
+| limit 200
