@@ -104,6 +104,9 @@ recommendation:
     minimum-base-rate: "${RECOMMENDATION_ALLY_MINIMUM_BASE_RATE:0.02}"
   pair-synergy:
     minimum-pair-games: "${RECOMMENDATION_PAIR_SYNERGY_MIN_GAMES:5}"
+  aggregation:
+    # champion_pair_item_stats를 내 챔피언 구간 몇 개로 나눠 만들지. 구간이 많을수록 DB 메모리를 덜 쓴다.
+    pair-buckets: "${RECOMMENDATION_AGGREGATION_PAIR_BUCKETS:4}"
   self-synergy:
     minimum-position-sample: "${RECOMMENDATION_SELF_SYNERGY_MIN_POSITION_SAMPLE:10}"
   candidate-top-k:

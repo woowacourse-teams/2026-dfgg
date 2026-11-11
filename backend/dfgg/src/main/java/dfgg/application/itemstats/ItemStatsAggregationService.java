@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,7 @@ public class ItemStatsAggregationService {
     private final ChampionPairItemStatsRepository championPairItemStatsRepository;
     private final ItemMetaStatsRepository itemMetaStatsRepository;
     private final TierScope tierScope;
+    private final int pairAggregationBuckets;
 
     public ItemStatsAggregationService(
             NormalizedMatchParticipantRepository participantRepository,
@@ -42,14 +44,19 @@ public class ItemStatsAggregationService {
             ChampionItemRollupRepository championItemRollupRepository,
             ChampionPairItemStatsRepository championPairItemStatsRepository,
             ItemMetaStatsRepository itemMetaStatsRepository,
-            TierScope tierScope
+            TierScope tierScope,
+            @Value("${recommendation.aggregation.pair-buckets:4}") int pairAggregationBuckets
     ) {
+        if (pairAggregationBuckets < 1) {
+            throw new IllegalArgumentException("pair 집계 구간 수는 1 이상이어야 합니다: " + pairAggregationBuckets);
+        }
         this.participantRepository = participantRepository;
         this.championItemStatsRepository = championItemStatsRepository;
         this.championItemRollupRepository = championItemRollupRepository;
         this.championPairItemStatsRepository = championPairItemStatsRepository;
         this.itemMetaStatsRepository = itemMetaStatsRepository;
         this.tierScope = tierScope;
+        this.pairAggregationBuckets = pairAggregationBuckets;
     }
 
     @Transactional
@@ -79,7 +86,7 @@ public class ItemStatsAggregationService {
         championItemRollupRepository.aggregateFrom(recentPatches, excluded, tierScope.values());
 
         championPairItemStatsRepository.deleteAllInBatch();
-        championPairItemStatsRepository.aggregateFrom(recentPatches, excluded, tierScope.values());
+        aggregatePairStats(recentPatches, excluded);
 
         itemMetaStatsRepository.deleteAllInBatch();
         itemMetaStatsRepository.aggregateFrom(excluded, tierScope.values());
@@ -98,6 +105,17 @@ public class ItemStatsAggregationService {
                 result.championPairItemStatsCount(), result.itemMetaStatsCount(), result.durationMillis()
         );
         return result;
+    }
+
+    /** 한 번에 만들면 1GB DB가 메모리 부족으로 죽어서, 내 챔피언 구간별로 나눠 만든다. */
+    private void aggregatePairStats(Collection<String> recentPatches, Collection<String> excluded) {
+        for (int bucket = 0; bucket < pairAggregationBuckets; bucket++) {
+            long startedAt = System.currentTimeMillis();
+            championPairItemStatsRepository.aggregateFrom(
+                    recentPatches, excluded, tierScope.values(), pairAggregationBuckets, bucket);
+            log.info("Pair stats bucket {}/{} completed: durationMs={}",
+                    bucket + 1, pairAggregationBuckets, System.currentTimeMillis() - startedAt);
+        }
     }
 
     private RecentPatchWindow recentPatchWindow(int recentPatchWindowSize, Collection<String> excludedPatches) {
