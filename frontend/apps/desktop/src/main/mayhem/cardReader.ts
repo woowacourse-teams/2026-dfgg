@@ -13,6 +13,13 @@ import { captureRegionPixels, pixelsToImage, releaseCaptureSurfaces } from './sc
 import { titleMask, toLuma } from './titleStrip';
 import type { Gray, Mask } from './titleMatch';
 import { reportError } from '../sentry';
+import {
+  finishMayhemStats,
+  recordCheck,
+  recordKind,
+  recordReadTime,
+  recordSelection,
+} from './mayhemStats';
 
 // 확인 시간을 모아서 한 줄로 찍는다.
 const STATS_EVERY = 20;
@@ -133,9 +140,20 @@ export function startCardReader(
   let tracker = EMPTY_TRACKER;
   let slots = emptySlots();
   let stats = emptyStats();
+  // 이번 카드 묶음을 처음 본 시각과, 라벨을 띄운 데 걸린 시간. 묶음이 사라지면 한 번 기록한다
+  let selectionStarted: number | null = null;
+  let labelMs: number | null = null;
+
+  const endSelection = () => {
+    if (selectionStarted === null) return;
+    recordSelection(labelMs);
+    selectionStarted = null;
+    labelMs = null;
+  };
 
   /** 확인 한 번의 시간을 더하고, STATS_EVERY 번이 차면 찍고 비운다 */
   const record = (total: number, find: number, timing: Timing) => {
+    recordCheck(total, timing.grab, timing.luma);
     stats = {
       count: stats.count + 1,
       total: stats.total + total,
@@ -164,9 +182,16 @@ export function startCardReader(
     const timing: Timing = { grab: 0, luma: 0 };
     const frameWidth = game ? Math.round((game.width / game.height) * FRAME_HEIGHT) : 0;
     const frame = game && captureGray(game, frameWidth, FRAME_HEIGHT, undefined, timing);
+    // 창은 있는데 못 찍었다면 캡처 자체가 실패한 것이다. 같은 에러는 한 번만 보낸다
+    if (game && !frame) reportError('mayhem-capture', new Error('게임 화면 캡처 실패'));
     if (frame) tracker = trackCards(tracker, frame);
 
+    if (frame && (tracker.boxes || tracker.candidate) && selectionStarted === null) {
+      selectionStarted = performance.now(); // 카드 묶음을 처음 봤다
+    }
+
     if (!game || !frame || !tracker.boxes) {
+      if (!tracker.candidate) endSelection(); // 카드가 사라졌다
       slots = emptySlots();
       onCards([]);
       record(performance.now() - started, found, timing);
@@ -184,7 +209,9 @@ export function startCardReader(
       if (!shouldRead) return slot;
       const readStarted = performance.now();
       const mask = readTitle(game, box, scale, i);
+      if (!mask) recordKind('unreadable');
       const next = mask ? applyRead(slot, judge(mask)) : applyUnreadable(slot);
+      recordReadTime(performance.now() - readStarted);
       console.log(
         '[mayhem] 읽기',
         `카드${i + 1}`,
@@ -196,6 +223,9 @@ export function startCardReader(
     onCards(
       boxes.map((box, i) => ({ box: relative(box, frame), augment: slots[i].augment ?? null })),
     );
+    if (labelMs === null && selectionStarted !== null && slots.some((slot) => slot.augment)) {
+      labelMs = performance.now() - selectionStarted; // 이번 묶음의 첫 라벨
+    }
     record(performance.now() - started, found, timing);
     return OPEN_MS;
   };
@@ -203,6 +233,8 @@ export function startCardReader(
   const tick = () => {
     if (!alive()) {
       releaseCaptureSurfaces(); // 판이 끝나면 찍기용 자원을 돌려준다
+      endSelection();
+      finishMayhemStats(); // 한 판 동안 모은 인식 통계를 보낸다
       return;
     }
     let delay = OPEN_MS;

@@ -161,7 +161,18 @@ function MayhemChampSelectSection({ state }: { state: ChampSelectState }) {
   const podium = shown.slice(0, PODIUM);
   const rest = shown.slice(PODIUM);
   const openPodium = podium.find((a) => a.augmentId === openId);
-  const toggle = (id: number) => setOpenId((current) => (current === id ? null : id));
+  // 설명을 펼칠 때만 기록한다. 어느 순위·자리의 설명을 실제로 읽는지 본다
+  const toggle = (augment: MayhemAugment, place: 'podium' | 'list') => {
+    const opening = openId !== augment.augmentId;
+    setOpenId(opening ? augment.augmentId : null);
+    if (opening) {
+      window.analytics.track('mayhem-augment-open', {
+        rarity: augment.rarity,
+        rank: augment.rank ?? -1, // 순위가 없으면 -1
+        place,
+      });
+    }
+  };
 
   const select = (next: AugmentRarity) => {
     setRarity(next);
@@ -235,7 +246,7 @@ function MayhemChampSelectSection({ state }: { state: ChampSelectState }) {
                     augment={augment}
                     maxRate={maxRate}
                     open={openId === augment.augmentId}
-                    onToggle={() => toggle(augment.augmentId)}
+                    onToggle={() => toggle(augment, 'podium')}
                   />
                 ))}
               </ol>
@@ -254,7 +265,7 @@ function MayhemChampSelectSection({ state }: { state: ChampSelectState }) {
                       augment={augment}
                       maxRate={maxRate}
                       open={openId === augment.augmentId}
-                      onToggle={() => toggle(augment.augmentId)}
+                      onToggle={() => toggle(augment, 'list')}
                     />
                   ))}
                 </ol>
