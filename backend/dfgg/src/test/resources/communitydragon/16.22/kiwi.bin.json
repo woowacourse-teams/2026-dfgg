@@ -1,0 +1,322 @@
+{
+  "Maps/ModeSpecificData/Augments/Sonata/Particles/Augment_Sonata_Sona_Base_E_Buff_SFX": {
+    "__type": "VfxSystemDefinitionData",
+    "particleName": "Augment_Sonata_Sona_Base_E_Buff_SFX"
+  },
+  "Maps/ModeSpecificData/Augments/ARAM_BluntForce": {
+    "AugmentNameId": "ARAM_BluntForce",
+    "NameTra": "Kiwi_ARAM_BluntForce_Name",
+    "DescriptionTra": "Cherry_BluntForce_Summary",
+    "AugmentTooltipTra": "Cherry_BluntForce_Tooltip",
+    "RootSpell": "Maps/ModeSpecificData/Augments/ARAM_BluntForce/Augment_ARAM_BluntForce",
+    "mAugmentTags": 4,
+    "AugmentLargeIconPath": "assets/ux/cherry/augments/icons/bluntforce_large.tex",
+    "AugmentSmallIconPath": "assets/ux/cherry/augments/icons/bluntforce_small.tex",
+    "AugmentDisplayTags": [
+      1
+    ],
+    "AugmentPlatformId": 1007,
+    "__type": "AugmentData"
+  },
+  "Maps/ModeSpecificData/Augments/ARAM_BluntForce/Augment_ARAM_BluntForce": {
+    "mScriptName": "Augment_ARAM_BluntForce",
+    "mSpell": {
+      "DataValues": [
+        {
+          "name": "ADAmp",
+          "values": [
+            0.20000000298023224,
+            0.20000000298023224,
+            0.20000000298023224,
+            0.20000000298023224,
+            0.20000000298023224,
+            0.20000000298023224,
+            0.20000000298023224
+          ],
+          "__type": "SpellDataValue"
+        }
+      ]
+    },
+    "__type": "SpellObject"
+  },
+  "Maps/ModeSpecificData/Augments/Totentanz": {
+    "AugmentNameId": "Totentanz",
+    "NameTra": "Kiwi_Augment_Totentanz_Name",
+    "DescriptionTra": "Kiwi_Augment_Totentanz_Description",
+    "AugmentTooltipTra": "Kiwi_Augment_Totentanz_Tooltip",
+    "RootSpell": "Maps/ModeSpecificData/Augments/Totentanz/Augment_Totentanz",
+    "AdditionalSpells": [
+      "{b8dcb020}"
+    ],
+    "AugmentLargeIconPath": "assets/ux/kiwi/augments/icons/totentanz_large.tex",
+    "AugmentSmallIconPath": "assets/ux/kiwi/augments/icons/totentanz_small.tex",
+    "AugmentDisplayTags": [
+      5
+    ],
+    "rarity": 2,
+    "AugmentPlatformId": 3079,
+    "ResourceResolver": "{0a8951c7}",
+    "__type": "AugmentData"
+  },
+  "Maps/ModeSpecificData/Augments/Totentanz/Augment_Totentanz": {
+    "mScriptName": "Augment_Totentanz",
+    "mSpell": {
+      "DataValues": [
+        {
+          "name": "Buff_Duration",
+          "values": [
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "Takedown_Window",
+          "values": [
+            3.0,
+            3.0,
+            3.0,
+            3.0,
+            3.0,
+            3.0,
+            3.0
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "CastTime",
+          "values": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "MinHealth",
+          "values": [
+            25.0,
+            25.0,
+            25.0,
+            25.0,
+            25.0,
+            25.0,
+            25.0
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "Kill_Empower_Duration",
+          "values": [
+            10.0,
+            10.0,
+            10.0,
+            10.0,
+            10.0,
+            10.0,
+            10.0
+          ],
+          "__type": "SpellDataValue"
+        }
+      ],
+      "mSpellCalculations": {
+        "Calc_Heal": {
+          "mFormulaParts": [
+            {
+              "mStartValue": 250.0,
+              "mEndValue": 1000.0,
+              "__type": "ByCharLevelInterpolationCalculationPart"
+            },
+            {
+              "mStat": 29,
+              "mCoefficient": 10.0,
+              "__type": "StatByCoefficientCalculationPart"
+            },
+            {
+              "mStat": 22,
+              "mCoefficient": 10.0,
+              "__type": "StatByCoefficientCalculationPart"
+            }
+          ],
+          "__type": "GameCalculation"
+        },
+        "{8a7e6cfb}": {
+          "mSimpleTooltipCalculationDisplay": 5,
+          "mExpandedTooltipCalculationDisplay": 5,
+          "mFormulaParts": [
+            {
+              "mNumber": 20.0,
+              "__type": "NumberCalculationPart"
+            }
+          ],
+          "__type": "GameCalculation"
+        }
+      }
+    },
+    "__type": "SpellObject"
+  },
+  "{b8dcb020}": {
+    "mScriptName": "Augment_Totentanz_BlinkTrail",
+    "mSpell": {},
+    "__type": "SpellObject"
+  },
+  "Maps/ModeSpecificData/Augments/ARAM_RabbleRousing": {
+    "AugmentNameId": "ARAM_RabbleRousing",
+    "NameTra": "Kiwi_ARAM_RabbleRousing_Name",
+    "DescriptionTra": "Kiwi_RabbleRousing_Summary",
+    "AugmentTooltipTra": "Kiwi_RabbleRousing_Tooltip",
+    "RootSpell": "Maps/ModeSpecificData/Augments/ARAM_RabbleRousing/Augment_ARAM_RabbleRousing",
+    "mBuildTags": 312,
+    "AugmentLargeIconPath": "assets/ux/cherry/augments/icons/rabblerousing_large.tex",
+    "AugmentSmallIconPath": "assets/ux/cherry/augments/icons/rabblerousing_small.tex",
+    "AugmentDisplayTags": [
+      3
+    ],
+    "rarity": 1,
+    "AugmentPlatformId": 1067,
+    "ResourceResolver": "Maps/ModeSpecificData/Augments/ARAM_RabbleRousing/Resources",
+    "IsAbilityAugment": true,
+    "__type": "AugmentData"
+  },
+  "Maps/ModeSpecificData/Augments/ARAM_RabbleRousing/Augment_ARAM_RabbleRousing": {
+    "mScriptName": "Augment_ARAM_RabbleRousing",
+    "mSpell": {
+      "DataValues": [
+        {
+          "name": "MaxHealthPercentageHeal",
+          "values": [
+            0.014999999664723873,
+            0.014999999664723873,
+            0.014999999664723873,
+            0.014999999664723873,
+            0.014999999664723873,
+            0.014999999664723873,
+            0.014999999664723873
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "BonusPercentMax",
+          "values": [
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "BonusPercentMin",
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "bAD",
+          "values": [
+            0.25,
+            0.25,
+            0.25,
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "AP",
+          "values": [
+            0.15000000596046448,
+            0.15000000596046448,
+            0.15000000596046448,
+            0.15000000596046448,
+            0.15000000596046448,
+            0.15000000596046448,
+            0.15000000596046448
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "BonusHealthPercentageHeal",
+          "values": [
+            0.05000000074505806,
+            0.05000000074505806,
+            0.05000000074505806,
+            0.05000000074505806,
+            0.05000000074505806,
+            0.05000000074505806,
+            0.05000000074505806
+          ],
+          "__type": "SpellDataValue"
+        }
+      ],
+      "mSpellCalculations": {
+        "HealAmount": {
+          "mFormulaParts": [
+            {
+              "mStartValue": 30.0,
+              "mEndValue": 100.0,
+              "__type": "ByCharLevelInterpolationCalculationPart"
+            },
+            {
+              "mStat": 12,
+              "mStatFormula": 2,
+              "mDataValue": "BonusHealthPercentageHeal",
+              "__type": "StatByNamedDataValueCalculationPart"
+            },
+            {
+              "mDataValue": "AP",
+              "__type": "StatByNamedDataValueCalculationPart"
+            },
+            {
+              "mStat": 2,
+              "mStatFormula": 2,
+              "mDataValue": "bAD",
+              "__type": "StatByNamedDataValueCalculationPart"
+            }
+          ],
+          "__type": "GameCalculation"
+        }
+      }
+    },
+    "__type": "SpellObject"
+  },
+  "Maps/ModeSpecificData/Augments/ARAM_Quest_UrfsChampion": {
+    "AugmentNameId": "ARAM_Quest_UrfsChampion",
+    "NameTra": "Kiwi_ARAM_Quest_UrfsChampion_Name",
+    "DescriptionTra": "Kiwi_Quest_UrfsChampion_Summary",
+    "AugmentTooltipTra": "Kiwi_Quest_UrfsChampion_Tooltip",
+    "RootSpell": "Maps/ModeSpecificData/Augments/ARAM_Quest_UrfsChampion/Augment_ARAM_Quest_UrfsChampion",
+    "AugmentLargeIconPath": "assets/ux/kiwi/augments/icons/quest_urfschampion_large.tex",
+    "AugmentSmallIconPath": "assets/ux/kiwi/augments/icons/quest_urfschampion_small.tex",
+    "AugmentDisplayTags": [
+      2,
+      1,
+      8
+    ],
+    "rarity": 2,
+    "AugmentPlatformId": 1154,
+    "ResourceResolver": "{a2c4b558}",
+    "QuestData": {
+      "Quest": "Maps/ModeSpecificData/ModesQuests/UrfsChampionQuest",
+      "__type": "AugmentQuestData"
+    },
+    "__type": "AugmentData"
+  },
+  "Maps/ModeSpecificData/Augments/ARAM_Quest_UrfsChampion/Augment_ARAM_Quest_UrfsChampion": {
+    "mScriptName": "Augment_ARAM_Quest_UrfsChampion",
+    "mSpell": {},
+    "__type": "SpellObject"
+  }
+}

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dfgg.domain.language.Language;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -194,6 +195,20 @@ class AugmentDescriptionTemplateTest {
 
         // then
         assertThat(description).contains("해당 스킬 강화!\n\n강화 해당 스킬은 스킬 가속이 20 증가합니다.");
+    }
+
+    @Test
+    @DisplayName("끼워 넣는 문자열 키를 소문자로 알려 주고 스킬 이름 자리는 뺀다")
+    void includedKeys_ReturnsLowerCaseKeysWithoutSpellName() {
+        // given
+        AugmentDescriptionTemplate template = new AugmentDescriptionTemplate(Language.KO_KR,
+                "{{SpellName}} 스킬이 {{ Item_Keyword_OnHit }} 효과와 {{Kiwi_Augment_Totentanz_Summoner_Name}}을 얻습니다.");
+
+        // when
+        Set<String> keys = template.includedKeys();
+
+        // then
+        assertThat(keys).containsExactlyInAnyOrder("item_keyword_onhit", "kiwi_augment_totentanz_summoner_name");
     }
 
     @Test

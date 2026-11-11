@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -45,6 +46,13 @@ public final class AugmentDescriptionTemplate {
                 .flatMap(resolved -> fillPlaceholders(resolved, values))
                 .map(AugmentDescriptionTemplate::stripMarkup)
                 .filter(AugmentDescriptionTemplate::isFullyResolved);
+    }
+
+    /** 이 원문이 끼워 넣는 게임 문자열 키(소문자). 스킬 이름 자리는 문자열로 풀지 않으므로 빠진다. */
+    public Set<String> includedKeys() {
+        return INCLUDE.matcher(replaceSpellName(text)).results()
+                .map(AugmentDescriptionTemplate::keyOf)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private Optional<String> resolveIncludes(Map<String, String> strings) {

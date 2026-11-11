@@ -1,0 +1,11 @@
+{
+  "entries": {
+    "cherry_bluntforce_summary": "Gain %i:scaleAD% <scaleAD>@ADAmp*100@% Attack Damage</scaleAD>.",
+    "kiwi_augment_totentanz_description": "Replace a Summoner Spell with <spellName>{{Kiwi_Augment_Totentanz_Summoner_Name}}</spellName>.<br><br><spellName>{{Kiwi_Augment_Totentanz_Summoner_Name}}</spellName>: Blink forward and become <attention>Unkillable</attention>. Get a takedown within @Buff_Duration@ seconds or else<br><danger>YOU DIE</danger>.",
+    "kiwi_augment_totentanz_summoner_name": "A Dance with Death",
+    "kiwi_quest_urfschampion_summary": "<font color='#F0C200'>QUEST:</font> Score @QuestRequirement@ takedowns.<br><br>REWARD: Golden Spatula",
+    "kiwi_rabblerousing_summary": "Using {{SpellName}} restores <healing>Health</healing>.",
+    "generatedtip_unrelated_entry": "Unrelated"
+  },
+  "version": "16.22"
+}
