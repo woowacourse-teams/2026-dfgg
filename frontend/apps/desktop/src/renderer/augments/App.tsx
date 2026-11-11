@@ -21,24 +21,37 @@ function App() {
     return window.mayhem.onCards(setCards);
   }, []);
 
+  // 지금 뜬 카드 중 순위가 가장 높은(숫자가 작은) 것을 강조한다
+  const ranks = cards.flatMap(({ augment }) => (augment?.rank != null ? [augment.rank] : []));
+  const bestRank = ranks.length > 0 ? Math.min(...ranks) : null;
+
   return (
     <>
       {cards.map(({ box, augment }, i) =>
         augment ? (
           <div
             key={i}
-            className='augment-label'
+            className='augment-slot'
             style={{
               left: `${box.x * 100}%`,
               top: `${box.y * 100}%`,
               width: `${box.width * 100}%`,
             }}
           >
-            <strong>{augment.name}</strong>
-            <span>
-              {augment.rank !== null ? `${RARITY_LABEL[augment.rarity]} ${augment.rank}위` : '-'} · 픽률{' '}
-              {formatPickRate(augment.pickRate)}
-            </span>
+            {/* key 에 id 를 넣어 증강이 바뀌면 다시 떠오르게 한다 */}
+            <div key={augment.augmentId} className={`augment-label${augment.rank !== null && augment.rank === bestRank ? ' is-best' : ''}`}>
+              {augment.rank !== null && (
+                <>
+                  <span className='augment-stat'>
+                    {RARITY_LABEL[augment.rarity]} <b>{augment.rank}위</b>
+                  </span>
+                  <i className='augment-sep' />
+                </>
+              )}
+              <span className='augment-stat'>
+                픽률 <b>{formatPickRate(augment.pickRate)}</b>
+              </span>
+            </div>
           </div>
         ) : null,
       )}

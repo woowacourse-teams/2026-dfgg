@@ -88,7 +88,7 @@ function createAugmentWindow() {
   });
   augment.setIgnoreMouseEvents(true);
   augment.setAlwaysOnTop(true, 'screen-saver');
-  augment.setContentProtection(true);
+  // augment.setContentProtection(true);
   loadRenderer(augment, 'augments');
   return augment;
 }
