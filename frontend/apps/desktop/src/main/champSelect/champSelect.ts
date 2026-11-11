@@ -155,7 +155,10 @@ function onSession(session: LcuChampSelectSession) {
   const { position } = next;
   if (trackedRound !== round) {
     trackedRound = round;
-    trackEvent('desktop-champ-select', { assigned: parsed.position !== null, mode: mode ?? 'rift' });
+    trackEvent('desktop-champ-select', {
+      assigned: parsed.position !== null,
+      mode: mode ?? 'rift',
+    });
   }
 
   // 아수라장은 협곡용 오늘의 픽·카운터·룬 대신 추천 증강만 받는다

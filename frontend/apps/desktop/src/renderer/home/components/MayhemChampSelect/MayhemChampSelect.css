@@ -201,8 +201,7 @@
   border: 1px solid var(--tier-line);
   border-radius: var(--radius-l);
   background:
-    radial-gradient(120% 70% at 50% 0%, var(--tier-soft), transparent 70%),
-    var(--surface);
+    radial-gradient(120% 70% at 50% 0%, var(--tier-soft), transparent 70%), var(--surface);
   font: inherit;
   color: inherit;
   text-align: center;
@@ -306,8 +305,7 @@ li:nth-child(3) > .mcs-card {
 .mcs-card.mcs-best {
   border-color: rgb(230 57 80 / 55%);
   background:
-    radial-gradient(120% 70% at 50% 0%, rgb(230 57 80 / 24%), transparent 70%),
-    var(--surface);
+    radial-gradient(120% 70% at 50% 0%, rgb(230 57 80 / 24%), transparent 70%), var(--surface);
   box-shadow: 0 8px 26px rgb(230 57 80 / 18%);
 }
 
@@ -370,12 +368,24 @@ li:nth-child(3) > .mcs-card {
   border-top: 1px solid var(--line);
 }
 
-.mcs-row:nth-child(2) { animation-delay: 20ms; }
-.mcs-row:nth-child(3) { animation-delay: 40ms; }
-.mcs-row:nth-child(4) { animation-delay: 60ms; }
-.mcs-row:nth-child(5) { animation-delay: 80ms; }
-.mcs-row:nth-child(6) { animation-delay: 100ms; }
-.mcs-row:nth-child(n + 7) { animation-delay: 120ms; }
+.mcs-row:nth-child(2) {
+  animation-delay: 20ms;
+}
+.mcs-row:nth-child(3) {
+  animation-delay: 40ms;
+}
+.mcs-row:nth-child(4) {
+  animation-delay: 60ms;
+}
+.mcs-row:nth-child(5) {
+  animation-delay: 80ms;
+}
+.mcs-row:nth-child(6) {
+  animation-delay: 100ms;
+}
+.mcs-row:nth-child(n + 7) {
+  animation-delay: 120ms;
+}
 
 /* 한 줄: 순위 · 그림 · 이름 · 설명 첫 줄 · 픽률 · 펼침 표시 */
 .mcs-row-head {

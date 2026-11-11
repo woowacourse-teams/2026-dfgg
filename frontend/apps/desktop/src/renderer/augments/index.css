@@ -116,7 +116,8 @@ body {
   margin-left: -30%;
   height: 0.13em;
   background:
-    linear-gradient(90deg, transparent, rgb(255 255 255 / 90%), transparent) -60% 0 / 40% 100% no-repeat,
+    linear-gradient(90deg, transparent, rgb(255 255 255 / 90%), transparent) -60% 0 / 40% 100%
+      no-repeat,
     linear-gradient(90deg, transparent, var(--accent) 30%, var(--accent) 70%, transparent);
   box-shadow: 0 0 10px rgb(230 57 80 / 60%);
   animation: best-sweep 1.2s var(--ease-out) 0.2s backwards;
@@ -124,10 +125,14 @@ body {
 
 @keyframes best-sweep {
   from {
-    background-position: -60% 0, 0 0;
+    background-position:
+      -60% 0,
+      0 0;
   }
   to {
-    background-position: 160% 0, 0 0;
+    background-position:
+      160% 0,
+      0 0;
   }
 }
 

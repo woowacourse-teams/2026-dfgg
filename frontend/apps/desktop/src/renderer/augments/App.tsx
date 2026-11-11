@@ -39,7 +39,10 @@ function App() {
             }}
           >
             {/* key 에 id 를 넣어 증강이 바뀌면 다시 떠오르게 한다 */}
-            <div key={augment.augmentId} className={`augment-label${augment.rank !== null && augment.rank === bestRank ? ' is-best' : ''}`}>
+            <div
+              key={augment.augmentId}
+              className={`augment-label${augment.rank !== null && augment.rank === bestRank ? ' is-best' : ''}`}
+            >
               {augment.rank !== null && (
                 <>
                   <span className='augment-stat'>

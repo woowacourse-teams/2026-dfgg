@@ -94,7 +94,10 @@ function captureGray(
 
   if (debugDir && debugName) {
     try {
-      fs.writeFileSync(path.join(debugDir, `${debugName}.png`), pixelsToImage(pixels, width, height).toPNG());
+      fs.writeFileSync(
+        path.join(debugDir, `${debugName}.png`),
+        pixelsToImage(pixels, width, height).toPNG(),
+      );
       pruneDebugDir();
     } catch (error) {
       console.warn('[mayhem] 디버그 그림 저장 실패', error);

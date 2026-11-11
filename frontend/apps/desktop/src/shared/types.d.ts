@@ -30,7 +30,6 @@ export interface MayhemAugments {
   augments: MayhemAugment[];
 }
 
-
 export type OverlayClickTarget = 'item' | 'situational' | 'collapse' | 'expand' | 'empty' | 'other';
 
 // 전적 카드에 하이라이트 보기 버튼을 그릴 때 필요

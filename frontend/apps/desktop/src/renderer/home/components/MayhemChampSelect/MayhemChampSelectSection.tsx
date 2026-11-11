@@ -86,7 +86,8 @@ function PodiumCard({
 }
 
 /** 순위 강조 단계. 1위는 레드, 2~3위는 등급 색, 나머지는 회색 */
-const tierOf = (rank: number | null) => (rank === 1 ? 'best' : rank !== null && rank <= 3 ? 'top' : 'rest');
+const tierOf = (rank: number | null) =>
+  rank === 1 ? 'best' : rank !== null && rank <= 3 ? 'top' : 'rest';
 
 /** 한 줄: 순위 · 그림 · 이름 · 설명 첫 줄 · 픽률. 누르면 아래에 설명 전체를 펼친다 */
 function AugmentRow({
@@ -115,11 +116,7 @@ function AugmentRow({
       <img className='mcs-icon' src={iconUrl} alt='' loading='lazy' />
       <b className='mcs-name'>{name}</b>
       {/* 첫 줄만 보이고 넘치면 줄인다. 펼치면 숨긴다 */}
-      {description && !open ? (
-        <Description text={description} className='mcs-preview' />
-      ) : (
-        <span />
-      )}
+      {description && !open ? <Description text={description} className='mcs-preview' /> : <span />}
       {rate}
     </>
   );
