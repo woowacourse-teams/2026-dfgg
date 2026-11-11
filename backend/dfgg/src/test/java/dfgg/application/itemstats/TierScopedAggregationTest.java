@@ -51,7 +51,7 @@ class TierScopedAggregationTest {
         return new ItemStatsAggregationService(
                 participantRepository, championItemStatsRepository, championItemRollupRepository,
                 championPairItemStatsRepository, itemMetaStatsRepository,
-                TierScope.of(List.of(tiers), "test"));
+                TierScope.of(List.of(tiers), "test"), 1);
     }
 
     @Test
