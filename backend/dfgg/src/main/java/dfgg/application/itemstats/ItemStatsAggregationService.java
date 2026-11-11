@@ -79,24 +79,28 @@ public class ItemStatsAggregationService {
         Collection<String> recentPatches = recentPatchParameter(window);
         Collection<String> excluded = excludedPatchParameter(excludedPatches);
 
+        // 행 수는 INSERT가 돌려준 값을 쓴다. 같은 트랜잭션에서 count(*)를 다시 하면 방금 넣은 행이
+        // visibility map에 없어 인덱스 항목마다 테이블을 무작위로 읽고, 운영 DB에서 수 시간이 걸렸다.
         championItemStatsRepository.deleteAllInBatch();
-        championItemStatsRepository.aggregateFrom(recentPatches, excluded, tierScope.values());
+        int championItemStatsCount = championItemStatsRepository.aggregateFrom(
+                recentPatches, excluded, tierScope.values());
 
         championItemRollupRepository.deleteAllInBatch();
-        championItemRollupRepository.aggregateFrom(recentPatches, excluded, tierScope.values());
+        int championItemRollupCount = championItemRollupRepository.aggregateFrom(
+                recentPatches, excluded, tierScope.values());
 
         championPairItemStatsRepository.deleteAllInBatch();
-        aggregatePairStats(recentPatches, excluded);
+        long championPairItemStatsCount = aggregatePairStats(recentPatches, excluded);
 
         itemMetaStatsRepository.deleteAllInBatch();
-        itemMetaStatsRepository.aggregateFrom(excluded, tierScope.values());
+        int itemMetaStatsCount = itemMetaStatsRepository.aggregateFrom(excluded, tierScope.values());
 
         ItemStatsAggregationResult result = new ItemStatsAggregationResult(
                 window.patches(),
-                championItemStatsRepository.count(),
-                championItemRollupRepository.count(),
-                championPairItemStatsRepository.count(),
-                itemMetaStatsRepository.count(),
+                championItemStatsCount,
+                championItemRollupCount,
+                championPairItemStatsCount,
+                itemMetaStatsCount,
                 System.currentTimeMillis() - startedAt
         );
         log.info(
@@ -108,14 +112,17 @@ public class ItemStatsAggregationService {
     }
 
     /** 한 번에 만들면 1GB DB가 메모리 부족으로 죽어서, 내 챔피언 구간별로 나눠 만든다. */
-    private void aggregatePairStats(Collection<String> recentPatches, Collection<String> excluded) {
+    private long aggregatePairStats(Collection<String> recentPatches, Collection<String> excluded) {
+        long insertedRows = 0;
         for (int bucket = 0; bucket < pairAggregationBuckets; bucket++) {
             long startedAt = System.currentTimeMillis();
-            championPairItemStatsRepository.aggregateFrom(
+            int bucketRows = championPairItemStatsRepository.aggregateFrom(
                     recentPatches, excluded, tierScope.values(), pairAggregationBuckets, bucket);
-            log.info("Pair stats bucket {}/{} completed: durationMs={}",
-                    bucket + 1, pairAggregationBuckets, System.currentTimeMillis() - startedAt);
+            insertedRows += bucketRows;
+            log.info("Pair stats bucket {}/{} completed: rows={}, durationMs={}",
+                    bucket + 1, pairAggregationBuckets, bucketRows, System.currentTimeMillis() - startedAt);
         }
+        return insertedRows;
     }
 
     private RecentPatchWindow recentPatchWindow(int recentPatchWindowSize, Collection<String> excludedPatches) {

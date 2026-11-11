@@ -62,6 +62,6 @@ public interface ItemMetaStatsRepository extends JpaRepository<ItemMetaStats, Lo
              AND scope.normalized_position = pick.normalized_position
             GROUP BY pick.patch, pick.normalized_position, pick.item_id
             """, nativeQuery = true)
-    void aggregateFrom(@Param("excludedPatches") Collection<String> excludedPatches,
+    int aggregateFrom(@Param("excludedPatches") Collection<String> excludedPatches,
                        @Param("tiers") Collection<String> tiers);
 }

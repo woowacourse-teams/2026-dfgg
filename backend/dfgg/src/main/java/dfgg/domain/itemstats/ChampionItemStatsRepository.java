@@ -81,7 +81,7 @@ public interface ChampionItemStatsRepository extends JpaRepository<ChampionItemS
              AND champion_games.normalized_position = purchase.normalized_position
             GROUP BY purchase.champion_id, purchase.normalized_position, purchase.item_id
             """, nativeQuery = true)
-    void aggregateFrom(@Param("recentPatches") Collection<String> recentPatches,
+    int aggregateFrom(@Param("recentPatches") Collection<String> recentPatches,
                        @Param("excludedPatches") Collection<String> excludedPatches,
                        @Param("tiers") Collection<String> tiers);
 }

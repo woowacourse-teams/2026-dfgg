@@ -102,7 +102,7 @@ public interface ChampionPairItemStatsRepository extends JpaRepository<ChampionP
             GROUP BY pair_items.my_champion_id, pair_items.other_champion_id, pair_items.relation,
                      pair_items.item_id
             """, nativeQuery = true)
-    void aggregateFrom(@Param("recentPatches") Collection<String> recentPatches,
+    int aggregateFrom(@Param("recentPatches") Collection<String> recentPatches,
                        @Param("excludedPatches") Collection<String> excludedPatches,
                        @Param("tiers") Collection<String> tiers,
                        @Param("buckets") int buckets,
