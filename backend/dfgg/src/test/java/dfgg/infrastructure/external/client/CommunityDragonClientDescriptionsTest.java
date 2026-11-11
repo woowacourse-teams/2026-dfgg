@@ -62,10 +62,12 @@ class CommunityDragonClientDescriptionsTest {
         CommunityDragonDescriptions descriptions = client.getAugmentDescriptions("16.22");
 
         // then
-        assertThat(descriptions.descriptionOf(3079)).containsEntry("ko-KR", "소환사 주문이 죽음과 함께하는 춤으로 변경됩니다.\n\n"
-                + "죽음과 함께하는 춤: 전방으로 순간적으로 이동하여 불사 상태가 됩니다. 5초 이내에 처치 관여를 달성하지 않으면\n사망합니다.");
-        assertThat(descriptions.descriptionOf(3079)).containsEntry("en-US", "Replace a Summoner Spell with A Dance with Death.\n\n"
-                + "A Dance with Death: Blink forward and become Unkillable. Get a takedown within 5 seconds or else\nYOU DIE.");
+        assertThat(descriptions.descriptionOf(3079)).containsEntry("ko-KR",
+                "소환사 주문이 죽음과 함께하는 춤으로 변경됩니다.\n\n죽음과 함께하는 춤: 전방으로 순간적으로 이동하여 "
+                        + "불사 상태가 됩니다. 5초 이내에 처치 관여를 달성하지 않으면\n사망합니다.");
+        assertThat(descriptions.descriptionOf(3079)).containsEntry("en-US",
+                "Replace a Summoner Spell with A Dance with Death.\n\nA Dance with Death: Blink forward and become "
+                        + "Unkillable. Get a takedown within 5 seconds or else\nYOU DIE.");
         server.verify();
     }
 
@@ -153,8 +155,8 @@ class CommunityDragonClientDescriptionsTest {
     }
 
     @Test
-    @DisplayName("능력치 계수는 아직 풀지 않아 설명이 없다")
-    void getAugmentDescriptions_WhenStatCoefficient_IsEmpty() {
+    @DisplayName("능력치 계수는 기본값 뒤에 괄호로 쓴다")
+    void getAugmentDescriptions_WhenStatCoefficient_WritesCoefficient() {
         // given
         expectAllFiles();
 
@@ -162,7 +164,69 @@ class CommunityDragonClientDescriptionsTest {
         CommunityDragonDescriptions descriptions = client.getAugmentDescriptions("16.22");
 
         // then
-        assertThat(descriptions.descriptionOf(1018)).isEmpty();
+        assertThat(descriptions.descriptionOf(1018)).isEqualTo(Map.of(
+                "ko-KR", "적 챔피언을 이동 불가 상태로 만들거나 이동 스킬을 사용할 수 없게 하면 "
+                        + "150~450(레벨에 따라) (+체력의 4%)의 보호막을 얻습니다.",
+                "en-US", "Gain 150~450 (based on level) (+4% Health) Shield after Immobilizing or Grounding "
+                        + "an enemy champion."));
+    }
+
+    @Test
+    @DisplayName("백분율 계산식의 계수는 능력치 100당 값으로 쓴다")
+    void getAugmentDescriptions_WhenPercentCoefficient_WritesPerHundred() {
+        // given
+        expectAllFiles();
+
+        // when
+        CommunityDragonDescriptions descriptions = client.getAugmentDescriptions("16.22");
+
+        // then
+        assertThat(descriptions.descriptionOf(1048)).containsEntry("en-US",
+                "Your Abilities can Critically Strike.\n\nGain 25% (+4.5% per 100 AP) Crit Chance.");
+    }
+
+    @Test
+    @DisplayName("자리표시자 뒤의 퍼센트는 기본값 뒤로 옮긴다")
+    void getAugmentDescriptions_WhenPercentFollowsCoefficient_MovesPercent() {
+        // given
+        expectAllFiles();
+
+        // when
+        CommunityDragonDescriptions descriptions = client.getAugmentDescriptions("16.22");
+
+        // then
+        assertThat(descriptions.descriptionOf(1324)).containsEntry("ko-KR", "추가 방어력 및 마법 저항력에 비례하여 "
+                + "25% (+추가 방어력의 35%) (+추가 마법 저항력의 35%)의 체력 회복 및 보호막 효과를 얻습니다.");
+    }
+
+    @Test
+    @DisplayName("원거리 배율 계산식은 원거리 값을 함께 쓴다")
+    void getAugmentDescriptions_WhenRanged_WritesRangedValue() {
+        // given
+        expectAllFiles();
+
+        // when
+        CommunityDragonDescriptions descriptions = client.getAugmentDescriptions("16.22");
+
+        // then
+        assertThat(descriptions.descriptionOf(1071))
+                .isEqualTo(Map.of("ko-KR", "공격 사거리가 150(원거리 100) 증가합니다.",
+                        "en-US", "Gain 150 (Ranged: 100) Attack Range."));
+        assertThat(descriptions.descriptionOf(2096)).containsEntry("ko-KR",
+                "해당 스킬 지속시간 동안 공격 사거리가 150(원거리 100), 공격 속도가 75%(원거리 40%) 증가합니다.");
+    }
+
+    @Test
+    @DisplayName("표에 없는 능력치의 계수가 있으면 설명이 없다")
+    void getAugmentDescriptions_WhenStatUnknown_IsEmpty() {
+        // given
+        expectAllFiles();
+
+        // when
+        CommunityDragonDescriptions descriptions = client.getAugmentDescriptions("16.22");
+
+        // then
+        assertThat(descriptions.descriptionOf(1415)).isEmpty();
     }
 
     @Test
@@ -193,7 +257,8 @@ class CommunityDragonClientDescriptionsTest {
     void getAugmentDescriptions_WhenEntriesMissing_Rejects() {
         // given
         server.expect(requestTo(KIWI)).andRespond(withSuccess(fixture("kiwi.bin.json"), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(KOREAN)).andRespond(withSuccess("{\"version\": \"16.22\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(KOREAN))
+                .andRespond(withSuccess("{\"version\": \"16.22\"}", MediaType.APPLICATION_JSON));
 
         // when & then
         assertThatThrownBy(() -> client.getAugmentDescriptions("16.22"))

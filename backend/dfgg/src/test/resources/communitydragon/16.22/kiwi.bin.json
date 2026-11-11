@@ -652,5 +652,473 @@
       }
     },
     "__type": "SpellObject"
+  },
+  "Maps/ModeSpecificData/Augments/ARAM_ScopierWeapons": {
+    "AugmentNameId": "ARAM_ScopierWeapons",
+    "NameTra": "Kiwi_ARAM_ScopierWeapons_Name",
+    "DescriptionTra": "Cherry_ScopierWeapons_Summary",
+    "AugmentTooltipTra": "Cherry_ScopierWeapons_Summary",
+    "RootSpell": "Maps/ModeSpecificData/Augments/ARAM_ScopierWeapons/Augment_ARAM_ScopierWeapons",
+    "mBuildTags": 64,
+    "AugmentLargeIconPath": "assets/ux/cherry/augments/icons/scopierweapons_large.tex",
+    "AugmentSmallIconPath": "assets/ux/cherry/augments/icons/scopierweapons_small.tex",
+    "AugmentDisplayTags": [
+      2
+    ],
+    "rarity": 1,
+    "AugmentPlatformId": 1071,
+    "__type": "AugmentData"
+  },
+  "Maps/ModeSpecificData/Augments/ARAM_ScopierWeapons/Augment_ARAM_ScopierWeapons": {
+    "mScriptName": "Augment_ARAM_ScopierWeapons",
+    "mSpell": {
+      "DataValues": [
+        {
+          "name": "MeleeRangeIncrease",
+          "values": [
+            150.0,
+            150.0,
+            150.0,
+            150.0,
+            150.0,
+            150.0,
+            150.0
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "RangedRangeIncrease",
+          "values": [
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0
+          ],
+          "__type": "SpellDataValue"
+        }
+      ],
+      "mSpellCalculations": {
+        "RangeIncrease": {
+          "mSimpleTooltipCalculationDisplay": 5,
+          "mExpandedTooltipCalculationDisplay": 5,
+          "mFormulaParts": [
+            {
+              "mNumber": 150.0,
+              "__type": "NumberCalculationPart"
+            }
+          ],
+          "mRangedMultiplier": {
+            "mNumber": 0.6669999957084656,
+            "__type": "NumberCalculationPart"
+          },
+          "__type": "{e9a3c91d}"
+        }
+      }
+    },
+    "__type": "SpellObject"
+  },
+  "Maps/ModeSpecificData/Augments/ARAM_ProteinShake": {
+    "AugmentNameId": "ARAM_ProteinShake",
+    "NameTra": "Kiwi_ARAM_ProteinShake_Name",
+    "DescriptionTra": "Kiwi_ProteinShake_Summary",
+    "AugmentTooltipTra": "Kiwi_ProteinShake_Tooltip",
+    "RootSpell": "Maps/ModeSpecificData/Augments/ARAM_ProteinShake/Augment_ARAM_ProteinShake",
+    "mAugmentTags": 4096,
+    "mBuildTags": 2312,
+    "AugmentLargeIconPath": "assets/ux/kiwi/augments/icons/proteinshake_large.tex",
+    "AugmentSmallIconPath": "assets/ux/kiwi/augments/icons/proteinshake_small.tex",
+    "AugmentDisplayTags": [
+      5,
+      3
+    ],
+    "rarity": 2,
+    "AugmentPlatformId": 1324,
+    "__type": "AugmentData"
+  },
+  "Maps/ModeSpecificData/Augments/ARAM_ProteinShake/Augment_ARAM_ProteinShake": {
+    "mScriptName": "Augment_ARAM_ProteinShake",
+    "mSpell": {
+      "DataValues": [
+        {
+          "name": "ConversionRate",
+          "values": [
+            0.3499999940395355,
+            0.3499999940395355,
+            0.3499999940395355,
+            0.3499999940395355,
+            0.3499999940395355,
+            0.3499999940395355,
+            0.3499999940395355
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "InitialHS",
+          "values": [
+            25.0,
+            25.0,
+            25.0,
+            25.0,
+            25.0,
+            25.0,
+            25.0
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "MaxLevel",
+          "values": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "__type": "SpellDataValue"
+        }
+      ],
+      "mSpellCalculations": {
+        "BonusHSPower": {
+          "mFormulaParts": [
+            {
+              "mDataValue": "InitialHS",
+              "__type": "NamedDataValueCalculationPart"
+            },
+            {
+              "mStat": 1,
+              "mStatFormula": 2,
+              "mDataValue": "ConversionRate",
+              "__type": "StatByNamedDataValueCalculationPart"
+            },
+            {
+              "mStat": 6,
+              "mStatFormula": 2,
+              "mDataValue": "ConversionRate",
+              "__type": "StatByNamedDataValueCalculationPart"
+            }
+          ],
+          "__type": "GameCalculation"
+        }
+      }
+    },
+    "__type": "SpellObject"
+  },
+  "Maps/ModeSpecificData/Augments/Twinfire": {
+    "AugmentNameId": "Twinfire",
+    "NameTra": "Kiwi_TwinFire_Name",
+    "DescriptionTra": "Kiwi_TwinFire_Summary",
+    "AugmentTooltipTra": "Kiwi_TwinFire_Tooltip",
+    "RootSpell": "Maps/ModeSpecificData/Augments/Twinfire/Augment_Twinfire",
+    "AdditionalSpells": [
+      "Maps/ModeSpecificData/Augments/Twinfire/Augment_TwinFire_Mis",
+      "Maps/ModeSpecificData/Augments/Twinfire/Augment_TwinFire_Mis_2"
+    ],
+    "mAugmentTags": 2,
+    "mBuildTags": 512,
+    "TooltipData": {
+      "{c4182067}": "Kiwi_TwinFire_Tooltip",
+      "__type": "{5b441d9b}"
+    },
+    "AugmentLevelData": {
+      "__type": "{21dad86e}"
+    },
+    "AugmentLargeIconPath": "assets/ux/kiwi/augments/icons/twinfire_large.tex",
+    "AugmentSmallIconPath": "assets/ux/kiwi/augments/icons/twinfire_small.tex",
+    "AugmentDisplayTags": [
+      1
+    ],
+    "AugmentPlatformId": 1415,
+    "ResourceResolver": "Maps/ModeSpecificData/Augments/Twinfire/Resources",
+    "__type": "AugmentData"
+  },
+  "Maps/ModeSpecificData/Augments/Twinfire/Augment_Twinfire": {
+    "mScriptName": "Augment_TwinFire",
+    "mSpell": {
+      "DataValues": [
+        {
+          "name": "ADRatio",
+          "values": [
+            0.07000000029802322,
+            0.07000000029802322,
+            0.07000000029802322,
+            0.07000000029802322,
+            0.07000000029802322,
+            0.07000000029802322,
+            0.07000000029802322
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "CrtiChance",
+          "values": [
+            0.25,
+            0.25,
+            0.25,
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "AdditionalMisDivision",
+          "values": [
+            3.0,
+            3.0,
+            3.0,
+            3.0,
+            3.0,
+            3.0,
+            3.0
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "APRatio",
+          "values": [
+            0.07000000029802322,
+            0.07000000029802322,
+            0.07000000029802322,
+            0.07000000029802322,
+            0.07000000029802322,
+            0.07000000029802322,
+            0.07000000029802322
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "Cooldown",
+          "values": [
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "MaxLevel",
+          "values": [
+            3.0,
+            3.0,
+            3.0,
+            3.0,
+            3.0,
+            3.0,
+            3.0
+          ],
+          "__type": "SpellDataValue"
+        }
+      ],
+      "mSpellCalculations": {
+        "Damage": {
+          "mFormulaParts": [
+            {
+              "mStartValue": 10.0,
+              "mEndValue": 30.0,
+              "__type": "ByCharLevelInterpolationCalculationPart"
+            },
+            {
+              "mStat": 2,
+              "mStatFormula": 2,
+              "mDataValue": "ADRatio",
+              "__type": "StatByNamedDataValueCalculationPart"
+            },
+            {
+              "mDataValue": "APRatio",
+              "__type": "StatByNamedDataValueCalculationPart"
+            }
+          ],
+          "__type": "GameCalculation"
+        },
+        "AdditionalMis": {
+          "mFormulaParts": [
+            {
+              "mStat": 8,
+              "mDataValue": "AdditionalMisDivision",
+              "__type": "StatByNamedDataValueCalculationPart"
+            }
+          ],
+          "__type": "GameCalculation"
+        }
+      }
+    },
+    "__type": "SpellObject"
+  },
+  "Maps/ModeSpecificData/Augments/Twinfire/Augment_TwinFire_Mis": {
+    "mScriptName": "Augment_TwinFire_Mis",
+    "mSpell": {},
+    "__type": "SpellObject"
+  },
+  "Maps/ModeSpecificData/Augments/Twinfire/Augment_TwinFire_Mis_2": {
+    "mScriptName": "Augment_TwinFire_Mis_2",
+    "mSpell": {},
+    "__type": "SpellObject"
+  },
+  "Maps/ModeSpecificData/Augments/LittleExtraHelp": {
+    "AugmentNameId": "LittleExtraHelp",
+    "NameTra": "Kiwi_LittleExtraHelp_Name",
+    "DescriptionTra": "Kiwi_LittleExtraHelp_Summary",
+    "AugmentTooltipTra": "Kiwi_LittleExtraHelp_Tooltip",
+    "RootSpell": "Maps/ModeSpecificData/Augments/LittleExtraHelp/Augment_LittleExtraHelp",
+    "AdditionalSpells": [
+      "Maps/ModeSpecificData/Augments/LittleExtraHelp/Augment_LittleExtraHelp_AttackRange"
+    ],
+    "AugmentLargeIconPath": "assets/ux/kiwi/augments/icons/genericabilityaugmenticon_gold.tex",
+    "AugmentSmallIconPath": "assets/ux/kiwi/augments/icons/genericabilityaugmenticon_gold.tex",
+    "AugmentDisplayTags": [
+      1
+    ],
+    "rarity": 1,
+    "AugmentPlatformId": 2096,
+    "ResourceResolver": "Maps/ModeSpecificData/Augments/LittleExtraHelp/Resources",
+    "IsAbilityAugment": true,
+    "__type": "AugmentData"
+  },
+  "Maps/ModeSpecificData/Augments/LittleExtraHelp/Augment_LittleExtraHelp": {
+    "mScriptName": "Augment_LittleExtraHelp",
+    "mSpell": {
+      "mSpellCalculations": {
+        "RangeIncrease": {
+          "mSimpleTooltipCalculationDisplay": 5,
+          "mExpandedTooltipCalculationDisplay": 5,
+          "mFormulaParts": [
+            {
+              "mNumber": 150.0,
+              "__type": "NumberCalculationPart"
+            }
+          ],
+          "mRangedMultiplier": {
+            "mNumber": 0.6669999957084656,
+            "__type": "NumberCalculationPart"
+          },
+          "__type": "{e9a3c91d}"
+        },
+        "ExtraAttackSpeed": {
+          "mSimpleTooltipCalculationDisplay": 5,
+          "mExpandedTooltipCalculationDisplay": 5,
+          "mFormulaParts": [
+            {
+              "mNumber": 0.75,
+              "__type": "NumberCalculationPart"
+            }
+          ],
+          "mDisplayAsPercent": true,
+          "mRangedMultiplier": {
+            "mNumber": 0.5329999923706055,
+            "__type": "NumberCalculationPart"
+          },
+          "__type": "{e9a3c91d}"
+        }
+      }
+    },
+    "__type": "SpellObject"
+  },
+  "Maps/ModeSpecificData/Augments/LittleExtraHelp/Augment_LittleExtraHelp_AttackRange": {
+    "mScriptName": "Augment_LittleExtraHelp_AttackRange",
+    "mSpell": {},
+    "__type": "SpellObject"
+  },
+  "Maps/ModeSpecificData/Augments/ARAM_JeweledGauntlet": {
+    "AugmentNameId": "ARAM_JeweledGauntlet",
+    "NameTra": "Kiwi_ARAM_JeweledGauntlet_Name",
+    "DescriptionTra": "Cherry_JeweledGauntlet_Summary",
+    "AugmentTooltipTra": "Kiwi_JeweledGauntlet_Tooltip",
+    "RootSpell": "Maps/ModeSpecificData/Augments/ARAM_JeweledGauntlet/Augment_ARAM_JeweledGauntlet",
+    "mBuildTags": 2610,
+    "AugmentLargeIconPath": "assets/ux/cherry/augments/icons/jeweledgauntlet_large.tex",
+    "AugmentSmallIconPath": "assets/ux/cherry/augments/icons/jeweledgauntlet_small.tex",
+    "AugmentDisplayTags": [
+      1
+    ],
+    "rarity": 2,
+    "AugmentPlatformId": 1048,
+    "ResourceResolver": "Maps/ModeSpecificData/Augments/ARAM_JeweledGauntlet/Resources",
+    "__type": "AugmentData"
+  },
+  "Maps/ModeSpecificData/Augments/ARAM_JeweledGauntlet/Augment_ARAM_JeweledGauntlet": {
+    "mScriptName": "Augment_ARAM_JeweledGauntlet",
+    "mSpell": {
+      "DataValues": [
+        {
+          "name": "CritDamage",
+          "values": [
+            1.4500000476837158,
+            1.4500000476837158,
+            1.4500000476837158,
+            1.4500000476837158,
+            1.4500000476837158,
+            1.4500000476837158,
+            1.4500000476837158
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "CritChance",
+          "values": [
+            0.25,
+            0.25,
+            0.25,
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "CritConverRatio",
+          "values": [
+            0.00044999999227002263,
+            0.00044999999227002263,
+            0.00044999999227002263,
+            0.00044999999227002263,
+            0.00044999999227002263,
+            0.00044999999227002263,
+            0.00044999999227002263
+          ],
+          "__type": "SpellDataValue"
+        },
+        {
+          "name": "CritDamageTooltip",
+          "values": [
+            45.0,
+            45.0,
+            45.0,
+            45.0,
+            45.0,
+            45.0,
+            45.0
+          ],
+          "__type": "SpellDataValue"
+        }
+      ],
+      "mSpellCalculations": {
+        "CritGranted": {
+          "mFormulaParts": [
+            {
+              "mDataValue": "CritChance",
+              "__type": "NamedDataValueCalculationPart"
+            },
+            {
+              "mDataValue": "CritConverRatio",
+              "__type": "StatByNamedDataValueCalculationPart"
+            }
+          ],
+          "mDisplayAsPercent": true,
+          "__type": "GameCalculation"
+        }
+      }
+    },
+    "__type": "SpellObject"
   }
 }

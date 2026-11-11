@@ -1,26 +1,27 @@
 package dfgg.domain.aram;
 
+import dfgg.domain.aram.CalculationValue.StatTerm;
 import java.util.Map;
 import java.util.Optional;
 
-/** 주문 계산식의 요소 하나. 기본값에 더할 범위를 답하고, 풀지 못하면 비어 있다. */
+/** 주문 계산식의 요소 하나. 계산식 값에 더할 몫을 답하고, 풀지 못하면 비어 있다. */
 public sealed interface CalculationPart {
 
-    Optional<CalculationRange> rangeWith(Map<String, Double> dataValues);
+    Optional<CalculationValue> valueWith(Map<String, Double> dataValues);
 
     record Constant(double value) implements CalculationPart {
 
         @Override
-        public Optional<CalculationRange> rangeWith(Map<String, Double> dataValues) {
-            return Optional.of(CalculationRange.fixed(value));
+        public Optional<CalculationValue> valueWith(Map<String, Double> dataValues) {
+            return Optional.of(CalculationValue.fixed(value));
         }
     }
 
     record DataValue(String name) implements CalculationPart {
 
         @Override
-        public Optional<CalculationRange> rangeWith(Map<String, Double> dataValues) {
-            return Optional.ofNullable(dataValues.get(name)).map(CalculationRange::fixed);
+        public Optional<CalculationValue> valueWith(Map<String, Double> dataValues) {
+            return Optional.ofNullable(dataValues.get(name)).map(CalculationValue::fixed);
         }
     }
 
@@ -28,8 +29,24 @@ public sealed interface CalculationPart {
     record LevelRange(double start, double end) implements CalculationPart {
 
         @Override
-        public Optional<CalculationRange> rangeWith(Map<String, Double> dataValues) {
-            return Optional.of(CalculationRange.byLevel(start, end));
+        public Optional<CalculationValue> valueWith(Map<String, Double> dataValues) {
+            return Optional.of(CalculationValue.byLevel(start, end));
+        }
+    }
+
+    /**
+     * 챔피언 능력치에 비례하는 몫. 능력치를 알 수 없어 기본값에 더하지 않고 계수로 붙인다.
+     *
+     * @param bonus       추가 능력치({@code mStatFormula} 2)에 비례하는지
+     * @param coefficient 계수. 숫자 하나여야 한다
+     */
+    record StatScaling(ChampionStat stat, boolean bonus, CalculationPart coefficient) implements CalculationPart {
+
+        @Override
+        public Optional<CalculationValue> valueWith(Map<String, Double> dataValues) {
+            return coefficient.valueWith(dataValues)
+                    .filter(CalculationValue::isConstant)
+                    .map(value -> CalculationValue.scaling(new StatTerm(stat, bonus, value.low())));
         }
     }
 
@@ -37,7 +54,7 @@ public sealed interface CalculationPart {
     record Unsupported(String type) implements CalculationPart {
 
         @Override
-        public Optional<CalculationRange> rangeWith(Map<String, Double> dataValues) {
+        public Optional<CalculationValue> valueWith(Map<String, Double> dataValues) {
             return Optional.empty();
         }
     }
