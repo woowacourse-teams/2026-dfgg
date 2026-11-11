@@ -13,13 +13,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import dfgg.common.exception.AugmentDataRejectedException;
+import dfgg.domain.aram.Augment;
 import dfgg.domain.aram.AugmentCatalog;
+import dfgg.domain.language.Language;
 import dfgg.infrastructure.external.client.CommunityDragonClient;
 import dfgg.infrastructure.external.dto.CherryAugment;
 import dfgg.infrastructure.external.dto.CommunityDragonAugments;
+import dfgg.infrastructure.external.dto.CommunityDragonDescriptions;
 import dfgg.infrastructure.storage.S3ImageStorage;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -43,13 +47,62 @@ class AugmentCatalogServiceTest {
 
     private CommunityDragonClient client;
     private S3ImageStorage storage;
+    private CommunityDragonDescriptions descriptions;
     private AugmentCatalogService service;
 
     @BeforeEach
     void setUp() {
         client = mock(CommunityDragonClient.class);
         storage = mock(S3ImageStorage.class);
+        descriptions = mock(CommunityDragonDescriptions.class);
+        when(client.getAugmentDescriptions("16.21")).thenReturn(descriptions);
         service = new AugmentCatalogService(client, storage);
+    }
+
+    @Test
+    @DisplayName("연결한 증강에 언어별 설명을 붙인다")
+    void link_AttachesDescriptions() {
+        // given
+        linkable(21);
+        when(descriptions.descriptionOf(1)).thenReturn(Map.of("ko-KR", "설명", "en-US", "Description"));
+
+        // when
+        AugmentCatalog catalog = service.link("16.21", LINKABLE_IDS);
+
+        // then
+        assertThat(augmentOf(catalog, 1).descriptionIn(Language.EN_US)).contains("Description");
+        assertThat(augmentOf(catalog, 2).descriptionIn(Language.EN_US)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("설명 파일을 받지 못해도 설명 없이 카탈로그를 만들고 경고를 남긴다")
+    void link_WhenDescriptionsFail_LinksWithoutDescriptions(CapturedOutput output) {
+        // given
+        linkable(21);
+        when(client.getAugmentDescriptions("16.21")).thenThrow(new AugmentDataRejectedException("문자열 파일 없음"));
+
+        // when
+        AugmentCatalog catalog = service.link("16.21", LINKABLE_IDS);
+
+        // then
+        assertThat(catalog.augments()).hasSize(21)
+                .allSatisfy(augment -> assertThat(augment.descriptionIn(Language.KO_KR)).isEmpty());
+        assertThat(output).contains("증강 설명 없이 저장합니다").contains("문자열 파일 없음");
+    }
+
+    @Test
+    @DisplayName("설명을 붙인 증강 수를 로그로 남긴다")
+    void link_LogsDescribedCount(CapturedOutput output) {
+        // given
+        linkable(21);
+        when(descriptions.descriptionOf(1)).thenReturn(Map.of("ko-KR", "설명"));
+        when(descriptions.descriptionOf(2)).thenReturn(Map.of("ko-KR", "설명"));
+
+        // when
+        service.link("16.21", LINKABLE_IDS);
+
+        // then
+        assertThat(output).contains("described=2/21");
     }
 
     @Test
@@ -238,6 +291,13 @@ class AugmentCatalogServiceTest {
 
     private static String iconOf(int augmentId) {
         return "/lol-game-data/assets/ASSETS/UX/Kiwi/Augments/Icons/A" + augmentId + "_small.png";
+    }
+
+    private static Augment augmentOf(AugmentCatalog catalog, int augmentId) {
+        return catalog.augments().stream()
+                .filter(augment -> augment.augmentId() == augmentId)
+                .findFirst()
+                .orElseThrow();
     }
 
     private static Set<Integer> idsUpTo(int count) {

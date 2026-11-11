@@ -15,7 +15,7 @@ import java.util.Optional;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** 패치별 증강 카탈로그 항목. 이름만 저장하고 이미지는 S3에 따로 둔다. */
+/** 패치별 증강 카탈로그 항목. 이름과 요약 설명을 저장하고 이미지는 S3에 따로 둔다. */
 @Entity
 @Table(name = "aram_mayhem_augments")
 public class Augment {
@@ -37,6 +37,11 @@ public class Augment {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private AugmentRarity rarity;
+
+    /** 이름과 같은 언어별 형식. 수치를 채우지 못한 증강은 설명이 없어 null이다. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, String> description;
 
     protected Augment() {
     }
@@ -62,6 +67,20 @@ public class Augment {
 
     public String nameIn(Language language) {
         return language.pick(name);
+    }
+
+    /** @param descriptions 언어 키({@code ko-KR})별 설명. 비어 있으면 설명이 없는 증강이다 */
+    public void describe(Map<String, String> descriptions) {
+        this.description = descriptions.isEmpty() ? null : Map.copyOf(descriptions);
+    }
+
+    /** 이름처럼 요청 언어가 없으면 한글로 낸다. 한글도 없으면 비어 있다. */
+    public Optional<String> descriptionIn(Language language) {
+        return Optional.ofNullable(description).map(language::pick);
+    }
+
+    public boolean isDescribed() {
+        return description != null;
     }
 
     /** 견본은 게임 화면 언어와 같아야 맞으므로 다른 언어 이름으로 대신하지 않는다. */
