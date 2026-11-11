@@ -57,7 +57,7 @@ public interface ChampionItemRollupRepository extends JpaRepository<ChampionItem
             JOIN champion_games ON champion_games.champion_id = purchase.champion_id
             GROUP BY purchase.champion_id, purchase.item_id
             """, nativeQuery = true)
-    void aggregateFrom(@Param("recentPatches") Collection<String> recentPatches,
+    int aggregateFrom(@Param("recentPatches") Collection<String> recentPatches,
                        @Param("excludedPatches") Collection<String> excludedPatches,
                        @Param("tiers") Collection<String> tiers);
 }
