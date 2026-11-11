@@ -34,6 +34,9 @@ public interface ChampionPairItemStatsRepository extends JpaRepository<ChampionP
      *
      * <p>자기 자신은 {@code puuid}로 제외한다. 챔피언 ID로 제외하면 미러 매치업
      * (양 팀에 같은 챔피언)이 통째로 사라지는데, 그건 실제로 존재하는 매치업이다.
+     *
+     * <p>{@code champion_id % buckets = bucket}인 내 챔피언만 만든다. 행이 내 챔피언별로 독립이라
+     * 구간을 모두 돌면 한 번에 만든 결과와 같고, 한 번에 다루는 행이 줄어 DB 메모리를 덜 쓴다.
      */
     @Modifying
     @Query(value = """
@@ -51,6 +54,7 @@ public interface ChampionPairItemStatsRepository extends JpaRepository<ChampionP
                   AND core_item_purchase_order_complete
                   AND core_item_purchase_order <> ''
                   AND tier IN (:tiers)
+                  AND champion_id % :buckets = :bucket
             ),
             context AS (
                 SELECT match_id, puuid, team_id, champion_id
@@ -100,5 +104,7 @@ public interface ChampionPairItemStatsRepository extends JpaRepository<ChampionP
             """, nativeQuery = true)
     void aggregateFrom(@Param("recentPatches") Collection<String> recentPatches,
                        @Param("excludedPatches") Collection<String> excludedPatches,
-                       @Param("tiers") Collection<String> tiers);
+                       @Param("tiers") Collection<String> tiers,
+                       @Param("buckets") int buckets,
+                       @Param("bucket") int bucket);
 }
