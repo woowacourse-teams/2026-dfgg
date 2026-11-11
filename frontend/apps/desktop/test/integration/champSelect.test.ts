@@ -148,7 +148,7 @@ describe('밴픽 흐름', () => {
       const augments = {
         patch: '16.22',
         augments: [
-          { augmentId: 1, name: '빵과 버터', rarity: 'silver', rank: 1, pickRate: 18.4, iconUrl: '' },
+          { augmentId: 1, name: '빵과 버터', rarity: 'silver', rank: 1, pickRate: 18.4, iconUrl: '', description: null },
         ],
       };
       backend.setResponse('/api/aram-mayhem/champions/61/augments', augments);

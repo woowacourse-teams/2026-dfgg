@@ -326,6 +326,11 @@ const MAYHEM_AUGMENTS: MayhemAugments = {
       rank: i === MAYHEM_NAMES[rarity].length - 1 ? null : i + 1,
       pickRate: i === MAYHEM_NAMES[rarity].length - 1 ? null : Math.round((18 - i * 3.1) * 10) / 10,
       iconUrl: `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${[1, 61, 103, 157, 234, 64][i]}.png`,
+      // 마지막 증강은 설명이 없는 경우(null)를 보여 준다
+      description:
+        i === MAYHEM_NAMES[rarity].length - 1
+          ? null
+          : '스킬을 맞히면 대상에게 20~80(레벨에 따라)의 추가 마법 피해를 입힙니다.\n같은 대상에게는 5초마다 한 번 발동합니다.',
     })),
   ),
 };

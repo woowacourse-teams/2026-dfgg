@@ -21,6 +21,8 @@ export interface MayhemAugment {
   rank: number | null;
   pickRate: number | null;
   iconUrl: string;
+  /** 게임 카드 문구 요약. 평문이고 줄바꿈은 \n. 수치를 채우지 못한 증강은 null */
+  description: string | null;
 }
 
 export interface MayhemAugments {

@@ -9,7 +9,7 @@ import { GAME_WINDOW_TITLE } from '../highlight/highlight';
 import { type Box, fingerprint, isCardVisible, region, TITLE_REGION } from './cardDetect';
 import { applyRead, applyUnreadable, type CardSlot, EMPTY_SLOT, observeSlot } from './cardSlot';
 import { EMPTY_TRACKER, trackCards } from './cardTracker';
-import { captureRegion } from './screenCapture';
+import { captureRegionPixels, pixelsToImage, releaseCaptureSurfaces } from './screenCapture';
 import { titleMask, toLuma } from './titleStrip';
 import type { Gray, Mask } from './titleMatch';
 import { reportError } from '../sentry';
@@ -17,11 +17,20 @@ import { reportError } from '../sentry';
 // 확인 시간을 모아서 한 줄로 찍는다.
 const STATS_EVERY = 20;
 
-type TickStats = { count: number; total: number; capture: number; max: number };
-const emptyStats = (): TickStats => ({ count: 0, total: 0, capture: 0, max: 0 });
+// find: 게임 창 찾기, grab: 화면 찍기, luma: 흑백 바꾸기 (판 화면 기준)
+type TickStats = {
+  count: number;
+  total: number;
+  find: number;
+  grab: number;
+  luma: number;
+  max: number;
+};
+const emptyStats = (): TickStats => ({ count: 0, total: 0, find: 0, grab: 0, luma: 0, max: 0 });
+type Timing = { grab: number; luma: number };
 
 const OPEN_MS = 500; // 카드가 떠 있거나 뜨는 중일 때 확인 주기 500ms
-const IDLE_MS = 1000; // 카드가 없을 때 확인 주기 1초
+const IDLE_MS = 500; // 카드가 없을 때 확인 주기 500ms. 카드가 뜬 뒤 첫 확인까지 최대 0.5초
 const FRAME_HEIGHT = 720; // 크기 720px
 const MAX_DEBUG_FILES = 300;
 
@@ -60,18 +69,36 @@ function pruneDebugDir() {
 
 const emptySlots = (): CardSlot[] => [EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT];
 
-function captureGray(rect: Rect, width: number, height: number, debugName?: string): Gray | null {
-  const image = captureRegion(rect, width, height);
-  if (!image) return null;
+/**
+ * 화면을 찍어 바로 흑백으로 바꾼다. 찍은 픽셀에서 곧장 흑백을 뽑아
+ * 그림(nativeImage)으로 감쌌다 다시 꺼내는 복사를 하지 않는다. 그림은 디버그 저장 때만 만든다.
+ */
+function captureGray(
+  rect: Rect,
+  width: number,
+  height: number,
+  debugName?: string,
+  timing?: Timing,
+): Gray | null {
+  const grabStarted = performance.now();
+  const pixels = captureRegionPixels(rect, width, height);
+  const grabbed = performance.now();
+  if (!pixels) return null;
+
   if (debugDir && debugName) {
     try {
-      fs.writeFileSync(path.join(debugDir, `${debugName}.png`), image.toPNG());
+      fs.writeFileSync(path.join(debugDir, `${debugName}.png`), pixelsToImage(pixels, width, height).toPNG());
       pruneDebugDir();
     } catch (error) {
       console.warn('[mayhem] 디버그 그림 저장 실패', error);
     }
   }
-  return toLuma(image.toBitmap(), width, height);
+  const gray = toLuma(pixels, width, height);
+  if (timing) {
+    timing.grab = grabbed - grabStarted;
+    timing.luma = performance.now() - grabbed;
+  }
+  return gray;
 }
 
 // 카드 제목 영역을 원래 해상도로 찍어 마스크로 만든다.
@@ -108,18 +135,22 @@ export function startCardReader(
   let stats = emptyStats();
 
   /** 확인 한 번의 시간을 더하고, STATS_EVERY 번이 차면 찍고 비운다 */
-  const record = (total: number, capture: number) => {
+  const record = (total: number, find: number, timing: Timing) => {
     stats = {
       count: stats.count + 1,
       total: stats.total + total,
-      capture: stats.capture + capture,
+      find: stats.find + find,
+      grab: stats.grab + timing.grab,
+      luma: stats.luma + timing.luma,
       max: Math.max(stats.max, total),
     };
     if (stats.count < STATS_EVERY) return;
     console.log(
       '[mayhem] 확인',
       `${stats.count}회 평균 ${(stats.total / stats.count).toFixed(0)}ms`,
-      `(캡처 ${(stats.capture / stats.count).toFixed(0)}ms)`,
+      `(창 찾기 ${(stats.find / stats.count).toFixed(0)}ms`,
+      `찍기 ${(stats.grab / stats.count).toFixed(0)}ms`,
+      `흑백 ${(stats.luma / stats.count).toFixed(0)}ms)`,
       `최대 ${stats.max.toFixed(0)}ms`,
     );
     stats = emptyStats();
@@ -129,15 +160,16 @@ export function startCardReader(
     const started = performance.now();
 
     const game = findWindowRect(GAME_WINDOW_TITLE);
+    const found = performance.now() - started;
+    const timing: Timing = { grab: 0, luma: 0 };
     const frameWidth = game ? Math.round((game.width / game.height) * FRAME_HEIGHT) : 0;
-    const frame = game && captureGray(game, frameWidth, FRAME_HEIGHT);
-    const captured = performance.now();
+    const frame = game && captureGray(game, frameWidth, FRAME_HEIGHT, undefined, timing);
     if (frame) tracker = trackCards(tracker, frame);
 
     if (!game || !frame || !tracker.boxes) {
       slots = emptySlots();
       onCards([]);
-      record(performance.now() - started, captured - started);
+      record(performance.now() - started, found, timing);
       return tracker.candidate ? OPEN_MS : IDLE_MS;
     }
 
@@ -164,12 +196,15 @@ export function startCardReader(
     onCards(
       boxes.map((box, i) => ({ box: relative(box, frame), augment: slots[i].augment ?? null })),
     );
-    record(performance.now() - started, captured - started);
+    record(performance.now() - started, found, timing);
     return OPEN_MS;
   };
 
   const tick = () => {
-    if (!alive()) return;
+    if (!alive()) {
+      releaseCaptureSurfaces(); // 판이 끝나면 찍기용 자원을 돌려준다
+      return;
+    }
     let delay = OPEN_MS;
     try {
       delay = check();
