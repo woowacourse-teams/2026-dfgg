@@ -15,6 +15,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,6 +39,7 @@ import dfgg.infrastructure.external.dto.AramhexGames;
 import dfgg.infrastructure.external.dto.AramhexPatchData;
 import dfgg.infrastructure.external.dto.CherryAugment;
 import dfgg.infrastructure.external.dto.CommunityDragonAugments;
+import dfgg.infrastructure.external.dto.CommunityDragonDescriptions;
 import dfgg.infrastructure.storage.S3ImageStorage;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
@@ -106,10 +108,14 @@ class AramMayhemAdminControllerTest {
     @MockitoBean
     private S3ImageStorage storage;
 
+    private CommunityDragonDescriptions descriptions;
+
     @BeforeEach
     void setUp() {
         RestAssured.port = port;
         championRepository.save(new Champion((long) ASHE, "Ashe", Map.of("ko-KR", "애쉬", "en-US", "Ashe"), List.of()));
+        descriptions = mock(CommunityDragonDescriptions.class);
+        when(communityDragonClient.getAugmentDescriptions(anyString())).thenReturn(descriptions);
     }
 
     /** {@code @SpringBootTest}는 롤백하지 않는다. 커밋된 채 남으면 다른 테스트가 깨진다. */
@@ -136,6 +142,41 @@ class AramMayhemAdminControllerTest {
                 .body("augments", hasSize(ALL_AUGMENTS))
                 .body("augments.find { it.augmentId == 1373 }.name", equalTo("축소 엔진"))
                 .body("augments.find { it.augmentId == 1373 }.pickRate", equalTo(16.8f));
+    }
+
+    @Test
+    @DisplayName("수집하면 조회 API가 저장된 설명을 준다")
+    void sync_ThenDescriptionsAreServed() {
+        // given
+        patchAvailable("16.21", 1679);
+        when(descriptions.descriptionOf(1373)).thenReturn(Map.of("ko-KR", "크기가 줄어듭니다.", "en-US", "Shrink."));
+
+        // when
+        sync().then().statusCode(204);
+
+        // then
+        given().accept(ContentType.JSON).header("Accept-Language", "ko")
+                .when().get("/api/aram-mayhem/champions/22/augments")
+                .then().statusCode(200)
+                .body("augments.find { it.augmentId == 1373 }.description", equalTo("크기가 줄어듭니다."));
+    }
+
+    @Test
+    @DisplayName("설명 파일이 거부돼도 수집은 성공하고 설명만 비운다")
+    void sync_WhenDescriptionsRejected_StoresWithoutDescriptions() {
+        // given
+        patchAvailable("16.21", 1679);
+        when(communityDragonClient.getAugmentDescriptions("16.21")).thenThrow(new AugmentDataRejectedException("거부"));
+
+        // when
+        sync().then().statusCode(204);
+
+        // then
+        given().accept(ContentType.JSON).header("Accept-Language", "ko")
+                .when().get("/api/aram-mayhem/champions/22/augments")
+                .then().statusCode(200)
+                .body("augments", hasSize(ALL_AUGMENTS))
+                .body("augments.find { it.augmentId == 1373 }.description", nullValue());
     }
 
     @Test

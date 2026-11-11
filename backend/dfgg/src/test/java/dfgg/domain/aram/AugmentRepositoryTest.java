@@ -48,6 +48,43 @@ class AugmentRepositoryTest {
     }
 
     @Test
+    @DisplayName("증강 설명을 언어별로 저장하고 요청한 언어로 읽는다")
+    void save_RestoresDescriptionByLanguage() {
+        // given
+        Augment described = new Augment("16.22", 1007, NAME, AugmentRarity.SILVER);
+        described.describe(Map.of("ko-KR", "공격력이 20% 증가합니다.", "en-US", "Gain 20% Attack Damage."));
+        Augment saved = augmentRepository.save(described);
+        entityManager.flush();
+        entityManager.clear();
+
+        // when
+        Augment augment = augmentRepository.findById(saved.id()).orElseThrow();
+
+        // then
+        assertThat(augment.descriptionIn(Language.KO_KR)).contains("공격력이 20% 증가합니다.");
+        assertThat(augment.descriptionIn(Language.EN_US)).contains("Gain 20% Attack Damage.");
+    }
+
+    @Test
+    @DisplayName("설명이 없는 증강은 설명 컬럼을 비워 둔다")
+    void save_WhenNoDescription_StoresNull() {
+        // given
+        Augment undescribed = new Augment("16.22", 1154, NAME, AugmentRarity.PRISMATIC);
+        undescribed.describe(Map.of());
+        Augment saved = augmentRepository.save(undescribed);
+        entityManager.flush();
+
+        // when
+        Object isNull = entityManager
+                .createNativeQuery("SELECT description IS NULL FROM aram_mayhem_augments WHERE id = :id")
+                .setParameter("id", saved.id())
+                .getSingleResult();
+
+        // then
+        assertThat(isNull).isEqualTo(true);
+    }
+
+    @Test
     @DisplayName("저장된 패치 중 가장 높은 패치는 숫자 순서로 고른다")
     void findDistinctPatches_LatestComparesNumerically() {
         // given

@@ -1,0 +1,20 @@
+{
+  "entries": {
+    "cherry_bluntforce_summary": "%i:scaleAD% <scaleAD>공격력이 @ADAmp*100@%</scaleAD> 증가합니다.",
+    "cherry_courageofthecolossus_summary": "적 챔피언을 <status>이동 불가</status> 상태로 만들거나 <status>이동 스킬을 사용할 수 없게</status> 하면 <shield>@TotalShield@의 보호막</shield>을 얻습니다.<br>",
+    "cherry_jeweledgauntlet_summary": "스킬에 <crit>치명타</crit>가 적용될 수 있습니다. <br><br><crit>치명타 확률%i:scaleCrit%을 @CritGranted@</crit> 얻습니다.",
+    "cherry_scopierweapons_summary": "공격 사거리가 @RangeIncrease@ 증가합니다.",
+    "cherry_witchfulthinking_summary": "%i:scaleAP% <scaleAP>주문력이 @AP@</scaleAP> 증가합니다.",
+    "kiwi_augment_totentanz_description": "소환사 주문이 <spellName>{{Kiwi_Augment_Totentanz_Summoner_Name}}</spellName>으로 변경됩니다.<br><br><spellName>{{Kiwi_Augment_Totentanz_Summoner_Name}}</spellName>: 전방으로 순간적으로 이동하여 <attention>불사</attention> 상태가 됩니다. @Buff_Duration@초 이내에 처치 관여를 달성하지 않으면<br><danger>사망합니다</danger>.",
+    "kiwi_augment_totentanz_summoner_name": "죽음과 함께하는 춤",
+    "kiwi_doubletap_summary": "<crit>치명타</crit> 발동 시 <OnHit>%i:OnHit% 적중 시</OnHit> 효과를 한 번 더 적용합니다.<br><br><crit>%i:scaleCrit% 치명타 확률을 @Calc_Crit_Chance@</crit> 획득합니다.",
+    "kiwi_littleextrahelp_summary": "{{SpellName}} 지속시간 동안 공격 사거리가 @RangeIncrease@, <attackSpeed>공격 속도</attackSpeed>가 @ExtraAttackSpeed@ 증가합니다.",
+    "kiwi_proteinshake_summary": "추가 <scaleArmor>방어력</scaleArmor> 및 <scaleMR>마법 저항력</scaleMR>에 비례하여 <healing>%i:scaleHealShield%@BonusHSPower@%의 체력 회복 및 보호막 효과</healing>를 얻습니다.",
+    "kiwi_quest_urfschampion_summary": "<font color='#F0C200'>퀘스트:</font> 처치 관여를 @QuestRequirement@회 달성해야 합니다.<br><br>보상: 황금 뒤집개",
+    "kiwi_rabblerousing_summary": "{{SpellName}} 스킬 사용 시 <healing>체력</healing>을 회복합니다.",
+    "kiwi_titanspulse_summary": "{{Spellname}} 스킬로 적 챔피언에게 피해를 입히면 <scaleArmor>방어력</scaleArmor> 및 <scaleMR>마법 저항력</scaleMR>이 @ARMR_Inc@ 증가합니다.",
+    "kiwi_twinfire_summary": "스킬 피해를 입히면 투사체 1+@AdditionalMis@개를 발사해 각각 <magicDamage>@Damage@의 마법 피해</magicDamage>를 입힙니다. <br><br><attention>%i:scaleCrit% 치명타 확률이 @CrtiChance*100@%</attention> 증가합니다.",
+    "generatedtip_unrelated_entry": "관계없는 문장"
+  },
+  "version": "16.22"
+}

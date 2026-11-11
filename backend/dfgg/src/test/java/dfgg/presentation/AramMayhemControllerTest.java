@@ -130,6 +130,48 @@ class AramMayhemControllerTest {
     }
 
     @Test
+    @DisplayName("증강 항목에 요청 언어의 설명을 싣는다")
+    void getAugments_CarriesDescriptionInRequestedLanguage() {
+        // given
+        saveDescribedAugment("16.22", 1007, "공격력이 20% 증가합니다.", "Gain 20% Attack Damage.");
+        savePick("16.22", 1007, 12.3);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .header("Accept-Language", "ko")
+                .when().get("/api/aram-mayhem/champions/22/augments")
+                .then().statusCode(200)
+                .body("augments[0].description", equalTo("공격력이 20% 증가합니다."));
+    }
+
+    @Test
+    @DisplayName("설명이 없는 증강은 description이 null이다")
+    void getAugments_WhenNoDescription_CarriesNull() {
+        // given
+        saveAugment("16.22", 1154, "우르프의 챔피언", "Urf's Champion", AugmentRarity.PRISMATIC);
+        savePick("16.22", 1154, 1.0);
+
+        // when & then
+        given().accept(ContentType.JSON)
+                .when().get("/api/aram-mayhem/champions/22/augments")
+                .then().statusCode(200)
+                .body("augments[0]", hasKey("description"))
+                .body("augments[0].description", nullValue());
+    }
+
+    @Test
+    @DisplayName("이름으로 찾은 증강에도 설명을 싣는다")
+    void lookup_CarriesDescription() {
+        // given
+        saveDescribedAugment("16.22", 1007, "공격력이 20% 증가합니다.", "Gain 20% Attack Damage.");
+
+        // when & then
+        lookup(22, "{\"names\": [\"육중한 힘\"]}")
+                .then().statusCode(200)
+                .body("augments[0].description", equalTo("Gain 20% Attack Damage."));
+    }
+
+    @Test
     @DisplayName("저장된 패치 중 가장 높은 패치만 쓴다")
     void getAugments_UsesLatestPatchOnly() {
         // given
@@ -630,6 +672,14 @@ class AramMayhemControllerTest {
                              AugmentRarity rarity) {
         Map<String, String> name = Map.of("ko-KR", koreanName, "en-US", englishName);
         augmentRepository.save(new Augment(patch, augmentId, name, rarity));
+    }
+
+    private void saveDescribedAugment(String patch, int augmentId, String koreanDescription,
+                                      String englishDescription) {
+        Augment augment = new Augment(patch, augmentId, Map.of("ko-KR", "육중한 힘", "en-US", "Blunt Force"),
+                AugmentRarity.SILVER);
+        augment.describe(Map.of("ko-KR", koreanDescription, "en-US", englishDescription));
+        augmentRepository.save(augment);
     }
 
     private void savePick(String patch, int augmentId, double pickRate) {

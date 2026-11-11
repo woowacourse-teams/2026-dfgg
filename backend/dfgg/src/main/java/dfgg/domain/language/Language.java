@@ -40,6 +40,11 @@ public enum Language {
         return tag.replace('-', '_');
     }
 
+    /** 언어별 이름을 저장할 때 쓰는 키({@code ko-KR}). */
+    public String tag() {
+        return tag;
+    }
+
     /** 언어별 이름에서 이 언어의 이름을 고른다. 없으면 한글 이름으로 낸다. */
     public String pick(Map<String, String> names) {
         return find(names).orElseGet(() -> names.get(FALLBACK.tag));
