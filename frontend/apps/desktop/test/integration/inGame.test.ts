@@ -39,7 +39,7 @@ describe('실시간 인게임 아이템 추천 테스트', () => {
     league.lcu.setResponse('GET', '/lol-patch/v1/game-version', '15.20.700.1234');
     // 솔로 랭크 판. 추천은 일반·랭크 큐에서만 요청한다
     league.lcu.setResponse('GET', '/lol-gameflow/v1/session', {
-      gameData: { gameId: 1, queue: { id: 420 } },
+      gameData: { gameId: 1, queue: { id: 420, gameMode: 'CLASSIC' } },
     });
 
     // 게임: 나(가렌, 미드, 롱소드 보유)와 상대(오공)
@@ -118,7 +118,7 @@ describe('실시간 인게임 아이템 추천 테스트', () => {
   });
   it('아수라장처럼 일반·랭크가 아닌 큐에서는 추천을 요청하지 않는다', async () => {
     league.lcu.setResponse('GET', '/lol-gameflow/v1/session', {
-      gameData: { gameId: 1, queue: { id: 3270 } },
+      gameData: { gameId: 1, queue: { id: 3270, gameMode: 'CLASSIC' } },
     });
     app.poller.initLivePolling();
     app.connection.startLcuConnection();

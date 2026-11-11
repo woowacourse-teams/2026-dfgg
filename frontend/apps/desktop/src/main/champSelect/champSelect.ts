@@ -1,11 +1,19 @@
 import { todayPickKey } from '../../shared/todayPicks';
-import type { ChampSelectState, GameflowPhase, Lockfile, Position } from '../../shared/types';
+import type {
+  ChampSelectMode,
+  ChampSelectState,
+  GameflowPhase,
+  Lockfile,
+  Position,
+} from '../../shared/types';
 import { trackEvent } from '../analytics/umami';
+import { fetchMayhemAugments } from '../api/augments';
 import { fetchCounters, fetchRuneRecommendation, fetchTodayPicks } from '../api/champSelect';
 import { broadcastToAllWindows } from '../ipc/broadcast';
 import type { LcuChampionSummary, LcuChampSelectSession } from '../lcu/champSelect.types';
 import { lcuRequest } from '../lcu/client';
 import { getLockfileContent } from '../lcu/lockfile';
+import { fetchChampSelectMode } from '../lcu/queue';
 import { getLcuState, onPhaseChange } from '../lcu/state';
 import { reportError } from '../sentry';
 import { applyPerkPage, fromPro, fromRecommended, type PerkSelection } from './perks';
@@ -16,6 +24,8 @@ const SESSION_PATH = '/lol-champ-select/v1/session';
 let state: ChampSelectState | null = null;
 let info: ChampSelectInfo | null = null;
 let lastSession: LcuChampSelectSession | null = null;
+/** 이번 밴픽의 모드. 밴픽이 시작되면 큐를 읽어 정한다. 정하기 전에는 null */
+let mode: ChampSelectMode | null = null;
 /** 배정이 없는 큐에서 사용자가 고른 포지션. 다음 판에도 같은 걸 쓰도록 밴픽이 끝나도 남겨 둔다. */
 let pickedPosition: Position | null = null;
 /** 밴픽마다 올린다. 이전 밴픽의 늦은 응답이 새 화면을 덮지 않게 한다. */
@@ -26,6 +36,8 @@ let trackedRound = -1;
 type ApplySource = 'auto' | 'tab' | 'pro';
 
 const emptyState = (): ChampSelectState => ({
+  mode: 'rift',
+  mayhemAugments: null,
   position: null,
   positionAssigned: false,
   myChampionId: null,
@@ -109,6 +121,22 @@ function loadRunes(next: ChampSelectInfo) {
   );
 }
 
+/** 아수라장: 내 챔피언의 추천 증강을 받는다. 주사위·교체로 챔피언이 바뀌면 다시 받는다. */
+function loadMayhemAugments(championId: number | null) {
+  update({ mayhemAugments: null });
+  if (!championId) return;
+
+  void load(
+    '아수라장 증강',
+    () => fetchMayhemAugments(championId),
+    () => info?.myChampionId === championId,
+    (mayhemAugments) => {
+      update({ mayhemAugments });
+      trackEvent('desktop-mayhem-augments', { count: mayhemAugments.augments.length });
+    },
+  );
+}
+
 function onSession(session: LcuChampSelectSession) {
   lastSession = session;
   const prev = info;
@@ -117,6 +145,7 @@ function onSession(session: LcuChampSelectSession) {
   const next = { ...parsed, position: parsed.position ?? pickedPosition };
   info = next;
   update({
+    mode: mode ?? 'rift',
     position: next.position,
     positionAssigned: parsed.position !== null,
     myChampionId: next.myChampionId,
@@ -126,7 +155,13 @@ function onSession(session: LcuChampSelectSession) {
   const { position } = next;
   if (trackedRound !== round) {
     trackedRound = round;
-    trackEvent('desktop-champ-select', { assigned: parsed.position !== null });
+    trackEvent('desktop-champ-select', { assigned: parsed.position !== null, mode: mode ?? 'rift' });
+  }
+
+  // 아수라장은 협곡용 오늘의 픽·카운터·룬 대신 추천 증강만 받는다
+  if (mode === 'mayhem') {
+    if (prev?.myChampionId !== next.myChampionId) loadMayhemAugments(next.myChampionId);
+    return;
   }
 
   if (!position) return;
@@ -163,13 +198,20 @@ function onSession(session: LcuChampSelectSession) {
 
 /** 소켓으로 온 세션. 밴픽이 끝나면 null 이 온다. */
 export function handleChampSelectSession(session: LcuChampSelectSession | null) {
-  if (session && getLcuState().phase === 'ChampSelect') onSession(session);
+  if (!session || getLcuState().phase !== 'ChampSelect') return;
+  // 모드를 정하기 전에 온 세션은 받아만 둔다. 모드를 모르고 협곡 추천을 부르면 안 된다.
+  if (mode === null) {
+    lastSession = session;
+    return;
+  }
+  onSession(session);
 }
 
 function reset() {
   round += 1;
   info = null;
   lastSession = null;
+  mode = null;
   if (state === null) return;
   state = null;
   broadcastToAllWindows('champ-select:state', null);
@@ -177,6 +219,16 @@ function reset() {
 
 async function syncWithPhase(phase: GameflowPhase | null) {
   if (phase !== 'ChampSelect') return reset();
+
+  // 큐를 읽어 이번 밴픽의 모드를 먼저 정한다. 기다리는 사이 밴픽이 끝났으면 버린다.
+  if (mode === null) {
+    const startedIn = round;
+    const nextMode = await fetchChampSelectMode();
+    if (startedIn !== round) return;
+    mode = nextMode;
+    // 모드를 정하는 사이 소켓으로 온 세션이 있으면 그걸 쓴다
+    if (lastSession) return onSession(lastSession);
+  }
 
   // 소켓은 바뀔 때만 알려 준다. 밴픽 도중에 앱을 켰을 때를 위해 한 번 직접 받는다.
   const lockfile = getLockfileContent();

@@ -14,8 +14,10 @@
  * 응답 모양은 백엔드 문서 예시를 따른다. 그림 주소는 CommunityDragon 으로 대신 채웠다.
  */
 import type {
+  AugmentRarity,
   ChampSelectState,
   CounterEnemy,
+  MayhemAugments,
   Position,
   RecommendedRunePage,
   RuneEntry,
@@ -295,6 +297,8 @@ const counters = (enemies: CounterEnemy[]) => ({
 const RUNES = { patch: '16.21', championGames: 1520, pages: PAGES };
 
 const BASE: ChampSelectState = {
+  mode: 'rift',
+  mayhemAugments: null,
   position: 'MID',
   positionAssigned: true,
   myChampionId: 61,
@@ -306,7 +310,36 @@ const BASE: ChampSelectState = {
   runeError: null,
 };
 
+// 아수라장 증강 mock. 그림은 실제 증강 그림 대신 챔피언 아이콘을 빌려 쓴다
+const MAYHEM_NAMES: Record<AugmentRarity, string[]> = {
+  silver: ['빵과 버터', '마법 미사일', '서두름', '방패 강타', '무한 순환', '체력 강화'],
+  gold: ['요정 마법', '제왕의 진노', '거인 학살자', '마법사의 생각', '처형인', '천상의 몸'],
+  prismatic: ['전능의 영혼', '쿼드라 피니시', '용의 숨결', '차원 이동', '고스트 프로토콜'],
+};
+const MAYHEM_AUGMENTS: MayhemAugments = {
+  patch: '16.22',
+  augments: (Object.keys(MAYHEM_NAMES) as AugmentRarity[]).flatMap((rarity, r) =>
+    MAYHEM_NAMES[rarity].map((name, i) => ({
+      augmentId: (r + 1) * 100 + i,
+      name,
+      rarity,
+      rank: i === MAYHEM_NAMES[rarity].length - 1 ? null : i + 1,
+      pickRate: i === MAYHEM_NAMES[rarity].length - 1 ? null : Math.round((18 - i * 3.1) * 10) / 10,
+      iconUrl: `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${[1, 61, 103, 157, 234, 64][i]}.png`,
+    })),
+  ),
+};
+
 const SCENARIOS: Record<string, Partial<ChampSelectState>> = {
+  // 아수라장 밴픽. &cs=mayhem-wait 은 챔피언이 정해지기 전, mayhem-loading 은 증강을 받는 중
+  mayhem: {
+    mode: 'mayhem',
+    mayhemAugments: MAYHEM_AUGMENTS,
+    position: null,
+    positionAssigned: false,
+  },
+  'mayhem-wait': { mode: 'mayhem', myChampionId: null, position: null, positionAssigned: false },
+  'mayhem-loading': { mode: 'mayhem', position: null, positionAssigned: false },
   picked: {},
   blue: { myChampionId: null, counters: counters([]), runes: null, applied: null },
   one: { counters: counters([ARI]) },

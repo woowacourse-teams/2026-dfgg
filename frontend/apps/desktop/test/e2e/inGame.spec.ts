@@ -24,7 +24,7 @@ test.beforeEach(async () => {
   league.lcu.setResponse('GET', '/lol-gameflow/v1/gameflow-phase', 'InProgress');
   league.lcu.setResponse('GET', '/lol-patch/v1/game-version', '15.20.700.1234');
   league.lcu.setResponse('GET', '/lol-gameflow/v1/session', {
-    gameData: { gameId: 1, queue: { id: 420 } },
+    gameData: { gameId: 1, queue: { id: 420, gameMode: 'CLASSIC' } },
   });
 
   // 게임: 나(가렌, 미드)와 상대(오공)

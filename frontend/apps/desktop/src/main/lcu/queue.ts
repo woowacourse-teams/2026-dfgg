@@ -1,3 +1,4 @@
+import type { ChampSelectMode } from '../../shared/types';
 import { fetchGameflowSession } from './service';
 
 /** 아이템 추천 오버레이를 띄우는 큐. 소환사의 협곡 일반·랭크 */
@@ -10,9 +11,23 @@ export const OVERLAY_QUEUES = new Set([
   490, // Quickplay
 ]);
 
+/** 무작위 총력전: 아수라장의 gameMode. 큐 id 는 사용자 설정·시즌마다 달라질 수 있어 모드로 가른다 */
+export const MAYHEM_MODE = 'KIWI';
+
+/** 지금 판의 큐. 세션을 못 읽으면 null */
+export async function fetchQueue() {
+  const session = await fetchGameflowSession().catch(() => null);
+  return session?.gameData.queue ?? null;
+}
+
 /** 지금 게임이 오버레이를 띄울 큐인지. 세션을 못 읽으면 띄우지 않는다 */
 export async function isOverlayQueue(): Promise<boolean> {
-  const session = await fetchGameflowSession().catch(() => null);
-  const queueId = session?.gameData.queue.id;
-  return queueId !== undefined && OVERLAY_QUEUES.has(queueId);
+  const queue = await fetchQueue();
+  return queue !== null && OVERLAY_QUEUES.has(queue.id);
+}
+
+/** 밴픽 화면을 고를 모드. 세션을 못 읽으면 협곡으로 둔다 */
+export async function fetchChampSelectMode(): Promise<ChampSelectMode> {
+  const queue = await fetchQueue();
+  return queue?.gameMode === MAYHEM_MODE ? 'mayhem' : 'rift';
 }

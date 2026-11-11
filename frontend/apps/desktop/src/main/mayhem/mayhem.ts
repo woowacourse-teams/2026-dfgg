@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import type { GameflowPhase, MayhemAugments, MayhemCard } from '../../shared/types';
 import { fetchMayhemAugments } from '../api/augments';
+import { MAYHEM_MODE } from '../lcu/queue';
 import { getLcuState, onPhaseChange } from '../lcu/state';
 import { getDDragonData } from '../live/ddragon';
 import { getActivePlayer, getGameStats, getPlayerList } from '../live/endpoints';
@@ -10,7 +11,6 @@ import { loadCandidates } from './titleImages';
 import { startCardReader } from './cardReader';
 import { judgeTitle } from './cardJudge';
 
-const MAYHEM_MODE = 'KIWI';
 const RETRY_MS = 3000;
 
 let gameToken = 0;

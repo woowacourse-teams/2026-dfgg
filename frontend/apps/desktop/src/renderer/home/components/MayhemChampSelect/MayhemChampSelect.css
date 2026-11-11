@@ -1,0 +1,493 @@
+/*
+ * 아수라장 밴픽 화면.
+ * 고른 등급의 색(--tier)이 탭·카드 테두리·빛에 함께 번진다. 레드는 1위에만 쓴다.
+ */
+.mcs {
+  --tier: #c3c9d3;
+  --tier-soft: rgb(195 201 211 / 14%);
+  --tier-line: rgb(195 201 211 / 35%);
+  --tier-fill: var(--tier);
+
+  gap: 14px;
+}
+
+.mcs-tier-gold {
+  --tier: #e6b450;
+  --tier-soft: rgb(230 180 80 / 14%);
+  --tier-line: rgb(230 180 80 / 42%);
+  --tier-fill: var(--tier);
+}
+
+/* 프리즘은 한 색이 아니라 무지갯빛. 글자는 보라, 면은 그라데이션 */
+.mcs-tier-prismatic {
+  --tier: #c9a6ff;
+  --tier-soft: rgb(180 140 255 / 15%);
+  --tier-line: rgb(190 150 255 / 45%);
+  --tier-fill: linear-gradient(90deg, #ff8fcf, #b98cff 45%, #6fd8f0);
+}
+
+/* ---------- 머리: 챔피언 그림 위에 제목 ---------- */
+.mcs-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  min-height: 104px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-l);
+  background: var(--surface-2);
+}
+
+.mcs-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  opacity: 0.55;
+  animation: mcs-fade 600ms var(--ease-out) backwards;
+}
+
+/* 왼쪽은 글자가 읽히게 어둡게, 아래는 등급 색이 비친다 */
+.mcs-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(10 11 13 / 92%) 0%, rgb(10 11 13 / 55%) 55%, rgb(10 11 13 / 15%)),
+    linear-gradient(0deg, var(--tier-soft), transparent 60%);
+  transition: background var(--duration-normal) ease;
+}
+
+.mcs-hero-body {
+  flex: none;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+.mcs-hero-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mcs-hero-title h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 8px rgb(0 0 0 / 60%);
+}
+
+.mcs-hero-champ {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  outline: 1.5px solid rgb(255 255 255 / 25%);
+  outline-offset: -1px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 50%);
+}
+
+.mcs-hero-meta {
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+/* 머리 오른쪽: 등급별 1위. 챔피언 그림 위라 유리판에 얹는다 */
+.mcs-tops {
+  position: relative;
+  z-index: 1;
+  flex: 0 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0 14px 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.mcs-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 9px;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 8px;
+  background: rgb(10 11 13 / 72%);
+  font-size: 12px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  animation: mcs-in 380ms var(--ease-out) backwards;
+  transition:
+    border-color var(--duration-fast) ease,
+    background-color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out);
+}
+
+li:nth-child(2) > .mcs-top {
+  animation-delay: 60ms;
+}
+
+li:nth-child(3) > .mcs-top {
+  animation-delay: 120ms;
+}
+
+.mcs-top:hover {
+  border-color: rgb(255 255 255 / 20%);
+  transform: translateX(-2px);
+}
+
+/* 지금 보고 있는 등급 줄은 그 등급 색으로 */
+.mcs-top[aria-pressed='true'] {
+  border-color: var(--tier-line);
+  background: linear-gradient(90deg, var(--tier-soft), rgb(10 11 13 / 80%));
+}
+
+.mcs-top .mcs-icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+}
+
+.mcs-top .mcs-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.mcs-top-rate {
+  flex: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+/* ---------- 등급 탭 ---------- */
+.mcs-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 5%);
+}
+
+.mcs-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+.mcs-tab:hover {
+  color: var(--ink);
+}
+
+.mcs-tab small {
+  font-size: 10.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.mcs-tab[aria-selected='true'] {
+  border-color: var(--tier-line);
+  background: var(--tier-soft);
+  font-weight: 800;
+  color: var(--tier);
+}
+
+/* 등급을 나타내는 작은 보석. 탭마다 자기 색을 쓴다 */
+.mcs-gem {
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  background: #c3c9d3;
+}
+
+.mcs-tab-gold .mcs-gem {
+  background: #e6b450;
+}
+
+.mcs-tab-prismatic .mcs-gem {
+  background: linear-gradient(135deg, #ff8fcf, #b98cff, #6fd8f0);
+}
+
+.mcs-tab[aria-selected='true'] .mcs-gem {
+  box-shadow: 0 0 8px currentcolor;
+}
+
+.mcs-loading {
+  margin: 0;
+  padding: 18px 0;
+  font-size: 12px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+/* ---------- 공통 조각 ---------- */
+.mcs-board {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mcs-podium,
+.mcs-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 순위는 오버레이 pick-rank 와 같은 비스듬한 딱지 */
+.mcs-rank {
+  min-width: 20px;
+  padding: 0 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  transform: skewX(-12deg);
+}
+
+.mcs-icon {
+  display: block;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.mcs-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.mcs-bar {
+  position: relative;
+  height: 4px;
+  background: rgb(255 255 255 / 7%);
+  transform: skewX(-25deg);
+}
+
+.mcs-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--tier-fill);
+  transform-origin: left;
+  animation: mcs-grow 700ms var(--ease-out) 120ms backwards;
+}
+
+/* ---------- 1~3위 카드 ---------- */
+.mcs-podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mcs-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 10px 12px;
+  overflow: hidden;
+  border: 1px solid var(--tier-line);
+  border-radius: var(--radius-l);
+  background:
+    radial-gradient(120% 70% at 50% 0%, var(--tier-soft), transparent 70%),
+    var(--surface);
+  text-align: center;
+  animation: mcs-in 380ms var(--ease-out) backwards;
+}
+
+.mcs-card:nth-child(2) {
+  animation-delay: 60ms;
+}
+
+.mcs-card:nth-child(3) {
+  animation-delay: 120ms;
+}
+
+.mcs-card .mcs-rank {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+
+/* 그림 뒤로 등급 빛이 퍼진다 */
+.mcs-card-art {
+  position: relative;
+  padding: 3px;
+  border-radius: 13px;
+  background: var(--tier-fill);
+  box-shadow: 0 6px 20px var(--tier-soft);
+}
+
+.mcs-card .mcs-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+}
+
+.mcs-card .mcs-name {
+  max-width: 100%;
+  font-size: 13px;
+}
+
+.mcs-card-rate {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.mcs-card-rate small {
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+.mcs-card-rate b {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.mcs-card .mcs-bar {
+  align-self: stretch;
+  margin: 0 4px;
+}
+
+/* 1위: 붉은 판에 딱지·막대까지 레드 */
+.mcs-card.mcs-best {
+  border-color: rgb(230 57 80 / 55%);
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgb(230 57 80 / 26%), transparent 70%),
+    var(--surface);
+  box-shadow: 0 8px 26px rgb(230 57 80 / 18%);
+}
+
+.mcs-best .mcs-rank {
+  background: var(--accent);
+  color: #fff;
+}
+
+.mcs-best .mcs-card-rate b {
+  color: #fff;
+}
+
+.mcs-best .mcs-bar span {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgb(230 57 80 / 70%);
+}
+
+/* ---------- 4위부터 줄 ---------- */
+.mcs-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.mcs-row {
+  display: grid;
+  grid-template-columns: 26px 28px minmax(0, 1fr) 72px 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px 7px 10px;
+  animation: mcs-in 320ms var(--ease-out) backwards;
+  transition: background-color var(--duration-fast) ease;
+}
+
+.mcs-row + .mcs-row {
+  border-top: 1px solid var(--line);
+}
+
+.mcs-row:hover {
+  background: rgb(255 255 255 / 3%);
+}
+
+.mcs-row:nth-child(2) { animation-delay: 160ms; }
+.mcs-row:nth-child(3) { animation-delay: 180ms; }
+.mcs-row:nth-child(4) { animation-delay: 200ms; }
+.mcs-row:nth-child(5) { animation-delay: 220ms; }
+.mcs-row:nth-child(n + 6) { animation-delay: 240ms; }
+.mcs-row:first-child { animation-delay: 140ms; }
+
+.mcs-row .mcs-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.mcs-row .mcs-name {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.mcs-rate-value {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+/* ---------- 움직임 ---------- */
+@keyframes mcs-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes mcs-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes mcs-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mcs-card,
+  .mcs-row,
+  .mcs-bar span,
+  .mcs-top,
+  .mcs-hero-bg {
+    animation: none;
+  }
+}
