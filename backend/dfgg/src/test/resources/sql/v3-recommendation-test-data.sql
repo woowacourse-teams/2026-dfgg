@@ -13,15 +13,16 @@ INSERT INTO champions (champion_id, riot_key, name) VALUES
     (33, 'Rammus', jsonb_build_object('ko-KR', '람머스', 'en-US', 'Rammus')), (103, 'Ahri', jsonb_build_object('ko-KR', '아리', 'en-US', 'Ahri')), (51, 'Caitlyn', jsonb_build_object('ko-KR', '케이틀린', 'en-US', 'Caitlyn')),
     (89, 'Leona', jsonb_build_object('ko-KR', '레오나', 'en-US', 'Leona')), (60, 'Elise', jsonb_build_object('ko-KR', '엘리스', 'en-US', 'Elise'));
 
-INSERT INTO items (item_id, name, tags) VALUES
-    (6673, jsonb_build_object('ko-KR', '몰락한 왕의 검', 'en-US', 'Blade of The Ruined King'), '["Damage"]'::jsonb),
-    (3031, jsonb_build_object('ko-KR', '무한의 대검', 'en-US', 'Infinity Edge'), '["Damage","CriticalStrike"]'::jsonb),
-    (3036, jsonb_build_object('ko-KR', '도미닉 경의 인사', 'en-US', 'Lord Dominik''s Regards'), '["Damage","ArmorPenetration"]'::jsonb),
-    (3072, jsonb_build_object('ko-KR', '피바라기', 'en-US', 'Bloodthirster'), '["Damage","LifeSteal"]'::jsonb),
-    (3033, jsonb_build_object('ko-KR', '필멸자의 운명', 'en-US', 'Mortal Reminder'), '["Damage"]'::jsonb),
-    (3153, jsonb_build_object('ko-KR', '몰락한 왕의 검(급등)', 'en-US', 'Blade of The Ruined King (Surge)'), '["Damage","AttackSpeed"]'::jsonb),
-    (3006, jsonb_build_object('ko-KR', '광전사의 군화', 'en-US', 'Berserker''s Greaves'), '["Boots"]'::jsonb),
-    (3047, jsonb_build_object('ko-KR', '판금 장화', 'en-US', 'Plated Steelcaps'), '["Boots"]'::jsonb);
+-- 완성 아이템이어야 Core 후보가 된다(ItemService.findCoreItemIds: 조합 재료가 있고 저장된 상위 아이템이 없음).
+INSERT INTO items (item_id, name, tags, from_item_ids) VALUES
+    (6673, jsonb_build_object('ko-KR', '몰락한 왕의 검', 'en-US', 'Blade of The Ruined King'), '["Damage"]'::jsonb, '["1036"]'::jsonb),
+    (3031, jsonb_build_object('ko-KR', '무한의 대검', 'en-US', 'Infinity Edge'), '["Damage","CriticalStrike"]'::jsonb, '["1036"]'::jsonb),
+    (3036, jsonb_build_object('ko-KR', '도미닉 경의 인사', 'en-US', 'Lord Dominik''s Regards'), '["Damage","ArmorPenetration"]'::jsonb, '["1036"]'::jsonb),
+    (3072, jsonb_build_object('ko-KR', '피바라기', 'en-US', 'Bloodthirster'), '["Damage","LifeSteal"]'::jsonb, '["1036"]'::jsonb),
+    (3033, jsonb_build_object('ko-KR', '필멸자의 운명', 'en-US', 'Mortal Reminder'), '["Damage"]'::jsonb, '["1036"]'::jsonb),
+    (3153, jsonb_build_object('ko-KR', '몰락한 왕의 검(급등)', 'en-US', 'Blade of The Ruined King (Surge)'), '["Damage","AttackSpeed"]'::jsonb, '["1036"]'::jsonb),
+    (3006, jsonb_build_object('ko-KR', '광전사의 군화', 'en-US', 'Berserker''s Greaves'), '["Boots"]'::jsonb, '["1001"]'::jsonb),
+    (3047, jsonb_build_object('ko-KR', '판금 장화', 'en-US', 'Plated Steelcaps'), '["Boots"]'::jsonb, '["1001"]'::jsonb);
 
 -- 전개 표본: [6673,3031] 다음은 3036(3판) 또는 3006(2판)
 INSERT INTO normalized_match_participants (
