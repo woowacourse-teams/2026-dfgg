@@ -72,6 +72,40 @@ class SelfSynergyCandidateGeneratorTest {
     }
 
     @Test
+    @DisplayName("Core가 아닌 아이템이 구매율 상위여도 topK를 Core 아이템으로 채운다 — #297")
+    void generate_WhenNonCoreItemsRankHighest_FillsTopKWithCoreItems() {
+        // given: 전체 1위 3072와 최근 1위 6673이 Core가 아니다(오염 데이터의 도란처럼)
+        RecommendationQuery query = new RecommendationQuery(
+                157L, ChampionPosition.MID, List.of(),
+                List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
+                "EMERALD", "16.17", Set.of(INFINITY_EDGE, RARE_ITEM, THIN_POSITION_ITEM, ROLLUP_ITEM)
+        );
+
+        // when
+        GeneratorResult result = generator.generate(query, 2);
+
+        // then
+        assertThat(itemIdsOf(result)).containsExactly(INFINITY_EDGE, RARE_ITEM);
+    }
+
+    @Test
+    @DisplayName("포지션을 합친 통계로 물러나도 Core가 아닌 아이템을 내지 않는다 — #297")
+    void generate_WhenBackedOffToRollupAndNonCoreItemRanksHighest_FillsTopKWithCoreItems() {
+        // given: 888은 TOP 표본이 부족해 rollup으로 물러나고, rollup 1위 3157이 Core가 아니다
+        RecommendationQuery query = new RecommendationQuery(
+                888L, ChampionPosition.TOP, List.of(),
+                List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
+                "EMERALD", "16.17", Set.of(THIN_POSITION_ITEM)
+        );
+
+        // when
+        GeneratorResult result = generator.generate(query, 1);
+
+        // then
+        assertThat(itemIdsOf(result)).containsExactly(THIN_POSITION_ITEM);
+    }
+
+    @Test
     @DisplayName("점수는 구매 이력과 무관하다 — 이미 산 것을 뺀 나머지의 순서가 그대로 유지된다")
     void generate_WhenPurchaseHistoryDiffers_KeepsRelativeOrderOfRemainingItems() {
         // given: 같은 챔피언·포지션, 구매 이력만 다르다.
