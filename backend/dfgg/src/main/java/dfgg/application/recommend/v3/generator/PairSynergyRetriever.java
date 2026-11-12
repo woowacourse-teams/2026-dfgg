@@ -3,6 +3,7 @@ package dfgg.application.recommend.v3.generator;
 import dfgg.domain.itemstats.ChampionPairItemStats;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.domain.itemstats.PairRelation;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,15 +49,16 @@ public class PairSynergyRetriever {
      * 아이템별로 "상대 챔피언 → 점수" 묶음을 만든다.
      * 반환된 map에 없는 아이템은 어떤 상대와도 유의미하게 관측되지 않았다는 뜻이다.
      *
+     * @param coreItemIds     후보로 낼 수 있는 Core 아이템. 통계에 섞인 Core가 아닌 아이템은 읽지 않는다(#297)
      * @param baseCountByItem 내 챔피언이 각 아이템을 산 판 수(상대 무관) — lift의 분모
      * @param baseGameCount   내 챔피언이 치른 판 수
      */
     public Map<Long, PairScoreAggregate> scoresByItem(
-            long myChampionId, List<Long> otherChampionIds, PairRelation relation,
+            long myChampionId, List<Long> otherChampionIds, PairRelation relation, Collection<Long> coreItemIds,
             Map<Long, Integer> baseCountByItem, int baseGameCount
     ) {
         Map<Long, Map<Long, Double>> scoreByItemAndOther = new HashMap<>();
-        for (ChampionPairItemStats stats : findStats(myChampionId, otherChampionIds, relation)) {
+        for (ChampionPairItemStats stats : findCoreStats(myChampionId, otherChampionIds, relation, coreItemIds)) {
             if (stats.getPairGameCountAll() < minimumPairGames
                     || belowBaseRateFloor(stats.getItemId(), baseCountByItem, baseGameCount)) {
                 continue;
@@ -71,6 +73,18 @@ public class PairSynergyRetriever {
         scoreByItemAndOther.forEach((itemId, scoreByOther) ->
                 aggregateByItem.put(itemId, PairScoreAggregate.of(scoreByOther)));
         return aggregateByItem;
+    }
+
+    private List<ChampionPairItemStats> findCoreStats(
+            long myChampionId, List<Long> otherChampionIds, PairRelation relation, Collection<Long> coreItemIds
+    ) {
+        if (otherChampionIds.isEmpty()) {
+            return List.of();
+        }
+        return pairRepository.findByMyChampionIdAndRelationAndOtherChampionIdInAndItemIdIn(
+                Math.toIntExact(myChampionId), relation,
+                otherChampionIds.stream().map(Math::toIntExact).toList(), coreItemIds
+        );
     }
 
     private List<ChampionPairItemStats> findStats(

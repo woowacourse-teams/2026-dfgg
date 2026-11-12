@@ -24,6 +24,11 @@ public interface ChampionPairItemStatsRepository extends JpaRepository<ChampionP
             Integer myChampionId, PairRelation relation, Collection<Integer> otherChampionIds
     );
 
+    /** 추천 후보를 찾을 때 쓴다. 통계에 섞인 Core가 아닌 아이템을 읽지 않는다(#297). */
+    List<ChampionPairItemStats> findByMyChampionIdAndRelationAndOtherChampionIdInAndItemIdIn(
+            Integer myChampionId, PairRelation relation, Collection<Integer> otherChampionIds, Collection<Long> itemIds
+    );
+
     /**
      * {@code [내 챔피언 + 상대 챔피언 + 아이템]} 삼중항을 원본 참가자 데이터에서 만든다.
      *
