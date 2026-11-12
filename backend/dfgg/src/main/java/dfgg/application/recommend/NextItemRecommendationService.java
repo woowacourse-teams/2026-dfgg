@@ -213,8 +213,26 @@ public class NextItemRecommendationService {
                 championIdsOf(allies),
                 championIdsOf(enemies),
                 tierOf(request),
-                patchOf(request)
+                patchOf(request),
+                coreItemIdsOf(request)
         );
+    }
+
+    /**
+     * generator가 통계를 읽을 때 Core 아이템만 읽도록 넘길 목록. 요청마다 한 번 읽는다.
+     * <p>
+     * 09-17~10-17에 정규화된 구매 순서에는 시작 아이템·재료가 Core처럼 섞여 있다(#297).
+     * Core가 하나도 없으면 추천할 수 없으므로, 아이템 표가 비었을 때처럼 NotFound(404)로 답한다.
+     */
+    private Set<Long> coreItemIdsOf(NextItemRecommendationRequest request) {
+        Set<Long> coreItemIds = itemService.findCoreItemIds().stream()
+                .map(Long::valueOf)
+                .collect(Collectors.toUnmodifiableSet());
+        if (coreItemIds.isEmpty()) {
+            throw new NextItemRecommendationNotFoundException(
+                    request.myChampion().name(), request.myChampion().position());
+        }
+        return coreItemIds;
     }
 
     private String tierOf(NextItemRecommendationRequest request) {

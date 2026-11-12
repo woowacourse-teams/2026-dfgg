@@ -18,6 +18,7 @@ import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
@@ -44,6 +45,9 @@ import org.springframework.test.context.jdbc.Sql;
 // base rate로 백오프하고, 그러면 근거가 비어 근거 전달을 확인할 수 없다.
 @Sql({"/sql/v3-recommendation-test-data.sql", "/sql/counter-test-data.sql"})
 class EvidenceReachesResponseLayerTest {
+
+    /** 테스트 데이터의 구매 순서에 나오는 아이템. 모두 Core로 둔다 — Core 거르기는 이 테스트의 관심사가 아니다. */
+    private static final Set<Long> CORE_ITEM_IDS = Set.of(3006L, 3031L, 3036L, 3047L, 3068L, 3072L, 6653L, 6673L);
 
     private static final long YASUO = 157L;
     private static final long RAMMUS = 33L;
@@ -102,7 +106,7 @@ class EvidenceReachesResponseLayerTest {
                 YASUO, ChampionPosition.MID, List.of(),
                 List.of(AHRI, JINX),
                 List.of(RAMMUS),
-                "EMERALD", "16.17");
+                "EMERALD", "16.17", CORE_ITEM_IDS);
     }
 
     /** 서비스가 하는 것과 같은 조립: generator → union → hard filter. */

@@ -2,6 +2,7 @@ package dfgg.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dfgg.application.item.ItemService;
 import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.recommend.v3.CandidateGenerator;
 import dfgg.application.recommend.v3.CandidateUnion;
@@ -13,6 +14,7 @@ import dfgg.application.recommend.v3.feature.FeatureName;
 import dfgg.domain.champion.ChampionPosition;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,8 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("evaluation")
 @Tag("evaluation")
 class FeatureSanityEvaluationTest {
+    @Autowired
+    private ItemService itemService;
 
     private static final long YASUO = 157L;
     private static final long RAMMUS = 33L;
@@ -48,7 +52,7 @@ class FeatureSanityEvaluationTest {
         RecommendationQuery query = new RecommendationQuery(
                 YASUO, ChampionPosition.MID, List.of(),
                 List.of(222L, 412L, 64L, 516L), List.of(RAMMUS, 103L, 51L, 89L, 60L),
-                "PLATINUM", "16.16");
+                "PLATINUM", "16.16", itemService.findCoreItemIds().stream().map(Long::valueOf).collect(Collectors.toUnmodifiableSet()));
 
         List<GeneratorResult> results = new ArrayList<>();
         for (CandidateGenerator generator : generators) {

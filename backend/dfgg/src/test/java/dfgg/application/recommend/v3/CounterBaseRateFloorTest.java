@@ -13,6 +13,7 @@ import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.infrastructure.config.TierScopeConfiguration;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,9 @@ import org.springframework.test.context.jdbc.Sql;
 @Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/counter-base-rate-floor-test-data.sql")
 class CounterBaseRateFloorTest {
+
+    /** 테스트 데이터의 구매 순서에 나오는 아이템. 모두 Core로 둔다 — Core 거르기는 이 테스트의 관심사가 아니다. */
+    private static final Set<Long> CORE_ITEM_IDS = Set.of(3031L, 3089L, 6673L);
 
     private static final long YASUO = 157L;
     private static final long RAMMUS = 33L;
@@ -77,7 +81,7 @@ class CounterBaseRateFloorTest {
     private RecommendationQuery query() {
         return new RecommendationQuery(
                 YASUO, ChampionPosition.MID, List.of(),
-                List.of(), List.of(RAMMUS), "EMERALD", "16.17");
+                List.of(), List.of(RAMMUS), "EMERALD", "16.17", CORE_ITEM_IDS);
     }
 
     @Test

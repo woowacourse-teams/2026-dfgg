@@ -5,9 +5,12 @@ import dfgg.application.recommend.v3.RecommendationQuery;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 실제 매치 한 판을 구매 단계별 평가 스냅샷으로 펼친다.
@@ -21,6 +24,12 @@ import java.util.Optional;
 public final class SnapshotQueryBuilder {
 
     private final ChampionPositionNormalizer positionNormalizer = new ChampionPositionNormalizer();
+    private final Set<Long> coreItemIds;
+
+    /** 서빙과 같은 기준({@code ItemService.findCoreItemIds()})의 Core 아이템을 모든 query에 싣는다 — 학습·평가와 서빙의 입력을 맞춘다. */
+    public SnapshotQueryBuilder(Collection<Integer> coreItemIds) {
+        this.coreItemIds = coreItemIds.stream().map(Long::valueOf).collect(Collectors.toUnmodifiableSet());
+    }
 
     /** 구매 시점 검증용: 경기 종료 후 Core summary 대신 호출자가 복원한 과거 구매만 받는다. */
     public RecommendationQuery buildAtPurchase(List<NormalizedMatchParticipant> participants,
@@ -64,7 +73,8 @@ public final class SnapshotQueryBuilder {
     private RecommendationQuery queryOf(List<NormalizedMatchParticipant> participants,
             NormalizedMatchParticipant me, String patch, List<Long> purchasedIds, ChampionPosition position) {
         return new RecommendationQuery(Long.valueOf(me.getChampionId()), position, purchasedIds,
-                championIdsOf(participants, me, true), championIdsOf(participants, me, false), me.getTier(), patch);
+                championIdsOf(participants, me, true), championIdsOf(participants, me, false), me.getTier(), patch,
+                coreItemIds);
     }
 
     private List<Long> championIdsOf(

@@ -12,6 +12,7 @@ import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.champion.ChampionTag;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,7 +65,7 @@ class QueryFeatureExtractorTest {
                 YASUO, position, purchased,
                 List.of(JINX, THRESH, MALPHITE, AHRI),
                 List.of(RAMMUS, ZED, 51L, 89L, 60L),
-                "EMERALD", "16.17"
+                "EMERALD", "16.17", Set.of()
         );
     }
 
@@ -147,7 +148,7 @@ class QueryFeatureExtractorTest {
         // given
         RecommendationQuery tierQuery = new RecommendationQuery(
                 YASUO, ChampionPosition.MID, List.of(),
-                List.of(JINX), List.of(RAMMUS), tier, "16.17");
+                List.of(JINX), List.of(RAMMUS), tier, "16.17", Set.of());
 
         // when
         FeatureVector vector = extract(tierQuery);
@@ -162,7 +163,7 @@ class QueryFeatureExtractorTest {
         // given
         RecommendationQuery lowerCase = new RecommendationQuery(
                 YASUO, ChampionPosition.MID, List.of(),
-                List.of(JINX), List.of(RAMMUS), "challenger", "16.17");
+                List.of(JINX), List.of(RAMMUS), "challenger", "16.17", Set.of());
 
         // when & then
         assertThat(extract(lowerCase).get(FeatureName.TIER_ORDINAL)).isEqualTo(10.0);
@@ -173,7 +174,7 @@ class QueryFeatureExtractorTest {
     void extract_WhenTierUnknown_LeavesNaN() {
         RecommendationQuery unknownTier = new RecommendationQuery(
                 YASUO, ChampionPosition.MID, List.of(),
-                List.of(JINX), List.of(RAMMUS), "UNRANKED", "16.17");
+                List.of(JINX), List.of(RAMMUS), "UNRANKED", "16.17", Set.of());
 
         FeatureVector vector = extract(unknownTier);
 

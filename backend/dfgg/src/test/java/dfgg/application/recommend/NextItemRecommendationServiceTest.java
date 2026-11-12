@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,6 +38,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,6 +75,7 @@ class NextItemRecommendationServiceTest {
         buildGenerator = mock(CandidateGenerator.class);
         candidateRanker = mock(CandidateRanker.class);
         championRepository = mock(dfgg.domain.champion.ChampionRepository.class);
+        when(itemService.findCoreItemIds()).thenReturn(Set.of(6673, 3031, 6653, 3222, 3050));
 
         when(championService.findChampionByName(any())).thenAnswer(invocation -> {
             Champion champion = mock(Champion.class);
@@ -228,6 +232,36 @@ class NextItemRecommendationServiceTest {
         // then
         assertThat(response.recommendedItems()).extracting(item -> item.id())
                 .containsExactly(LIANDRY, KRAKEN, INFINITY_EDGE);
+    }
+
+    @Test
+    @DisplayName("요청마다 Core 아이템 ID를 한 번 읽어 query에 싣는다")
+    void recommendNextItem_WhenRequested_LoadsCoreItemIdsOnceIntoQuery() {
+        // given
+        givenCandidates(KRAKEN);
+        when(candidateRanker.rank(any(CandidateUnion.class), any(RecommendationQuery.class), anyInt()))
+                .thenReturn(rankedOf(KRAKEN));
+
+        // when
+        service.recommendNextItem(request(), Language.KO_KR);
+
+        // then
+        ArgumentCaptor<RecommendationQuery> query = ArgumentCaptor.forClass(RecommendationQuery.class);
+        verify(buildGenerator).generate(query.capture(), anyInt());
+        assertThat(query.getValue().coreItemIds()).containsExactlyInAnyOrder(6673L, 3031L, 6653L, 3222L, 3050L);
+        verify(itemService, times(1)).findCoreItemIds();
+    }
+
+    @Test
+    @DisplayName("Core 아이템이 하나도 없으면 후보를 찾지 않고 NotFound를 던진다 — 404 계약을 유지한다")
+    void recommendNextItem_WhenNoCoreItemExists_ThrowsNotFound() {
+        // given
+        when(itemService.findCoreItemIds()).thenReturn(Set.of());
+
+        // when & then
+        assertThatThrownBy(() -> service.recommendNextItem(request(), Language.KO_KR))
+                .isInstanceOf(NextItemRecommendationNotFoundException.class);
+        verify(buildGenerator, never()).generate(any(RecommendationQuery.class), anyInt());
     }
 
     @Test

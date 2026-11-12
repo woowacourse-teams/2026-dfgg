@@ -5,12 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class SnapshotQueryBuilderTest {
 
-    private final SnapshotQueryBuilder builder = new SnapshotQueryBuilder();
+    private final SnapshotQueryBuilder builder = new SnapshotQueryBuilder(Set.of());
 
     private NormalizedMatchParticipant participant(
             String puuid, int championId, int teamId, String position, List<Integer> order, boolean complete

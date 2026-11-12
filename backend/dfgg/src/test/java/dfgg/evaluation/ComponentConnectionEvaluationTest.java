@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.item.ItemPurchaseTypeClassifier;
+import dfgg.application.item.ItemService;
 import dfgg.application.match.ParticipantItemPurchaseBundle;
 import dfgg.application.match.ParticipantItemPurchaseSnapshotService;
 import dfgg.application.match.PurchaseInventoryReconstructor;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +52,15 @@ import org.springframework.transaction.annotation.Transactional;
         "spring.datasource.hikari.read-only=true", "collection.scheduler.enabled=false"})
 @Transactional(readOnly = true)
 class ComponentConnectionEvaluationTest {
+
+    @Autowired
+    private ItemService itemService;
+    private SnapshotQueryBuilder snapshotQueryBuilder;
+
+    @BeforeEach
+    void createSnapshotQueryBuilder() {
+        snapshotQueryBuilder = new SnapshotQueryBuilder(itemService.findCoreItemIds());
+    }
     @Autowired ParticipantItemPurchaseSnapshotService snapshots;
     @Autowired PurchaseInventoryReconstructor inventoryReconstructor;
     @Autowired NormalizedMatchParticipantRepository participants;
@@ -105,7 +116,7 @@ class ComponentConnectionEvaluationTest {
                         || s.purchase().getPurchaseType() == ItemPurchaseType.BOOTS)
                 .filter(s -> inventoryReconstructor.isStillOwned(s.purchase().getItemId(), bundle.inventoryBefore(), patch))
                 .map(s -> Long.valueOf(s.purchase().getItemId())).distinct().toList();
-        var query = new SnapshotQueryBuilder().buildAtPurchase(matchParticipants, participantId, patch, pastCoreIds);
+        var query = snapshotQueryBuilder.buildAtPurchase(matchParticipants, participantId, patch, pastCoreIds);
         assertThat(query.position().isFullBuild(query.purchasedItemCount())).as("이미 최종 Core 빌드입니다").isFalse();
 
         // 기존 운영 Core와 동일한 generator·filter·Feature·ranker Bean을 사용하며 통계를 재집계하지 않는다.

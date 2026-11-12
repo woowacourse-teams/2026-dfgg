@@ -2,6 +2,7 @@ package dfgg.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dfgg.application.item.ItemService;
 import dfgg.application.itemstats.ItemStatsAggregationResult;
 import dfgg.domain.language.Language;
 import dfgg.application.itemstats.ItemStatsAggregationService;
@@ -66,12 +67,15 @@ class DescriptionFillRateEvaluationTest {
     @Value("${recommendation.counter.minimum-base-rate}")
     private double counterMinimumBaseRate;
 
-    private final SnapshotQueryBuilder snapshotQueryBuilder = new SnapshotQueryBuilder();
+    private SnapshotQueryBuilder snapshotQueryBuilder;
+    @Autowired
+    private ItemService itemService;
     private final GameSplit gameSplit = new GameSplit(0.8);
     private ParticipantSampler participantSampler;
 
     @BeforeEach
     void prepareSampler() {
+        snapshotQueryBuilder = new SnapshotQueryBuilder(itemService.findCoreItemIds());
         participantSampler = new ParticipantSampler(tierScope);
     }
 

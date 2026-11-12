@@ -18,6 +18,7 @@ import dfgg.domain.itemstats.PairRelation;
 import dfgg.infrastructure.config.TierScopeConfiguration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,9 @@ import org.springframework.test.context.jdbc.Sql;
 @Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/ally-synergy-test-data.sql")
 class AllySynergyCandidateGeneratorTest {
+
+    /** 테스트 데이터의 구매 순서에 나오는 아이템. 모두 Core로 둔다 — Core 거르기는 이 테스트의 관심사가 아니다. */
+    private static final Set<Long> CORE_ITEM_IDS = Set.of(3031L, 3068L, 3190L, 3222L, 3504L, 6617L);
 
     private static final long JANNA = 40L;
     private static final long JINX = 222L;
@@ -98,7 +102,7 @@ class AllySynergyCandidateGeneratorTest {
         return new RecommendationQuery(
                 JANNA, ChampionPosition.SUPPORT, List.of(),
                 allyChampionIds, List.of(33L, 103L, 51L, 89L, 60L),
-                "EMERALD", "16.17"
+                "EMERALD", "16.17", CORE_ITEM_IDS
         );
     }
 

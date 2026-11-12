@@ -2,6 +2,7 @@ package dfgg.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dfgg.application.item.ItemService;
 import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.recommend.v3.CandidateGenerator;
 import dfgg.application.recommend.v3.CandidateSource;
@@ -51,12 +52,15 @@ class AllyLiftQualityProbeTest {
     @Autowired private ItemStatsAggregationService aggregationService;
     @Autowired private TierScope tierScope;
 
-    private final SnapshotQueryBuilder snapshotQueryBuilder = new SnapshotQueryBuilder();
+    private SnapshotQueryBuilder snapshotQueryBuilder;
+    @Autowired
+    private ItemService itemService;
     private final GameSplit gameSplit = new GameSplit(0.8);
     private ParticipantSampler participantSampler;
 
     @BeforeEach
     void prepareSampler() {
+        snapshotQueryBuilder = new SnapshotQueryBuilder(itemService.findCoreItemIds());
         participantSampler = new ParticipantSampler(tierScope);
     }
 
