@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
-import {
+import type {
   ChampSelectState,
   Position,
   EndedGame,
@@ -10,6 +10,7 @@ import {
   OverlayClickTarget,
   RecommendationUpdate,
   Summoner,
+  MayhemCard,
 } from '../shared/types';
 import type { Locale } from '../shared/i18n';
 
@@ -131,4 +132,14 @@ contextBridge.exposeInMainWorld('settings', {
   setHighlightMaxClipCount: (count: number) => ipcRenderer.invoke('highlight:set-max-clip', count),
   getAppVersion: () => ipcRenderer.sendSync('app:version'),
   openPrivacyPolicy: () => ipcRenderer.invoke('app:open-privacy'),
+});
+
+contextBridge.exposeInMainWorld('mayhem', {
+  // 아수라장 판이 아니면 null
+  getCards: (): Promise<MayhemCard[]> => ipcRenderer.invoke('mayhem:get-cards'),
+  onCards: (callback: (cards: MayhemCard[]) => void) => {
+    const listener = (_event: IpcRendererEvent, cards: MayhemCard[]) => callback(cards);
+    ipcRenderer.on('mayhem:cards', listener);
+    return () => ipcRenderer.removeListener('mayhem:cards', listener);
+  },
 });

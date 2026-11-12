@@ -12,7 +12,7 @@ export function pickLocale(languages: readonly string[]): Locale {
 }
 
 const KO = {
-  // 빌드 때 언어별 index.html 에도 넣어야 해서 webpack.config.js 와 같은 파일을 쓴다.
+  // 빌드 때 언어별 index.html 에도 넣어야 해서 webpack.renderer.js 와 같은 파일을 쓴다.
   meta: META.ko,
   header: {
     navLabel: '주요 메뉴',

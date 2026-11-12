@@ -4,6 +4,7 @@ import type { DDragonChampionList, DDragonItemList, DDragonVersions } from './ty
 type DDragonData = {
   version: string;
   championNames: Record<string, string>;
+  championKeys: Record<string, number>;
   componentItemIds: Set<number>;
   bootsItemIds: Set<number>;
 };
@@ -112,6 +113,9 @@ async function load(): Promise<DDragonData> {
     version: version[0],
     championNames: Object.fromEntries(
       Object.values(championList.data).map((champion) => [champion.id, champion.name]),
+    ),
+    championKeys: Object.fromEntries(
+      Object.values(championList.data).map((champion) => [champion.id, Number(champion.key)]),
     ),
     componentItemIds: new Set([...componentItemIds, ...startingItemIds]),
     bootsItemIds: toBootsItemIds(itemList),

@@ -16,15 +16,10 @@ import { championTileUrl } from '../../lib/ddragon';
 import { rankTone } from '../../lib/dfRank';
 import { formatMinutes, formatWhen, queueLabel } from '../../lib/format';
 import DfRankCard from '../DfRankCard/DfRankCard';
-import HighlightPlayer from '../HighlightSection/HighlightPlayer';
+import HighlightNotice from '../HighlightSection/HighlightNotice';
+import HighlightPlayer, { formatClock } from '../HighlightSection/HighlightPlayer';
 import MatchDetail from './MatchDetail';
 import { ItemRow, KdaLine, RatioChip } from './parts';
-
-// 47.3 → '0:47'. 기존 formatMinutes는 '18분' 단위라 클립 길이에는 안 맞음
-const formatClock = (sec: number) => {
-  const s = Math.round(sec);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-};
 
 export function MatchCard({
   match,
@@ -150,9 +145,7 @@ export function MatchCard({
           {highlightGame ? (
             <HighlightPlayer game={highlightGame} autoPlay source='match-card' />
           ) : (
-            <p className='matches-empty'>
-              {highlightGame === null ? t.match.highlightDeleted : t.common.loading}
-            </p>
+            <HighlightNotice kind={highlightGame === null ? 'deleted' : 'loading'} />
           )}
         </div>
       )}

@@ -13,7 +13,7 @@ import { trackEvent } from '../analytics/umami';
 
 let sessionDir: string | null = null; // 이번 판 세션 폴더 (녹화 시작 시 생성)
 
-const GAME_WINDOW_TITLE = 'League of Legends (TM) Client'; // 롤 게임 창 제목
+export const GAME_WINDOW_TITLE = 'League of Legends (TM) Client'; // 롤 게임 창 제목
 const WINDOW_POLL_MS = 2_000; // 게임 창 2초마다 확인
 
 // 번호표: 정지할 때마다 1씩 올라감 => 기다리던 시작 작업이 자기 번호가 아니면 그만둠
