@@ -5,7 +5,7 @@ v3 추천(`POST /api/recommendations/v3`)에 동시 부하를 걸어 병목을 �
 | 파일 | 하는 일 |
 |---|---|
 | `k6/v3-load.js` | k6 시나리오. v3·v4 겸용(`ENDPOINT`). `smoke` / `target` / `ramp` / `validate` |
-| `k6/make-v4-requests.py` | v3 요청 파일을 행 수·순서 그대로 v4 요청 파일(`k6/data/requests-v4.json`)로 늘린다 |
+| `k6/make-v4-requests.py` | v3 요청 파일을 행 수·순서 그대로 v4 요청 파일(`k6/data/requests-v4.json`)로 늘린다. 챔피언 이름은 앱처럼 영어로 바꾼다 |
 | `run.sh` | 측정 1회 = pg_stat_statements 초기화 → k6 → 결과 수집. 결과는 `results/<UTC>-<tag>/` |
 | `prom-window.sh` | 측정 1회의 앱 지표(Hikari, v4 단계별 시간, CPU·힙)를 Prometheus에서 측정 구간만 잘라 `prometheus.txt`로 남긴다 |
 | `results/` | 측정 원자료. **커밋한다** — 서버 홈에만 두었다가 원자료를 잃은 적이 있다 |
@@ -516,7 +516,8 @@ v4 요청 파일은 v3 파일에서 만든다. 저장소 루트에서:
 python3 backend/ops/perf/k6/make-v4-requests.py
 ```
 
-기대: `rows=1000`. 행 수·순서와 v3 키는 v3 파일과 같고, 보유 아이템(구매 아이템 × 수량 1)·게임 시간(구매 k개 → (5 + 4k)분)·골드(고정 시드 난수 0~3,000)가 더해진다.
+기대: `rows=1000`, `ddragon_version=16.21.1`. 행 수·순서와 구매 목록은 v3 파일과 같고, 보유 아이템(구매 아이템 × 수량 1)·게임 시간(구매 k개 → (5 + 4k)분)·골드(고정 시드 난수 0~3,000)가 더해진다.
+챔피언 이름은 데스크톱 앱과 같은 Data Dragon `en_US` 이름(`Lee Sin`, `Kai'Sa` 등)으로 바꾼다. v3 파일의 한글 이름 그대로 보내면 백엔드가 riotKey 조회에 실패한 뒤 이름으로 한 번 더 찾아, 챔피언 조회 비용을 실제보다 크게 잰다. Data Dragon을 받으므로 인터넷이 필요하고, 대응표에 없는 이름이 있으면 파일을 만들지 않는다.
 v4가 운영 카탈로그에 없는 보유 아이템을 400으로 거절하면, `validate` 회차(아래 "측정 1회의 순서")의 로그에서 id를 뽑아 스크립트의 `EXCLUDED_ITEM_IDS`에 넣고 다시 만든다:
 
 ```bash
@@ -743,6 +744,7 @@ ENDPOINT=v4 ./backend/ops/perf/run.sh before-1 -e SCENARIO=target -e TARGET_RPS=
 | 측정 중 모니터링 EC2 CPU가 포화됐다 | 부하 발생기가 병목이다. Grafana와 같은 서버를 쓴다 |
 | `requests_sha256` 또는 `perf_data`가 다르다 | 다른 요청·다른 데이터로 쟀다 |
 | `requests-v4.json`의 제외 목록을 바꿨다 | 그 전에 잰 v4 결과는 다른 요청으로 잰 것이다(`requests_sha256`이 달라진다) |
+| `requests-v4.json`의 챔피언 이름이 한글이다(2026-11-10 이전 파일, sha256 `11b1e76a…`) | 챔피언 조회 비용이 실제보다 크다. 영어 이름 파일로 잰 결과와 비교하지 않는다 |
 
 ## 결과 폴더
 
