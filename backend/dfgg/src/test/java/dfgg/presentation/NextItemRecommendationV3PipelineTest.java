@@ -36,6 +36,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.context.jdbc.SqlMergeMode;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -47,6 +48,7 @@ class NextItemRecommendationV3PipelineTest {
     private static final long DOMINIK = 3036L;
     private static final long BERSERKERS_GREAVES = 3006L;
     private static final long PLATED_STEELCAPS = 3047L;
+    private static final long DORANS_BLADE = 1055L;
 
     private static final long RAMMUS_ID = 33L;
     private static final long AHRI_ID = 103L;
@@ -143,6 +145,21 @@ class NextItemRecommendationV3PipelineTest {
 
     private List<Long> itemIdsOf(NextItemRecommendationResponse response) {
         return response.recommendedItems().stream().map(item -> item.id()).toList();
+    }
+
+    @Test
+    @SqlMergeMode(SqlMergeMode.MergeMode.MERGE)
+    @Sql("/sql/starter-item-contamination-test-data.sql")
+    @DisplayName("구매 순서에 시작 아이템이 섞인 통계에서도 시작 아이템을 추천하지 않는다 — #297")
+    void recommendV3_WhenStatsContainStarterItem_DoesNotRecommendIt() {
+        // given: 야스오 12판의 구매 순서 첫 자리에 도란의 검이 섞여 있다(09-17~10-17 정규화 데이터처럼)
+        List<Long> nothingPurchased = List.of();
+
+        // when
+        NextItemRecommendationResponse response = recommend(nothingPurchased);
+
+        // then
+        assertThat(itemIdsOf(response)).isNotEmpty().doesNotContain(DORANS_BLADE);
     }
 
     @Test
