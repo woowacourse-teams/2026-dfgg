@@ -82,7 +82,7 @@ public class BuildCandidateGenerator implements CandidateGenerator {
                 .collect(Collectors.joining(","));
         return participantRepository.findNextItemAfterExactPrefix(
                 query.myChampionId(), riotPositions(query), prefix,
-                query.purchasedItemCount() + 1, recentPatches
+                query.purchasedItemCount() + 1, recentPatches, coreItemIdTexts(query)
         );
     }
 
@@ -92,8 +92,13 @@ public class BuildCandidateGenerator implements CandidateGenerator {
         }
         Long lastItemId = query.purchasedItemIds().get(query.purchasedItemCount() - 1);
         return participantRepository.findNextItemAfterLastItem(
-                query.myChampionId(), riotPositions(query), lastItemId, recentPatches
+                query.myChampionId(), riotPositions(query), lastItemId, recentPatches, coreItemIdTexts(query)
         );
+    }
+
+    /** 구매 순서 쿼리는 아이템 ID를 문자열로 다룬다. */
+    private List<String> coreItemIdTexts(RecommendationQuery query) {
+        return query.coreItemIds().stream().map(String::valueOf).toList();
     }
 
     /**
@@ -119,8 +124,8 @@ public class BuildCandidateGenerator implements CandidateGenerator {
     }
 
     private List<ScoredItem> championLevel(RecommendationQuery query, int topK) {
-        List<ChampionItemStats> stats = championItemStatsRepository
-                .findByChampionIdAndPosition(Math.toIntExact(query.myChampionId()), query.position());
+        List<ChampionItemStats> stats = championItemStatsRepository.findByChampionIdAndPositionAndItemIdIn(
+                Math.toIntExact(query.myChampionId()), query.position(), query.coreItemIds());
 
         List<TransitionScore> scores = stats.stream()
                 .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))

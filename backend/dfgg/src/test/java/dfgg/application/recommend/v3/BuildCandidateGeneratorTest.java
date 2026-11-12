@@ -129,6 +129,23 @@ class BuildCandidateGeneratorTest {
     }
 
     @Test
+    @DisplayName("아무것도 안 샀을 때 첫 구매 상위가 Core가 아닌 아이템이어도 topK를 Core 아이템으로 채운다 — #297")
+    void generate_WhenNothingPurchasedAndNonCoreItemsLeadFirstPurchase_FillsTopKWithCoreItems() {
+        // given: 첫 구매 1·2위인 3072(12판)·3033(11판)이 Core가 아니다 — 오염 데이터의 도란처럼
+        RecommendationQuery query = new RecommendationQuery(
+                157L, ChampionPosition.MID, List.of(),
+                List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
+                "EMERALD", "16.17", Set.of(KRAKEN, INFINITY_EDGE, SHIELDBOW, BOOTS, SURGING_ITEM)
+        );
+
+        // when
+        GeneratorResult result = generator.generate(query, 2);
+
+        // then
+        assertThat(itemIdsOf(result)).containsExactlyInAnyOrder(SURGING_ITEM, KRAKEN);
+    }
+
+    @Test
     @DisplayName("최근 급등 아이템이 전체 표본 기준으로 밀려도 후보에 남는다 — recent/all union의 목적")
     void generate_WhenItemSurgedRecently_IsRetrievedEvenIfWeakOverall() {
         // given: 3153은 16.17에서만 5판. topK를 2로 좁혀 전체 기준으로는 잘리게 만든다.

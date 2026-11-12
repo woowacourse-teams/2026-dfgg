@@ -45,6 +45,8 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
      * 1~2코어에서 이 차이가 크게 벌어진다.
      *
      * <p>반환: {@code [item_id, support_all, win_all, support_recent, win_recent]}
+     *
+     * <p>{@code coreItemIds}에 없는 다음 아이템은 세지 않는다. 구매 순서에 섞인 Core가 아닌 아이템을 후보로 내지 않기 위해서다(#297).
      */
     @Query(value = """
             SELECT item_id,
@@ -61,6 +63,7 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
                   AND (:prefix = '' OR core_item_purchase_order LIKE :prefix || ',%')
             ) AS next_items
             WHERE item_id <> ''
+              AND item_id IN (:coreItemIds)
             GROUP BY item_id
             """, nativeQuery = true)
     List<Object[]> findNextItemAfterExactPrefix(
@@ -68,7 +71,8 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
             @Param("positions") Collection<String> positions,
             @Param("prefix") String prefix,
             @Param("nextPosition") int nextPosition,
-            @Param("recentPatches") Collection<String> recentPatches
+            @Param("recentPatches") Collection<String> recentPatches,
+            @Param("coreItemIds") Collection<String> coreItemIds
     );
 
     /**
@@ -76,6 +80,8 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
      * 정확 prefix가 표본을 못 찾을 때 한 단계 물러설 자리다.
      *
      * <p>반환: {@code [item_id, support_all, win_all, support_recent, win_recent]}
+     *
+     * <p>{@code coreItemIds}에 없는 다음 아이템은 세지 않는다. 구매 순서에 섞인 Core가 아닌 아이템을 후보로 내지 않기 위해서다(#297).
      */
     @Query(value = """
             SELECT item_id,
@@ -95,13 +101,15 @@ public interface NormalizedMatchParticipantRepository extends JpaRepository<Norm
                 WHERE array_position(items, cast(:lastItemId AS text)) IS NOT NULL
             ) AS next_items
             WHERE item_id IS NOT NULL AND item_id <> ''
+              AND item_id IN (:coreItemIds)
             GROUP BY item_id
             """, nativeQuery = true)
     List<Object[]> findNextItemAfterLastItem(
             @Param("championId") Long championId,
             @Param("positions") Collection<String> positions,
             @Param("lastItemId") Long lastItemId,
-            @Param("recentPatches") Collection<String> recentPatches
+            @Param("recentPatches") Collection<String> recentPatches,
+            @Param("coreItemIds") Collection<String> coreItemIds
     );
 
     /**
