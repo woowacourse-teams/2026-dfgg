@@ -52,7 +52,8 @@ class FeatureSanityEvaluationTest {
         RecommendationQuery query = new RecommendationQuery(
                 YASUO, ChampionPosition.MID, List.of(),
                 List.of(222L, 412L, 64L, 516L), List.of(RAMMUS, 103L, 51L, 89L, 60L),
-                "PLATINUM", "16.16", itemService.findCoreItemIds().stream().map(Long::valueOf).collect(Collectors.toUnmodifiableSet()));
+                "PLATINUM", "16.16",
+                itemService.findCoreItemIds().stream().map(Long::valueOf).collect(Collectors.toUnmodifiableSet()));
 
         List<GeneratorResult> results = new ArrayList<>();
         for (CandidateGenerator generator : generators) {

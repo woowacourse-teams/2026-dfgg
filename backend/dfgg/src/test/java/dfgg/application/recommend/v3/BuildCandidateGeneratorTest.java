@@ -146,6 +146,24 @@ class BuildCandidateGeneratorTest {
     }
 
     @Test
+    @DisplayName("챔피언 단위 통계로 물러나도 Core가 아닌 아이템을 내지 않는다 — #297")
+    void generate_WhenBackedOffToChampionLevelAndNonCoreItemsRankHighest_FillsTopKWithCoreItems() {
+        // given: 처음 보는 아이템을 샀다고 하면 전개가 없어 챔피언 단위로 물러난다. 구매 1·2위 3072·3033이 Core가 아니다
+        RecommendationQuery query = new RecommendationQuery(
+                157L, ChampionPosition.MID, List.of(NEVER_SEEN),
+                List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
+                "EMERALD", "16.17", Set.of(KRAKEN, INFINITY_EDGE, SHIELDBOW, BOOTS, SURGING_ITEM)
+        );
+
+        // when
+        GeneratorResult result = generator.generate(query, 2);
+
+        // then
+        assertThat(result.backoffLevel()).isEqualTo(BuildBackoffLevel.CHAMPION.ordinal());
+        assertThat(itemIdsOf(result)).hasSize(2).doesNotContain(BLACK_CLEAVER, 3033L);
+    }
+
+    @Test
     @DisplayName("최근 급등 아이템이 전체 표본 기준으로 밀려도 후보에 남는다 — recent/all union의 목적")
     void generate_WhenItemSurgedRecently_IsRetrievedEvenIfWeakOverall() {
         // given: 3153은 16.17에서만 5판. topK를 2로 좁혀 전체 기준으로는 잘리게 만든다.

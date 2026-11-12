@@ -84,6 +84,23 @@ class CounterCandidateGeneratorTest {
     }
 
     @Test
+    @DisplayName("포지션을 합친 통계로 물러나도 Core가 아닌 아이템을 내지 않는다 — #297")
+    void generate_WhenBackedOffToRollupAndNonCoreItemRanksHighest_FillsTopKWithCoreItems() {
+        // given: 야스오는 TOP 통계가 없어 rollup으로 물러나고, 만난 적 없는 적이다. rollup 1위인 무한의 대검이 Core가 아니다
+        RecommendationQuery query = new RecommendationQuery(
+                YASUO, ChampionPosition.TOP, List.of(),
+                List.of(222L, 412L, 64L, 516L), List.of(89L),
+                "EMERALD", "16.17", Set.of(DOMINIK)
+        );
+
+        // when
+        GeneratorResult result = generator.generate(query, 1);
+
+        // then
+        assertThat(itemIdsOf(result)).containsExactly(DOMINIK);
+    }
+
+    @Test
     @DisplayName("적 상대 lift 1위가 Core가 아닌 아이템이어도 topK를 Core 아이템으로 채운다 — #297")
     void generate_WhenNonCoreItemHasHighestLift_FillsTopKWithCoreItems() {
         // given: 람머스 상대로 가장 더 사는 도미닉이 Core가 아니다

@@ -115,6 +115,23 @@ class AllySynergyCandidateGeneratorTest {
     }
 
     @Test
+    @DisplayName("포지션을 합친 통계로 물러나도 Core가 아닌 아이템을 내지 않는다 — #297")
+    void generate_WhenBackedOffToRollupAndNonCoreItemsRankHighest_FillsTopKWithCoreItems() {
+        // given: 잔나는 TOP 통계가 없어 rollup으로 물러나고, 아리와는 함께한 적이 없다. rollup 1·2위인 향로·월석이 Core가 아니다
+        RecommendationQuery query = new RecommendationQuery(
+                JANNA, ChampionPosition.TOP, List.of(),
+                List.of(AHRI), List.of(33L, 51L, 89L, 60L, 222L),
+                "EMERALD", "16.17", Set.of(MIKAEL, LOCKET)
+        );
+
+        // when
+        GeneratorResult result = generator.generate(query, 2);
+
+        // then
+        assertThat(itemIdsOf(result)).containsExactly(MIKAEL, LOCKET);
+    }
+
+    @Test
     @DisplayName("아군과의 근거가 모두 Core가 아닌 아이템이면 챔피언 base rate로 물러난다 — #297")
     void generate_WhenEveryPairEvidenceIsNonCore_BacksOffToChampionBaseRate() {
         // given: 징크스와 함께일 때 산 향로·미카엘이 Core가 아니다
@@ -188,8 +205,8 @@ class AllySynergyCandidateGeneratorTest {
                 .get(INCENSE).scoreOf(JINX);
 
         // when: 관계없는 아군을 하나 더 넣는다
-        double afterAdding = retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW, ORNN), PairRelation.ALLY, CORE_ITEM_IDS,
-                        jannaBaseCounts(), jannaGameCount())
+        double afterAdding = retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW, ORNN), PairRelation.ALLY,
+                        CORE_ITEM_IDS, jannaBaseCounts(), jannaGameCount())
                 .get(INCENSE).scoreOf(JINX);
 
         // then: 통짜 window라면 아군이 늘 때마다 점수가 흔들린다

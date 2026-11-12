@@ -60,7 +60,8 @@ class EvidenceTest {
                 idOf("Renekton"), ChampionPosition.TOP, List.of(),
                 allies.stream().map(this::idOf).toList(),
                 enemies.stream().map(this::idOf).toList(),
-                "PLATINUM", "16.16", itemService.findCoreItemIds().stream().map(Long::valueOf).collect(Collectors.toUnmodifiableSet()));
+                "PLATINUM", "16.16",
+                itemService.findCoreItemIds().stream().map(Long::valueOf).collect(Collectors.toUnmodifiableSet()));
 
         List<GeneratorResult> results = new ArrayList<>();
         for (CandidateGenerator generator : generators) {
