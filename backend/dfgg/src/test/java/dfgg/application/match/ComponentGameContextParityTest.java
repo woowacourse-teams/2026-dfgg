@@ -19,6 +19,7 @@ import dfgg.presentation.dto.*;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
 import java.util.*;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class ComponentGameContextParityTest {
@@ -41,7 +42,7 @@ class ComponentGameContextParityTest {
         // Self TANK is excluded; multi-tag contributes to both; unknown 999 contributes zero.
         assertThat(composition.values()).containsExactly(1., 0., 1., 1., 1., 0., 1., 0., 1.);
         var query = new RecommendationQuery(1L, ChampionPosition.TOP, List.of(), List.of(2L),
-                List.of(3L, 4L, 999L), null, "16.18");
+                List.of(3L, 4L, 999L), null, "16.18", Set.of());
         var coreVector = FeatureVector.empty();
         new QueryFeatureExtractor(calculator).extract(query, coreVector);
         for (int i = 0; i < 9; i++) {

@@ -63,7 +63,7 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
         // lift 분모는 off-role이면 챔피언 전체로 물러선다. feature 추출기와 같은 곳에서 읽는다.
         ChampionBaseline baseline = championBaselineReader.read(query.myChampionId(), query.position());
         Map<Long, PairScoreAggregate> scoresByItem = pairSynergyRetriever.scoresByItem(
-                query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
+                query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY, query.coreItemIds(),
                 baseline.purchaseCountAllByItem(), baseline.gameCountAll());
         List<ChampionItemStats> positionStats =
                 championItemStatsRepository.findByChampionIdAndPosition(
@@ -127,7 +127,8 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
     private List<ScoredItem> championBaseRate(RecommendationQuery query, int topK) {
         int championId = Math.toIntExact(query.myChampionId());
         List<ChampionItemStats> positionStats =
-                championItemStatsRepository.findByChampionIdAndPosition(championId, query.position());
+                championItemStatsRepository.findByChampionIdAndPositionAndItemIdIn(
+                        championId, query.position(), query.coreItemIds());
         if (!positionStats.isEmpty()) {
             return positionStats.stream()
                     .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
@@ -138,7 +139,8 @@ public class AllySynergyCandidateGenerator implements CandidateGenerator {
                     .toList();
         }
 
-        List<ChampionItemRollup> rollup = championItemRollupRepository.findByChampionId(championId);
+        List<ChampionItemRollup> rollup =
+                championItemRollupRepository.findByChampionIdAndItemIdIn(championId, query.coreItemIds());
         return rollup.stream()
                 .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
                 .map(stat -> new ScoredItem(stat.getItemId(), wilsonScoreCalculator.lowerBound(

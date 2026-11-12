@@ -14,6 +14,7 @@ import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import java.util.List;
 import dfgg.infrastructure.config.TierScopeConfiguration;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,9 @@ import org.springframework.test.context.jdbc.Sql;
 @Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/counter-test-data.sql")
 class CounterCandidateGeneratorTest {
+
+    /** 테스트 데이터의 구매 순서에 나오는 아이템. 모두 Core로 둔다 — Core 거르기는 이 테스트의 관심사가 아니다. */
+    private static final Set<Long> CORE_ITEM_IDS = Set.of(3031L, 3036L, 3068L, 6653L);
 
     private static final long YASUO = 157L;
     private static final long AHRI = 103L;
@@ -67,8 +71,60 @@ class CounterCandidateGeneratorTest {
         return new RecommendationQuery(
                 YASUO, ChampionPosition.MID, List.of(),
                 List.of(222L, 412L, 64L, 516L), enemyChampionIds,
-                "EMERALD", "16.17"
+                "EMERALD", "16.17", CORE_ITEM_IDS
         );
+    }
+
+    private RecommendationQuery queryAgainstWithCore(List<Long> enemyChampionIds, Set<Long> coreItemIds) {
+        return new RecommendationQuery(
+                YASUO, ChampionPosition.MID, List.of(),
+                List.of(222L, 412L, 64L, 516L), enemyChampionIds,
+                "EMERALD", "16.17", coreItemIds
+        );
+    }
+
+    @Test
+    @DisplayName("포지션을 합친 통계로 물러나도 Core가 아닌 아이템을 내지 않는다 — #297")
+    void generate_WhenBackedOffToRollupAndNonCoreItemRanksHighest_FillsTopKWithCoreItems() {
+        // given: 야스오는 TOP 통계가 없어 rollup으로 물러나고, 만난 적 없는 적이다. rollup 1위인 무한의 대검이 Core가 아니다
+        RecommendationQuery query = new RecommendationQuery(
+                YASUO, ChampionPosition.TOP, List.of(),
+                List.of(222L, 412L, 64L, 516L), List.of(89L),
+                "EMERALD", "16.17", Set.of(DOMINIK)
+        );
+
+        // when
+        GeneratorResult result = generator.generate(query, 1);
+
+        // then
+        assertThat(itemIdsOf(result)).containsExactly(DOMINIK);
+    }
+
+    @Test
+    @DisplayName("적 상대 lift 1위가 Core가 아닌 아이템이어도 topK를 Core 아이템으로 채운다 — #297")
+    void generate_WhenNonCoreItemHasHighestLift_FillsTopKWithCoreItems() {
+        // given: 람머스 상대로 가장 더 사는 도미닉이 Core가 아니다
+        RecommendationQuery query = queryAgainstWithCore(List.of(RAMMUS), Set.of(INFINITY_EDGE));
+
+        // when
+        GeneratorResult result = generator.generate(query, 1);
+
+        // then
+        assertThat(itemIdsOf(result)).containsExactly(INFINITY_EDGE);
+    }
+
+    @Test
+    @DisplayName("base rate로 물러났을 때 Core가 아닌 아이템이 구매율 1위여도 topK를 Core 아이템으로 채운다 — #297")
+    void generate_WhenBackedOffAndNonCoreItemRanksHighest_FillsTopKWithCoreItems() {
+        // given: 만난 적 없는 적(89)이고, 야스오가 가장 많이 산 무한의 대검이 Core가 아니다
+        RecommendationQuery query = queryAgainstWithCore(List.of(89L), Set.of(DOMINIK));
+
+        // when
+        GeneratorResult result = generator.generate(query, 1);
+
+        // then
+        assertThat(result.backoffLevel()).isEqualTo(PairBackoffLevel.BASE_RATE.ordinal());
+        assertThat(itemIdsOf(result)).containsExactly(DOMINIK);
     }
 
     private List<Long> itemIdsOf(GeneratorResult result) {

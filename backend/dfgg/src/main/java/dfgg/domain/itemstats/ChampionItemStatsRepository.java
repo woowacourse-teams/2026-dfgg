@@ -19,6 +19,10 @@ public interface ChampionItemStatsRepository extends JpaRepository<ChampionItemS
 
     List<ChampionItemStats> findByChampionIdAndPosition(Integer championId, ChampionPosition position);
 
+    /** 추천 후보를 찾을 때 쓴다. 통계에 섞인 Core가 아닌 아이템을 읽지 않는다(#297). */
+    List<ChampionItemStats> findByChampionIdAndPositionAndItemIdIn(
+            Integer championId, ChampionPosition position, Collection<Long> itemIds);
+
     /**
      * {@code normalized_match_participants}에서 챔피언·포지션·아이템 통계를 통째로 다시 만든다.
      *

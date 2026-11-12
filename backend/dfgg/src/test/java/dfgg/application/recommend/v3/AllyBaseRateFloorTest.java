@@ -14,6 +14,7 @@ import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.itemstats.ChampionPairItemStatsRepository;
 import dfgg.infrastructure.config.TierScopeConfiguration;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,9 @@ import org.springframework.test.context.jdbc.Sql;
 @Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/ally-base-rate-floor-test-data.sql")
 class AllyBaseRateFloorTest {
+
+    /** 테스트 데이터의 구매 순서에 나오는 아이템. 모두 Core로 둔다 — Core 거르기는 이 테스트의 관심사가 아니다. */
+    private static final Set<Long> CORE_ITEM_IDS = Set.of(3089L, 3504L, 6617L);
 
     private static final long JANNA = 40L;
     private static final long JINX = 222L;
@@ -81,7 +85,7 @@ class AllyBaseRateFloorTest {
     private RecommendationQuery query() {
         return new RecommendationQuery(
                 JANNA, ChampionPosition.SUPPORT, List.of(),
-                List.of(JINX), List.of(), "EMERALD", "16.17");
+                List.of(JINX), List.of(), "EMERALD", "16.17", CORE_ITEM_IDS);
     }
 
     @Test

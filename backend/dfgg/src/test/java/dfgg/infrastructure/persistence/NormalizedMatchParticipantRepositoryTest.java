@@ -118,6 +118,36 @@ class NormalizedMatchParticipantRepositoryTest {
     }
 
     @Test
+    @DisplayName("정확한 구매 prefix 다음 아이템 중 Core가 아닌 아이템은 세지 않는다 — #297")
+    @Sql("/sql/build-generator-test-data.sql")
+    void findNextItemAfterExactPrefix_WhenNextItemIsNotCore_ExcludesIt() {
+        // given: 야스오(157)의 첫 구매는 3072·3033·3153·6673·3031이고, 그중 6673·3153만 Core다
+        List<String> coreItemIds = List.of("6673", "3153");
+
+        // when
+        List<Object[]> rows = participantRepository.findNextItemAfterExactPrefix(
+                157L, List.of("MIDDLE"), "", 1, List.of("16.17"), coreItemIds);
+
+        // then
+        assertThat(rows).extracting(row -> (String) row[0]).containsExactlyInAnyOrder("6673", "3153");
+    }
+
+    @Test
+    @DisplayName("마지막 아이템 다음 아이템 중 Core가 아닌 아이템은 세지 않는다 — #297")
+    @Sql("/sql/build-generator-test-data.sql")
+    void findNextItemAfterLastItem_WhenNextItemIsNotCore_ExcludesIt() {
+        // given: 6673 다음에는 3031(5판)과 3072(4판)를 샀고, 그중 3031만 Core다
+        List<String> coreItemIds = List.of("3031");
+
+        // when
+        List<Object[]> rows = participantRepository.findNextItemAfterLastItem(
+                157L, List.of("MIDDLE"), 6673L, List.of("16.17"), coreItemIds);
+
+        // then
+        assertThat(rows).extracting(row -> (String) row[0]).containsExactly("3031");
+    }
+
+    @Test
     @DisplayName("prefix가 비어있으면(1코어) 실제로 1번째 위치에 있는 아이템 분포를 반환한다")
     @Sql("/sql/most-frequent-build-test-data.sql")
     void findNextItemDistribution_WhenPrefixIsEmpty_ReturnsFirstPositionItemDistribution() {

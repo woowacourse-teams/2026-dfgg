@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.item.ItemPurchaseTypeClassifier;
+import dfgg.application.item.ItemService;
 import dfgg.application.match.ParticipantItemPurchaseBundle;
 import dfgg.application.match.ParticipantItemPurchaseSnapshotService;
 import dfgg.application.match.PurchaseInventoryReconstructor;
@@ -26,6 +27,7 @@ import java.security.MessageDigest;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +44,15 @@ import org.springframework.transaction.annotation.Transactional;
         "spring.datasource.hikari.read-only=true", "collection.scheduler.enabled=false"})
 @Transactional(readOnly = true)
 class ComponentCoreBridgeReplayTest {
+
+    @Autowired
+    private ItemService itemService;
+    private SnapshotQueryBuilder snapshotQueryBuilder;
+
+    @BeforeEach
+    void createSnapshotQueryBuilder() {
+        snapshotQueryBuilder = new SnapshotQueryBuilder(itemService.findCoreItemIds());
+    }
     @Autowired ParticipantItemPurchaseSnapshotService snapshots;
     @Autowired PurchaseInventoryReconstructor inventoryReconstructor;
     @Autowired NormalizedMatchParticipantRepository participants;
@@ -157,7 +168,7 @@ class ComponentCoreBridgeReplayTest {
                     .map(p -> Long.valueOf(p.purchase().getItemId())).distinct().toList();
             if (!pastCores.isEmpty()) { exclude(label, "NOT_FIRST_CORE_STATE"); continue; }
             try {
-                var query = new SnapshotQueryBuilder().buildAtPurchase(matchParticipants, participant, "16.18", pastCores);
+                var query = snapshotQueryBuilder.buildAtPurchase(matchParticipants, participant, "16.18", pastCores);
                 states.add(new ReplayPoint(label, bundle, query, inStats));
             } catch (IllegalArgumentException exception) {
                 exclude(label, "QUERY_BUILD_FAILED: " + exception.getMessage());

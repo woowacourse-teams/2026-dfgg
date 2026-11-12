@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dfgg.domain.champion.ChampionPosition;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -15,8 +16,26 @@ class RecommendationQueryTest {
         return new RecommendationQuery(
                 157L, ChampionPosition.MID, purchasedItemIds,
                 List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
-                "EMERALD", "16.17"
+                "EMERALD", "16.17", Set.of(6673L, 3031L)
         );
+    }
+
+    @Test
+    @DisplayName("생성 후 Core 목록 원본을 바꿔도 query는 영향받지 않는다")
+    void construct_WhenCoreItemIdsMutatedAfterwards_QueryIsUnaffected() {
+        // given
+        Set<Long> mutableCore = new java.util.HashSet<>(Set.of(6673L));
+        RecommendationQuery query = new RecommendationQuery(
+                157L, ChampionPosition.MID, List.of(),
+                List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
+                "EMERALD", "16.17", mutableCore
+        );
+
+        // when
+        mutableCore.add(3031L);
+
+        // then
+        assertThat(query.coreItemIds()).containsExactly(6673L);
     }
 
     @Test
@@ -60,7 +79,7 @@ class RecommendationQueryTest {
         assertThatThrownBy(() -> new RecommendationQuery(
                 157L, ChampionPosition.MID, List.of(),
                 List.of(222L, 412L, 64L, 516L), List.of(157L, 103L, 51L, 89L, 60L),
-                "EMERALD", "16.17"
+                "EMERALD", "16.17", Set.of(6673L, 3031L)
         )).isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -71,7 +90,7 @@ class RecommendationQueryTest {
         assertThatThrownBy(() -> new RecommendationQuery(
                 157L, ChampionPosition.MID, List.of(),
                 List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
-                "EMERALD", "  "
+                "EMERALD", "  ", Set.of(6673L, 3031L)
         )).isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -82,7 +101,7 @@ class RecommendationQueryTest {
         assertThatThrownBy(() -> new RecommendationQuery(
                 null, ChampionPosition.MID, List.of(),
                 List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
-                "EMERALD", "16.17"
+                "EMERALD", "16.17", Set.of(6673L, 3031L)
         )).isInstanceOf(IllegalArgumentException.class);
     }
 }

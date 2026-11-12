@@ -67,7 +67,8 @@ public class SelfSynergyCandidateGenerator implements CandidateGenerator {
     public GeneratorResult generate(RecommendationQuery query, int topK) {
         int championId = Math.toIntExact(query.myChampionId());
         List<ChampionItemStats> positionStats =
-                championItemStatsRepository.findByChampionIdAndPosition(championId, query.position());
+                championItemStatsRepository.findByChampionIdAndPositionAndItemIdIn(
+                        championId, query.position(), query.coreItemIds());
 
         if (hasEnoughSample(positionStats)) {
             List<Compatibility> scores = positionStats.stream()
@@ -81,7 +82,8 @@ public class SelfSynergyCandidateGenerator implements CandidateGenerator {
                     SelfSynergyBackoffLevel.CHAMPION_POSITION.ordinal());
         }
 
-        List<ChampionItemRollup> rollup = championItemRollupRepository.findByChampionId(championId);
+        List<ChampionItemRollup> rollup =
+                championItemRollupRepository.findByChampionIdAndItemIdIn(championId, query.coreItemIds());
         List<Compatibility> scores = rollup.stream()
                 .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
                 .map(stat -> new Compatibility(

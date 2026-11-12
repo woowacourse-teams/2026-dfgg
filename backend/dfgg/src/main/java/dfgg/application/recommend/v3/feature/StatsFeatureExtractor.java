@@ -67,7 +67,7 @@ public class StatsFeatureExtractor {
                 // ally 점수도 lift다. 분모(base rate)는 counter와 같은 값을 쓴다 —
                 // 여기서 다른 분모를 쓰면 두 묶음의 feature가 서로 다른 축을 갖게 된다.
                 pairSynergyRetriever.scoresByItem(
-                        query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY,
+                        query.myChampionId(), query.allyChampionIds(), PairRelation.ALLY, query.coreItemIds(),
                         baseline.purchaseCountAllByItem(), baseline.gameCountAll())
         );
     }

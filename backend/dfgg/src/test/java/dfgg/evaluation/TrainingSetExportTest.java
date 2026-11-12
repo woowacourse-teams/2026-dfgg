@@ -89,11 +89,12 @@ class TrainingSetExportTest {
     @Value("${recommendation.counter.minimum-base-rate:0.0}")
     private double counterMinimumBaseRate;
 
-    private final SnapshotQueryBuilder snapshotQueryBuilder = new SnapshotQueryBuilder();
+    private SnapshotQueryBuilder snapshotQueryBuilder;
     private ParticipantSampler participantSampler;
 
     @BeforeEach
     void prepareSampler() {
+        snapshotQueryBuilder = new SnapshotQueryBuilder(itemService.findCoreItemIds());
         participantSampler = new ParticipantSampler(tierScope);
     }
     private final GameSplit gameSplit = new GameSplit(0.8);

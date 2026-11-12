@@ -18,6 +18,7 @@ import dfgg.domain.itemstats.PairRelation;
 import dfgg.infrastructure.config.TierScopeConfiguration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,9 @@ import org.springframework.test.context.jdbc.Sql;
 @Import({ItemStatsAggregationService.class, TierScopeConfiguration.class})
 @Sql("/sql/ally-synergy-test-data.sql")
 class AllySynergyCandidateGeneratorTest {
+
+    /** 테스트 데이터의 구매 순서에 나오는 아이템. 모두 Core로 둔다 — Core 거르기는 이 테스트의 관심사가 아니다. */
+    private static final Set<Long> CORE_ITEM_IDS = Set.of(3031L, 3068L, 3190L, 3222L, 3504L, 6617L);
 
     private static final long JANNA = 40L;
     private static final long JINX = 222L;
@@ -98,8 +102,59 @@ class AllySynergyCandidateGeneratorTest {
         return new RecommendationQuery(
                 JANNA, ChampionPosition.SUPPORT, List.of(),
                 allyChampionIds, List.of(33L, 103L, 51L, 89L, 60L),
-                "EMERALD", "16.17"
+                "EMERALD", "16.17", CORE_ITEM_IDS
         );
+    }
+
+    private RecommendationQuery queryWithAlliesAndCore(List<Long> allyChampionIds, Set<Long> coreItemIds) {
+        return new RecommendationQuery(
+                JANNA, ChampionPosition.SUPPORT, List.of(),
+                allyChampionIds, List.of(33L, 103L, 51L, 89L, 60L),
+                "EMERALD", "16.17", coreItemIds
+        );
+    }
+
+    @Test
+    @DisplayName("포지션을 합친 통계로 물러나도 Core가 아닌 아이템을 내지 않는다 — #297")
+    void generate_WhenBackedOffToRollupAndNonCoreItemsRankHighest_FillsTopKWithCoreItems() {
+        // given: 잔나는 TOP 통계가 없어 rollup으로 물러나고, 아리와는 함께한 적이 없다. rollup 1·2위인 향로·월석이 Core가 아니다
+        RecommendationQuery query = new RecommendationQuery(
+                JANNA, ChampionPosition.TOP, List.of(),
+                List.of(AHRI), List.of(33L, 51L, 89L, 60L, 222L),
+                "EMERALD", "16.17", Set.of(MIKAEL, LOCKET)
+        );
+
+        // when
+        GeneratorResult result = generator.generate(query, 2);
+
+        // then
+        assertThat(itemIdsOf(result)).containsExactly(MIKAEL, LOCKET);
+    }
+
+    @Test
+    @DisplayName("아군과의 근거가 모두 Core가 아닌 아이템이면 챔피언 base rate로 물러난다 — #297")
+    void generate_WhenEveryPairEvidenceIsNonCore_BacksOffToChampionBaseRate() {
+        // given: 징크스와 함께일 때 산 향로·미카엘이 Core가 아니다
+        RecommendationQuery query = queryWithAlliesAndCore(List.of(JINX), Set.of(MOONSTONE, LOCKET));
+
+        // when
+        GeneratorResult result = generator.generate(query, 10);
+
+        // then: 근거가 없는데 TRIPLE 단계로 빈 결과를 내지 않는다
+        assertThat(result.backoffLevel()).isEqualTo(PairBackoffLevel.BASE_RATE.ordinal());
+    }
+
+    @Test
+    @DisplayName("base rate로 물러났을 때 Core가 아닌 아이템이 구매율 상위여도 topK를 Core 아이템으로 채운다 — #297")
+    void generate_WhenBackedOffAndNonCoreItemsRankHighest_FillsTopKWithCoreItems() {
+        // given: 잔나가 가장 많이 산 향로·월석이 Core가 아니고, 아리와는 함께한 적이 없다
+        RecommendationQuery query = queryWithAlliesAndCore(List.of(AHRI), Set.of(MIKAEL, LOCKET));
+
+        // when
+        GeneratorResult result = generator.generate(query, 2);
+
+        // then
+        assertThat(itemIdsOf(result)).containsExactly(MIKAEL, LOCKET);
     }
 
     private List<Long> itemIdsOf(GeneratorResult result) {
@@ -133,7 +188,7 @@ class AllySynergyCandidateGeneratorTest {
     void retrieve_WhenScoringPerAlly_KeepsEachAllyScoreSeparately() {
         // when
         Map<Long, PairScoreAggregate> byItem =
-                retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW), PairRelation.ALLY,
+                retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW), PairRelation.ALLY, CORE_ITEM_IDS,
                         jannaBaseCounts(), jannaGameCount());
 
         // then: 향로는 징크스와 8/10, 코그모와 1/10
@@ -145,13 +200,13 @@ class AllySynergyCandidateGeneratorTest {
     @DisplayName("아군을 추가해도 기존 아군과의 점수는 변하지 않는다 — 5명을 하나의 window로 묶지 않는다는 증거")
     void retrieve_WhenAnotherAllyAdded_DoesNotChangeExistingAllyScores() {
         // given
-        double beforeAdding = retriever.scoresByItem(JANNA, List.of(JINX), PairRelation.ALLY,
+        double beforeAdding = retriever.scoresByItem(JANNA, List.of(JINX), PairRelation.ALLY, CORE_ITEM_IDS,
                         jannaBaseCounts(), jannaGameCount())
                 .get(INCENSE).scoreOf(JINX);
 
         // when: 관계없는 아군을 하나 더 넣는다
         double afterAdding = retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW, ORNN), PairRelation.ALLY,
-                        jannaBaseCounts(), jannaGameCount())
+                        CORE_ITEM_IDS, jannaBaseCounts(), jannaGameCount())
                 .get(INCENSE).scoreOf(JINX);
 
         // then: 통짜 window라면 아군이 늘 때마다 점수가 흔들린다
@@ -217,7 +272,7 @@ class AllySynergyCandidateGeneratorTest {
     @Test
     @DisplayName("남긴 아군별 점수가 개별 조회 결과와 같다 — 다시 계산하면 값이 갈릴 수 있다")
     void generate_PreservedAllyScoreMatchesTheDirectLookup() {
-        double direct = retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW), PairRelation.ALLY,
+        double direct = retriever.scoresByItem(JANNA, List.of(JINX, KOGMAW), PairRelation.ALLY, CORE_ITEM_IDS,
                         jannaBaseCounts(), jannaGameCount())
                 .get(INCENSE).scoreOf(JINX);
 

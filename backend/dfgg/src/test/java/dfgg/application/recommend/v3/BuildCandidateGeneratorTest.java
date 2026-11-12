@@ -11,6 +11,7 @@ import dfgg.application.utils.WilsonScoreCalculator;
 import dfgg.domain.champion.ChampionPosition;
 import java.util.List;
 import dfgg.infrastructure.config.TierScopeConfiguration;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,9 @@ import org.springframework.test.context.jdbc.Sql;
         ChampionPositionNormalizer.class, WilsonScoreCalculator.class})
 @Sql("/sql/build-generator-test-data.sql")
 class BuildCandidateGeneratorTest {
+
+    /** 테스트 데이터의 구매 순서에 나오는 아이템. 모두 Core로 둔다 — Core 거르기는 이 테스트의 관심사가 아니다. */
+    private static final Set<Long> CORE_ITEM_IDS = Set.of(3006L, 3031L, 3033L, 3036L, 3072L, 3153L, 6673L);
 
     private static final long KRAKEN = 6673L;
     private static final long INFINITY_EDGE = 3031L;
@@ -54,7 +58,7 @@ class BuildCandidateGeneratorTest {
         return new RecommendationQuery(
                 157L, ChampionPosition.MID, purchasedItemIds,
                 List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
-                "EMERALD", "16.17"
+                "EMERALD", "16.17", CORE_ITEM_IDS
         );
     }
 
@@ -122,6 +126,41 @@ class BuildCandidateGeneratorTest {
 
         // then: 1코어로 관측된 것들 — 6673(9판), 3072(12판), 3033(11판), 3153(10판), 3031(1판)
         assertThat(itemIdsOf(result)).contains(KRAKEN, BLACK_CLEAVER, SURGING_ITEM);
+    }
+
+    @Test
+    @DisplayName("아무것도 안 샀을 때 첫 구매 상위가 Core가 아닌 아이템이어도 topK를 Core 아이템으로 채운다 — #297")
+    void generate_WhenNothingPurchasedAndNonCoreItemsLeadFirstPurchase_FillsTopKWithCoreItems() {
+        // given: 첫 구매 1·2위인 3072(12판)·3033(11판)이 Core가 아니다 — 오염 데이터의 도란처럼
+        RecommendationQuery query = new RecommendationQuery(
+                157L, ChampionPosition.MID, List.of(),
+                List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
+                "EMERALD", "16.17", Set.of(KRAKEN, INFINITY_EDGE, SHIELDBOW, BOOTS, SURGING_ITEM)
+        );
+
+        // when
+        GeneratorResult result = generator.generate(query, 2);
+
+        // then
+        assertThat(itemIdsOf(result)).containsExactlyInAnyOrder(SURGING_ITEM, KRAKEN);
+    }
+
+    @Test
+    @DisplayName("챔피언 단위 통계로 물러나도 Core가 아닌 아이템을 내지 않는다 — #297")
+    void generate_WhenBackedOffToChampionLevelAndNonCoreItemsRankHighest_FillsTopKWithCoreItems() {
+        // given: 처음 보는 아이템을 샀다고 하면 전개가 없어 챔피언 단위로 물러난다. 구매 1·2위 3072·3033이 Core가 아니다
+        RecommendationQuery query = new RecommendationQuery(
+                157L, ChampionPosition.MID, List.of(NEVER_SEEN),
+                List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
+                "EMERALD", "16.17", Set.of(KRAKEN, INFINITY_EDGE, SHIELDBOW, BOOTS, SURGING_ITEM)
+        );
+
+        // when
+        GeneratorResult result = generator.generate(query, 2);
+
+        // then
+        assertThat(result.backoffLevel()).isEqualTo(BuildBackoffLevel.CHAMPION.ordinal());
+        assertThat(itemIdsOf(result)).hasSize(2).doesNotContain(BLACK_CLEAVER, 3033L);
     }
 
     @Test

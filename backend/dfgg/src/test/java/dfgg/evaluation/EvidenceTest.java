@@ -1,6 +1,7 @@
 package dfgg.evaluation;
 
 import dfgg.application.champion.ChampionService;
+import dfgg.application.item.ItemService;
 import dfgg.domain.language.Language;
 import dfgg.application.recommend.NextItemRecommendationService;
 import dfgg.application.recommend.v3.CandidateGenerator;
@@ -19,6 +20,7 @@ import dfgg.presentation.dto.response.NextItemRecommendationResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +31,8 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("evaluation")
 @Tag("evaluation")
 class EvidenceTest {
+    @Autowired
+    private ItemService itemService;
 
     @Autowired private NextItemRecommendationService service;
     @Autowired private ChampionService championService;
@@ -56,7 +60,8 @@ class EvidenceTest {
                 idOf("Renekton"), ChampionPosition.TOP, List.of(),
                 allies.stream().map(this::idOf).toList(),
                 enemies.stream().map(this::idOf).toList(),
-                "PLATINUM", "16.16");
+                "PLATINUM", "16.16",
+                itemService.findCoreItemIds().stream().map(Long::valueOf).collect(Collectors.toUnmodifiableSet()));
 
         List<GeneratorResult> results = new ArrayList<>();
         for (CandidateGenerator generator : generators) {

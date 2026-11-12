@@ -15,6 +15,7 @@ import dfgg.application.utils.WilsonScoreCalculator;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.infrastructure.config.TierScopeConfiguration;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,9 @@ import org.springframework.test.context.jdbc.Sql;
 @Sql("/sql/off-role-baseline-test-data.sql")
 class OffRoleBaselineTest {
 
+    /** 테스트 데이터의 구매 순서에 나오는 아이템. 모두 Core로 둔다 — Core 거르기는 이 테스트의 관심사가 아니다. */
+    private static final Set<Long> CORE_ITEM_IDS = Set.of(2065L, 3504L);
+
     private static final long JANNA = 40L;
     private static final long JINX = 222L;
     private static final long RAMMUS = 33L;
@@ -70,7 +74,7 @@ class OffRoleBaselineTest {
         return new RecommendationQuery(
                 JANNA, ChampionPosition.MID, List.of(),
                 List.of(JINX), List.of(RAMMUS),
-                "EMERALD", "16.17");
+                "EMERALD", "16.17", CORE_ITEM_IDS);
     }
 
     private FeatureVector extract(long itemId) {
