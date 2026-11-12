@@ -1,0 +1,480 @@
+name: BE Deploy Container (reusable)
+
+# 컨테이너 슬롯 블루-그린 배포. 두 슬롯 모두 Quadlet이 사용자 systemd에서 띄운다.
+on:
+  workflow_call:
+    inputs:
+      runner-label:
+        description: "대상 self-hosted 러너 라벨 (dfgg-dev | dfgg-scheduling | dfgg-prod)"
+        required: true
+        type: string
+      profile:
+        description: "슬롯 설정 drop-in (dev | prod)"
+        required: true
+        type: string
+      image:
+        description: "배포할 이미지 (ghcr.io/...@sha256:...). current면 켜진 슬롯의 이미지를 다시 쓴다"
+        required: true
+        type: string
+      model:
+        description: "모델 묶음 (ltr-YYMMDD[-N] | current). 비우면 켜진 슬롯의 묶음을 그대로 쓰고, 묶음이 없으면 app-config/model.json을 쓴다"
+        required: false
+        type: string
+        default: ''
+    outputs:
+      recovery:
+        description: "전환 단계 실패 시 복구 결과 (restored | new-slot-active | uncertain). 전환 전에 멈췄으면 비어 있다"
+        value: ${{ jobs.deploy.outputs.recovery }}
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    runs-on: [ self-hosted, "${{ inputs.runner-label }}" ]
+    timeout-minutes: 30
+    outputs:
+      recovery: ${{ steps.switch.outputs.recovery }}
+    env:
+      IMAGE: ${{ inputs.image }}
+      PROFILE: ${{ inputs.profile }}
+      MODEL: ${{ inputs.model }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # 러너는 시스템 서비스라 사용자 systemd에 붙을 주소를 직접 알려 줘야 한다.
+      - name: Check deployment prerequisites
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE" == current || "$IMAGE" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] || { echo "::error::Invalid image reference"; exit 1; }
+          [[ -z "$MODEL" || "$MODEL" == current || "$MODEL" =~ ^ltr-[0-9]{6}(-[0-9]+)?$ ]] || { echo "::error::Invalid model bundle"; exit 1; }
+          [[ "$PROFILE" =~ ^(dev|prod)$ ]] || { echo "::error::Invalid profile"; exit 1; }
+          for tool in curl jq flock sha256sum systemctl nginx podman ps ss; do
+            command -v "$tool" > /dev/null
+          done
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "$GITHUB_ENV"
+          # 앱 설정은 러너 계정의 홈에 둔다. 서버 사용자 이름을 가정하지 않는다.
+          APP_CONFIG="$HOME/app-config"
+          echo "APP_CONFIG=$APP_CONFIG" >> "$GITHUB_ENV"
+          [[ "$(loginctl show-user "$(id -un)" -p Linger --value)" == yes ]] \
+            || { echo "::error::Linger must be enabled for $(id -un)"; exit 1; }
+          XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user is-system-running > /dev/null \
+            || [[ "$(XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user is-system-running)" == degraded ]]
+          test -w /opt/dfgg
+          test -w /opt/dfgg/blue
+          test -w /opt/dfgg/green
+          test -r /etc/nginx/conf.d/dfgg-upstream.conf
+          test -L /etc/nginx/sites-enabled/dfgg-backend
+          # API 문서 관리자 계정. 저장소에 두지 않으므로 서버에서 먼저 만들어야 한다.
+          sudo -n test -s /etc/nginx/dfgg-admin.htpasswd
+          sudo -n nginx -t
+          test -s "$APP_CONFIG/.env"
+
+      # current는 켜진 슬롯에서 찾는다. 모델은 묶음을 받아 검증해 두고, 슬롯 연결은 전환 단계에서 한다.
+      - name: Resolve image and model
+        run: |
+          set -euo pipefail
+          port=$(grep -oE '127\.0\.0\.1:[0-9]+' /etc/nginx/conf.d/dfgg-upstream.conf | cut -d: -f2)
+          case "$port" in
+            8081) active=blue ;;
+            8082) active=green ;;
+            *) echo "::error::Unexpected upstream port: $port"; exit 1 ;;
+          esac
+
+          resolved=$IMAGE
+          if [[ "$resolved" == current ]]; then
+            # 목록을 먼저 다 받은 뒤 고른다. 파이프로 grep -m1에 넘기면 grep이 먼저 끝날 때
+            # podman이 SIGPIPE(141)로 끝나 pipefail에 걸린다.
+            digests=$(podman image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "localhost/dfgg:$active")
+            resolved=$(grep -m1 -E '^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$' <<< "$digests") \
+              || { echo "::error::Cannot find the image of the active slot ($active)"; exit 1; }
+          fi
+          echo "DEPLOY_IMAGE=$resolved" >> "$GITHUB_ENV"
+          echo "image: $resolved"
+
+          name=$MODEL
+          active_model="/opt/dfgg/$active/model"
+          if [[ -z "$name" && -L "$active_model" ]]; then
+            name=$(basename "$(readlink -f "$active_model")")
+            echo "keep the bundle of the active slot: $name"
+          fi
+          if [[ -z "$name" ]]; then
+            jq -e -s 'length == 1 and (.[0] | type == "object")' "$APP_CONFIG/model.json" > /dev/null
+            echo "MODEL_DIR=" >> "$GITHUB_ENV"
+            echo "model: $APP_CONFIG/model.json (no bundle)"
+            exit 0
+          fi
+          args=(--name "$name")
+          if [[ "$name" == current ]]; then args=(); fi
+          dir=$(bash backend/ops/pipeline/fetch-model.sh "${args[@]}" | tail -1)
+          [[ "$dir" =~ ^/opt/dfgg/models/ltr-[0-9]{6}(-[0-9]+)?$ && -d "$dir" ]] \
+            || { echo "::error::Model bundle was not installed: $dir"; exit 1; }
+          echo "MODEL_DIR=$dir" >> "$GITHUB_ENV"
+          echo "model: $dir"
+
+      # 저장소가 관리하는 nginx 설정만 설치한다.
+      - name: Install nginx configuration
+        run: |
+          set -euo pipefail
+
+          declare -A targets=(
+            [dfgg-log-format.conf]=/etc/nginx/conf.d/dfgg-log-format.conf
+            [dfgg-metrics.conf]=/etc/nginx/conf.d/dfgg-metrics.conf
+            [dfgg-backend.conf]=/etc/nginx/sites-available/dfgg-backend
+          )
+          backups="$RUNNER_TEMP/nginx-conf-backup"
+          rm -rf "$backups"
+          mkdir -p "$backups"
+
+          changed=()
+          for name in "${!targets[@]}"; do
+            source="backend/ops/nginx/$name"
+            target="${targets[$name]}"
+            test -r "$source"
+            if cmp -s "$source" "$target"; then continue; fi
+            if [[ -e "$target" ]]; then cp "$target" "$backups/$name"; fi
+            changed+=("$name")
+          done
+
+          if (( ${#changed[@]} == 0 )); then
+            echo 'nginx 설정 변경 없음'
+            exit 0
+          fi
+          echo "변경: ${changed[*]}"
+
+          install_all() {
+            for name in "${changed[@]}"; do
+              sudo -n install -o root -g root -m 0644 "backend/ops/nginx/$name" "${targets[$name]}" || return 1
+            done
+          }
+          restore() {
+            for name in "${changed[@]}"; do
+              if [[ -e "$backups/$name" ]]; then
+                sudo -n install -o root -g root -m 0644 "$backups/$name" "${targets[$name]}"
+              else
+                sudo -n rm -f "${targets[$name]}"
+              fi
+            done
+          }
+
+          if ! install_all || ! sudo -n nginx -t; then
+            echo '::error::nginx configuration failed nginx -t; restoring previous files'
+            restore
+            sudo -n nginx -t
+            exit 1
+          fi
+          sudo -n systemctl reload nginx.service
+
+      # 템플릿과 환경별 설정을 맞춘다. .env가 가리키는 외부 모델·조회표 폴더도 같은 경로로 마운트한다.
+      - name: Install Quadlet units
+        run: |
+          set -euo pipefail
+          quadlet="$HOME/.config/containers/systemd"
+          dropins="$quadlet/dfgg@.container.d"
+          mkdir -p "$dropins"
+          install -m 0644 backend/ops/podman/dfgg@.container "$quadlet/dfgg@.container"
+          install -m 0644 "backend/ops/podman/$PROFILE.conf" "$dropins/$PROFILE.conf"
+          for other in dev prod; do
+            [[ "$other" == "$PROFILE" ]] || rm -f "$dropins/$other.conf"
+          done
+
+          mounts="$RUNNER_TEMP/external-models.conf"
+          printf '# be-deploy-container.yml이 app-config/.env에서 만든다. 손으로 고치지 않는다.\n[Container]\n' > "$mounts"
+          { grep -hE '^(COMPONENT_LTR_MODEL_PATH|COMPONENT_LTR_POLICY_LOOKUP_PATH|SITUATIONAL_LOOKUP_PATH)=' "$APP_CONFIG/.env" || true; } \
+            | cut -d= -f2- | tr -d "\"'" | sed -n 's#^file:##p' \
+            | while IFS= read -r path; do dirname "$path"; done | sort -u \
+            | while IFS= read -r dir; do
+                [[ "$dir" == /* && -d "$dir" ]] || { echo "::error::Model directory not found: $dir" >&2; exit 1; }
+                echo "Volume=$dir:$dir:ro"
+              done >> "$mounts"
+          install -m 0644 "$mounts" "$dropins/external-models.conf"
+
+          # 템플릿이 슬롯의 model.env를 읽으므로 두 슬롯 모두 파일이 있어야 다시 뜬다.
+          # 묶음 링크인 슬롯은 묶음 경로를, 아니면 빈 파일을 둔다. 예전 슬롯 drop-in은 지운다.
+          for slot in blue green; do
+            rm -f "$quadlet/dfgg@$slot.container.d/model.conf"
+            [[ ! -e "/opt/dfgg/$slot/model.env" ]] || continue
+            if [[ -L "/opt/dfgg/$slot/model" ]]; then
+              install -m 0644 backend/ops/podman/model-bundle.env "/opt/dfgg/$slot/model.env"
+              continue
+            fi
+            : > "/opt/dfgg/$slot/model.env"
+          done
+          systemctl --user daemon-reload
+          systemctl --user cat dfgg@blue.service > /dev/null
+
+      # 배포 잡의 토큰으로 받고 인증 정보는 서버에 남기지 않는다.
+      - name: Pull image
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          auth="$RUNNER_TEMP/registry-auth.json"
+          trap 'rm -f "$auth"' EXIT
+          if podman image exists "$DEPLOY_IMAGE"; then
+            echo "already present: $DEPLOY_IMAGE"
+            exit 0
+          fi
+          echo "$GH_TOKEN" | podman login --authfile "$auth" ghcr.io -u "${{ github.actor }}" --password-stdin
+          podman pull --authfile "$auth" "$DEPLOY_IMAGE"
+
+      - name: Deploy with Blue-Green switch
+        id: switch
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+
+          DFGG_UPSTREAM=/etc/nginx/conf.d/dfgg-upstream.conf
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]] \
+            || { echo 'Invalid workflow run identifier'; exit 1; }
+          DFGG_CONFIG_STAGE="/etc/nginx/conf.d/.dfgg-upstream-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.pending"
+          DFGG_BACKUP="${DFGG_UPSTREAM}.backup-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          AUTOSTART=backend/ops/podman/set-autostart-slot.sh
+
+          # 워크플로 외부의 동일 배포와도 겹치지 않게 잠근다. lock 파일은 지우지 않는다.
+          test ! -L /opt/dfgg/.deploy.lock
+          exec 9>/opt/dfgg/.deploy.lock
+          flock -n 9 || { echo 'Another deployment is running'; exit 1; }
+          DFGG_TMP=$(mktemp -d)
+          DFGG_STARTED=false
+          DFGG_CHANGED=false
+          DFGG_RELOADED=false
+          DFGG_COMMITTED=false
+
+          property() { systemctl show "$1" -p "$2" --value; }
+          user_property() { systemctl --user show "$1" -p "$2" --value; }
+          user_stopped() {
+            [[ "$(user_property "$1" ActiveState)" =~ ^(inactive|failed)$ && "$(user_property "$1" MainPID)" == 0 ]]
+          }
+
+          probe() {
+            local port=$1 path=$2 filter=$3 code
+            local args=(--noproxy '*' --connect-timeout 3 --max-time 15 -sS
+              -o "$DFGG_TMP/response.json" -w '%{http_code}')
+            code=$(curl "${args[@]}" "http://127.0.0.1:${port}${path}") || return 1
+            [[ "$code" == 200 ]] || return 1
+            jq -e "$filter" "$DFGG_TMP/response.json" > /dev/null
+          }
+          ready() { probe "$1" /actuator/health/readiness '.status == "UP"'; }
+          proxy_ok() { probe 8080 /v3/api-docs '(.openapi | type == "string") and (.paths | type == "object")'; }
+
+          workers() {
+            local master
+            master=$(property nginx.service MainPID) || return 1
+            [[ "$master" == "$DFGG_MASTER" ]] || return 1
+            ps -eo pid=,ppid=,lstart=,args= | awk -v master="$master" '
+              $2 == master && $8 == "nginx:" && $9 == "worker" && $10 == "process" {
+                print $1 ":" $3 "_" $4 "_" $5 "_" $6 "_" $7
+              }'
+          }
+          wait_new_workers() {
+            local before=$1 current worker attempt
+            for attempt in $(seq 1 10); do
+              current=$(workers) || return 1
+              while IFS= read -r worker; do
+                [[ -n "$worker" ]] || continue
+                if ! grep -Fxq -- "$worker" <<< "$before"; then return 0; fi
+              done <<< "$current"
+              sleep 1
+            done
+            echo 'New Nginx workers were not observed' >&2
+            return 1
+          }
+          wait_drained() {
+            local before=$1 current worker pending attempt
+            for attempt in $(seq 1 60); do
+              current=$(workers) || return 1
+              [[ -n "$current" ]] || return 1
+              pending=false
+              while IFS= read -r worker; do
+                [[ -n "$worker" ]] || continue
+                if grep -Fxq -- "$worker" <<< "$current"; then pending=true; fi
+              done <<< "$before"
+              if [[ "$pending" == false ]]; then return 0; fi
+              sleep 1
+            done
+            echo 'Old Nginx workers are still draining' >&2
+            return 1
+          }
+          atomic_upstream() {
+            sudo -n install -o root -g root -m 0644 "$1" "$DFGG_CONFIG_STAGE" || return 1
+            sudo -n mv -T "$DFGG_CONFIG_STAGE" "$DFGG_UPSTREAM"
+          }
+
+          # 부팅 때 이전 슬롯이 다시 뜨도록 되돌린다.
+          restore_old_autostart() {
+            bash "$AUTOSTART" "$DFGG_OLD" > /dev/null
+          }
+          stop_old() {
+            systemctl --user stop "$DFGG_OLD_UNIT" || return 1
+            user_stopped "$DFGG_OLD_UNIT"
+          }
+
+          rollback() {
+            local before
+            if [[ "$DFGG_CHANGED" == true ]]; then
+              cmp -s "$DFGG_UPSTREAM" "$DFGG_TMP/upstream.next" \
+                || cmp -s "$DFGG_UPSTREAM" "$DFGG_TMP/upstream.before" || return 1
+              atomic_upstream "$DFGG_TMP/upstream.before" || return 1
+              sudo -n nginx -t || return 1
+            fi
+            if [[ "$DFGG_RELOADED" == true ]]; then
+              ready "$DFGG_OLD_PORT" || return 1
+              before=$(workers) || return 1
+              sudo -n systemctl reload nginx.service || return 1
+              wait_new_workers "$before" || return 1
+              wait_drained "$before" || return 1
+              proxy_ok || return 1
+            fi
+            if [[ "$DFGG_STARTED" == true ]]; then
+              restore_old_autostart || return 1
+              systemctl --user stop "$DFGG_NEW_UNIT" || return 1
+              user_stopped "$DFGG_NEW_UNIT" || return 1
+            fi
+          }
+          finish() {
+            local result=$?
+            trap - EXIT
+            trap '' INT TERM
+            set +e
+            if [[ "$result" != 0 ]]; then
+              if [[ "$DFGG_COMMITTED" == true ]]; then
+                recovery=new-slot-active
+                echo "::error::New slot remains active; old-slot cleanup/final check failed. Inspect manually."
+              elif rollback; then
+                recovery=restored
+                echo '::error::Deployment failed; previous route preserved/restored.'
+              else
+                recovery=uncertain
+                echo "::error::Recovery uncertain. Do not stop either app. Inspect $DFGG_BACKUP"
+              fi
+              echo "recovery=$recovery" >> "$GITHUB_OUTPUT"
+            fi
+            if [[ "$DFGG_CHANGED" == true ]]; then sudo -n rm -f "$DFGG_CONFIG_STAGE"; fi
+            rm -f "$DFGG_TMP/response.json" "$DFGG_TMP/upstream.before" "$DFGG_TMP/upstream.next"
+            rmdir "$DFGG_TMP"
+            exit "$result"
+          }
+          trap finish EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+
+          # 1. 현재 경로와 앱 상태를 확인한다. 모호한 상태라면 변경 없이 중단한다.
+          test ! -L "$DFGG_UPSTREAM"
+          cp "$DFGG_UPSTREAM" "$DFGG_TMP/upstream.before"
+          compact=$(sed 's/#.*//' "$DFGG_TMP/upstream.before" | tr -d '[:space:]')
+          case "$compact" in
+            'upstreamdfgg_backend{server127.0.0.1:8081;keepalive16;}')
+              DFGG_OLD=blue; DFGG_NEW=green; DFGG_OLD_PORT=8081; DFGG_NEW_PORT=8082 ;;
+            'upstreamdfgg_backend{server127.0.0.1:8082;keepalive16;}')
+              DFGG_OLD=green; DFGG_NEW=blue; DFGG_OLD_PORT=8082; DFGG_NEW_PORT=8081 ;;
+            *) echo 'Unknown upstream configuration'; exit 1 ;;
+          esac
+          DFGG_OLD_UNIT="dfgg@${DFGG_OLD}.service"
+          DFGG_NEW_UNIT="dfgg@${DFGG_NEW}.service"
+          [[ "$(user_property "$DFGG_OLD_UNIT" ActiveState)" == active ]] \
+            || { echo "$DFGG_OLD_UNIT is not running as a container"; exit 1; }
+          [[ "$(property nginx.service ActiveState)" == active ]] || exit 1
+          [[ "$(property nginx.service UnitFileState)" == enabled ]] || exit 1
+          user_stopped "$DFGG_NEW_UNIT"
+          DFGG_MASTER=$(property nginx.service MainPID)
+          [[ "$DFGG_MASTER" =~ ^[1-9][0-9]*$ ]] || exit 1
+          current_workers=$(workers)
+          [[ -n "$current_workers" ]] || exit 1
+          processes=$(ps -eo args=)
+          if grep -q '[n]ginx: worker process is shutting down' <<< "$processes"; then
+            echo 'Previous reload is still draining'; exit 1
+          fi
+          sudo -n nginx -t
+          ready "$DFGG_OLD_PORT"
+          proxy_ok
+          listeners=$(ss -H -ltn "sport = :$DFGG_NEW_PORT")
+          [[ -z "$listeners" ]] || { echo 'Target port is already in use'; exit 1; }
+
+          # 2. 꺼진 슬롯에 이미지·설정·모델을 놓는다. 켜진 슬롯은 건드리지 않는다.
+          test ! -L "/opt/dfgg/$DFGG_NEW"
+          podman tag "$DEPLOY_IMAGE" "localhost/dfgg:$DFGG_NEW"
+          # 서버의 슬롯 .env는 app-config/.env를 가리키는 링크다. 복사하지 않고 링크를 유지한다.
+          ln -sfn "$APP_CONFIG/.env" "/opt/dfgg/$DFGG_NEW/.env"
+          # 묶음이면 슬롯의 model을 묶음 링크로 두고 Component 경로를 슬롯의 model.env로 지정한다.
+          # 묶음이 아니면 기존처럼 app-config/model.json을 복사하고 Component는 .env 경로를 따른다.
+          slot_model="/opt/dfgg/$DFGG_NEW/model"
+          if [[ -n "$MODEL_DIR" ]]; then
+            rm -rf -- "$slot_model"
+            ln -s "$MODEL_DIR" "$slot_model"
+            install -m 0644 backend/ops/podman/model-bundle.env "/opt/dfgg/$DFGG_NEW/model.env"
+          else
+            if [[ -L "$slot_model" ]]; then rm -f "$slot_model"; fi
+            mkdir -p "$slot_model"
+            install -m 0644 "$APP_CONFIG/model.json" "$slot_model/model.json"
+            : > "/opt/dfgg/$DFGG_NEW/model.env"
+          fi
+          echo "Deploying $DFGG_OLD -> $DFGG_NEW; image=$DEPLOY_IMAGE; model=${MODEL_DIR:-app-config}"
+
+          # 3. 기동·Readiness를 확인한다. 준비에 실패하면 경로를 바꾸지 않는다.
+          DFGG_STARTED=true
+          systemctl --user start "$DFGG_NEW_UNIT"
+          deadline=$((SECONDS + 90))
+          until ready "$DFGG_NEW_PORT"; do
+            if (( SECONDS >= deadline )); then echo 'Readiness timed out'; exit 1; fi
+            sleep 2
+          done
+          [[ "$(user_property "$DFGG_NEW_UNIT" ActiveState)" == active ]] || exit 1
+          [[ "$(user_property "$DFGG_NEW_UNIT" SubState)" == running ]] || exit 1
+          # 응답한 쪽이 새 컨테이너인지 확인한다. 같은 포트의 다른 프로세스를 새 슬롯으로 오인하지 않는다.
+          [[ "$(podman inspect -f '{{.State.Running}}' "dfgg-$DFGG_NEW")" == true ]] || exit 1
+
+          # 4. 설정 백업 → 구문 검사 → reload. Nginx restart는 사용하지 않는다.
+          sudo -n install -o root -g root -m 0644 "$DFGG_TMP/upstream.before" "$DFGG_BACKUP"
+          echo "Upstream backup: $DFGG_BACKUP"
+          sed "s/127\\.0\\.0\\.1:$DFGG_OLD_PORT/127.0.0.1:$DFGG_NEW_PORT/" \
+            "$DFGG_TMP/upstream.before" > "$DFGG_TMP/upstream.next"
+          before=$(workers)
+          bash "$AUTOSTART" "$DFGG_NEW"
+          cmp -s "$DFGG_UPSTREAM" "$DFGG_TMP/upstream.before"
+          DFGG_CHANGED=true
+          atomic_upstream "$DFGG_TMP/upstream.next"
+          sudo -n nginx -t
+          date -u '+switch_started=%Y-%m-%dT%H:%M:%SZ'
+          DFGG_RELOADED=true
+          sudo -n systemctl reload nginx.service
+          wait_new_workers "$before"
+          for attempt in $(seq 1 5); do
+            ready "$DFGG_NEW_PORT"
+            proxy_ok
+            sleep 2
+          done
+
+          # 5. 이전 worker가 종료된 뒤 이전 앱을 멈춘다.
+          wait_drained "$before"
+          ready "$DFGG_NEW_PORT"
+          proxy_ok
+          DFGG_COMMITTED=true
+          stop_old
+          ready "$DFGG_NEW_PORT"
+          proxy_ok
+          date -u '+deployment_completed=%Y-%m-%dT%H:%M:%SZ'
+          echo "SUCCESS: $DFGG_NEW active (container); $DFGG_OLD stopped"
+
+      # 두 슬롯 태그(localhost/dfgg:blue|green)가 현재와 직전 이미지를 붙잡는다.
+      # digest로 받은 이미지는 ghcr 이름이 남아 prune만으로는 지워지지 않으므로,
+      # 슬롯이 쓰지 않는 ghcr 이미지를 직접 지운다.
+      - name: Prune old images
+        if: success()
+        run: |
+          set -euo pipefail
+          keep=$(for slot in blue green; do podman image inspect -f '{{.Id}}' "localhost/dfgg:$slot" 2> /dev/null || true; done)
+          podman images --no-trunc --format '{{.ID}} {{.Repository}}' \
+            | awk '$2 ~ /^ghcr\.io\/.+\/backend$/ { sub(/^sha256:/, "", $1); print $1 }' | sort -u \
+            | while IFS= read -r id; do
+                if grep -qxF "$id" <<< "$keep"; then continue; fi
+                podman rmi "$id" > /dev/null 2>&1 || true
+              done
+          podman image prune -f > /dev/null
+          podman images --format '{{.Repository}}:{{.Tag}} {{.Digest}}'

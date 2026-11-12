@@ -1,0 +1,6 @@
+{
+ "schema_fingerprint": "84a57f48a9e3d5f2",
+ "feature_names": ["source_build","source_self_synergy","source_ally_synergy","source_counter","build_score","build_rank","build_backoff_level","self_synergy_score","self_synergy_rank","self_synergy_backoff_level","ally_synergy_score","ally_synergy_rank","ally_synergy_backoff_level","ally_score_max","ally_score_mean","ally_score_sum","ally_score_top1","ally_score_top2","counter_score","counter_rank","counter_backoff_level","counter_lift_max","counter_lift_mean","counter_lift_top1","counter_lift_top2","counter_pair_probability_max","champion_base_rate_all","champion_base_rate_recent","champion_base_rate_recent_vs_all","item_pick_rate_current_patch","item_pick_rate_delta_prev_patch","item_pick_rate_delta_3patch","item_win_rate_current_patch","item_win_rate_delta_prev_patch","enemy_tank_count","enemy_mage_count","enemy_marksman_count","enemy_assassin_count","enemy_fighter_count","ally_tank_count","ally_mage_count","ally_marksman_count","ally_support_count","purchased_item_count","position_top","position_jungle","position_mid","position_bottom","position_support","tier_ordinal"],
+ "objective": "seed-not-a-trained-model",
+ "trees": [{"split_feature": [], "threshold": [], "default_left": [], "left": [], "right": [], "leaf_value": [0.0], "node_cover": [], "leaf_cover": [1.0]}]
+}

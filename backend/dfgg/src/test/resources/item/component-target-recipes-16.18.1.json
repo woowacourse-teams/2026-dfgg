@@ -1,0 +1,623 @@
+{
+  "version": "16.18.1",
+  "data": {
+    "3071": {
+      "name": "Black Cleaver",
+      "description": "<mainText><stats><attention>45</attention> Attack Damage<br><attention>400</attention> Health<br><attention>20</attention> Ability Haste</stats><br><br><passive>Carve</passive><br>Dealing <physicalDamage>physical damage</physicalDamage> to champions reduces the target's <scaleArmor>Armor by 6%</scaleArmor> for 6 seconds. (stacks 5 times).<br><br><passive>Fervor</passive><br>Dealing <physicalDamage>physical damage</physicalDamage> grants <speed> Move Speed</speed> for 2 seconds.</mainText>",
+      "colloq": ";bc",
+      "plaintext": "Dealing physical damage to enemy champions reduces their Armor",
+      "from": [
+        "3044",
+        "3067",
+        "1037"
+      ],
+      "image": {
+        "full": "3071.png",
+        "sprite": "item3.png",
+        "group": "item",
+        "x": 96,
+        "y": 240,
+        "w": 48,
+        "h": 48
+      },
+      "gold": {
+        "base": 225,
+        "purchasable": true,
+        "total": 3000,
+        "sell": 2100
+      },
+      "tags": [
+        "Health",
+        "Damage",
+        "CooldownReduction",
+        "OnHit",
+        "NonbootsMovement",
+        "ArmorPenetration",
+        "AbilityHaste"
+      ],
+      "maps": {
+        "11": true,
+        "12": true,
+        "22": false,
+        "30": false,
+        "453": true
+      },
+      "stats": {
+        "FlatHPPoolMod": 400,
+        "FlatPhysicalDamageMod": 45
+      },
+      "depth": 3
+    },
+    "3044": {
+      "name": "Phage",
+      "description": "<mainText><stats><attention>15</attention> Attack Damage<br><attention>200</attention> Health</stats><br><br><passive>Rage</passive><br>Attacking grants <speed>Move Speed</speed> for 2 seconds.</mainText>",
+      "colloq": ";",
+      "plaintext": "Attacks and kills give a small burst of speed",
+      "from": [
+        "1028",
+        "1036"
+      ],
+      "into": [
+        "3071",
+        "3078",
+        "3073",
+        "6630",
+        "6631"
+      ],
+      "image": {
+        "full": "3044.png",
+        "sprite": "item3.png",
+        "group": "item",
+        "x": 0,
+        "y": 192,
+        "w": 48,
+        "h": 48
+      },
+      "gold": {
+        "base": 350,
+        "purchasable": true,
+        "total": 1100,
+        "sell": 770
+      },
+      "tags": [
+        "Health",
+        "Damage",
+        "NonbootsMovement"
+      ],
+      "maps": {
+        "11": true,
+        "12": true,
+        "22": false,
+        "30": false,
+        "453": true
+      },
+      "stats": {
+        "FlatHPPoolMod": 200,
+        "FlatPhysicalDamageMod": 15
+      },
+      "effect": {
+        "Effect1Amount": "20",
+        "Effect2Amount": "2",
+        "Effect3Amount": "60",
+        "Effect4Amount": "0",
+        "Effect5Amount": "0",
+        "Effect6Amount": "0",
+        "Effect7Amount": "0",
+        "Effect8Amount": "8"
+      },
+      "depth": 2
+    },
+    "1028": {
+      "name": "Ruby Crystal",
+      "description": "<mainText><stats><attention>150</attention> Health</stats><br><br></mainText>",
+      "colloq": ";red",
+      "plaintext": "Increases Health",
+      "into": [
+        "3742",
+        "1011",
+        "3068",
+        "2021",
+        "323222",
+        "323075",
+        "326617",
+        "323107",
+        "3012",
+        "3147",
+        "3067",
+        "3211",
+        "2502",
+        "322526",
+        "2526",
+        "3023",
+        "3044",
+        "3053",
+        "3066",
+        "3075",
+        "3152",
+        "3161",
+        "3801",
+        "3803",
+        "4401",
+        "4635",
+        "6035",
+        "6660",
+        "6662"
+      ],
+      "image": {
+        "full": "1028.png",
+        "sprite": "item0.png",
+        "group": "item",
+        "x": 336,
+        "y": 0,
+        "w": 48,
+        "h": 48
+      },
+      "gold": {
+        "base": 400,
+        "purchasable": true,
+        "total": 400,
+        "sell": 280
+      },
+      "tags": [
+        "Health"
+      ],
+      "maps": {
+        "11": true,
+        "12": true,
+        "22": false,
+        "30": false,
+        "453": true
+      },
+      "stats": {
+        "FlatHPPoolMod": 150
+      }
+    },
+    "1036": {
+      "name": "Long Sword",
+      "description": "<mainText><stats><attention>10</attention> Attack Damage</stats><br><br></mainText>",
+      "colloq": ";",
+      "plaintext": "Slightly increases Attack Damage",
+      "into": [
+        "1053",
+        "4003",
+        "6701",
+        "2015",
+        "2019",
+        "2021",
+        "3077",
+        "6670",
+        "3133",
+        "2517",
+        "323004",
+        "3142",
+        "3004",
+        "2523",
+        "3032",
+        "3035",
+        "3044",
+        "3051",
+        "3155",
+        "6690",
+        "3123",
+        "3134",
+        "6699",
+        "6671",
+        "6692"
+      ],
+      "image": {
+        "full": "1036.png",
+        "sprite": "item0.png",
+        "group": "item",
+        "x": 96,
+        "y": 48,
+        "w": 48,
+        "h": 48
+      },
+      "gold": {
+        "base": 350,
+        "purchasable": true,
+        "total": 350,
+        "sell": 245
+      },
+      "tags": [
+        "Damage",
+        "Lane"
+      ],
+      "maps": {
+        "11": true,
+        "12": true,
+        "22": false,
+        "30": false,
+        "453": true
+      },
+      "stats": {
+        "FlatPhysicalDamageMod": 10
+      }
+    },
+    "3067": {
+      "name": "Kindlegem",
+      "description": "<mainText><stats><attention>200</attention> Health<br><attention>10</attention> Ability Haste</stats><br><br></mainText>",
+      "colloq": ";",
+      "plaintext": "Increases Health and Cooldown Reduction",
+      "from": [
+        "1028",
+        "2022"
+      ],
+      "into": [
+        "3071",
+        "8020",
+        "323050",
+        "328020",
+        "124011",
+        "323190",
+        "323222",
+        "3165",
+        "6620",
+        "3050",
+        "3109",
+        "6656",
+        "326617",
+        "323107",
+        "2502",
+        "2510",
+        "2524",
+        "2525",
+        "6617",
+        "3065",
+        "3152",
+        "3119",
+        "326620",
+        "3190",
+        "3222",
+        "323109",
+        "323119",
+        "4403",
+        "4629",
+        "4644",
+        "6630",
+        "6632",
+        "8001"
+      ],
+      "image": {
+        "full": "3067.png",
+        "sprite": "item3.png",
+        "group": "item",
+        "x": 432,
+        "y": 192,
+        "w": 48,
+        "h": 48
+      },
+      "gold": {
+        "base": 150,
+        "purchasable": true,
+        "total": 800,
+        "sell": 560
+      },
+      "tags": [
+        "Health",
+        "CooldownReduction",
+        "AbilityHaste"
+      ],
+      "maps": {
+        "11": true,
+        "12": true,
+        "22": false,
+        "30": false,
+        "453": true
+      },
+      "stats": {
+        "FlatHPPoolMod": 200
+      },
+      "depth": 2
+    },
+    "2022": {
+      "name": "Glowing Mote",
+      "description": "<mainText><stats><attention>5</attention> Ability Haste</stats><br><br></mainText>",
+      "colloq": "",
+      "plaintext": "",
+      "into": [
+        "2020",
+        "3024",
+        "3133",
+        "3802",
+        "3067",
+        "3057",
+        "3108",
+        "3158",
+        "4642",
+        "6660"
+      ],
+      "image": {
+        "full": "2022.png",
+        "sprite": "item0.png",
+        "group": "item",
+        "x": 192,
+        "y": 432,
+        "w": 48,
+        "h": 48
+      },
+      "gold": {
+        "base": 250,
+        "purchasable": true,
+        "total": 250,
+        "sell": 175
+      },
+      "tags": [
+        "CooldownReduction"
+      ],
+      "maps": {
+        "11": true,
+        "12": true,
+        "22": false,
+        "30": false,
+        "453": true
+      },
+      "stats": {}
+    },
+    "1037": {
+      "name": "Pickaxe",
+      "description": "<mainText><stats><attention>25</attention> Attack Damage</stats><br><br></mainText>",
+      "colloq": ";",
+      "plaintext": "Moderately increases Attack Damage",
+      "into": [
+        "667666",
+        "3071",
+        "6333",
+        "3031",
+        "3153",
+        "6701",
+        "2020",
+        "2517",
+        "3087",
+        "6695",
+        "2523",
+        "3053",
+        "3072",
+        "3124",
+        "3181",
+        "3139",
+        "3161",
+        "6029",
+        "6035",
+        "6673",
+        "6676",
+        "6692"
+      ],
+      "image": {
+        "full": "1037.png",
+        "sprite": "item0.png",
+        "group": "item",
+        "x": 144,
+        "y": 48,
+        "w": 48,
+        "h": 48
+      },
+      "gold": {
+        "base": 875,
+        "purchasable": true,
+        "total": 875,
+        "sell": 613
+      },
+      "tags": [
+        "Damage"
+      ],
+      "maps": {
+        "11": true,
+        "12": true,
+        "22": false,
+        "30": false,
+        "453": true
+      },
+      "stats": {
+        "FlatPhysicalDamageMod": 25
+      }
+    },
+    "6333": {
+      "name": "Death's Dance",
+      "description": "<mainText><stats><attention>60</attention> Attack Damage<br><attention>50</attention> Armor<br><attention>15</attention> Ability Haste</stats><br><br><passive>Ignore Pain</passive><br>A percentage of damage taken is dealt to you over 3 seconds instead.<br><br><passive>Defy</passive><br>When a champion that you damaged within 3 seconds dies, cleanse <passive>Ignore Pain's</passive> remaining damage and restore <healing>Health</healing> over 2 seconds.</mainText>",
+      "colloq": "",
+      "plaintext": "",
+      "stacks": 0,
+      "from": [
+        "2019",
+        "1037",
+        "3133"
+      ],
+      "image": {
+        "full": "6333.png",
+        "sprite": "item5.png",
+        "group": "item",
+        "x": 336,
+        "y": 384,
+        "w": 48,
+        "h": 48
+      },
+      "gold": {
+        "base": 275,
+        "purchasable": true,
+        "total": 3300,
+        "sell": 2310
+      },
+      "tags": [
+        "Armor",
+        "Damage",
+        "AbilityHaste"
+      ],
+      "maps": {
+        "11": true,
+        "12": true,
+        "22": false,
+        "30": false,
+        "453": true
+      },
+      "stats": {
+        "FlatArmorMod": 50,
+        "FlatPhysicalDamageMod": 60
+      },
+      "depth": 3
+    },
+    "2019": {
+      "name": "Steel Sigil",
+      "description": "<mainText><stats><attention>15</attention> Attack Damage<br><attention>30</attention> Armor</stats><br><br></mainText>",
+      "colloq": "",
+      "plaintext": "",
+      "from": [
+        "1029",
+        "1036",
+        "1029"
+      ],
+      "into": [
+        "6333",
+        "6700",
+        "3026"
+      ],
+      "image": {
+        "full": "2019.png",
+        "sprite": "item0.png",
+        "group": "item",
+        "x": 48,
+        "y": 432,
+        "w": 48,
+        "h": 48
+      },
+      "gold": {
+        "base": 150,
+        "purchasable": true,
+        "total": 1100,
+        "sell": 770
+      },
+      "tags": [
+        "Armor",
+        "Damage"
+      ],
+      "maps": {
+        "11": true,
+        "12": true,
+        "22": false,
+        "30": false,
+        "453": true
+      },
+      "stats": {
+        "FlatArmorMod": 30,
+        "FlatPhysicalDamageMod": 15
+      },
+      "depth": 2
+    },
+    "1029": {
+      "name": "Cloth Armor",
+      "description": "<mainText><stats><attention>15</attention> Armor</stats><br><br></mainText>",
+      "colloq": ";",
+      "plaintext": "Slightly increases Armor",
+      "into": [
+        "2421",
+        "2420",
+        "1031",
+        "323050",
+        "323190",
+        "2019",
+        "3193",
+        "3047",
+        "3024",
+        "3050",
+        "2524",
+        "3023",
+        "3076",
+        "3082",
+        "3105",
+        "3190"
+      ],
+      "image": {
+        "full": "1029.png",
+        "sprite": "item0.png",
+        "group": "item",
+        "x": 384,
+        "y": 0,
+        "w": 48,
+        "h": 48
+      },
+      "gold": {
+        "base": 300,
+        "purchasable": true,
+        "total": 300,
+        "sell": 210
+      },
+      "tags": [
+        "Armor"
+      ],
+      "maps": {
+        "11": true,
+        "12": true,
+        "22": false,
+        "30": false,
+        "453": true
+      },
+      "stats": {
+        "FlatArmorMod": 15
+      }
+    },
+    "3133": {
+      "name": "Caulfield's Warhammer",
+      "description": "<mainText><stats><attention>20</attention> Attack Damage<br><attention>10</attention> Ability Haste</stats><br><br></mainText>",
+      "colloq": ";",
+      "plaintext": "Attack Damage and Cooldown Reduction",
+      "stacks": 0,
+      "from": [
+        "1036",
+        "2022",
+        "1036"
+      ],
+      "into": [
+        "6333",
+        "126697",
+        "6697",
+        "4402",
+        "3156",
+        "2517",
+        "323004",
+        "6693",
+        "3004",
+        "3508",
+        "3074",
+        "3179",
+        "6691",
+        "6609",
+        "6610",
+        "6632",
+        "6692",
+        "6694",
+        "6696"
+      ],
+      "image": {
+        "full": "3133.png",
+        "sprite": "item3.png",
+        "group": "item",
+        "x": 48,
+        "y": 432,
+        "w": 48,
+        "h": 48
+      },
+      "gold": {
+        "base": 100,
+        "purchasable": true,
+        "total": 1050,
+        "sell": 735
+      },
+      "tags": [
+        "Damage",
+        "CooldownReduction",
+        "AbilityHaste"
+      ],
+      "maps": {
+        "11": true,
+        "12": true,
+        "22": false,
+        "30": false,
+        "453": true
+      },
+      "stats": {
+        "FlatPhysicalDamageMod": 20
+      },
+      "depth": 2
+    }
+  }
+}

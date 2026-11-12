@@ -40,3 +40,13 @@ out/
 .env
 .env.*
 !.env.example
+
+### Local notes & scripts ###
+# 이미 추적 중인 스크립트는 영향 없음
+*.py
+docs/
+__pycache__/
+
+### Experiment outputs ###
+component_*_experiment/
+component_candidate_scope_diagnostics/
