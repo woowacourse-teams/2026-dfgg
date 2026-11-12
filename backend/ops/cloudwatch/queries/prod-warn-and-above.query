@@ -1,0 +1,6 @@
+# dfgg/prod 1. 경고 이상 (WARN·ERROR)
+# 로그 그룹: /dfgg/prod
+fields @timestamp, level, slot, logger_name, traceId, installId, message, stack_trace
+| filter @logStream like "app-" and level in ["WARN", "ERROR"]
+| sort @timestamp desc
+| limit 200

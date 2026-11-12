@@ -10,8 +10,8 @@
             "file_path": "__LOG_DIR__/dfgg-blue.log",
             "log_group_name": "/dfgg/__ENV__",
             "log_stream_name": "{instance_id}/app-blue",
-            "timestamp_format": "%Y-%m-%d %H:%M:%S.%f",
-            "multi_line_start_pattern": "{timestamp_format}",
+            "timestamp_format": "%Y-%m-%dT%H:%M:%S.%f",
+            "multi_line_start_pattern": "^(\\{|\\d{4}-\\d{2}-\\d{2} )",
             "timezone": "Local",
             "retention_in_days": __RETENTION__
           },
@@ -19,8 +19,8 @@
             "file_path": "__LOG_DIR__/dfgg-green.log",
             "log_group_name": "/dfgg/__ENV__",
             "log_stream_name": "{instance_id}/app-green",
-            "timestamp_format": "%Y-%m-%d %H:%M:%S.%f",
-            "multi_line_start_pattern": "{timestamp_format}",
+            "timestamp_format": "%Y-%m-%dT%H:%M:%S.%f",
+            "multi_line_start_pattern": "^(\\{|\\d{4}-\\d{2}-\\d{2} )",
             "timezone": "Local",
             "retention_in_days": __RETENTION__
           },

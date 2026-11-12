@@ -37,16 +37,27 @@ class LoggingConfigurationTest {
     }
 
     @Test
-    @DisplayName("로그 한 줄에 추적 번호와 슬롯이 들어간다")
-    void pattern_WhenConfigured_CarryTraceIdAndSlot() {
-        for (String key : new String[] {"logging.pattern.console", "logging.pattern.file"}) {
-            assertThat(property(key))
-                    .asString()
-                    .as("%s: 지표에서 본 이상을 로그에서 찾아가는 연결고리다", key)
-                    .contains("%X{traceId")
-                    .as("%s: 배포마다 blue/green이 바뀐다. 어느 슬롯이 남긴 줄인지 보여야 한다", key)
-                    .contains("${DFGG_SLOT:");
-        }
+    @DisplayName("콘솔 로그 한 줄에 추적 번호, 설치 ID, 슬롯이 들어간다")
+    void consolePattern_WhenConfigured_CarryTraceIdInstallIdAndSlot() {
+        assertThat(property("logging.pattern.console"))
+                .asString()
+                .as("지표에서 본 이상을 로그에서 찾아가는 연결고리다")
+                .contains("%X{traceId")
+                .as("같은 기기의 요청을 묶는다")
+                .contains("%X{installId:-none}")
+                .as("배포마다 blue/green이 바뀐다. 어느 슬롯이 남긴 줄인지 보여야 한다")
+                .contains("${DFGG_SLOT:");
+    }
+
+    @Test
+    @DisplayName("파일 로그는 JSON으로 남기고 슬롯을 고정 필드로 붙인다")
+    void fileFormat_WhenConfigured_WriteStructuredJsonWithSlot() {
+        assertThat(property("logging.structured.format.file"))
+                .as("CloudWatch·Grafana가 parse 없이 필드로 거른다")
+                .isEqualTo("logstash");
+        assertThat(property("logging.structured.json.add.slot"))
+                .as("텍스트 패턴의 [blue] 자리를 대신한다")
+                .isEqualTo("${DFGG_SLOT:local}");
     }
 
     private Object property(String name) {
