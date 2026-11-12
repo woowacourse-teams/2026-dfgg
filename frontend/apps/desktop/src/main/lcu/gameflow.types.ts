@@ -2,7 +2,7 @@
 export interface LcuGameflowSession {
   gameData: {
     gameId: number;
-    queue: { id: number };
+    queue: { id: number; gameMode: string };
   };
 }
 

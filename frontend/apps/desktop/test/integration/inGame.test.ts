@@ -37,6 +37,10 @@ describe('실시간 인게임 아이템 추천 테스트', () => {
     // 롤 클라이언트: 게임 중, 패치 15.20
     league.lcu.setResponse('GET', '/lol-gameflow/v1/gameflow-phase', 'InProgress');
     league.lcu.setResponse('GET', '/lol-patch/v1/game-version', '15.20.700.1234');
+    // 솔로 랭크 판. 추천은 일반·랭크 큐에서만 요청한다
+    league.lcu.setResponse('GET', '/lol-gameflow/v1/session', {
+      gameData: { gameId: 1, queue: { id: 420, gameMode: 'CLASSIC' } },
+    });
 
     // 게임: 나(가렌, 미드, 롱소드 보유)와 상대(오공)
     league.live.setResponse('/liveclientdata/activeplayer', activePlayer({ currentGold: 1300 }));
@@ -111,5 +115,20 @@ describe('실시간 인게임 아이템 추천 테스트', () => {
     await vi.waitFor(() => expect(recommendRequests()).toHaveLength(2), { timeout: 4000 });
 
     expect(recommendRequests()[1]?.body).toMatchObject({ purchasedItemIds: [3031] });
+  });
+  it('아수라장처럼 일반·랭크가 아닌 큐에서는 추천을 요청하지 않는다', async () => {
+    league.lcu.setResponse('GET', '/lol-gameflow/v1/session', {
+      gameData: { gameId: 1, queue: { id: 3270, gameMode: 'CLASSIC' } },
+    });
+    app.poller.initLivePolling();
+    app.connection.startLcuConnection();
+
+    const askedQueue = () =>
+      league.lcu.requests().some((request) => request.path === '/lol-gameflow/v1/session');
+    await vi.waitFor(() => expect(askedQueue()).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+
+    expect(activePlayerRequests()).toBe(0);
+    expect(recommendRequests()).toHaveLength(0);
   });
 });

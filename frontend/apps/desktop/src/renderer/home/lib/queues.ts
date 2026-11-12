@@ -5,8 +5,8 @@ const SOLO_QUEUE_ID = 420;
 const FLEX_QUEUE_ID = 440;
 // 일반: 교차 선택(400), 비공개 선택(430), 신속 대전(480), 빠른 대전(490)
 const NORMAL_QUEUE_IDS = [400, 430, 480, 490];
-// 칼바람: 무작위 총력전(450), 아수라장(2400)
-const ARAM_QUEUE_IDS = [450, 2400];
+// 칼바람: 무작위 총력전(450), 아수라장(2400 · 3270)
+const ARAM_QUEUE_IDS = [450, 2400, 3270];
 
 export type QueueFilter = 'all' | 'solo' | 'flex' | 'normal' | 'aram' | 'etc';
 

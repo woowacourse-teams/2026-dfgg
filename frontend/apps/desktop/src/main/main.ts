@@ -37,6 +37,9 @@ import { readSettings } from './settings';
 import { initOverlayVisibility, updateOverlayPhase } from './overlay/visibility';
 import { getTestEnv } from './testEnv';
 
+import { startMemoryProbe } from './debug/memoryProbe';
+import { initMayhem } from './mayhem/mayhem';
+
 const DEV_SERVER_URL = 'http://localhost:3001';
 
 // home 창을 저장하고, 이미 실행되고 있는 같은 프로그램 인스턴스를 확인하는 변수
@@ -65,6 +68,29 @@ function detectClientStatus(home: BrowserWindow) {
     home.showInactive();
     shown = true;
   });
+}
+
+function createAugmentWindow() {
+  const augment = new BrowserWindow({
+    show: false,
+    title: 'augments',
+    frame: false,
+    transparent: true,
+    skipTaskbar: true,
+    focusable: false,
+    resizable: false,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      // 게임이 앞에 있어도 화면 캡처와 카드 찾기가 느려지지 않게 한다
+      backgroundThrottling: false,
+    },
+  });
+  augment.setIgnoreMouseEvents(true);
+  augment.setAlwaysOnTop(true, 'screen-saver');
+  // augment.setContentProtection(true);
+  loadRenderer(augment, 'augments');
+  return augment;
 }
 
 function createWindow() {
@@ -101,7 +127,7 @@ function createWindow() {
 
   overlay.hide();
   initOverlayVisibility(overlay, readSettings().showOverlay ?? true);
-  onPhaseChange((phase) => updateOverlayPhase(phase));
+  onPhaseChange((phase) => void updateOverlayPhase(phase));
 
   detectClientStatus(home);
 
@@ -112,6 +138,8 @@ function createWindow() {
 
   loadRenderer(home, 'home');
   loadRenderer(overlay, 'overlay');
+
+  initMayhem(createAugmentWindow);
 
   home.on('closed', () => {
     app.quit();
@@ -179,6 +207,7 @@ if (!gotTheLock) {
       }
     });
   });
+  if (!app.isPackaged || process.env.DFGG_MEM_PROBE) startMemoryProbe();
 }
 
 app.on('will-quit', () => {
