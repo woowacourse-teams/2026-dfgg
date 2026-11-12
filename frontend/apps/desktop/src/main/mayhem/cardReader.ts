@@ -19,6 +19,7 @@ import {
   recordKind,
   recordReadTime,
   recordSelection,
+  recordScreen,
 } from './mayhemStats';
 
 // 확인 시간을 모아서 한 줄로 찍는다.
@@ -201,6 +202,7 @@ export function startCardReader(
       return tracker.candidate ? OPEN_MS : IDLE_MS;
     }
 
+    recordScreen(game.width, game.height);
     const scale = game.height / FRAME_HEIGHT;
     const boxes = tracker.boxes;
     slots = boxes.map((box, i) => {
