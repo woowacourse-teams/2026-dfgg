@@ -6,7 +6,6 @@ import dfgg.application.recommend.v3.GeneratorResult;
 import dfgg.application.recommend.v3.RecommendationQuery;
 import dfgg.application.recommend.v3.ScoredItem;
 import dfgg.application.utils.WilsonScoreCalculator;
-import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.itemstats.ChampionItemRollup;
 import dfgg.domain.itemstats.ChampionItemRollupRepository;
 import dfgg.domain.itemstats.ChampionItemStats;
@@ -135,19 +134,20 @@ public class CounterCandidateGenerator implements CandidateGenerator {
         if (query.enemyChampionIds().isEmpty()) {
             return List.of();
         }
-        return pairRepository.findByMyChampionIdAndRelationAndOtherChampionIdIn(
+        return pairRepository.findByMyChampionIdAndRelationAndOtherChampionIdInAndItemIdIn(
                 Math.toIntExact(query.myChampionId()), PairRelation.ENEMY,
-                query.enemyChampionIds().stream().map(Math::toIntExact).toList()
+                query.enemyChampionIds().stream().map(Math::toIntExact).toList(), query.coreItemIds()
         );
     }
 
-    private List<ChampionItemStats> positionStats(long myChampionId, ChampionPosition position) {
-        return championItemStatsRepository.findByChampionIdAndPosition(Math.toIntExact(myChampionId), position);
+    private List<ChampionItemStats> positionStats(RecommendationQuery query) {
+        return championItemStatsRepository.findByChampionIdAndPositionAndItemIdIn(
+                Math.toIntExact(query.myChampionId()), query.position(), query.coreItemIds());
     }
 
     /** 만난 적 있는 적이 하나도 없을 때의 마지막 수단. backoff level이 "조합 근거가 아니다"를 알린다. */
     private List<ScoredItem> championBaseRate(RecommendationQuery query, int topK) {
-        List<ChampionItemStats> positionStats = positionStats(query.myChampionId(), query.position());
+        List<ChampionItemStats> positionStats = positionStats(query);
         if (!positionStats.isEmpty()) {
             return positionStats.stream()
                     .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
@@ -157,7 +157,8 @@ public class CounterCandidateGenerator implements CandidateGenerator {
                     .limit(topK)
                     .toList();
         }
-        return championItemRollupRepository.findByChampionId(Math.toIntExact(query.myChampionId())).stream()
+        return championItemRollupRepository.findByChampionIdAndItemIdIn(
+                        Math.toIntExact(query.myChampionId()), query.coreItemIds()).stream()
                 .filter(stat -> !query.purchasedItemIds().contains(stat.getItemId()))
                 .map(stat -> new ScoredItem(stat.getItemId(), wilsonScoreCalculator.lowerBound(
                         stat.getPurchaseCountAll(), stat.getChampionGameCountAll())))
