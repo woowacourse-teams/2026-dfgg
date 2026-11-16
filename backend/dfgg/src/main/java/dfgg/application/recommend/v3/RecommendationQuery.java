@@ -15,6 +15,8 @@ import java.util.Set;
  *
  * <p>{@code coreItemIds}는 generator가 통계를 읽을 때 조건으로 넘기는 Core 아이템 목록이다. 통계에 섞인
  * 시작 아이템·재료가 후보로 오지 않게 한다(#297). 서빙은 요청마다 한 번 채우고, 평가도 같은 목록을 넣는다.
+ *
+ * <p>{@code situation}은 추천을 받는 시점의 10명 상태다. 상황을 보내지 않는 요청이 있어 "모름"일 수 있다.
  */
 public record RecommendationQuery(
         Long myChampionId,
@@ -24,14 +26,31 @@ public record RecommendationQuery(
         List<Long> enemyChampionIds,
         String tier,
         String patch,
-        Set<Long> coreItemIds
+        Set<Long> coreItemIds,
+        GameSituation situation
 ) {
+
+    /** 상황을 모를 때만 쓴다. 상황을 아는 쪽은 상황까지 넘기는 생성자를 쓴다. */
+    public RecommendationQuery(
+            Long myChampionId,
+            ChampionPosition position,
+            List<Long> purchasedItemIds,
+            List<Long> allyChampionIds,
+            List<Long> enemyChampionIds,
+            String tier,
+            String patch,
+            Set<Long> coreItemIds
+    ) {
+        this(myChampionId, position, purchasedItemIds, allyChampionIds, enemyChampionIds, tier, patch, coreItemIds,
+                GameSituation.unknown());
+    }
 
     public RecommendationQuery {
         if (myChampionId == null) {
             throw new IllegalArgumentException("내 챔피언 ID는 필수입니다.");
         }
         Objects.requireNonNull(position, "포지션은 필수입니다.");
+        Objects.requireNonNull(situation, "상황은 필수입니다. 모르면 GameSituation.unknown()을 싣습니다.");
         if (patch == null || patch.isBlank()) {
             throw new IllegalArgumentException("패치는 필수입니다.");
         }
