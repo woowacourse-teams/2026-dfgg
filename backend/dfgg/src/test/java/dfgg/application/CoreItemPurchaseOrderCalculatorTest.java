@@ -3,9 +3,11 @@ package dfgg.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dfgg.application.match.CoreItemPurchaseOrderCalculator;
+import dfgg.domain.match.CoreItemAcquisition;
 import dfgg.infrastructure.external.dto.MatchTimelineResponse;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class CoreItemPurchaseOrderCalculatorTest {
@@ -65,6 +67,209 @@ class CoreItemPurchaseOrderCalculatorTest {
         );
 
         assertThat(result).isEmpty();
+    }
+
+    // --- 보유 규칙을 꺼내기 전에 지금 동작을 고정하는 테스트 ---
+
+    @Test
+    @DisplayName("판 코어를 다시 사면 다시 산 자리로 옮긴다")
+    void calculate_WhenCoreIsSoldAndBoughtAgain_PlacesItAtRepurchase() {
+        // given
+        MatchTimelineResponse timeline = timeline(
+                new MatchTimelineResponse.Event(100L, "ITEM_PURCHASED", 1, 3071, null, null),
+                new MatchTimelineResponse.Event(200L, "ITEM_PURCHASED", 1, 3053, null, null),
+                new MatchTimelineResponse.Event(300L, "ITEM_SOLD", 1, 3071, null, null),
+                new MatchTimelineResponse.Event(400L, "ITEM_PURCHASED", 1, 3071, null, null)
+        );
+
+        // when
+        Optional<List<Integer>> result = calculator.calculate(
+                timeline,
+                1,
+                List.of(3071, 3053),
+                List.of(3071, 3053)
+        );
+
+        // then
+        assertThat(result).contains(List.of(3053, 3071));
+    }
+
+    @Test
+    @DisplayName("코어가 아닌 아이템의 구매·판매·되돌리기는 순서에 영향이 없다")
+    void calculate_WhenNonCoreItemsChange_IgnoresThem() {
+        // given
+        MatchTimelineResponse timeline = timeline(
+                new MatchTimelineResponse.Event(100L, "ITEM_PURCHASED", 1, 1036, null, null),
+                new MatchTimelineResponse.Event(200L, "ITEM_PURCHASED", 1, 3071, null, null),
+                new MatchTimelineResponse.Event(300L, "ITEM_UNDO", 1, null, 1036, 0),
+                new MatchTimelineResponse.Event(400L, "ITEM_PURCHASED", 1, 1001, null, null),
+                new MatchTimelineResponse.Event(500L, "ITEM_SOLD", 1, 1001, null, null),
+                new MatchTimelineResponse.Event(600L, "ITEM_PURCHASED", 1, 3053, null, null)
+        );
+
+        // when
+        Optional<List<Integer>> result = calculator.calculate(
+                timeline,
+                1,
+                List.of(3071, 3053),
+                List.of(3071, 3053)
+        );
+
+        // then
+        assertThat(result).contains(List.of(3071, 3053));
+    }
+
+    @Test
+    @DisplayName("같은 시각의 이벤트는 타임라인에 나온 순서대로 처리한다")
+    void calculate_WhenEventsShareTimestamp_KeepsTimelineOrder() {
+        // given
+        MatchTimelineResponse timeline = timeline(
+                new MatchTimelineResponse.Event(100L, "ITEM_PURCHASED", 1, 3071, null, null),
+                new MatchTimelineResponse.Event(100L, "ITEM_PURCHASED", 1, 3053, null, null)
+        );
+
+        // when
+        Optional<List<Integer>> result = calculator.calculate(
+                timeline,
+                1,
+                List.of(3071, 3053),
+                List.of(3071, 3053)
+        );
+
+        // then
+        assertThat(result).contains(List.of(3071, 3053));
+    }
+
+    @Test
+    @DisplayName("시각이 없는 이벤트는 시각이 있는 이벤트 뒤에 처리한다")
+    void calculate_WhenEventHasNoTimestamp_ProcessesItLast() {
+        // given
+        MatchTimelineResponse timeline = timeline(
+                new MatchTimelineResponse.Event(null, "ITEM_PURCHASED", 1, 3071, null, null),
+                new MatchTimelineResponse.Event(100L, "ITEM_PURCHASED", 1, 3053, null, null)
+        );
+
+        // when
+        Optional<List<Integer>> result = calculator.calculate(
+                timeline,
+                1,
+                List.of(3071, 3053),
+                List.of(3071, 3053)
+        );
+
+        // then
+        assertThat(result).contains(List.of(3053, 3071));
+    }
+
+    // --- 순서와 함께 얻은 시각을 돌려준다 ---
+
+    @Test
+    @DisplayName("순서는 calculate()와 같고 시각은 각 코어를 산 이벤트의 시각이다")
+    void calculateWithAcquiredTimes_WhenCoresBought_ReturnsCalculateOrderWithTimes() {
+        // given
+        MatchTimelineResponse timeline = timeline(
+                new MatchTimelineResponse.Event(500L, "ITEM_PURCHASED", 1, 1036, null, null),
+                new MatchTimelineResponse.Event(100L, "ITEM_PURCHASED", 1, 3071, null, null),
+                new MatchTimelineResponse.Event(200L, "ITEM_PURCHASED", 1, 6610, null, null),
+                new MatchTimelineResponse.Event(300L, "ITEM_SOLD", 1, 6610, null, null),
+                new MatchTimelineResponse.Event(400L, "ITEM_PURCHASED", 1, 3053, null, null)
+        );
+        List<Integer> finalCoreItemIds = List.of(3071, 3053);
+        List<Integer> coreItemIds = List.of(3071, 6610, 3053);
+
+        // when
+        Optional<List<CoreItemAcquisition>> result =
+                calculator.calculateWithAcquiredTimes(timeline, 1, finalCoreItemIds, coreItemIds);
+
+        // then
+        assertThat(result).contains(List.of(
+                new CoreItemAcquisition(3071, 100L),
+                new CoreItemAcquisition(3053, 400L)
+        ));
+        assertThat(result.orElseThrow().stream().map(CoreItemAcquisition::itemId).toList())
+                .isEqualTo(calculator.calculate(timeline, 1, finalCoreItemIds, coreItemIds).orElseThrow());
+    }
+
+    @Test
+    @DisplayName("팔고 다시 산 코어는 다시 산 시각이다")
+    void calculateWithAcquiredTimes_WhenCoreIsSoldAndBoughtAgain_ReturnsRepurchaseTime() {
+        // given
+        MatchTimelineResponse timeline = timeline(
+                new MatchTimelineResponse.Event(100L, "ITEM_PURCHASED", 1, 3071, null, null),
+                new MatchTimelineResponse.Event(200L, "ITEM_PURCHASED", 1, 3053, null, null),
+                new MatchTimelineResponse.Event(300L, "ITEM_SOLD", 1, 3071, null, null),
+                new MatchTimelineResponse.Event(400L, "ITEM_PURCHASED", 1, 3071, null, null)
+        );
+
+        // when
+        Optional<List<CoreItemAcquisition>> result = calculator.calculateWithAcquiredTimes(
+                timeline, 1, List.of(3071, 3053), List.of(3071, 3053));
+
+        // then
+        assertThat(result).contains(List.of(
+                new CoreItemAcquisition(3053, 200L),
+                new CoreItemAcquisition(3071, 400L)
+        ));
+    }
+
+    @Test
+    @DisplayName("서포터 퀘스트 최종형은 퀘스트를 끝낸 시각이다")
+    void calculateWithAcquiredTimes_WhenSupportQuestItemHasNoPurchase_ReturnsQuestCompletionTime() {
+        // given
+        MatchTimelineResponse timeline = timeline(
+                new MatchTimelineResponse.Event(744292L, "ITEM_PURCHASED", 10, 3190, null, null),
+                new MatchTimelineResponse.Event(832244L, "ITEM_DESTROYED", 10, 3867, null, null),
+                new MatchTimelineResponse.Event(966607L, "ITEM_PURCHASED", 10, 3047, null, null)
+        );
+
+        // when
+        Optional<List<CoreItemAcquisition>> result = calculator.calculateWithAcquiredTimes(
+                timeline, 10, List.of(3190, 3876, 3047), List.of(3190, 3876, 3047));
+
+        // then
+        assertThat(result).contains(List.of(
+                new CoreItemAcquisition(3190, 744292L),
+                new CoreItemAcquisition(3876, 832244L),
+                new CoreItemAcquisition(3047, 966607L)
+        ));
+    }
+
+    @Test
+    @DisplayName("코어 기록 하나라도 시각이 없으면 시각은 빈 결과이고 순서는 그대로 나온다")
+    void calculateWithAcquiredTimes_WhenCoreEventHasNoTimestamp_ReturnsEmpty() {
+        // given
+        MatchTimelineResponse timeline = timeline(
+                new MatchTimelineResponse.Event(null, "ITEM_PURCHASED", 1, 3071, null, null),
+                new MatchTimelineResponse.Event(100L, "ITEM_PURCHASED", 1, 3053, null, null)
+        );
+
+        // when
+        Optional<List<CoreItemAcquisition>> result = calculator.calculateWithAcquiredTimes(
+                timeline, 1, List.of(3071, 3053), List.of(3071, 3053));
+
+        // then
+        assertThat(result).isEmpty();
+        assertThat(calculator.calculate(timeline, 1, List.of(3071, 3053), List.of(3071, 3053)))
+                .contains(List.of(3053, 3071));
+    }
+
+    @Test
+    @DisplayName("판 코어를 시각 없이 다시 사면 예전 시각을 내보내지 않고 빈 결과를 돌려준다")
+    void calculateWithAcquiredTimes_WhenSoldCoreIsBoughtAgainWithoutTimestamp_ReturnsEmpty() {
+        // given
+        MatchTimelineResponse timeline = timeline(
+                new MatchTimelineResponse.Event(100L, "ITEM_PURCHASED", 1, 3071, null, null),
+                new MatchTimelineResponse.Event(200L, "ITEM_SOLD", 1, 3071, null, null),
+                new MatchTimelineResponse.Event(null, "ITEM_PURCHASED", 1, 3071, null, null)
+        );
+
+        // when
+        Optional<List<CoreItemAcquisition>> result = calculator.calculateWithAcquiredTimes(
+                timeline, 1, List.of(3071), List.of(3071));
+
+        // then
+        assertThat(result).isEmpty();
+        assertThat(calculator.calculate(timeline, 1, List.of(3071), List.of(3071))).contains(List.of(3071));
     }
 
     private MatchTimelineResponse timeline(MatchTimelineResponse.Event... events) {

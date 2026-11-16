@@ -1,13 +1,13 @@
 package dfgg.application.match;
 
+import dfgg.domain.match.CoreItemAcquisition;
+import dfgg.domain.match.CoreItemChange;
+import dfgg.domain.match.CoreItemInventory;
 import dfgg.infrastructure.external.dto.MatchTimelineResponse;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -17,9 +17,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class CoreItemPurchaseOrderCalculator {
 
-    private static final String ITEM_PURCHASED = "ITEM_PURCHASED";
-    private static final String ITEM_SOLD = "ITEM_SOLD";
-    private static final String ITEM_UNDO = "ITEM_UNDO";
     private static final String ITEM_DESTROYED = "ITEM_DESTROYED";
 
     /**
@@ -43,6 +40,34 @@ public class CoreItemPurchaseOrderCalculator {
             Collection<Integer> finalCoreItemIds,
             Collection<Integer> coreItemIds
     ) {
+        return replay(timeline, participantId, finalCoreItemIds, coreItemIds)
+                .map(Replay::purchaseOrder);
+    }
+
+    /**
+     * {@link #calculate}와 같은 순서로, 각 Core를 얻은 시각을 함께 돌려준다.
+     *
+     * <p>이 선수의 Core 기록 중 하나라도 시각이 없으면 빈 결과다. 판 뒤 다시 산 기록에 시각이 없으면
+     * 보유에는 예전 시각이 남아 있어서, 그대로 내보내면 틀린 시각이 조용히 쓰이기 때문이다.
+     * {@link #calculate}는 이 조건을 보지 않으므로 결과가 바뀌지 않는다.
+     */
+    public Optional<List<CoreItemAcquisition>> calculateWithAcquiredTimes(
+            MatchTimelineResponse timeline,
+            int participantId,
+            Collection<Integer> finalCoreItemIds,
+            Collection<Integer> coreItemIds
+    ) {
+        return replay(timeline, participantId, finalCoreItemIds, coreItemIds)
+                .filter(Replay::allCoreChangesTimed)
+                .flatMap(Replay::acquisitions);
+    }
+
+    private Optional<Replay> replay(
+            MatchTimelineResponse timeline,
+            int participantId,
+            Collection<Integer> finalCoreItemIds,
+            Collection<Integer> coreItemIds
+    ) {
         Objects.requireNonNull(timeline, "timeline must not be null");
         Objects.requireNonNull(finalCoreItemIds, "finalCoreItemIds must not be null");
         Objects.requireNonNull(coreItemIds, "coreItemIds must not be null");
@@ -51,60 +76,46 @@ public class CoreItemPurchaseOrderCalculator {
         Set<Integer> finalItems = new HashSet<>(finalCoreItemIds);
         finalItems.retainAll(coreItems);
         if (finalItems.isEmpty()) {
-            return Optional.of(List.of());
+            return Optional.of(new Replay(List.of(), CoreItemInventory.empty(), true));
         }
         if (timeline.info() == null || timeline.info().frames() == null) {
             return Optional.empty();
         }
 
         List<IndexedEvent> events = flattenEvents(timeline);
-        LinkedHashSet<Integer> ownedCoreItems = new LinkedHashSet<>();
-        List<Integer> purchaseOrder = new ArrayList<>();
-        Map<Integer, Long> acquiredAt = new HashMap<>();
+        CoreItemChangeReader changeReader = new CoreItemChangeReader(coreItems);
+        CoreItemInventory inventory = CoreItemInventory.empty();
         Long supportQuestCompletedAt = null;
+        boolean allCoreChangesTimed = true;
 
         for (IndexedEvent indexedEvent : events) {
             MatchTimelineResponse.Event event = indexedEvent.event();
             if (!Objects.equals(event.participantId(), participantId)) {
                 continue;
             }
-            if (event.type() == null) {
-                continue;
+            if (isSupportQuestCompletion(event)) {
+                supportQuestCompletedAt = event.timestamp();
             }
-            switch (event.type()) {
-                case ITEM_PURCHASED -> addItem(
-                        event.itemId(), coreItems, ownedCoreItems, purchaseOrder, acquiredAt, event.timestamp());
-                case ITEM_SOLD -> removeItem(event.itemId(), coreItems, ownedCoreItems, purchaseOrder);
-                case ITEM_UNDO -> {
-                    removeItem(event.beforeId(), coreItems, ownedCoreItems, purchaseOrder);
-                    addItem(event.afterId(), coreItems, ownedCoreItems, purchaseOrder,
-                            acquiredAt, event.timestamp());
-                }
-                case ITEM_DESTROYED -> {
-                    if (Objects.equals(event.itemId(), SUPPORT_QUEST_TIER3_ITEM)) {
-                        supportQuestCompletedAt = event.timestamp();
-                    }
-                }
-                default -> {
-                    // Item order is determined only by item inventory events.
-                }
+            Optional<CoreItemChange> change = changeReader.read(event);
+            if (change.isPresent()) {
+                allCoreChangesTimed &= change.get().changesNothing() || event.timestamp() != null;
+                inventory = inventory.changed(change.get());
             }
         }
 
-        insertSupportQuestItems(
-                finalItems, ownedCoreItems, purchaseOrder, acquiredAt, supportQuestCompletedAt);
+        inventory = insertSupportQuestItems(finalItems, inventory, supportQuestCompletedAt);
 
-        if (!ownedCoreItems.containsAll(finalItems)) {
+        if (!inventory.ownsAll(finalItems)) {
             return Optional.empty();
         }
 
-        List<Integer> finalPurchaseOrder = purchaseOrder.stream()
+        List<Integer> finalPurchaseOrder = inventory.itemIds().stream()
                 .filter(finalItems::contains)
                 .toList();
         if (finalPurchaseOrder.size() != finalItems.size()) {
             return Optional.empty();
         }
-        return Optional.of(finalPurchaseOrder);
+        return Optional.of(new Replay(finalPurchaseOrder, inventory, allCoreChangesTimed));
     }
 
     private List<IndexedEvent> flattenEvents(MatchTimelineResponse timeline) {
@@ -137,66 +148,45 @@ public class CoreItemPurchaseOrderCalculator {
      * <p>타임라인에 가짜 이벤트를 만들지 않는다 — 어떤 아이템인지는 매치 데이터가 이미 알려주고,
      * 언제인지만 3티어 파괴 시점에서 가져온다. 그 근거가 없으면 지어내지 않고 그대로 실패시킨다.
      */
-    private void insertSupportQuestItems(
+    private CoreItemInventory insertSupportQuestItems(
             Set<Integer> finalItems,
-            Set<Integer> ownedCoreItems,
-            List<Integer> purchaseOrder,
-            Map<Integer, Long> acquiredAt,
+            CoreItemInventory inventory,
             Long supportQuestCompletedAt
     ) {
         if (supportQuestCompletedAt == null) {
-            return;
+            return inventory;
         }
         List<Integer> missingQuestItems = finalItems.stream()
-                .filter(itemId -> !ownedCoreItems.contains(itemId))
+                .filter(itemId -> !inventory.owns(itemId))
                 .filter(SUPPORT_QUEST_FINAL_ITEMS::contains)
                 .sorted()
                 .toList();
 
+        CoreItemInventory result = inventory;
         for (Integer questItem : missingQuestItems) {
-            purchaseOrder.add(insertIndexFor(purchaseOrder, acquiredAt, supportQuestCompletedAt), questItem);
-            acquiredAt.put(questItem, supportQuestCompletedAt);
-            ownedCoreItems.add(questItem);
+            result = result.acquiredWithoutEvent(questItem, supportQuestCompletedAt);
         }
+        return result;
     }
 
-    private int insertIndexFor(List<Integer> purchaseOrder, Map<Integer, Long> acquiredAt, long timestamp) {
-        for (int index = 0; index < purchaseOrder.size(); index++) {
-            Long itemAcquiredAt = acquiredAt.get(purchaseOrder.get(index));
-            if (itemAcquiredAt != null && itemAcquiredAt > timestamp) {
-                return index;
+    private boolean isSupportQuestCompletion(MatchTimelineResponse.Event event) {
+        return ITEM_DESTROYED.equals(event.type()) && Objects.equals(event.itemId(), SUPPORT_QUEST_TIER3_ITEM);
+    }
+
+    /** 한 선수의 기록을 끝까지 따라간 결과. 최종 Core의 구매 순서와 그때의 보유를 함께 담는다. */
+    private record Replay(List<Integer> purchaseOrder, CoreItemInventory inventory, boolean allCoreChangesTimed) {
+
+        private Optional<List<CoreItemAcquisition>> acquisitions() {
+            List<CoreItemAcquisition> acquisitions = new ArrayList<>();
+            for (int itemId : purchaseOrder) {
+                Optional<Long> acquiredAt = inventory.acquiredAt(itemId);
+                if (acquiredAt.isEmpty()) {
+                    return Optional.empty();
+                }
+                acquisitions.add(new CoreItemAcquisition(itemId, acquiredAt.get()));
             }
+            return Optional.of(acquisitions);
         }
-        return purchaseOrder.size();
-    }
-
-    private void addItem(
-            Integer itemId,
-            Set<Integer> coreItems,
-            Set<Integer> ownedCoreItems,
-            List<Integer> purchaseOrder,
-            Map<Integer, Long> acquiredAt,
-            Long timestamp
-    ) {
-        if (itemId == null || !coreItems.contains(itemId) || !ownedCoreItems.add(itemId)) {
-            return;
-        }
-        purchaseOrder.add(itemId);
-        if (timestamp != null) {
-            acquiredAt.put(itemId, timestamp);
-        }
-    }
-
-    private void removeItem(
-            Integer itemId,
-            Set<Integer> coreItems,
-            Set<Integer> ownedCoreItems,
-            List<Integer> purchaseOrder
-    ) {
-        if (itemId == null || !coreItems.contains(itemId) || !ownedCoreItems.remove(itemId)) {
-            return;
-        }
-        purchaseOrder.remove(itemId);
     }
 
     private record IndexedEvent(MatchTimelineResponse.Event event, int sequence) {
