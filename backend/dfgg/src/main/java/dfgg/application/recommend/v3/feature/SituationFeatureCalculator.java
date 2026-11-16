@@ -1,6 +1,7 @@
 package dfgg.application.recommend.v3.feature;
 
 import dfgg.application.recommend.v3.GameSituation;
+import dfgg.application.recommend.v3.MyState;
 import dfgg.application.recommend.v3.PlayerState;
 import dfgg.application.recommend.v3.RecommendationQuery;
 import dfgg.domain.champion.ChampionTag;
@@ -31,7 +32,10 @@ public class SituationFeatureCalculator {
         }
         return new SituationFeatures(
                 enemyItems(situation.enemies(), items),
-                enemyKills(situation.enemies(), championTags)
+                enemyKills(situation.enemies(), championTags),
+                laneOpponent(query, situation, items),
+                myState(situation.me(), situation.enemies()),
+                teamState(query, situation, items)
         );
     }
 
@@ -79,6 +83,79 @@ public class SituationFeatureCalculator {
                 .mapToInt(PlayerState::kills)
                 .max()
                 .orElse(0);
+    }
+
+    private LaneOpponentFeatures laneOpponent(
+            RecommendationQuery query,
+            GameSituation.Known situation,
+            Map<Long, Item> items
+    ) {
+        List<PlayerState> opponents = situation.enemies().stream()
+                .filter(enemy -> enemy.playsAt(query.position()))
+                .toList();
+        if (opponents.size() != 1) {
+            return LaneOpponentFeatures.unknown();
+        }
+        PlayerState opponent = opponents.get(0);
+        return new LaneOpponentFeatures(
+                situation.me().level() - opponent.level(),
+                opponent.kills(),
+                coreGoldSum(query.purchasedItemIds(), items) - coreGoldSum(opponent.coreItemIds(), items)
+        );
+    }
+
+    private MyStateFeatures myState(MyState me, List<PlayerState> enemies) {
+        return new MyStateFeatures(
+                me.level() - averageLevel(enemies),
+                me.kills(),
+                me.deaths(),
+                me.assists()
+        );
+    }
+
+    /** 우리 팀은 나와 아군이다. 내 Core는 요청의 {@code purchasedItemIds}에서 읽는다. */
+    private TeamStateFeatures teamState(
+            RecommendationQuery query,
+            GameSituation.Known situation,
+            Map<Long, Item> items
+    ) {
+        MyState me = situation.me();
+        List<PlayerState> allies = situation.allies();
+        List<PlayerState> enemies = situation.enemies();
+        double myTeamCoreGold = coreGoldSum(query.purchasedItemIds(), items)
+                + coreGoldSum(coreItemIdsOf(allies), items);
+        return new TeamStateFeatures(
+                me.kills() + killSum(allies) - killSum(enemies),
+                me.assists() + assistSum(allies) - assistSum(enemies),
+                myTeamAverageLevel(me, allies) - averageLevel(enemies),
+                myTeamCoreGold - coreGoldSum(coreItemIdsOf(enemies), items)
+        );
+    }
+
+    private double assistSum(List<PlayerState> players) {
+        return players.stream()
+                .mapToInt(PlayerState::assists)
+                .sum();
+    }
+
+    /** 우리 팀에는 내가 늘 있어 평균을 낼 선수가 없는 경우가 없다. */
+    private double myTeamAverageLevel(MyState me, List<PlayerState> allies) {
+        double levelSum = me.level() + allies.stream()
+                .mapToInt(PlayerState::level)
+                .sum();
+        return levelSum / (allies.size() + 1);
+    }
+
+    /** 실린 선수 수로 나눈다. 평균을 낼 선수가 없으면 비운다. */
+    private double averageLevel(List<PlayerState> players) {
+        return players.stream()
+                .mapToInt(PlayerState::level)
+                .average()
+                .orElse(Double.NaN);
+    }
+
+    private double coreGoldSum(List<Long> coreItemIds, Map<Long, Item> items) {
+        return goldSum(pricedItems(coreItemIds, items));
     }
 
     private List<Long> coreItemIdsOf(List<PlayerState> players) {
