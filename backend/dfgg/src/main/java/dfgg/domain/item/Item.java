@@ -7,6 +7,7 @@ import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -113,5 +114,17 @@ public class Item {
 
     public boolean hasTag(String tag) {
         return tags.contains(tag);
+    }
+
+    /** 완성하는 데 드는 총가격. 가격 정보가 없는 아이템은 없다고 답한다. */
+    public OptionalInt totalGold() {
+        if (gold == null) {
+            return OptionalInt.empty();
+        }
+        Integer total = gold.get("total");
+        if (total == null) {
+            return OptionalInt.empty();
+        }
+        return OptionalInt.of(total);
     }
 }

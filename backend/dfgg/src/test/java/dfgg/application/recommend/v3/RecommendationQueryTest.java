@@ -104,4 +104,45 @@ class RecommendationQueryTest {
                 "EMERALD", "16.17", Set.of(6673L, 3031L)
         )).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("상황 없이 만든 query의 상황은 모름이다 — 상황을 보내지 않는 요청이 그대로 동작한다")
+    void construct_WhenSituationNotGiven_SituationIsUnknown() {
+        // when
+        RecommendationQuery query = queryWith(List.of());
+
+        // then
+        assertThat(query.situation().isUnknown()).isTrue();
+    }
+
+    @Test
+    @DisplayName("상황을 넘겨 만든 query는 그 상황을 그대로 갖는다")
+    void construct_WhenSituationGiven_KeepsSituation() {
+        // given
+        GameSituation situation = GameSituation.of(
+                new MyState(9, 3, 1, 4),
+                List.of(new PlayerState(222L, ChampionPosition.BOTTOM, 8, 2, 1, List.of(3031L))),
+                List.of(new PlayerState(103L, ChampionPosition.MID, 10, 5, 2, List.of(3089L))));
+
+        // when
+        RecommendationQuery query = new RecommendationQuery(
+                157L, ChampionPosition.MID, List.of(),
+                List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
+                "EMERALD", "16.17", Set.of(6673L, 3031L), situation
+        );
+
+        // then
+        assertThat(query.situation()).isEqualTo(situation);
+    }
+
+    @Test
+    @DisplayName("상황 자리에 null을 넘기면 거부한다 — 모름은 null이 아니라 모름으로 싣는다")
+    void construct_WhenSituationIsNull_ThrowsException() {
+        // when & then
+        assertThatThrownBy(() -> new RecommendationQuery(
+                157L, ChampionPosition.MID, List.of(),
+                List.of(222L, 412L, 64L, 516L), List.of(33L, 103L, 51L, 89L, 60L),
+                "EMERALD", "16.17", Set.of(6673L, 3031L), null
+        )).isInstanceOf(NullPointerException.class);
+    }
 }
