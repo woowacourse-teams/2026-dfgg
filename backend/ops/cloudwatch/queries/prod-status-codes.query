@@ -1,0 +1,7 @@
+# dfgg/prod 5. 상태코드별
+# 로그 그룹: /dfgg/prod
+fields @timestamp, message
+| filter @logStream like "app-" and logger_name = "dfgg.common.logging.RequestLoggingFilter" and message like "duration_ms="
+| parse message "method=* uri=* status=* duration_ms=*" as method, uri, status, duration_ms
+| stats count(*) as requests by status
+| sort status asc

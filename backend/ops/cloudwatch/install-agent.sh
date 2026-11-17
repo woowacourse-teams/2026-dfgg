@@ -45,6 +45,12 @@ else
   echo "== 이미 설치돼 있다. 설정만 갱신한다 =="
 fi
 
+# 앱 로그는 JSON 한 줄(@timestamp가 맨 앞)이다. 템플릿은 JSON이라 주석을 못 달아 이유를 여기 둔다.
+# - timestamp_format에 시간대를 넣지 않는다. Agent의 %z는 +0900만 읽고 앱은 +09:00을 쓴다.
+#   컨테이너(TZ=Asia/Seoul)와 서버 시간대가 같으므로 Local로 읽는다.
+# - multi_line_start_pattern은 '{'로 시작하는 JSON 줄과 날짜로 시작하는 옛 텍스트 줄을 모두 새 이벤트로 본다.
+#   JSON 전환 배포 직전에 적용해도 남아 있는 텍스트 줄이 한 이벤트로 합쳐지지 않는다.
+#   텍스트 줄은 시각 형식이 맞지 않아 수집 시각으로 들어간다.
 echo "== 설정 적용 (환경: $ENV_NAME) =="
 sed -e "s/__ENV__/$ENV_NAME/g" -e "s/__RETENTION__/$RETENTION/g" -e "s#__LOG_DIR__#$LOG_DIR#g" "$TEMPLATE" | sudo -n tee "$AGENT_CONFIG" > /dev/null
 sudo -n "$CTL" -a fetch-config -m ec2 -s -c "file:$AGENT_CONFIG"

@@ -1305,7 +1305,7 @@
         "x": 0,
         "y": 58
       },
-      "description": "지표에서 이상을 보면 시간 범위를 좁힌다. 이 패널도 같은 범위를 따라온다.\n레벨은 원문 정규식으로 잡는다 — parse로 만든 필드에 filter를 걸면 결과가 빈다(실측).",
+      "description": "지표에서 이상을 보면 시간 범위를 좁힌다. 이 패널도 같은 범위를 따라온다.\n앱 로그는 JSON이라 level·traceId 같은 필드를 parse 없이 바로 거른다. JSON 전환 전의 텍스트 줄은 나오지 않는다.",
       "options": {
         "showTime": true,
         "wrapLogMessage": true,
@@ -1326,7 +1326,7 @@
               "name": "/dfgg/$env"
             }
           ],
-          "expression": "fields @timestamp, @message\n| filter @logStream like \"app-\"\n  and @message =~ /^\\d{4}-\\d{2}-\\d{2} \\S+ (WARN|ERROR) /\n| parse @message /^\\S+ \\S+ (?<level>WARN|ERROR)\\s+\\[(?<slot>[^\\]]*)\\] \\[[^\\]]*\\] (?<logger>\\S+) traceId=(?<traceId>\\S+) - (?<msg>.*)/\n| fields concat(level, \" [\", slot, \"] \", logger, \" - \", msg) as line\n| display @timestamp, line, level, traceId\n| sort @timestamp desc\n| limit 100"
+          "expression": "fields @timestamp, level, slot, logger_name, message, traceId, installId\n| filter @logStream like \"app-\" and level in [\"WARN\", \"ERROR\"]\n| fields concat(level, \" [\", slot, \"] \", logger_name, \" - \", message) as line\n| display @timestamp, line, level, traceId, installId\n| sort @timestamp desc\n| limit 100"
         }
       ]
     }

@@ -171,8 +171,14 @@ logging:
       max-history: 30
       total-size-cap: 1GB
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [${DFGG_SLOT:local}] [%thread] %logger{36} traceId=%X{traceId:-none} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [${DFGG_SLOT:local}] [%thread] %logger{36} traceId=%X{traceId:-none} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [${DFGG_SLOT:local}] [%thread] %logger{36} traceId=%X{traceId:-none} installId=%X{installId:-none} - %msg%n"
+  # 파일은 서버에서만 만들어진다. CloudWatch·Grafana가 parse 없이 필드로 거르도록 JSON으로 남긴다.
+  structured:
+    format:
+      file: logstash
+    json:
+      add:
+        slot: "${DFGG_SLOT:local}"
   slow-request-threshold-millis: "${LOGGING_SLOW_REQUEST_THRESHOLD_MILLIS:1000}"
 
 assets:

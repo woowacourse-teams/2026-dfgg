@@ -1,0 +1,6 @@
+# dfgg/prod 3. 요청 최신순
+# 로그 그룹: /dfgg/prod
+fields @timestamp, level, slot, traceId, installId, message
+| filter @logStream like "app-" and logger_name = "dfgg.common.logging.RequestLoggingFilter"
+| sort @timestamp desc
+| limit 200
