@@ -88,7 +88,7 @@ def make_value_inputs():
     dataset = Dataset(
         features=np.zeros((8, 1)), labels=np.array([3, 0, 3, 0, 0, 3, 0, 3]), group=np.array([2, 2, 2, 2]),
         qids=["q0", "q1", "q2", "q3"], feature_names=["f"], schema_fingerprint="abc")
-    meta = QueryMeta(qids=dataset.qids, match_ids=["A", "B", "C", "D"], win=np.array([1.0, 1.0, 0.0, 0.0]),
+    meta = QueryMeta(qids=dataset.qids, match_ids=["A", "B", "C", "D"], patches=["16.22"] * 4, win=np.array([1.0, 1.0, 0.0, 0.0]),
                      purchase_minute=np.full(4, np.nan), team_gold_diff=np.full(4, np.nan),
                      own_total_gold=np.full(4, np.nan))
     first = np.array([1.0, 0.0] * 4)

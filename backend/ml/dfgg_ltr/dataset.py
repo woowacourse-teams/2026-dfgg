@@ -127,6 +127,7 @@ class QueryMeta:
 
     qids: list[str]
     match_ids: list[str]
+    patches: list[str]
     win: np.ndarray
     purchase_minute: np.ndarray
     team_gold_diff: np.ndarray
@@ -151,6 +152,7 @@ def load_query_meta(data_path: Path, split: str, subset: str) -> QueryMeta:
     return QueryMeta(
         qids=list(first_rows.keys()),
         match_ids=[row["match_id"] for row in rows],
+        patches=[row["patch"] for row in rows],
         win=_meta_column(rows, "win"),
         purchase_minute=_meta_column(rows, "purchase_minute"),
         team_gold_diff=_meta_column(rows, "team_gold_diff"),
