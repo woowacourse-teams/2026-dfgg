@@ -34,6 +34,21 @@ class ReasonGroupTest {
     }
 
     @Test
+    @DisplayName("기준 계약 뒤에 더한 게임 상황 feature는 모두 게임 상황 그룹으로 간다")
+    void of_WhenFeatureIsAfterBaseline_ReturnsGameSituation() {
+        // given
+        int baselineCount = FeatureName.baselineExportNames().size();
+
+        // when
+        var groups = Arrays.stream(FeatureName.values())
+                .skip(baselineCount)
+                .map(ReasonGroup::of);
+
+        // then
+        assertThat(groups).isNotEmpty().containsOnly(ReasonGroup.GAME_SITUATION);
+    }
+
+    @Test
     @DisplayName("generator가 찾았다는 표시는 그 generator의 그룹으로 간다")
     void sourceFlags_GoToTheirOwnGroup() {
         assertThat(ReasonGroup.of(FeatureName.SOURCE_COUNTER)).isEqualTo(ReasonGroup.COUNTER);

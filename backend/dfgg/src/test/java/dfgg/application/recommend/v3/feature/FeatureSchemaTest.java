@@ -58,6 +58,26 @@ class FeatureSchemaTest {
     }
 
     @Test
+    @DisplayName("게임 상황 feature 20개는 기준 계약 바로 뒤에 온다 — 이 순서가 새 모델의 칸 번호다")
+    void exportNames_WhenReadAfterBaseline_ListsSituationFeaturesInOrder() {
+        // given
+        int baselineCount = FeatureName.baselineExportNames().size();
+
+        // when
+        var appended = FeatureName.exportNames().subList(baselineCount, FeatureName.values().length);
+
+        // then
+        assertThat(appended).containsExactly(
+                "enemy_core_gold_sum", "enemy_spell_damage_gold_share",
+                "enemy_armor_gold_share", "enemy_spell_block_gold_share",
+                "enemy_kill_sum", "enemy_mage_kill_share", "enemy_assassin_kill_share",
+                "enemy_marksman_kill_share", "enemy_top_killer_kill_share",
+                "lane_level_lead", "lane_opponent_kills", "lane_core_gold_lead",
+                "my_level_lead", "my_kills", "my_deaths", "my_assists",
+                "team_kill_lead", "team_assist_lead", "team_level_lead", "team_core_gold_lead");
+    }
+
+    @Test
     @DisplayName("이름은 소문자 스네이크케이스로 내보낸다 — LightGBM feature_names와 그대로 대응한다")
     void featureNames_AreExportedAsSnakeCase() {
         assertThat(FeatureName.SOURCE_BUILD.exportName()).isEqualTo("source_build");

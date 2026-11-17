@@ -100,6 +100,38 @@ public enum FeatureName {
     POSITION_BOTTOM,
     POSITION_SUPPORT,
     TIER_ORDINAL,
+
+    // ═══ 여기까지가 기준 계약이다. 지금 운영 모델은 위 feature만 읽는다 (baselineExportNames) ═══
+
+    // ─── Game Situation: 상대의 아이템 — "상대가 무엇을 들고 있는가" ─────────
+    ENEMY_CORE_GOLD_SUM,
+    ENEMY_SPELL_DAMAGE_GOLD_SHARE,
+    ENEMY_ARMOR_GOLD_SHARE,
+    ENEMY_SPELL_BLOCK_GOLD_SHARE,
+
+    // ─── Game Situation: 상대 중 누가 컸나 ──────────────────────────────────
+    ENEMY_KILL_SUM,
+    ENEMY_MAGE_KILL_SHARE,
+    ENEMY_ASSASSIN_KILL_SHARE,
+    ENEMY_MARKSMAN_KILL_SHARE,
+    ENEMY_TOP_KILLER_KILL_SHARE,
+
+    // ─── Game Situation: 맞라인 ────────────────────────────────────────────
+    LANE_LEVEL_LEAD,
+    LANE_OPPONENT_KILLS,
+    LANE_CORE_GOLD_LEAD,
+
+    // ─── Game Situation: 내 상태 ───────────────────────────────────────────
+    MY_LEVEL_LEAD,
+    MY_KILLS,
+    MY_DEATHS,
+    MY_ASSISTS,
+
+    // ─── Game Situation: 팀 상태 ───────────────────────────────────────────
+    TEAM_KILL_LEAD,
+    TEAM_ASSIST_LEAD,
+    TEAM_LEVEL_LEAD,
+    TEAM_CORE_GOLD_LEAD,
     ;
 
     public int index() {

@@ -45,6 +45,26 @@ class TreeShapCalculatorTest {
     }
 
     @Test
+    @DisplayName("스키마가 늘어 계산기의 칸이 많아져도 앞 칸의 기여도는 그대로이고 모델이 읽지 않는 칸은 0이다")
+    void contributions_WhenCalculatorIsWiderThanTheModelsFeatures_KeepsLeadingValuesAndZerosTheRest() {
+        // given: 모델은 첫 칸만 읽는다. 운영에서는 지금 스키마 전체 크기로 계산기를 만든다
+        GradientBoostedTrees model = new GradientBoostedTrees(List.of(evenSplitOnFirstFeature()));
+        TreeShapCalculator narrow = new TreeShapCalculator(model, 3);
+        TreeShapCalculator wide = new TreeShapCalculator(model, 5);
+
+        // when
+        FeatureContributions narrowContributions = narrow.contributions(new double[]{0.9, 0.1, 0.2});
+        FeatureContributions wideContributions = wide.contributions(new double[]{0.9, 0.1, 0.2, 123.0, Double.NaN});
+
+        // then
+        assertThat(wideContributions.baseValue()).isEqualTo(narrowContributions.baseValue());
+        assertThat(wideContributions.values()).hasSize(5);
+        assertThat(java.util.Arrays.copyOf(wideContributions.values(), 3)).containsExactly(narrowContributions.values());
+        assertThat(wideContributions.values()[3]).isZero();
+        assertThat(wideContributions.values()[4]).isZero();
+    }
+
+    @Test
     @DisplayName("기준값은 잎 값을 cover로 가중평균한 값이다 — 입력과 무관하다")
     void baseValue_IsTheCoverWeightedMeanOfLeaves_AndDoesNotDependOnInput() {
         TreeShapCalculator calculator = calculatorOf(evenSplitOnFirstFeature());

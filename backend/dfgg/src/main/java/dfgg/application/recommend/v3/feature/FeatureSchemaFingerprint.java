@@ -8,7 +8,7 @@ package dfgg.application.recommend.v3.feature;
  */
 public final class FeatureSchemaFingerprint {
 
-    public static final String EXPECTED = "84a57f48a9e3d5f2";
+    public static final String EXPECTED = "50714dac4aca299c";
 
     /**
      * 기준 계약({@link FeatureName#baselineExportNames()})의 지문. 지금 운영 모델이 이 계약으로 학습됐다.
