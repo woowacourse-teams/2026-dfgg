@@ -115,3 +115,55 @@ def baseline_view(dataset: Dataset) -> Dataset:
         feature_names=dataset.feature_names[:count],
         schema_fingerprint=dataset.baseline_schema_fingerprint,
     )
+
+
+@dataclass(frozen=True)
+class QueryMeta:
+    """query별 승패·상황 메타 값. feature가 아니라 승률 지표(V)와 행동 모델만 쓴다.
+
+    순서는 같은 인자로 부른 `load_dataset`의 `qids`와 같다(파일에서 처음 나온 순서).
+    모르는 값은 NaN이다.
+    """
+
+    qids: list[str]
+    match_ids: list[str]
+    win: np.ndarray
+    purchase_minute: np.ndarray
+    team_gold_diff: np.ndarray
+    own_total_gold: np.ndarray
+
+
+def load_query_meta(data_path: Path, split: str, subset: str) -> QueryMeta:
+    if split not in VALID_SPLITS:
+        raise ValueError(f"split은 {VALID_SPLITS} 중 하나여야 합니다: {split}")
+    if subset not in VALID_SUBSETS:
+        raise ValueError(f"subset은 {VALID_SUBSETS} 중 하나여야 합니다: {subset}")
+    split_field = f"split_{split}"
+
+    first_rows: dict[str, dict] = {}
+    with Path(data_path).open(encoding="utf-8") as source:
+        for line in source:
+            row = json.loads(line)
+            if row[split_field] == subset and row["qid"] not in first_rows:
+                first_rows[row["qid"]] = row
+
+    rows = list(first_rows.values())
+    return QueryMeta(
+        qids=list(first_rows.keys()),
+        match_ids=[row["match_id"] for row in rows],
+        win=_meta_column(rows, "win"),
+        purchase_minute=_meta_column(rows, "purchase_minute"),
+        team_gold_diff=_meta_column(rows, "team_gold_diff"),
+        own_total_gold=_meta_column(rows, "own_total_gold"),
+    )
+
+
+def _meta_column(rows: list[dict], name: str) -> np.ndarray:
+    """칸이 없거나(C1 이전 export) null이면 NaN."""
+    return np.asarray([_nan_if_none(row.get(name)) for row in rows], dtype=np.float64)
+
+
+def _nan_if_none(value) -> float:
+    if value is None:
+        return np.nan
+    return float(value)
