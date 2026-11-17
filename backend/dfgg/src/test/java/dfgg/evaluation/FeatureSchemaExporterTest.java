@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.recommend.v3.feature.FeatureName;
+import dfgg.application.recommend.v3.feature.FeatureSchemaFingerprint;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -81,6 +82,19 @@ class FeatureSchemaExporterTest {
                 : dfgg.application.recommend.v3.feature.ReasonGroup.values()) {
             assertThat(json).contains(group.name());
         }
+    }
+
+    @Test
+    @DisplayName("기준 계약의 칸 수와 지문을 함께 내보낸다 — Python이 기준 모델을 내보낼 때 지문을 따로 계산하지 않는다")
+    void export_WhenCalled_WritesBaselineContract(@TempDir Path directory) throws IOException {
+        // when
+        JsonNode schema = exportAndRead(directory);
+
+        // then
+        assertThat(schema.get("baseline_feature_count").asInt())
+                .isEqualTo(FeatureName.baselineExportNames().size());
+        assertThat(schema.get("baseline_schema_fingerprint").asText())
+                .isEqualTo(FeatureSchemaFingerprint.BASELINE);
     }
 
     @Test

@@ -7,6 +7,7 @@ import dfgg.application.itemstats.ItemStatsAggregationResult;
 import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.item.ItemService;
 import dfgg.application.match.CoreItemPurchaseOrderCalculator;
+import dfgg.application.match.MatchStateTimelineReader;
 import dfgg.application.recommend.v3.CandidateGenerator;
 import dfgg.application.recommend.v3.CandidateTopK;
 import dfgg.application.recommend.v3.CandidateUnion;
@@ -18,6 +19,7 @@ import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.item.Item;
 import dfgg.domain.itemstats.ChampionItemStats;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
+import dfgg.domain.match.CoreItemAcquisition;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import dfgg.domain.match.RawMatchTimeline;
@@ -34,6 +36,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -90,6 +93,8 @@ class TrainingSetExportTest {
     @Autowired
     private CoreItemPurchaseOrderCalculator purchaseOrderCalculator;
     @Autowired
+    private MatchStateTimelineReader matchStateTimelineReader;
+    @Autowired
     private ObjectMapper objectMapper;
 
     /** 집계·서빙과 같은 범위를 본다. 학습 데이터만 다른 티어를 보면 train/serve가 어긋난다. */
@@ -102,10 +107,13 @@ class TrainingSetExportTest {
     private SnapshotQueryBuilder snapshotQueryBuilder;
     private ParticipantSampler participantSampler;
     private PurchaseSituationReader situationReader;
+    private SnapshotTimelineReader snapshotTimelineReader;
 
     @BeforeEach
     void prepareSampler() {
         snapshotQueryBuilder = new SnapshotQueryBuilder(itemService.findCoreItemIds());
+        snapshotTimelineReader = new SnapshotTimelineReader(
+                matchStateTimelineReader, purchaseOrderCalculator, objectMapper, itemService.findCoreItemIds());
         participantSampler = new ParticipantSampler(tierScope);
         situationReader = new PurchaseSituationReader(
                 objectMapper, purchaseOrderCalculator, itemService.findCoreItemIds());
@@ -143,6 +151,8 @@ class TrainingSetExportTest {
         Files.createDirectories(outputPath.toAbsolutePath().getParent());
         // Python은 JSONL만으로는 각 feature 칸이 무엇인지 알 수 없다. 스키마를 함께 내보낸다.
         new FeatureSchemaExporter().export(outputPath.toAbsolutePath().getParent());
+        // 학습 줄에는 아이템 번호만 있다. 평가가 "마법 저항 Core" 같은 아이템을 태그로 고를 수 있게 함께 내보낸다.
+        new ItemCatalogExporter().export(outputPath.toAbsolutePath().getParent(), itemById.values());
 
         ExportStats stats = new ExportStats();
         long startedAt = System.currentTimeMillis();
@@ -192,22 +202,34 @@ class TrainingSetExportTest {
             Map<Long, Item> itemById, String latestPatch
     ) {
         List<NormalizedMatchParticipant> matchParticipants = participantRepository.findByMatchId(matchId);
-        // 승률 지표의 상황 값(구매 시각·골드). 타임라인이 없는 DB면 모두 null로 나간다.
+        // 타임라인 원본은 경기당 한 번만 읽는다. 승률 지표의 상황 값(구매 시각·골드)과
+        // 게임 상황 feature(구매 직전의 10명 상태)가 같이 쓴다. 타임라인이 없는 DB면 둘 다 비어 나간다.
+        long timelineStartedAt = System.nanoTime();
         String rawTimeline = rawMatchTimelineRepository.findById(matchId)
                 .map(RawMatchTimeline::getRawData)
                 .orElse(null);
+        SnapshotTimelineReader.SnapshotTimelines timelines = snapshotTimelineReader.read(rawTimeline);
+        stats.timelineNanos += System.nanoTime() - timelineStartedAt;
         int used = 0;
         for (NormalizedMatchParticipant participant
                 : participantSampler.sample(matchParticipants, matchId, matchParticipants.size())) {
             if (used >= PARTICIPANTS_PER_MATCH) {
                 return;
             }
-            List<SnapshotQuery> snapshots = snapshotQueryBuilder.build(
-                    matchParticipants, participant.getPuuid(), participant.getPatch());
+            // 스냅샷마다 그 Core를 산 시각 직전의 게임 상황을 싣는다. 만들 수 없으면 상황만 "모름"이고 스냅샷은 그대로다.
+            Optional<List<CoreItemAcquisition>> acquisitions = timelines.acquisitionsOf(participant);
+            List<SnapshotQuery> snapshots = snapshotQueryBuilder.buildWithSituation(
+                    matchParticipants, participant.getPuuid(), participant.getPatch(),
+                    timelines.states(), acquisitions);
             if (snapshots.isEmpty()) {
                 continue;
             }
             used++;
+            stats.countGameSituation(timelines, acquisitions, snapshots);
+            if (acquisitions.isPresent()) {
+                stats.countHeldCoreMismatches(snapshots,
+                        timelines.countHeldCoreMismatches(participant, acquisitions.get(), snapshots));
+            }
             Map<Long, Double> baseRates = baseRatesOf(participant);
             List<PurchaseSituation> situations = situationReader.read(rawTimeline, participant, matchParticipants);
             for (SnapshotQuery snapshot : snapshots) {
@@ -263,6 +285,9 @@ class TrainingSetExportTest {
         }
         stats.exportedQueries++;
         stats.countSituation(outcome.situation());
+        if (!snapshot.query().situation().isUnknown()) {
+            stats.exportedQueriesWithGameSituation++;
+        }
         stats.rowsWithGroundTruth++;
         stats.countCoverage(snapshot.query().position(), snapshot.query().myChampionId(),
                 snapshot.query().patch(), snapshot.query().tier());
@@ -305,11 +330,51 @@ class TrainingSetExportTest {
         private int queriesWithPurchaseMinute;
         private int queriesWithTeamGoldDiff;
         private int queriesWithOwnTotalGold;
+        private int exportedQueriesWithGameSituation;
+        private long gameSituationSnapshots;
+        private long heldCoreMismatchSnapshots;
+        private long timelineNanos;
+        private final Map<String, Long> gameSituationOutcomes = new LinkedHashMap<>();
         private final Map<Integer, Long> labelCounts = new LinkedHashMap<>();
         private final Map<ChampionPosition, Long> positionCounts = new LinkedHashMap<>();
         private final Map<Long, Long> championCounts = new HashMap<>();
         private final Map<String, Long> patchCounts = new HashMap<>();
         private final Map<String, Long> tierCounts = new HashMap<>();
+
+        /** 스냅샷을 만든 참가자마다, 게임 상황을 만들었는지와 못 만들었다면 왜인지를 센다. */
+        private void countGameSituation(
+                SnapshotTimelineReader.SnapshotTimelines timelines,
+                Optional<List<CoreItemAcquisition>> acquisitions, List<SnapshotQuery> snapshots
+        ) {
+            gameSituationOutcomes.merge(gameSituationOutcomeOf(timelines, acquisitions, snapshots), 1L, Long::sum);
+        }
+
+        private String gameSituationOutcomeOf(
+                SnapshotTimelineReader.SnapshotTimelines timelines,
+                Optional<List<CoreItemAcquisition>> acquisitions, List<SnapshotQuery> snapshots
+        ) {
+            if (!snapshots.getFirst().query().situation().isUnknown()) {
+                return "상황을 만듦";
+            }
+            if (!timelines.found()) {
+                return "모름: 타임라인 원본 없음";
+            }
+            if (timelines.states().isEmpty()) {
+                return "모름: 상태 기록을 만들지 못함(시각이나 참가자 번호가 빠진 기록)";
+            }
+            if (acquisitions.isEmpty()) {
+                return "모름: Core를 얻은 시각을 알 수 없음";
+            }
+            return "모름: 다시 계산한 구매 순서가 저장된 순서와 다름";
+        }
+
+        /** 게임 상황을 만든 스냅샷 중, 그 시각의 내 실제 Core 보유가 구매 이력과 다른 것을 센다(샀다가 판 Core). */
+        private void countHeldCoreMismatches(List<SnapshotQuery> snapshots, long mismatches) {
+            gameSituationSnapshots += snapshots.stream()
+                    .filter(snapshot -> !snapshot.query().situation().isUnknown())
+                    .count();
+            heldCoreMismatchSnapshots += mismatches;
+        }
 
         private void countSituation(PurchaseSituation situation) {
             queriesWithPurchaseMinute += presence(situation.purchaseMinute());
@@ -364,6 +429,28 @@ class TrainingSetExportTest {
             report.append("| 처리 속도 | ")
                     .append(String.format("%.1f query/s", 1000.0 * exportedQueries / Math.max(durationMillis, 1)))
                     .append(" |\n\n");
+
+            report.append("## 게임 상황 feature (구매 직전의 10명 상태)\n\n| 항목 | 값 |\n|---|---|\n");
+            report.append("| 내보낸 query 중 게임 상황이 있는 것 | ").append(exportedQueriesWithGameSituation).append(" (")
+                    .append(String.format("%.1f%%", 100.0 * exportedQueriesWithGameSituation / Math.max(exportedQueries, 1)))
+                    .append(") |\n");
+            report.append("| 타임라인 읽기에 쓴 시간 | ").append(timelineNanos / 1_000_000_000L).append("초 |\n");
+            // 내 Core는 구매 이력(끝까지 남은 Core)에서, 다른 선수의 Core는 그 시각의 실제 보유에서 읽는다.
+            // 내가 샀다가 판 Core가 있으면 그 사이의 스냅샷에서 내 Core 가격이 적게 잡힌다. 그 크기다.
+            report.append("| 게임 상황을 만든 스냅샷 중 내 실제 Core 보유가 구매 이력과 다른 것 | ")
+                    .append(heldCoreMismatchSnapshots).append(" / ").append(gameSituationSnapshots).append(" (")
+                    .append(String.format("%.1f%%", 100.0 * heldCoreMismatchSnapshots / Math.max(gameSituationSnapshots, 1)))
+                    .append(") |\n\n");
+            long gameSituationParticipants = gameSituationOutcomes.values().stream().mapToLong(Long::longValue).sum();
+            report.append("스냅샷을 만든 참가자 ").append(gameSituationParticipants).append("명의 결과:\n\n");
+            report.append("| 결과 | 참가자 | 비중 |\n|---|---|---|\n");
+            gameSituationOutcomes.entrySet().stream()
+                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                    .forEach(entry -> report.append("| ").append(entry.getKey()).append(" | ")
+                            .append(entry.getValue()).append(" | ")
+                            .append(String.format("%.1f%%", 100.0 * entry.getValue() / Math.max(gameSituationParticipants, 1)))
+                            .append(" |\n"));
+            report.append("\n");
 
             report.append("## 라벨 분포\n\n| 등급 | 의미 | 행 수 | 비중 |\n|---|---|---|---|\n");
             Map<Integer, String> meanings = Map.of(

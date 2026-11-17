@@ -2,9 +2,14 @@ package dfgg.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dfgg.application.recommend.v3.GameSituation;
 import dfgg.domain.champion.ChampionPosition;
+import dfgg.domain.match.CoreItemAcquisition;
+import dfgg.domain.match.CoreItemChange;
+import dfgg.domain.match.MatchStateTimeline;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -143,5 +148,157 @@ class SnapshotQueryBuilderTest {
 
         // when & then
         assertThat(builder.build(matchParticipants, "me", "16.17")).isEmpty();
+    }
+
+    // ─── 구매 시점의 상황 채우기 ────────────────────────────────────────────
+
+    private static final long FIRST_CORE_AT = 600_000L;
+    private static final long SECOND_CORE_AT = 1_200_000L;
+
+    private NormalizedMatchParticipant numbered(
+            String puuid, int participantId, int championId, int teamId, String position, List<Integer> order
+    ) {
+        return new NormalizedMatchParticipant(
+                puuid, participantId, championId, teamId, position, "EMERALD", true, order, order, true
+        );
+    }
+
+    /** 나(1번)는 6673, 3031 순으로 샀다. 아군 2번, 상대 6번. */
+    private List<NormalizedMatchParticipant> numberedMatch() {
+        return List.of(
+                numbered("me", 1, 157, 100, "MIDDLE", List.of(6673, 3031)),
+                numbered("ally", 2, 222, 100, "BOTTOM", List.of(3031)),
+                numbered("enemy", 6, 103, 200, "MIDDLE", List.of(3089))
+        );
+    }
+
+    private Optional<List<CoreItemAcquisition>> myAcquisitions() {
+        return Optional.of(List.of(
+                new CoreItemAcquisition(6673, FIRST_CORE_AT), new CoreItemAcquisition(3031, SECOND_CORE_AT)));
+    }
+
+    /**
+     * 첫 Core 전에 내가 한 번 잡았고, 첫 Core와 <b>같은 시각</b>에 한 번 더 잡았다.
+     * 그 뒤 상대가 3089를 사고 나를 한 번 잡았다.
+     */
+    private Optional<MatchStateTimeline> stateTimeline() {
+        return Optional.of(new MatchStateTimeline(List.of(
+                new MatchStateTimeline.Kill(500_000L, 1, 6, List.of()),
+                new MatchStateTimeline.Kill(FIRST_CORE_AT, 1, 6, List.of()),
+                new MatchStateTimeline.CoreItemChanged(700_000L, 6, new CoreItemChange(700_000L, null, 3089)),
+                new MatchStateTimeline.Kill(900_000L, 6, 1, List.of())
+        )));
+    }
+
+    private GameSituation.Known knownSituationOf(SnapshotQuery snapshot) {
+        assertThat(snapshot.query().situation()).isInstanceOf(GameSituation.Known.class);
+        return (GameSituation.Known) snapshot.query().situation();
+    }
+
+    @Test
+    @DisplayName("스냅샷마다 그 Core를 산 시각 직전의 상황을 싣는다 — 구매와 같은 시각의 기록은 넣지 않는다")
+    void buildWithSituation_WhenStateAndPurchaseTimesGiven_FillsSituationJustBeforeEachPurchase() {
+        // when
+        List<SnapshotQuery> snapshots = builder.buildWithSituation(
+                numberedMatch(), "me", "16.17", stateTimeline(), myAcquisitions());
+
+        // then: 첫 Core 직전에는 한 번만 잡은 상태다. 같은 시각의 킬과 그 뒤의 기록은 아직 없다
+        GameSituation.Known beforeFirstCore = knownSituationOf(snapshots.get(0));
+        assertThat(beforeFirstCore.me().kills()).isEqualTo(1);
+        assertThat(beforeFirstCore.me().deaths()).isZero();
+        assertThat(beforeFirstCore.enemies().get(0).coreItemIds()).isEmpty();
+
+        // then: 두 번째 Core 직전에는 그 사이의 기록이 모두 들어 있다
+        GameSituation.Known beforeSecondCore = knownSituationOf(snapshots.get(1));
+        assertThat(beforeSecondCore.me().kills()).isEqualTo(2);
+        assertThat(beforeSecondCore.me().deaths()).isEqualTo(1);
+        assertThat(beforeSecondCore.enemies().get(0).coreItemIds()).containsExactly(3089L);
+    }
+
+    @Test
+    @DisplayName("상황 말고는 기존 스냅샷과 같다 — 표본과 정답이 달라지면 기준 모델과 비교할 수 없다")
+    void buildWithSituation_WhenSituationFilled_KeepsEverythingElseSameAsBuild() {
+        // given
+        List<SnapshotQuery> plain = builder.build(numberedMatch(), "me", "16.17");
+
+        // when
+        List<SnapshotQuery> withSituation = builder.buildWithSituation(
+                numberedMatch(), "me", "16.17", stateTimeline(), myAcquisitions());
+
+        // then
+        assertThat(withSituation).hasSameSizeAs(plain);
+        for (int step = 0; step < plain.size(); step++) {
+            assertThat(withSituation.get(step).purchaseStep()).isEqualTo(plain.get(step).purchaseStep());
+            assertThat(withSituation.get(step).groundTruthItemId()).isEqualTo(plain.get(step).groundTruthItemId());
+            assertThat(withSituation.get(step).matchId()).isEqualTo(plain.get(step).matchId());
+            // 상황만 뺀 요청 전체가 같아야 한다. 값을 옮기다 두 칸이 바뀌면 여기서 잡힌다.
+            var filled = withSituation.get(step).query();
+            var original = plain.get(step).query();
+            assertThat(filled.myChampionId()).isEqualTo(original.myChampionId());
+            assertThat(filled.position()).isEqualTo(original.position());
+            assertThat(filled.purchasedItemIds()).isEqualTo(original.purchasedItemIds());
+            assertThat(filled.allyChampionIds()).isEqualTo(original.allyChampionIds());
+            assertThat(filled.enemyChampionIds()).isEqualTo(original.enemyChampionIds());
+            assertThat(filled.tier()).isEqualTo(original.tier());
+            assertThat(filled.patch()).isEqualTo(original.patch());
+            assertThat(filled.coreItemIds()).isEqualTo(original.coreItemIds());
+            assertThat(filled.situation().isUnknown()).isFalse();
+        }
+    }
+
+    @Test
+    @DisplayName("다시 계산한 구매 목록이 저장된 것보다 짧아도 상황을 모름으로 둔다 — 시각이 없는 스냅샷이 생긴다")
+    void buildWithSituation_WhenRecomputedOrderIsShorterThanStoredOrder_LeavesSituationUnknown() {
+        // given: 저장된 순서는 6673, 3031인데 다시 계산한 것은 6673뿐이다
+        Optional<List<CoreItemAcquisition>> shorter = Optional.of(List.of(
+                new CoreItemAcquisition(6673, FIRST_CORE_AT)));
+
+        // when
+        List<SnapshotQuery> snapshots = builder.buildWithSituation(
+                numberedMatch(), "me", "16.17", stateTimeline(), shorter);
+
+        // then
+        assertThat(snapshots).hasSize(2);
+        assertThat(snapshots).allSatisfy(snapshot -> assertThat(snapshot.query().situation().isUnknown()).isTrue());
+    }
+
+    @Test
+    @DisplayName("다시 계산한 구매 순서가 저장된 순서와 다르면 상황을 모름으로 둔다 — 다른 Core의 시각을 쓰게 된다")
+    void buildWithSituation_WhenRecomputedOrderDiffersFromStoredOrder_LeavesSituationUnknown() {
+        // given: 저장된 순서는 6673, 3031인데 다시 계산한 순서는 3031, 6673이다
+        Optional<List<CoreItemAcquisition>> reordered = Optional.of(List.of(
+                new CoreItemAcquisition(3031, FIRST_CORE_AT), new CoreItemAcquisition(6673, SECOND_CORE_AT)));
+
+        // when
+        List<SnapshotQuery> snapshots = builder.buildWithSituation(
+                numberedMatch(), "me", "16.17", stateTimeline(), reordered);
+
+        // then: 스냅샷은 그대로 나오고 상황만 모름이다
+        assertThat(snapshots).hasSize(2);
+        assertThat(snapshots).allSatisfy(snapshot -> assertThat(snapshot.query().situation().isUnknown()).isTrue());
+    }
+
+    @Test
+    @DisplayName("상태 타임라인을 만들지 못한 경기는 상황을 모름으로 두고 스냅샷은 그대로 낸다")
+    void buildWithSituation_WhenStateTimelineMissing_LeavesSituationUnknown() {
+        // when
+        List<SnapshotQuery> snapshots = builder.buildWithSituation(
+                numberedMatch(), "me", "16.17", Optional.empty(), myAcquisitions());
+
+        // then
+        assertThat(snapshots).hasSize(2);
+        assertThat(snapshots).allSatisfy(snapshot -> assertThat(snapshot.query().situation().isUnknown()).isTrue());
+    }
+
+    @Test
+    @DisplayName("구매 시각을 얻지 못한 참가자는 상황을 모름으로 두고 스냅샷은 그대로 낸다")
+    void buildWithSituation_WhenPurchaseTimesMissing_LeavesSituationUnknown() {
+        // when
+        List<SnapshotQuery> snapshots = builder.buildWithSituation(
+                numberedMatch(), "me", "16.17", stateTimeline(), Optional.empty());
+
+        // then
+        assertThat(snapshots).hasSize(2);
+        assertThat(snapshots).allSatisfy(snapshot -> assertThat(snapshot.query().situation().isUnknown()).isTrue());
     }
 }
