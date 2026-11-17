@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dfgg.application.recommend.v3.feature.FeatureName;
+import dfgg.application.recommend.v3.feature.FeatureSchemaFingerprint;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -118,7 +119,74 @@ class LightGbmModelLoaderTest {
     }
 
     @Test
-    @DisplayName("실제로 커밋된 model.json이 현재 스키마로 로드된다 — 학습/추론 계약의 최종 확인")
+    @DisplayName("기준 계약으로 학습된 모델을 읽는다 — 지금 운영 모델이 이 계약이다")
+    void loadBaseline_WhenModelFollowsBaselineContract_ReturnsUsableModel() {
+        // given
+        String json = modelJson(FeatureSchemaFingerprint.BASELINE, FeatureName.baselineExportNames(), ONE_TREE);
+        double[] features = new double[FeatureName.values().length];
+        features[0] = 0.1;
+
+        // when
+        GradientBoostedTrees model = LightGbmModelLoader.loadBaseline(stream(json));
+
+        // then
+        assertThat(model.predict(features)).isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("기준 모델은 기준 계약 뒤의 칸을 읽지 않는다 — 스키마가 늘어 벡터가 길어져도 점수가 그대로다")
+    void loadBaseline_WhenVectorIsLongerThanBaseline_PredictsTheSameScore() {
+        // given: 기준 계약의 마지막 feature로 갈리는 트리. 그 칸까지는 읽고 그 뒤는 읽지 않아야 한다.
+        int baselineCount = FeatureName.baselineExportNames().size();
+        String splitsOnLastBaselineFeature = """
+                [{"split_feature": [%d], "threshold": [0.5], "default_left": [true],
+                  "left": [-1], "right": [-2], "leaf_value": [1.0, 2.0],
+                  "node_cover": [10.0], "leaf_cover": [6.0, 4.0]}]
+                """.formatted(baselineCount - 1);
+        GradientBoostedTrees model = LightGbmModelLoader.loadBaseline(stream(modelJson(
+                FeatureSchemaFingerprint.BASELINE, FeatureName.baselineExportNames(), splitsOnLastBaselineFeature)));
+
+        double[] baselineVector = new double[baselineCount];
+        baselineVector[baselineCount - 1] = 0.9;
+        double[] longerVector = java.util.Arrays.copyOf(baselineVector, baselineCount + 20);
+        java.util.Arrays.fill(longerVector, baselineCount, longerVector.length, 123.0);
+
+        // when
+        double baselineScore = model.predict(baselineVector);
+        double longerScore = model.predict(longerVector);
+
+        // then
+        assertThat(baselineScore).isEqualTo(2.0);
+        assertThat(longerScore).isEqualTo(baselineScore);
+    }
+
+    @Test
+    @DisplayName("기준 계약과 지문이 다른 모델은 기준 모델로 읽지 않는다")
+    void loadBaseline_WhenFingerprintDiffers_ThrowsException() {
+        // given
+        String json = modelJson("deadbeefdeadbeef", FeatureName.baselineExportNames(), ONE_TREE);
+
+        // when & then
+        assertThatThrownBy(() -> LightGbmModelLoader.loadBaseline(stream(json)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("deadbeefdeadbeef");
+    }
+
+    @Test
+    @DisplayName("기준 계약보다 feature가 많은 모델은 기준 모델로 읽지 않는다 — 다른 계약으로 학습된 모델이다")
+    void loadBaseline_WhenModelHasMoreFeaturesThanBaseline_ThrowsException() {
+        // given
+        List<String> extended = new java.util.ArrayList<>(FeatureName.baselineExportNames());
+        extended.add("feature_added_after_baseline");
+        String json = modelJson(FeatureSchemaFingerprint.BASELINE, extended, ONE_TREE);
+
+        // when & then
+        assertThatThrownBy(() -> LightGbmModelLoader.loadBaseline(stream(json)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("실제로 커밋된 model.json이 기준 계약으로 로드된다 — 학습/추론 계약의 최종 확인")
     void load_WhenReadingCommittedModelResource_Succeeds() {
         GradientBoostedTrees model = LightGbmModelLoader.loadFromClasspath("ltr/model.json");
 

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.recommend.v3.feature.FeatureName;
+import dfgg.application.recommend.v3.feature.FeatureSchemaFingerprint;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -34,7 +35,8 @@ class TreeShapParityTest {
     @BeforeAll
     static void loadArtifacts() {
         model = LightGbmModelLoader.loadFromClasspath("ltr/model.json");
-        calculator = new TreeShapCalculator(model, FeatureName.values().length);
+        // fixture와 저장소의 모델은 기준 계약을 따른다. 기여도도 기준 계약의 칸 수로 계산해 fixture와 칸을 맞춘다.
+        calculator = new TreeShapCalculator(model, FeatureName.baselineExportNames().size());
         fixture = readJson("ltr/shap_parity_sample.json");
     }
 
@@ -60,11 +62,11 @@ class TreeShapParityTest {
     }
 
     @Test
-    @DisplayName("fixture가 현재 스키마로 만들어졌다")
-    void fixture_MatchesCurrentSchema() {
+    @DisplayName("fixture가 기준 계약으로 만들어졌다")
+    void fixture_MatchesBaselineContract() {
         assertThat(fixture.get("schema_fingerprint").asText())
-                .isEqualTo(FeatureName.schemaFingerprint());
-        assertThat(fixture.get("feature_count").asInt()).isEqualTo(FeatureName.values().length);
+                .isEqualTo(FeatureSchemaFingerprint.BASELINE);
+        assertThat(fixture.get("feature_count").asInt()).isEqualTo(FeatureName.baselineExportNames().size());
         assertThat(fixture.get("cases")).isNotEmpty();
     }
 

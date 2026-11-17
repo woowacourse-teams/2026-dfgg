@@ -10,6 +10,14 @@ public final class FeatureSchemaFingerprint {
 
     public static final String EXPECTED = "84a57f48a9e3d5f2";
 
+    /**
+     * 기준 계약({@link FeatureName#baselineExportNames()})의 지문. 지금 운영 모델이 이 계약으로 학습됐다.
+     * <p>
+     * {@link #EXPECTED}와 달리 feature를 뒤에 더해도 고치지 않는다.
+     * 이 값이 바뀌어야 한다면 앞쪽 feature를 건드린 것이고, 운영 모델을 그대로 쓸 수 없다.
+     */
+    public static final String BASELINE = "84a57f48a9e3d5f2";
+
     private FeatureSchemaFingerprint() {
     }
 }

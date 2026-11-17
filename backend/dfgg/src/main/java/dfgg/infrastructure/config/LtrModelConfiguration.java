@@ -3,6 +3,7 @@ package dfgg.infrastructure.config;
 import dfgg.application.recommend.v3.feature.FeatureExtractionPipeline;
 import dfgg.application.recommend.v3.explanation.ChampionDirectory;
 import dfgg.application.recommend.v3.feature.FeatureName;
+import dfgg.application.recommend.v3.feature.FeatureSchemaFingerprint;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
 import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
 import dfgg.application.recommend.v3.ranker.LambdaMartRanker;
@@ -34,7 +35,7 @@ public class LtrModelConfiguration {
         // 기존 접두사 없는 경로는 classpath로 유지하고 EC2의 file:/...도 허용한다.
         var resource = resources.getResource(modelPath.contains(":") ? modelPath : "classpath:" + modelPath);
         try (var input = resource.getInputStream()) {
-            return LightGbmModelLoader.load(input);
+            return LightGbmModelLoader.loadBaseline(input);
         } catch (IOException exception) {
             throw new UncheckedIOException("Core LTR 모델을 읽지 못했습니다: " + modelPath, exception);
         }
@@ -63,6 +64,6 @@ public class LtrModelConfiguration {
     @Bean
     public CandidateRanker candidateRanker(
             FeatureExtractionPipeline pipeline, @Qualifier("ltrModel") GradientBoostedTrees ltrModel) {
-        return new LambdaMartRanker(pipeline, ltrModel);
+        return new LambdaMartRanker(pipeline, ltrModel, FeatureSchemaFingerprint.BASELINE);
     }
 }

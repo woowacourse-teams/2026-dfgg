@@ -147,6 +147,20 @@ class LambdaMartRankerTest {
     }
 
     @Test
+    @DisplayName("계약 지문을 받은 랭커는 그 지문으로 modelVersion을 만든다 — 스키마가 늘어도 모델의 버전은 그대로다")
+    void modelVersion_WhenContractFingerprintGiven_ContainsThatFingerprint() {
+        // given
+        String contractFingerprint = "0123456789abcdef";
+        LambdaMartRanker ranker = new LambdaMartRanker(pipeline, scoreIsFirstFeature, contractFingerprint);
+
+        // when
+        String modelVersion = ranker.modelVersion();
+
+        // then
+        assertThat(modelVersion).isEqualTo("lambdamart-0123456789abcdef");
+    }
+
+    @Test
     @DisplayName("실제 커밋된 모델로도 순위가 나온다")
     void rank_WorksWithTheCommittedModel() {
         given(pipeline.extract(any(), any())).willReturn(List.of(

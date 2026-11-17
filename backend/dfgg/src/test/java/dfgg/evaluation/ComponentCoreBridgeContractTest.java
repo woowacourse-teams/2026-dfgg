@@ -63,7 +63,8 @@ class ComponentCoreBridgeContractTest {
         assertThat(coreJson.path("objective").asText()).isEqualTo("lambdarank");
         try (var input = Files.newInputStream(corePath)) {
             // 운영 Core의 feature 이름·순서·fingerprint 계약까지 확인한다.
-            LightGbmModelLoader.load(input);
+            // 운영 Core는 기준 계약(스키마의 앞쪽 feature)으로 학습돼 있다.
+            LightGbmModelLoader.loadBaseline(input);
         }
         var report = new LinkedHashMap<String, Object>();
         report.put("purpose", "SYNTHETIC_CONTRACT_PROBE_NOT_SERVICE_EVALUATION");

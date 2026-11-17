@@ -2,8 +2,11 @@ package dfgg.infrastructure.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
+import dfgg.application.recommend.v3.feature.FeatureExtractionPipeline;
 import dfgg.application.recommend.v3.feature.FeatureName;
+import dfgg.application.recommend.v3.feature.FeatureSchemaFingerprint;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,6 +63,20 @@ class LtrModelConfigurationTest {
                 .withInitializer(new ConfigDataApplicationContextInitializer())
                 .run(context -> assertThat(context.getEnvironment().getProperty("recommendation.ltr.model-path"))
                         .isEqualTo("ltr/model.json"));
+    }
+
+    @Test
+    @DisplayName("Core 랭커의 모델 버전은 기준 계약의 지문으로 만든다 — 지금 운영 모델이 그 계약으로 학습됐다")
+    void candidateRanker_WhenCreated_ModelVersionContainsBaselineFingerprint() {
+        // given
+        var configuration = new LtrModelConfiguration();
+        var model = configuration.ltrModel("ltr/model.json", new DefaultResourceLoader());
+
+        // when
+        var ranker = configuration.candidateRanker(mock(FeatureExtractionPipeline.class), model);
+
+        // then
+        assertThat(ranker.modelVersion()).isEqualTo("lambdamart-" + FeatureSchemaFingerprint.BASELINE);
     }
 
     @Test

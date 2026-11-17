@@ -3,6 +3,7 @@ package dfgg.application.recommend.v3.ranker;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.recommend.v3.feature.FeatureName;
+import dfgg.application.recommend.v3.feature.FeatureSchemaFingerprint;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -23,19 +24,31 @@ public final class LightGbmModelLoader {
     private LightGbmModelLoader() {
     }
 
+    /** 저장소에 든 Core 모델을 읽는다. 저장소의 모델은 기준 계약을 따르므로 {@link #loadBaseline}으로 검증한다. */
     public static GradientBoostedTrees loadFromClasspath(String resourcePath) {
         try (InputStream input = LightGbmModelLoader.class.getClassLoader().getResourceAsStream(resourcePath)) {
             if (input == null) {
                 throw new IllegalStateException("LTR 모델 리소스를 찾을 수 없습니다: " + resourcePath);
             }
-            return load(input);
+            return loadBaseline(input);
         } catch (IOException exception) {
             throw new UncheckedIOException("LTR 모델을 읽지 못했습니다: " + resourcePath, exception);
         }
     }
 
+    /** 지금 스키마 전체로 학습된 모델을 읽는다. */
     public static GradientBoostedTrees load(InputStream input) {
         return load(input, FeatureName.exportNames(), FeatureName.schemaFingerprint());
+    }
+
+    /**
+     * 기준 계약으로 학습된 모델 — 지금 운영 모델을 읽는다.
+     * <p>
+     * 스키마 뒤에 feature가 더해져도 이 모델은 기준 계약의 칸만 읽으므로, 지금 스키마 전체가 아니라
+     * 기준 계약과 대조한다.
+     */
+    public static GradientBoostedTrees loadBaseline(InputStream input) {
+        return load(input, FeatureName.baselineExportNames(), FeatureSchemaFingerprint.BASELINE);
     }
 
     /** Core와 Component가 같은 트리 형식을 재사용하되 각 Feature 계약을 따로 검증한다. */
