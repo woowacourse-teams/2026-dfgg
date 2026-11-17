@@ -35,3 +35,7 @@ mining:
 collection:
   scheduler:
     enabled: false
+# 이미지 URL만 만들고 S3에 접근하지 않는다. 비어 있으면 앱이 뜨지 않는다.
+assets:
+  s3:
+    bucket: "evaluation-not-used"

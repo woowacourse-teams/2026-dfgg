@@ -9,6 +9,8 @@ import dfgg.application.recommend.v3.feature.FeatureVector;
  * @param label      등급 관련도 3/2/1/0 ({@link RelevanceLabeler})
  * @param splitGame  {@code match_id} 해시 기준 train/test — 같은 게임의 스냅샷이 흩어지지 않게
  * @param splitPatch 패치 기준 train/test — 최신 패치 일반화를 따로 본다
+ * @param win        그 게임 승패. 승률 지표(V)용 메타 값이고 feature가 아니다
+ * @param situation  정답 Core를 산 순간의 상황. 승률 지표의 행동 모델만 쓴다
  */
 public record TrainingRow(
         String qid,
@@ -21,6 +23,8 @@ public record TrainingRow(
         String position,
         int purchaseStep,
         String splitGame,
-        String splitPatch
+        String splitPatch,
+        boolean win,
+        PurchaseSituation situation
 ) {
 }

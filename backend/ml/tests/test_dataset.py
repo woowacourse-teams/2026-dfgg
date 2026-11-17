@@ -76,6 +76,20 @@ def test_null_features_become_nan(tmp_path, schema):
     assert dataset.features[0][2] == 0.0
 
 
+def test_outcome_and_situation_columns_do_not_enter_features(tmp_path, schema):
+    """승패·상황 메타 칸은 feature가 아니다 — 있어도 학습 입력이 그대로다."""
+    data = tmp_path / "train.jsonl"
+    with_meta = row("q1", 3, [1.0, 2.0, 3.0])
+    with_meta.update({"win": 0, "purchase_minute": 12.5, "team_gold_diff": None, "own_total_gold": 8200})
+    write_jsonl(data, [with_meta])
+
+    dataset = load_dataset(data, schema, split="game", subset="train")
+
+    assert dataset.features.shape == (1, 3)
+    assert list(dataset.features[0]) == [1.0, 2.0, 3.0]
+    assert list(dataset.labels) == [3]
+
+
 def test_split_selects_only_requested_subset(tmp_path, schema):
     """game split과 patch split을 따로 고를 수 있다."""
     data = tmp_path / "train.jsonl"

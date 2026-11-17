@@ -17,12 +17,16 @@ class TrainingRowWriterTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private TrainingRow row(int label) {
+        return row(label, true, new PurchaseSituation(12.5, -1500, 8200));
+    }
+
+    private TrainingRow row(int label, boolean win, PurchaseSituation situation) {
         FeatureVector vector = FeatureVector.empty();
         vector.set(FeatureName.BUILD_SCORE, 0.81);
         vector.set(FeatureName.CHAMPION_BASE_RATE_ALL, 0.0);
         return new TrainingRow(
                 "KR_123#5#2", label, 3031L, vector,
-                "KR_123", "16.16", 157, "MID", 2, "train", "test");
+                "KR_123", "16.16", 157, "MID", 2, "train", "test", win, situation);
     }
 
     private JsonNode writeAndParse(List<TrainingRow> rows) throws IOException {
@@ -115,6 +119,33 @@ class TrainingRowWriterTest {
         assertThat(parsed.get("position").asText()).isEqualTo("MID");
         assertThat(parsed.get("purchase_step").asInt()).isEqualTo(2);
         assertThat(parsed.get("item_id").asLong()).isEqualTo(3031L);
+    }
+
+    @Test
+    @DisplayName("승패와 구매 순간의 상황을 feature 밖 메타 칸으로 담는다")
+    void write_WhenRowWritten_ContainsWinAndSituation() throws IOException {
+        // when
+        JsonNode parsed = writeAndParse(List.of(row(3)));
+
+        // then
+        assertThat(parsed.get("win").asInt()).isEqualTo(1);
+        assertThat(parsed.get("purchase_minute").asDouble()).isEqualTo(12.5);
+        assertThat(parsed.get("team_gold_diff").asInt()).isEqualTo(-1500);
+        assertThat(parsed.get("own_total_gold").asInt()).isEqualTo(8200);
+        assertThat(parsed.get("features")).hasSize(FeatureName.values().length);
+    }
+
+    @Test
+    @DisplayName("진 게임은 win 0이고, 모르는 상황은 0이 아니라 null이다")
+    void write_WhenLostAndSituationUnknown_WritesZeroWinAndNullSituation() throws IOException {
+        // when
+        JsonNode parsed = writeAndParse(List.of(row(3, false, PurchaseSituation.unknown())));
+
+        // then
+        assertThat(parsed.get("win").asInt()).isZero();
+        assertThat(parsed.get("purchase_minute").isNull()).isTrue();
+        assertThat(parsed.get("team_gold_diff").isNull()).isTrue();
+        assertThat(parsed.get("own_total_gold").isNull()).isTrue();
     }
 
     @Test

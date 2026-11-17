@@ -2,9 +2,11 @@ package dfgg.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.itemstats.ItemStatsAggregationResult;
 import dfgg.application.itemstats.ItemStatsAggregationService;
 import dfgg.application.item.ItemService;
+import dfgg.application.match.CoreItemPurchaseOrderCalculator;
 import dfgg.application.recommend.v3.CandidateGenerator;
 import dfgg.application.recommend.v3.CandidateTopK;
 import dfgg.application.recommend.v3.CandidateUnion;
@@ -18,6 +20,8 @@ import dfgg.domain.itemstats.ChampionItemStats;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.match.NormalizedMatchParticipant;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
+import dfgg.domain.match.RawMatchTimeline;
+import dfgg.domain.match.RawMatchTimelineRepository;
 import dfgg.domain.match.TierScope;
 import dfgg.domain.match.PatchVersion;
 import java.io.IOException;
@@ -81,6 +85,12 @@ class TrainingSetExportTest {
     private HardValidityFilter hardValidityFilter;
     @Autowired
     private FeatureExtractionPipeline featurePipeline;
+    @Autowired
+    private RawMatchTimelineRepository rawMatchTimelineRepository;
+    @Autowired
+    private CoreItemPurchaseOrderCalculator purchaseOrderCalculator;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /** 집계·서빙과 같은 범위를 본다. 학습 데이터만 다른 티어를 보면 train/serve가 어긋난다. */
     @Autowired
@@ -91,11 +101,14 @@ class TrainingSetExportTest {
 
     private SnapshotQueryBuilder snapshotQueryBuilder;
     private ParticipantSampler participantSampler;
+    private PurchaseSituationReader situationReader;
 
     @BeforeEach
     void prepareSampler() {
         snapshotQueryBuilder = new SnapshotQueryBuilder(itemService.findCoreItemIds());
         participantSampler = new ParticipantSampler(tierScope);
+        situationReader = new PurchaseSituationReader(
+                objectMapper, purchaseOrderCalculator, itemService.findCoreItemIds());
     }
     private final GameSplit gameSplit = new GameSplit(0.8);
     private final RelevanceLabeler labeler = new RelevanceLabeler(PLAUSIBLE_ALTERNATIVE_THRESHOLD);
@@ -179,6 +192,10 @@ class TrainingSetExportTest {
             Map<Long, Item> itemById, String latestPatch
     ) {
         List<NormalizedMatchParticipant> matchParticipants = participantRepository.findByMatchId(matchId);
+        // 승률 지표의 상황 값(구매 시각·골드). 타임라인이 없는 DB면 모두 null로 나간다.
+        String rawTimeline = rawMatchTimelineRepository.findById(matchId)
+                .map(RawMatchTimeline::getRawData)
+                .orElse(null);
         int used = 0;
         for (NormalizedMatchParticipant participant
                 : participantSampler.sample(matchParticipants, matchId, matchParticipants.size())) {
@@ -192,15 +209,19 @@ class TrainingSetExportTest {
             }
             used++;
             Map<Long, Double> baseRates = baseRatesOf(participant);
+            List<PurchaseSituation> situations = situationReader.read(rawTimeline, participant, matchParticipants);
             for (SnapshotQuery snapshot : snapshots) {
-                exportSnapshot(snapshot, snapshots, writer, stats, itemById, baseRates, latestPatch);
+                SnapshotOutcome outcome = new SnapshotOutcome(
+                        participant.getWin(), situations.get(snapshot.purchaseStep()));
+                exportSnapshot(snapshot, snapshots, writer, stats, itemById, baseRates, latestPatch, outcome);
             }
         }
     }
 
     private void exportSnapshot(
             SnapshotQuery snapshot, List<SnapshotQuery> allSnapshots, TrainingRowWriter writer,
-            ExportStats stats, Map<Long, Item> itemById, Map<Long, Double> baseRates, String latestPatch
+            ExportStats stats, Map<Long, Item> itemById, Map<Long, Double> baseRates, String latestPatch,
+            SnapshotOutcome outcome
     ) {
         stats.attemptedQueries++;
 
@@ -238,9 +259,10 @@ class TrainingSetExportTest {
                     snapshot.matchId(), snapshot.query().patch(),
                     Math.toIntExact(snapshot.query().myChampionId()),
                     snapshot.query().position().name(), snapshot.purchaseStep(),
-                    splitGame, splitPatch));
+                    splitGame, splitPatch, outcome.win(), outcome.situation()));
         }
         stats.exportedQueries++;
+        stats.countSituation(outcome.situation());
         stats.rowsWithGroundTruth++;
         stats.countCoverage(snapshot.query().position(), snapshot.query().myChampionId(),
                 snapshot.query().patch(), snapshot.query().tier());
@@ -269,6 +291,10 @@ class TrainingSetExportTest {
                 .value();
     }
 
+    /** query 하나의 결과·상황 메타 값. feature 계산에는 들어가지 않는다. */
+    private record SnapshotOutcome(boolean win, PurchaseSituation situation) {
+    }
+
     /** 표본이 전체를 대표하는지, 무엇을 얼마나 버렸는지를 남긴다. */
     private static final class ExportStats {
 
@@ -276,11 +302,31 @@ class TrainingSetExportTest {
         private int exportedQueries;
         private int droppedQueries;
         private int rowsWithGroundTruth;
+        private int queriesWithPurchaseMinute;
+        private int queriesWithTeamGoldDiff;
+        private int queriesWithOwnTotalGold;
         private final Map<Integer, Long> labelCounts = new LinkedHashMap<>();
         private final Map<ChampionPosition, Long> positionCounts = new LinkedHashMap<>();
         private final Map<Long, Long> championCounts = new HashMap<>();
         private final Map<String, Long> patchCounts = new HashMap<>();
         private final Map<String, Long> tierCounts = new HashMap<>();
+
+        private void countSituation(PurchaseSituation situation) {
+            queriesWithPurchaseMinute += presence(situation.purchaseMinute());
+            queriesWithTeamGoldDiff += presence(situation.teamGoldDiff());
+            queriesWithOwnTotalGold += presence(situation.ownTotalGold());
+        }
+
+        private int presence(Object value) {
+            if (value == null) {
+                return 0;
+            }
+            return 1;
+        }
+
+        private String filledShare(int filled) {
+            return String.format("%d (%.1f%%)", filled, 100.0 * filled / Math.max(exportedQueries, 1));
+        }
 
         private void countLabel(int label) {
             labelCounts.merge(label, 1L, Long::sum);
@@ -329,6 +375,11 @@ class TrainingSetExportTest {
                         .append(" | ").append(count).append(" | ")
                         .append(String.format("%.1f%%", 100.0 * count / Math.max(totalRows, 1))).append(" |\n");
             }
+
+            report.append("\n## 승률 지표 상황 칸 채움 (query 기준)\n\n| 칸 | 채운 query |\n|---|---|\n");
+            report.append("| purchase_minute | ").append(filledShare(queriesWithPurchaseMinute)).append(" |\n");
+            report.append("| team_gold_diff | ").append(filledShare(queriesWithTeamGoldDiff)).append(" |\n");
+            report.append("| own_total_gold | ").append(filledShare(queriesWithOwnTotalGold)).append(" |\n");
 
             report.append("\n## 표본 대표성\n\n| 포지션 | query | 비중 |\n|---|---|---|\n");
             for (ChampionPosition position : ChampionPosition.values()) {

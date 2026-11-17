@@ -55,8 +55,26 @@ public final class TrainingRowWriter implements AutoCloseable {
                 .append("\"purchase_step\":").append(row.purchaseStep()).append(',')
                 .append("\"split_game\":\"").append(row.splitGame()).append("\",")
                 .append("\"split_patch\":\"").append(row.splitPatch()).append("\",")
+                .append("\"win\":").append(winValue(row.win())).append(',')
+                .append("\"purchase_minute\":").append(numberOrNull(row.situation().purchaseMinute())).append(',')
+                .append("\"team_gold_diff\":").append(numberOrNull(row.situation().teamGoldDiff())).append(',')
+                .append("\"own_total_gold\":").append(numberOrNull(row.situation().ownTotalGold())).append(',')
                 .append("\"features\":").append(toJsonArray(row));
         return json.append('}').toString();
+    }
+
+    private int winValue(boolean win) {
+        if (win) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private String numberOrNull(Number value) {
+        if (value == null) {
+            return "null";
+        }
+        return value.toString();
     }
 
     private String toJsonArray(TrainingRow row) {
