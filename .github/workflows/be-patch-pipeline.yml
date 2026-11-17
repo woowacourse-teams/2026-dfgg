@@ -208,7 +208,7 @@ jobs:
           MESSAGE: "오늘 재학습을 건너뛰었습니다. 현재 패치 데이터가 없습니다: ${{ steps.decide.outputs.reason }}"
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: .github/scripts/notify-pipeline.sh
-      # 재학습 워크플로(U11)가 생기기 전에는 판단만 남긴다.
+      # 재학습(be-retrain.yml)은 3~4시간 걸려 기다리지 않는다. 결과는 재학습 실행이 Slack으로 알린다.
       - name: Start retraining
         if: steps.decide.outputs.run == 'yes'
         env:

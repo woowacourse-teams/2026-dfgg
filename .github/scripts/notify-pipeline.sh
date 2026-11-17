@@ -5,6 +5,7 @@
 #   LEVEL              failure | notice
 #   MESSAGE            본문 (여러 줄 가능)
 #   RUN_URL            실행 링크
+#   TITLE              제목 (기본값 야간 파이프라인 알림·실패)
 
 set -euo pipefail
 
@@ -14,10 +15,10 @@ if [[ -z "${ALERT_WEBHOOK_URL:-}" ]]; then
 fi
 
 icon=':information_source:'
-title='야간 파이프라인 알림'
+title=${TITLE:-야간 파이프라인 알림}
 if [[ "$LEVEL" == failure ]]; then
   icon=':rotating_light:'
-  title='야간 파이프라인 실패'
+  title=${TITLE:-야간 파이프라인 실패}
 fi
 
 text=$(printf '%s *[%s]*\n%s\n<%s|실행 로그 열기>' "$icon" "$title" "$MESSAGE" "$RUN_URL")
