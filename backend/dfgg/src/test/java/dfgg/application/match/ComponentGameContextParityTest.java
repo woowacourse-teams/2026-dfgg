@@ -44,7 +44,7 @@ class ComponentGameContextParityTest {
         var query = new RecommendationQuery(1L, ChampionPosition.TOP, List.of(), List.of(2L),
                 List.of(3L, 4L, 999L), null, "16.18", Set.of());
         var coreVector = FeatureVector.empty();
-        new QueryFeatureExtractor(calculator).extract(query, coreVector);
+        new QueryFeatureExtractor(calculator, mock(dfgg.domain.item.ItemRepository.class)).extract(query, coreVector);
         for (int i = 0; i < 9; i++) {
             assertThat(coreVector.get(FeatureName.valueOf(CompositionFeatures.FEATURE_NAMES.get(i).toUpperCase(Locale.ROOT))))
                     .isEqualTo(composition.values().get(i));

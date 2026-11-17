@@ -8,7 +8,7 @@ import json
 import numpy as np
 import pytest
 
-from dfgg_ltr.dataset import load_dataset
+from dfgg_ltr.dataset import baseline_view, load_dataset
 
 
 def write_jsonl(path, rows):
@@ -131,3 +131,101 @@ def test_rejects_unknown_split(tmp_path, schema):
 
     with pytest.raises(ValueError):
         load_dataset(data, schema, split="season", subset="train")
+
+
+# ─── 아이템 번호·구매 단계·기준 계약 ─────────────────────────────────────────
+
+@pytest.fixture
+def schema_with_baseline(tmp_path):
+    """뒤에 feature가 더해진 스키마. 앞 2개가 기준 계약이다."""
+    path = tmp_path / "feature_schema_with_baseline.json"
+    path.write_text(json.dumps({
+        "schema_fingerprint": "full789", "feature_count": 3,
+        "baseline_schema_fingerprint": "base456", "baseline_feature_count": 2,
+        "feature_names": ["f0", "f1", "f2"],
+    }), encoding="utf-8")
+    return path
+
+
+def test_item_ids_follow_the_feature_rows(tmp_path, schema):
+    """행마다 어느 아이템인지 싣는다 — 평가가 "이 아이템의 순위"를 물을 수 있어야 한다."""
+    data = tmp_path / "train.jsonl"
+    write_jsonl(data, [
+        {**row("q1", 3, [1.0, 2.0, 3.0]), "item_id": 3089},
+        {**row("q2", 3, [1.0, 2.0, 3.0]), "item_id": 6653},
+        {**row("q1", 0, [1.0, 2.0, 3.0]), "item_id": 3031},
+    ])
+
+    dataset = load_dataset(data, schema, split="game", subset="train")
+
+    # 행 순서는 qid로 묶은 순서다. 아이템 번호도 같은 순서를 따라야 feature 행과 맞는다.
+    assert list(dataset.item_ids) == [3089, 3031, 6653]
+
+
+def test_purchase_steps_are_kept_per_query(tmp_path, schema):
+    """구매 단계는 query의 속성이다 — 몇 번째 Core를 고르는 스냅샷인지로 나눠 볼 때 쓴다."""
+    data = tmp_path / "train.jsonl"
+    write_jsonl(data, [
+        {**row("q1", 3, [1.0, 2.0, 3.0]), "purchase_step": 0},
+        {**row("q1", 0, [1.0, 2.0, 3.0]), "purchase_step": 0},
+        {**row("q2", 3, [1.0, 2.0, 3.0]), "purchase_step": 2},
+    ])
+
+    dataset = load_dataset(data, schema, split="game", subset="train")
+
+    assert list(dataset.purchase_steps) == [0, 2]
+    assert len(dataset.purchase_steps) == len(dataset.group)
+
+
+def test_baseline_contract_is_read_from_the_schema(tmp_path, schema_with_baseline):
+    """기준 계약은 Java가 내보낸 값을 그대로 쓴다 — Python이 지문을 따로 계산하지 않는다."""
+    data = tmp_path / "train.jsonl"
+    write_jsonl(data, [row("q1", 3, [1.0, 2.0, 3.0])])
+
+    dataset = load_dataset(data, schema_with_baseline, split="game", subset="train")
+
+    assert dataset.baseline_feature_count == 2
+    assert dataset.baseline_schema_fingerprint == "base456"
+
+
+def test_schema_without_baseline_contract_still_loads(tmp_path, schema):
+    """기준 계약이 없는 옛 스키마 파일도 읽는다 — 기준 모델을 만들 때만 필요한 값이다."""
+    data = tmp_path / "train.jsonl"
+    write_jsonl(data, [row("q1", 3, [1.0, 2.0, 3.0])])
+
+    dataset = load_dataset(data, schema, split="game", subset="train")
+
+    assert dataset.baseline_feature_count is None
+    assert dataset.baseline_schema_fingerprint is None
+
+
+def test_baseline_view_keeps_the_leading_columns_under_the_baseline_fingerprint(tmp_path, schema_with_baseline):
+    """기준 모델은 앞쪽 feature만 본다. 칸 번호가 그대로라 서버의 기준 계약으로 읽을 수 있다."""
+    data = tmp_path / "train.jsonl"
+    write_jsonl(data, [
+        {**row("q1", 3, [1.0, 2.0, 3.0]), "item_id": 3089},
+        {**row("q1", 0, [4.0, None, 6.0]), "item_id": 3031},
+    ])
+    dataset = load_dataset(data, schema_with_baseline, split="game", subset="train")
+
+    baseline = baseline_view(dataset)
+
+    assert baseline.feature_names == ["f0", "f1"]
+    assert baseline.schema_fingerprint == "base456"
+    assert baseline.features.shape == (2, 2)
+    assert baseline.features[0].tolist() == [1.0, 2.0]
+    assert np.isnan(baseline.features[1, 1])
+    # 라벨·묶음·아이템 번호는 그대로다. 같은 표본으로 두 모델을 비교해야 한다.
+    assert list(baseline.labels) == list(dataset.labels)
+    assert list(baseline.group) == list(dataset.group)
+    assert list(baseline.item_ids) == [3089, 3031]
+
+
+def test_baseline_view_needs_the_baseline_contract(tmp_path, schema):
+    """기준 계약이 없는 스키마로는 기준 모델을 만들 수 없다 — 지문을 지어내지 않고 멈춘다."""
+    data = tmp_path / "train.jsonl"
+    write_jsonl(data, [row("q1", 3, [1.0, 2.0, 3.0])])
+    dataset = load_dataset(data, schema, split="game", subset="train")
+
+    with pytest.raises(ValueError, match="기준 계약"):
+        baseline_view(dataset)

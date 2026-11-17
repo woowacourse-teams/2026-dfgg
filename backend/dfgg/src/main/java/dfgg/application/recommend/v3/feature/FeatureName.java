@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
-import java.util.stream.Collectors;
 
 /**
  * LTR feature 스키마의 단일 원천. 선언 순서가 곧 벡터 인덱스이고, 그 순서로 Python과 Java가 합의한다.
@@ -101,6 +100,38 @@ public enum FeatureName {
     POSITION_BOTTOM,
     POSITION_SUPPORT,
     TIER_ORDINAL,
+
+    // ═══ 여기까지가 기준 계약이다. 지금 운영 모델은 위 feature만 읽는다 (baselineExportNames) ═══
+
+    // ─── Game Situation: 상대의 아이템 — "상대가 무엇을 들고 있는가" ─────────
+    ENEMY_CORE_GOLD_SUM,
+    ENEMY_SPELL_DAMAGE_GOLD_SHARE,
+    ENEMY_ARMOR_GOLD_SHARE,
+    ENEMY_SPELL_BLOCK_GOLD_SHARE,
+
+    // ─── Game Situation: 상대 중 누가 컸나 ──────────────────────────────────
+    ENEMY_KILL_SUM,
+    ENEMY_MAGE_KILL_SHARE,
+    ENEMY_ASSASSIN_KILL_SHARE,
+    ENEMY_MARKSMAN_KILL_SHARE,
+    ENEMY_TOP_KILLER_KILL_SHARE,
+
+    // ─── Game Situation: 맞라인 ────────────────────────────────────────────
+    LANE_LEVEL_LEAD,
+    LANE_OPPONENT_KILLS,
+    LANE_CORE_GOLD_LEAD,
+
+    // ─── Game Situation: 내 상태 ───────────────────────────────────────────
+    MY_LEVEL_LEAD,
+    MY_KILLS,
+    MY_DEATHS,
+    MY_ASSISTS,
+
+    // ─── Game Situation: 팀 상태 ───────────────────────────────────────────
+    TEAM_KILL_LEAD,
+    TEAM_ASSIST_LEAD,
+    TEAM_LEVEL_LEAD,
+    TEAM_CORE_GOLD_LEAD,
     ;
 
     public int index() {
@@ -119,14 +150,34 @@ public enum FeatureName {
     }
 
     /**
+     * 기준 계약의 이름 목록 — 지금 운영 모델이 학습된 feature들로, 맨 앞부터 {@link #TIER_ORDINAL}까지다.
+     * <p>
+     * 그 뒤에 feature를 더해도 이 목록은 바뀌지 않는다. 기준 계약으로 학습된 모델은
+     * 벡터가 길어져도 이 칸들만 읽으므로 점수가 그대로다.
+     */
+    public static List<String> baselineExportNames() {
+        return exportNames().subList(0, TIER_ORDINAL.ordinal() + 1);
+    }
+
+    /**
      * 순서를 포함한 스키마의 지문. feature를 추가·삭제·재배치하면 값이 바뀌고
      * {@link FeatureSchemaFingerprint}와 어긋나 테스트가 깨진다 — 그 실패가
      * "모델을 다시 학습해야 한다"는 신호다.
      */
     public static String schemaFingerprint() {
-        String ordered = Arrays.stream(values())
-                .map(FeatureName::exportName)
-                .collect(Collectors.joining(","));
+        return fingerprintOf(exportNames());
+    }
+
+    /**
+     * 기준 계약의 지문. {@link FeatureSchemaFingerprint#BASELINE}과 어긋나면
+     * 앞쪽 feature를 건드린 것이고, 지금 운영 모델이 다른 칸을 읽게 된다.
+     */
+    public static String baselineSchemaFingerprint() {
+        return fingerprintOf(baselineExportNames());
+    }
+
+    private static String fingerprintOf(List<String> exportNames) {
+        String ordered = String.join(",", exportNames);
         try {
             byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
                     .digest(ordered.getBytes(StandardCharsets.UTF_8));

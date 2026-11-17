@@ -28,7 +28,9 @@ public enum ReasonGroup {
     /** 양 팀 조합이 어떤 성향인가. */
     TEAM_COMPOSITION,
     /** 포지션·티어·진행도 등 질의 자체의 맥락. */
-    CONTEXT;
+    CONTEXT,
+    /** 지금 게임이 어떻게 흘러가고 있는가 — 상대의 아이템, 누가 컸는지, 맞라인·나·팀의 상태. */
+    GAME_SITUATION;
 
     private static final Map<FeatureName, ReasonGroup> GROUPS = buildGroups();
 
@@ -76,6 +78,17 @@ public enum ReasonGroup {
                 FeatureName.PURCHASED_ITEM_COUNT, FeatureName.POSITION_TOP,
                 FeatureName.POSITION_JUNGLE, FeatureName.POSITION_MID, FeatureName.POSITION_BOTTOM,
                 FeatureName.POSITION_SUPPORT, FeatureName.TIER_ORDINAL);
+
+        assign(groups, GAME_SITUATION,
+                FeatureName.ENEMY_CORE_GOLD_SUM, FeatureName.ENEMY_SPELL_DAMAGE_GOLD_SHARE,
+                FeatureName.ENEMY_ARMOR_GOLD_SHARE, FeatureName.ENEMY_SPELL_BLOCK_GOLD_SHARE,
+                FeatureName.ENEMY_KILL_SUM, FeatureName.ENEMY_MAGE_KILL_SHARE,
+                FeatureName.ENEMY_ASSASSIN_KILL_SHARE, FeatureName.ENEMY_MARKSMAN_KILL_SHARE,
+                FeatureName.ENEMY_TOP_KILLER_KILL_SHARE,
+                FeatureName.LANE_LEVEL_LEAD, FeatureName.LANE_OPPONENT_KILLS, FeatureName.LANE_CORE_GOLD_LEAD,
+                FeatureName.MY_LEVEL_LEAD, FeatureName.MY_KILLS, FeatureName.MY_DEATHS, FeatureName.MY_ASSISTS,
+                FeatureName.TEAM_KILL_LEAD, FeatureName.TEAM_ASSIST_LEAD,
+                FeatureName.TEAM_LEVEL_LEAD, FeatureName.TEAM_CORE_GOLD_LEAD);
 
         return groups;
     }

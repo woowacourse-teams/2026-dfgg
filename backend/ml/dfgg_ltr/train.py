@@ -15,7 +15,7 @@ from pathlib import Path
 import lightgbm as lgb
 import numpy as np
 
-from dfgg_ltr.dataset import Dataset, load_dataset
+from dfgg_ltr.dataset import Dataset, baseline_view, load_dataset
 from dfgg_ltr.model_export import to_export_dict
 
 EVAL_AT = [1, 3, 5]
@@ -45,12 +45,18 @@ def to_lgb_dataset(dataset: Dataset, reference: lgb.Dataset | None = None) -> lg
     )
 
 
-def train(train_set: Dataset, valid_set: Dataset, rounds: int) -> tuple[lgb.Booster, dict]:
+def train(train_set: Dataset, valid_set: Dataset, rounds: int,
+          seed: int | None = None) -> tuple[lgb.Booster, dict]:
+    """seed를 주지 않으면 LightGBM의 고정 기본값을 쓴다 — 기존 학습 결과가 바뀌지 않는다.
+
+    seed는 "같은 데이터로 다시 학습하면 얼마나 흔들리는가"를 잴 때만 바꾼다. 다른 설정은 건드리지 않는다.
+    """
+    params = PARAMS if seed is None else {**PARAMS, "seed": seed}
     lgb_train = to_lgb_dataset(train_set)
     lgb_valid = to_lgb_dataset(valid_set, reference=lgb_train)
     results: dict = {}
     booster = lgb.train(
-        PARAMS, lgb_train, num_boost_round=rounds,
+        params, lgb_train, num_boost_round=rounds,
         valid_sets=[lgb_valid], valid_names=["valid"],
         callbacks=[
             lgb.early_stopping(50, verbose=False),
@@ -68,7 +74,7 @@ def describe(name: str, dataset: Dataset) -> str:
             f"/ 라벨 {{{distribution}}}")
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="dfgg LTR LambdaMART 학습")
     parser.add_argument("--data", type=Path, default=Path("data/train.jsonl"))
     parser.add_argument("--schema", type=Path, default=Path("data/feature_schema.json"))
@@ -78,15 +84,23 @@ def main() -> None:
                         help="LightGBM 네이티브 모델 저장 경로. SHAP 기준값(pred_contrib) 생성에 쓴다.")
     parser.add_argument("--out", type=Path, default=None,
                         help="모델 JSON 출력 경로. 주지 않으면 학습만 하고 내보내지 않는다")
-    args = parser.parse_args()
+    parser.add_argument("--baseline", action="store_true",
+                        help="기준 계약(스키마의 앞쪽 feature)만으로 학습하고 그 계약의 이름·지문으로 내보낸다. "
+                             "지금 운영 모델(v4)을 다시 학습할 때는 반드시 이 선택지를 쓴다")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="LightGBM 씨앗. 주지 않으면 고정 기본값을 쓴다")
+    args = parser.parse_args(argv)
 
     train_set = load_dataset(args.data, args.schema, args.split, "train")
     valid_set = load_dataset(args.data, args.schema, args.split, "test")
-    print(f"\n=== split={args.split} ===")
+    if args.baseline:
+        train_set = baseline_view(train_set)
+        valid_set = baseline_view(valid_set)
+    print(f"\n=== split={args.split}{' (기준 계약)' if args.baseline else ''} ===")
     print(describe("train", train_set))
     print(describe("valid", valid_set))
 
-    booster, results = train(train_set, valid_set, args.rounds)
+    booster, results = train(train_set, valid_set, args.rounds, args.seed)
 
     print(f"\n최적 반복: {booster.best_iteration}")
     for k in EVAL_AT:

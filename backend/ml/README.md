@@ -31,15 +31,35 @@ EVALUATION_DB_URL=jdbc:postgresql://127.0.0.1:5432/dfgg_test_backtest \
   ./gradlew evaluationTest --tests '*TrainingSetExportTest' -Devaluation.queries=30000
 ```
 
-`../ml/data/`에 두 파일이 생긴다 — `train.jsonl`(학습 데이터)과
-`feature_schema.json`(feature 이름·순서·지문). JSONL의 feature는 이름 없는 배열이라
+`../ml/data/`에 세 파일이 생긴다 — `train.jsonl`(학습 데이터), `feature_schema.json`(feature 이름·순서·지문,
+기준 계약의 칸 수·지문), `item_catalog.json`(아이템 이름·태그·가격). JSONL의 feature는 이름 없는 배열이라
 스키마 파일이 없으면 Python이 각 칸이 무엇인지 알 수 없다.
 
-그 다음 학습하고 모델을 내보낸다:
+> **서비스가 읽는 DB에서 돌리지 않는다.** 이 export는 시작할 때 통계를 다시 집계해 붙은 DB의 통계 테이블을
+> 덮어쓴다. 기본값에서는 최신 패치를 뺀 통계다(patch split의 누수 차단). 평가 프로필은 붙은 DB에 Flyway
+> 마이그레이션도 실행하므로, 복사본 DB에서 `SPRING_FLYWAY_ENABLED=false`를 붙여 돌린다.
+
+그 다음 학습하고 모델을 내보낸다. **모델은 저장소 밖 경로로 내보낸다:**
 
 ```bash
-uv run python -m dfgg_ltr.train --split game --out ../dfgg/src/main/resources/ltr/model.json
+# 지금 운영 모델(v3·v4)을 다시 학습할 때 — 기준 계약(스키마의 앞쪽 feature)만 쓴다
+uv run python -m dfgg_ltr.train --split game --baseline --out <저장소 밖 경로>/model.json
+
+# 게임 상황 feature까지 쓰는 모델
+uv run python -m dfgg_ltr.train --split game --out <저장소 밖 경로>/model.json
+
 uv run python -m dfgg_ltr.train --split patch    # 최신 패치 일반화 확인
+```
+
+- **운영 모델은 반드시 `--baseline`으로 학습한다.** 스키마 뒤에 게임 상황 feature가 더해졌지만 운영 모델은
+  앞쪽 feature(기준 계약)만 읽는다. `--baseline` 없이 학습한 모델을 운영 모델 자리에 올리면 서버가
+  지문에서 거부해 뜨지 않는다.
+- `--seed`를 주지 않으면 LightGBM의 고정 기본값을 써서 같은 환경에서는 같은 모델이 나온다.
+
+기준 모델과 게임 상황 모델을 같은 데이터로 학습해 나란히 비교한다:
+
+```bash
+uv run python -m dfgg_ltr.situation_report --data data/train.jsonl --out <보고서 경로>
 ```
 
 테스트:
@@ -53,9 +73,11 @@ uv run pytest tests/ -q
 | 방향 | 실행 위치 | 경로 |
 |---|---|---|
 | 학습 데이터 export | `backend/dfgg` (Gradle) | → `../ml/data/train.jsonl` |
-| 모델 export | `backend/ml` (uv) | → `../dfgg/src/main/resources/ltr/model.json` |
+| 모델 export | `backend/ml` (uv) | → 저장소 밖 경로 |
 
-모델 JSON은 커밋한다. **재학습하는 사람만 Python이 필요하고**, 나머지 팀원과 CI/CD는
+**학습한 모델은 커밋하지 않는다.** 저장소의 `../dfgg/src/main/resources/ltr/model.json`은 학습한 모델이 아니라
+씨앗 파일이다(점수는 항상 0이고 feature 이름과 지문만 기준 계약과 같다). CI 테스트와 로컬 실행이 읽으므로
+덮어쓰지 않는다. **재학습하는 사람만 Python이 필요하고**, 나머지 팀원과 CI/CD는
 Java만으로 동작한다(`be-cd.yml`은 `working-directory: ./backend/dfgg`라 이 디렉터리를 보지 못한다).
 
 ## Java 추론과의 계약 (Task 12)
@@ -65,9 +87,24 @@ Java만으로 동작한다(`be-cd.yml`은 `working-directory: ./backend/dfgg`라
 - **자식 인덱스 규약**: 0 이상이면 분기 노드 인덱스, 음수면 잎이며 `-index - 1`이 잎 번호다.
   이 규약으로 순회하면 LightGBM 예측과 1e-9 이내로 일치한다(`tests/test_flatten_equivalence.py`)
 - 범주형 분기가 섞이면 export 단계에서 **실패시킨다**
-- `feature_names` 순서가 Java `FeatureName` enum과 정확히 일치해야 하며, 다르면 기동 실패
+- `feature_names` 순서가 Java `FeatureName` enum과 정확히 일치해야 하며, 다르면 기동 실패.
+  운영 모델은 기준 계약(`FeatureName.baselineExportNames()`, `FeatureSchemaFingerprint.BASELINE`)과,
+  게임 상황 모델은 스키마 전체와 대조한다
 - NaN은 `default_left` 방향으로 라우팅 (`missing_type`도 함께 확인)
-- parity 테스트: Python 예측과 Java 예측이 **1e-6 이내** 일치
+- parity 테스트: Python 예측과 Java 예측이 **1e-6 이내** 일치.
+  저장소 밖의 모델은 fixture를 만들어 `ExternalCoreModelParityTest`에 넘겨 확인한다(DB 불필요):
+
+  ```bash
+  # backend/ml — 모델과 같은 학습 데이터로 fixture를 만든다. 기준 계약 모델이면 학습 줄의 앞쪽 칸만 쓴다
+  uv run python -m dfgg_ltr.export_parity_sample --model <model.json> --data data/train.jsonl \
+      --out <저장소 밖 경로>/parity.json --count 1000
+  # backend/dfgg — 운영 모델(--baseline으로 학습)은 -Devaluation.core.contract=baseline을 더한다
+  ./gradlew evaluationTest --tests '*ExternalCoreModelParityTest' \
+      -Devaluation.core.model=<절대경로> -Devaluation.core.parity=<절대경로>
+  ```
+
+  기여도(SHAP) fixture를 만드는 `export_shap_sample`은 아직 학습 줄과 칸 수가 같은 모델만 다룬다.
+  기준 계약 모델의 기여도 일치를 저장소 밖에서 확인하는 길은 없다
 
 ## 검증된 환경
 

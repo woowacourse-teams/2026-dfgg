@@ -8,6 +8,10 @@ Java가 로드하는 것과 같은 `model.json`에서, 등가성이 증명된 �
         --model ../dfgg/src/main/resources/ltr/model.json \
         --data data/train.jsonl \
         --out ../dfgg/src/test/resources/ltr/parity_sample.json
+
+저장소 밖의 모델은 `--model`과 `--out`에 저장소 밖 경로를 주고, 만든 fixture는 Java의
+`ExternalCoreModelParityTest`에 넘긴다. 스키마의 앞쪽 feature(기준 계약)로 학습한 모델은 학습 줄보다
+짧은데, 그때는 학습 줄을 모델의 칸 수까지만 쓴다(`rows_for_model`).
 """
 from __future__ import annotations
 
@@ -68,6 +72,27 @@ def build_parity_sample(
     }
 
 
+def rows_for_model(rows: Sequence[Sequence[float | None]], model: dict,
+                   schema_feature_names: Sequence[str] | None) -> list[list[float | None]]:
+    """학습 줄이 모델보다 길면 모델이 본 앞쪽 칸까지만 남긴다.
+
+    스키마 뒤에 feature가 더해진 뒤에도 운영 모델은 앞쪽 feature(기준 계약)로 학습한다. 그 모델의 fixture를
+    만들려면 같은 학습 데이터에서 앞쪽 칸만 써야 한다. 앞쪽을 자르는 것이라 칸 번호가 그대로다.
+
+    모델의 feature가 스키마의 앞쪽과 같을 때만 자른다. 중간 feature를 뺀 모델에 앞쪽 칸을 주면 엉뚱한 값으로
+    기대 점수가 만들어지고, 그 fixture는 Java가 틀렸을 때도 통과한다.
+    """
+    count = len(model["feature_names"])
+    if all(len(row) == count for row in rows):
+        return [list(row) for row in rows]
+    if schema_feature_names is None or list(schema_feature_names[:count]) != list(model["feature_names"]):
+        raise ValueError(
+            "학습 줄의 길이가 모델과 다르고, 모델의 feature가 스키마의 앞쪽과 같은지 확인할 수 없습니다. "
+            "--schema로 학습 데이터의 feature_schema.json을 주고, 모델이 그 스키마의 앞쪽 feature로 "
+            "학습됐는지 확인하세요.")
+    return [list(row[:count]) for row in rows]
+
+
 def _sample_rows(data_path: Path, count: int, seed: int) -> list[list[float | None]]:
     """실제 학습 데이터에서 뽑는다 — 결측 패턴이 진짜여야 default_left 경로가 실제로 밟힌다."""
     rng = random.Random(seed)
@@ -91,12 +116,18 @@ def main() -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--count", type=int, default=100)
     parser.add_argument("--seed", type=int, default=12345)
+    parser.add_argument("--schema", type=Path, default=None,
+                        help="학습 데이터의 feature_schema.json. 주지 않으면 학습 데이터 옆에서 찾는다. "
+                             "모델이 학습 줄보다 짧을 때(기준 계약 모델) 앞쪽 칸만 써도 되는지 확인하는 데 쓴다")
     args = parser.parse_args()
 
     model = json.loads(args.model.read_text(encoding="utf-8"))
     feature_count = len(model["feature_names"])
+    schema_path = args.schema or args.data.parent / "feature_schema.json"
+    schema_feature_names = (json.loads(schema_path.read_text(encoding="utf-8"))["feature_names"]
+                            if schema_path.exists() else None)
 
-    rows = _sample_rows(args.data, args.count, args.seed)
+    rows = rows_for_model(_sample_rows(args.data, args.count, args.seed), model, schema_feature_names)
     # 극단 두 개를 손으로 덧붙인다: 전부 결측(default_left 경로만), 전부 0(경계값 근처)
     rows.append([None] * feature_count)
     rows.append([0.0] * feature_count)

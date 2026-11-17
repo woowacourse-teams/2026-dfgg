@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dfgg.application.recommend.v3.feature.FeatureName;
+import dfgg.application.recommend.v3.feature.FeatureSchemaFingerprint;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -63,10 +63,10 @@ class LightGbmParityTest {
     }
 
     @Test
-    @DisplayName("fixture가 현재 스키마로 만들어졌다 — 낡은 fixture로 통과하는 일을 막는다")
-    void fixture_MatchesCurrentSchema() {
+    @DisplayName("fixture가 기준 계약으로 만들어졌다 — 낡은 fixture로 통과하는 일을 막는다")
+    void fixture_MatchesBaselineContract() {
         assertThat(fixture.get("schema_fingerprint").asText())
-                .isEqualTo(FeatureName.schemaFingerprint());
+                .isEqualTo(FeatureSchemaFingerprint.BASELINE);
         assertThat(fixture.get("cases")).isNotEmpty();
     }
 

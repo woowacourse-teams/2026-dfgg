@@ -31,6 +31,53 @@ class FeatureSchemaTest {
     }
 
     @Test
+    @DisplayName("기준 계약의 지문은 바뀌지 않는다 — 앞쪽 feature를 건드리면 지금 운영 모델이 다른 칸을 읽는다")
+    void baselineSchemaFingerprint_WhenBaselineFeaturesUntouched_MatchesBaselineConstant() {
+        // given: 기준 계약은 지금 운영 모델이 학습된 이름 목록이다. 뒤에 feature를 더해도 이 값은 그대로여야 한다.
+
+        // when
+        String actual = FeatureName.baselineSchemaFingerprint();
+
+        // then
+        assertThat(actual).isEqualTo(FeatureSchemaFingerprint.BASELINE);
+    }
+
+    @Test
+    @DisplayName("기준 계약의 이름은 스키마 맨 앞 50개다 — 순서까지 같아야 벡터의 같은 칸을 읽는다")
+    void baselineExportNames_WhenSchemaHasMoreFeatures_ReturnsTheFirstFifty() {
+        // given
+        int baselineCount = 50;
+
+        // when
+        var baseline = FeatureName.baselineExportNames();
+
+        // then
+        assertThat(baseline).hasSize(baselineCount);
+        assertThat(baseline).isEqualTo(FeatureName.exportNames().subList(0, baselineCount));
+        assertThat(baseline.getLast()).isEqualTo("tier_ordinal");
+    }
+
+    @Test
+    @DisplayName("게임 상황 feature 20개는 기준 계약 바로 뒤에 온다 — 이 순서가 새 모델의 칸 번호다")
+    void exportNames_WhenReadAfterBaseline_ListsSituationFeaturesInOrder() {
+        // given
+        int baselineCount = FeatureName.baselineExportNames().size();
+
+        // when
+        var appended = FeatureName.exportNames().subList(baselineCount, FeatureName.values().length);
+
+        // then
+        assertThat(appended).containsExactly(
+                "enemy_core_gold_sum", "enemy_spell_damage_gold_share",
+                "enemy_armor_gold_share", "enemy_spell_block_gold_share",
+                "enemy_kill_sum", "enemy_mage_kill_share", "enemy_assassin_kill_share",
+                "enemy_marksman_kill_share", "enemy_top_killer_kill_share",
+                "lane_level_lead", "lane_opponent_kills", "lane_core_gold_lead",
+                "my_level_lead", "my_kills", "my_deaths", "my_assists",
+                "team_kill_lead", "team_assist_lead", "team_level_lead", "team_core_gold_lead");
+    }
+
+    @Test
     @DisplayName("이름은 소문자 스네이크케이스로 내보낸다 — LightGBM feature_names와 그대로 대응한다")
     void featureNames_AreExportedAsSnakeCase() {
         assertThat(FeatureName.SOURCE_BUILD.exportName()).isEqualTo("source_build");

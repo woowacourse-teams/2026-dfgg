@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from dfgg_ltr.export_parity_sample import build_parity_sample
+from dfgg_ltr.export_parity_sample import build_parity_sample, rows_for_model
 from dfgg_ltr.reference_predict import predict_with_flat_trees
 
 # f0 <= 0.5 → 1.0, 아니면 2.0 / 결측은 오른쪽
@@ -106,3 +106,35 @@ class TestThresholdBoundaryRows:
         sample = build_parity_sample(MODEL, rows, boundary_case_count=len(rows))
 
         assert sample["boundary_case_count"] == len(rows)
+
+
+class TestRowsForModel:
+    """스키마 뒤에 feature가 더해진 뒤에도, 앞쪽 feature(기준 계약)로 학습한 모델의 fixture를 만들 수 있어야 한다."""
+
+    SCHEMA_NAMES = ["f0", "f1", "f2"]
+
+    def test_keeps_rows_that_already_match_the_model(self):
+        model = {"feature_names": ["f0", "f1", "f2"]}
+        rows = [[1.0, None, 3.0]]
+
+        assert rows_for_model(rows, model, self.SCHEMA_NAMES) == rows
+
+    def test_cuts_longer_rows_down_to_the_models_leading_features(self):
+        """학습 줄이 모델보다 길면 모델이 본 앞쪽 칸까지만 쓴다. 칸 번호가 그대로라 값이 어긋나지 않는다."""
+        model = {"feature_names": ["f0", "f1"]}
+
+        assert rows_for_model([[1.0, None, 3.0], [4.0, 5.0, 6.0]], model, self.SCHEMA_NAMES) == [
+            [1.0, None], [4.0, 5.0]]
+
+    def test_refuses_to_cut_when_the_model_is_not_trained_on_the_leading_features(self):
+        """중간 feature를 뺀 모델에 앞쪽 칸을 주면 엉뚱한 값으로 기대 점수를 만든다. 멈추고 알린다."""
+        model = {"feature_names": ["f0", "f2"]}
+
+        with pytest.raises(ValueError, match="앞쪽"):
+            rows_for_model([[1.0, 2.0, 3.0]], model, self.SCHEMA_NAMES)
+
+    def test_refuses_to_cut_without_a_schema_to_check_against(self):
+        model = {"feature_names": ["f0", "f1"]}
+
+        with pytest.raises(ValueError):
+            rows_for_model([[1.0, 2.0, 3.0]], model, None)

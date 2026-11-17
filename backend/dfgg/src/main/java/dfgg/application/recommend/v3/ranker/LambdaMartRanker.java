@@ -21,10 +21,21 @@ public class LambdaMartRanker implements CandidateRanker {
 
     private final FeatureExtractionPipeline pipeline;
     private final GradientBoostedTrees model;
+    private final String schemaFingerprint;
 
+    /** 지금 스키마 전체로 학습된 모델의 랭커. */
     public LambdaMartRanker(FeatureExtractionPipeline pipeline, GradientBoostedTrees model) {
+        this(pipeline, model, FeatureName.schemaFingerprint());
+    }
+
+    /**
+     * @param schemaFingerprint 모델이 학습된 계약의 지문. 모델 버전은 지금 스키마가 아니라 모델을 따라간다
+     *                          — 스키마 뒤에 feature를 더해도 같은 모델이면 버전이 그대로여야 한다.
+     */
+    public LambdaMartRanker(FeatureExtractionPipeline pipeline, GradientBoostedTrees model, String schemaFingerprint) {
         this.pipeline = pipeline;
         this.model = model;
+        this.schemaFingerprint = schemaFingerprint;
     }
 
     @Override
@@ -40,7 +51,7 @@ public class LambdaMartRanker implements CandidateRanker {
 
     @Override
     public String modelVersion() {
-        return "lambdamart-" + FeatureName.schemaFingerprint();
+        return "lambdamart-" + schemaFingerprint;
     }
 
     private double score(CandidateFeatures candidate) {
