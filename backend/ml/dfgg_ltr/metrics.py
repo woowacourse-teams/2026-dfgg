@@ -6,9 +6,14 @@ NDCG만으로는 "정답을 몇 위에 뒀는가"가 보이지 않아 MRR·HitRa
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 
 GROUND_TRUTH_GRADE = 3
+P_MIN = 0.02
+BOOTSTRAP_ROUNDS = 1000
+BOOTSTRAP_CHUNK = 100
 
 
 def _dcg(gains: np.ndarray) -> float:
@@ -92,3 +97,145 @@ def evaluate_ranking(
     }
     result["queries"] = scored_queries
     return result
+
+
+# --- 승률 지표 V: 모델 1순위를 따랐을 때의 승률 (self-normalized IPS) ---
+#   V   = Σ [1순위 = 실제 구매] · r / p  ÷  Σ [1순위 = 실제 구매] / p
+#   ESS = (Σ w)² / Σ w²
+
+
+@dataclass(frozen=True)
+class PolicyValue:
+    """V와 그 신뢰도. 1순위가 실제 구매와 같은 query가 없으면 V와 구간은 NaN이다.
+
+    coverage는 p와 승패를 모두 아는 query의 비율이고, observed_win은 그 query들의 관측 승률(비교 기준선)이다.
+    """
+
+    value: float
+    lower: float
+    upper: float
+    ess: float
+    matched: int
+    usable: int
+    coverage: float
+    clipped_share: float
+    observed_win: float
+
+
+def top1_matches(labels: np.ndarray, scores: np.ndarray, group: np.ndarray) -> np.ndarray:
+    """query마다 1순위가 실제로 산 아이템(등급 3)인지."""
+    bounds = np.concatenate([[0], np.cumsum(group)])
+    matches = np.zeros(len(group), dtype=bool)
+    for index, (start, end) in enumerate(zip(bounds[:-1], bounds[1:])):
+        top = start + int(np.argsort(-scores[start:end], kind="stable")[0])
+        matches[index] = labels[top] == GROUND_TRUTH_GRADE
+    return matches
+
+
+def policy_value(matches: np.ndarray, propensity: np.ndarray, win: np.ndarray, match_ids: list[str],
+                 p_min: float = P_MIN, rounds: int = BOOTSTRAP_ROUNDS, seed: int = 0) -> PolicyValue:
+    """p나 승패를 모르는 query는 0으로 세지 않고 건너뛴다. 구간은 경기 단위 부트스트랩이다(같은 경기의 query는 승패를 공유)."""
+    usable = _usable(propensity, win)
+    weights = _weights(matches, propensity, usable, p_min)
+    rewards = np.nan_to_num(win)
+    lower, upper = _bootstrap_interval([weights], rewards, match_ids, usable, rounds, seed)
+    matched = matches & usable
+    return PolicyValue(
+        value=_ratio((weights * rewards).sum(), weights.sum()),
+        lower=lower,
+        upper=upper,
+        ess=_effective_sample_size(weights),
+        matched=int(matched.sum()),
+        usable=int(usable.sum()),
+        coverage=float(usable.mean()),
+        clipped_share=_ratio(float((matched & (propensity < p_min)).sum()), float(matched.sum())),
+        observed_win=_ratio(rewards[usable].sum(), float(usable.sum())),
+    )
+
+
+def policy_value_difference(candidate_matches: np.ndarray, baseline_matches: np.ndarray, propensity: np.ndarray,
+                            win: np.ndarray, match_ids: list[str], p_min: float = P_MIN,
+                            rounds: int = BOOTSTRAP_ROUNDS, seed: int = 0) -> dict[str, float]:
+    """후보 V − 기준 V와 95% 구간. 같은 부트스트랩 표본으로 짝지어 재서 두 모델이 공유하는 흔들림을 지운다."""
+    usable = _usable(propensity, win)
+    rewards = np.nan_to_num(win)
+    candidate = _weights(candidate_matches, propensity, usable, p_min)
+    baseline = _weights(baseline_matches, propensity, usable, p_min)
+    difference = (_ratio((candidate * rewards).sum(), candidate.sum())
+                  - _ratio((baseline * rewards).sum(), baseline.sum()))
+    lower, upper = _bootstrap_interval([candidate, baseline], rewards, match_ids, usable, rounds, seed,
+                                       combine=lambda values: values[0] - values[1])
+    return {"difference": difference, "lower": lower, "upper": upper}
+
+
+def hit_rate_by_outcome(labels: np.ndarray, scores: np.ndarray, group: np.ndarray, win: np.ndarray,
+                        k: int = 5) -> dict[str, float]:
+    """이긴 게임과 진 게임의 HitRate@k, 그 차이(win lift = 승리 − 패배). 승패를 모르는 query는 뺀다."""
+    bounds = np.concatenate([[0], np.cumsum(group)])
+    hits = np.array([_nan_if_none(hit_rate_at_k(labels[start:end], scores[start:end], k))
+                     for start, end in zip(bounds[:-1], bounds[1:])])
+    scored = ~np.isnan(hits)
+    won = scored & (win == 1)
+    lost = scored & (win == 0)
+    win_rate = _ratio(hits[won].sum(), float(won.sum()))
+    loss_rate = _ratio(hits[lost].sum(), float(lost.sum()))
+    return {f"hit_rate@{k}_win": win_rate, f"hit_rate@{k}_loss": loss_rate, "win_lift": win_rate - loss_rate}
+
+
+def _nan_if_none(value: float | None) -> float:
+    if value is None:
+        return float("nan")
+    return value
+
+
+def _usable(propensity: np.ndarray, win: np.ndarray) -> np.ndarray:
+    return ~np.isnan(propensity) & ~np.isnan(win)
+
+
+def _weights(matches: np.ndarray, propensity: np.ndarray, usable: np.ndarray, p_min: float) -> np.ndarray:
+    """1순위가 실제 구매와 같고 쓸 수 있는 query만 1 / max(p, 하한), 나머지는 0."""
+    clipped = np.clip(np.nan_to_num(propensity, nan=1.0), p_min, None)
+    return np.where(matches & usable, 1.0 / clipped, 0.0)
+
+
+def _effective_sample_size(weights: np.ndarray) -> float:
+    squared = float((weights ** 2).sum())
+    if squared == 0.0:
+        return 0.0
+    return float(weights.sum() ** 2 / squared)
+
+
+def _ratio(numerator: float, denominator: float) -> float:
+    if denominator == 0:
+        return float("nan")
+    return float(numerator / denominator)
+
+
+def _bootstrap_interval(weight_sets: list[np.ndarray], rewards: np.ndarray, match_ids: list[str],
+                        usable: np.ndarray, rounds: int, seed: int,
+                        combine=lambda values: values[0]) -> tuple[float, float]:
+    """쓸 수 있는 query가 속한 경기를 복원 추출해 V(또는 V 차이)의 2.5%·97.5% 분위를 낸다."""
+    ids = np.asarray(match_ids)[usable]
+    if ids.size == 0:
+        return float("nan"), float("nan")
+    _, cluster = np.unique(ids, return_inverse=True)
+    clusters = cluster.max() + 1
+    sums = [(np.bincount(cluster, (w * rewards)[usable], clusters), np.bincount(cluster, w[usable], clusters))
+            for w in weight_sets]
+    rng = np.random.default_rng(seed)
+    samples = []
+    for start in range(0, rounds, BOOTSTRAP_CHUNK):
+        draws = rng.integers(0, clusters, (min(BOOTSTRAP_CHUNK, rounds - start), clusters))
+        values = []
+        for weighted_rewards, weight_totals in sums:
+            numerators = weighted_rewards[draws].sum(axis=1)
+            denominators = weight_totals[draws].sum(axis=1)
+            with np.errstate(invalid="ignore", divide="ignore"):
+                values.append(numerators / denominators)
+        samples.append(combine(values))
+    samples = np.concatenate(samples)
+    samples = samples[~np.isnan(samples)]
+    if samples.size == 0:
+        return float("nan"), float("nan")
+    lower, upper = np.percentile(samples, [2.5, 97.5])
+    return float(lower), float(upper)
