@@ -1,0 +1,6 @@
+[Unit]
+Description=Stop the dfgg ml instance when no runner job is active
+
+[Service]
+Type=oneshot
+ExecStart=/opt/dfgg/ml/idle-stop.sh
