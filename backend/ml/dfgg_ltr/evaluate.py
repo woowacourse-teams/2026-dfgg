@@ -21,7 +21,7 @@ from dfgg_ltr.metrics import (
     policy_value_difference,
     top1_matches,
 )
-from dfgg_ltr.reference_predict import predict_with_flat_trees
+from dfgg_ltr.reference_predict import predict_flat
 from dfgg_ltr.train import PARAMS, train
 
 METRIC_COLUMNS = ["ndcg@1", "ndcg@3", "ndcg@5", "mrr", "hit_rate@5"]
@@ -49,7 +49,7 @@ def model_scores(model: dict, dataset: Dataset) -> np.ndarray:
     if model["schema_fingerprint"] != dataset.schema_fingerprint:
         raise ValueError(
             f"모델과 데이터의 스키마 지문이 다릅니다: {model['schema_fingerprint']} != {dataset.schema_fingerprint}")
-    return np.array([predict_with_flat_trees(model["trees"], row) for row in dataset.features])
+    return predict_flat(model["trees"], dataset.features)
 
 
 def value_rows(dataset: Dataset, meta: QueryMeta, propensity: np.ndarray,

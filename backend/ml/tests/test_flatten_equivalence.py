@@ -48,3 +48,14 @@ def test_matches_even_for_rows_that_are_entirely_missing(booster_and_data):
     actual = np.array([predict_with_flat_trees(trees, row) for row in all_nan])
 
     np.testing.assert_allclose(actual, expected, rtol=0, atol=1e-9)
+
+
+def test_vectorized_traversal_matches_lightgbm_prediction(booster_and_data):
+    """행 전체를 한 번에 도는 구현도 같은 규약을 따른다. 모델 비교는 이 구현으로 수십만 행을 채점한다."""
+    from dfgg_ltr.reference_predict import predict_flat
+
+    booster, features = booster_and_data
+    trees = flatten_model(booster.dump_model())
+
+    np.testing.assert_allclose(predict_flat(trees, features), booster.predict(features, raw_score=True),
+                               rtol=0, atol=1e-9)

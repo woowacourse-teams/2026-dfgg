@@ -10,6 +10,8 @@ from __future__ import annotations
 import math
 from typing import Sequence
 
+import numpy as np
+
 
 def predict_with_flat_trees(trees: list[dict], row: Sequence[float]) -> float:
     """자식 인덱스가 0 이상이면 분기 노드, 음수면 잎(`-index - 1`)이다."""
@@ -27,4 +29,29 @@ def predict_with_flat_trees(trees: list[dict], row: Sequence[float]) -> float:
                 go_left = value <= tree["threshold"][node]
             node = tree["left"][node] if go_left else tree["right"][node]
         total += tree["leaf_value"][-node - 1]
+    return total
+
+
+def predict_flat(trees: list[dict], features: np.ndarray) -> np.ndarray:
+    """`predict_with_flat_trees`와 같은 규약을 행 전체에 한 번에 적용한다. 행마다 도는 참조 구현은 수십만 행에서 너무 느리다."""
+    total = np.zeros(len(features))
+    rows = np.arange(len(features))
+    for tree in trees:
+        if not tree["split_feature"]:
+            total += tree["leaf_value"][0]
+            continue
+        split_feature = np.asarray(tree["split_feature"])
+        threshold = np.asarray(tree["threshold"], dtype=np.float64)
+        default_left = np.asarray(tree["default_left"], dtype=bool)
+        left = np.asarray(tree["left"])
+        right = np.asarray(tree["right"])
+        node = np.zeros(len(features), dtype=np.int64)
+        active = node >= 0
+        while active.any():
+            current = node[active]
+            values = features[rows[active], split_feature[current]]
+            go_left = np.where(np.isnan(values), default_left[current], values <= threshold[current])
+            node[active] = np.where(go_left, left[current], right[current])
+            active = node >= 0
+        total += np.asarray(tree["leaf_value"], dtype=np.float64)[-node - 1]
     return total
