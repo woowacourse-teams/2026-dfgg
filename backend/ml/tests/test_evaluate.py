@@ -2,8 +2,18 @@
 import numpy as np
 import pytest
 
-from dfgg_ltr.dataset import Dataset
-from dfgg_ltr.evaluate import baseline_scores, render_report
+import json
+
+from dfgg_ltr.dataset import Dataset, QueryMeta
+from dfgg_ltr.evaluate import (
+    baseline_scores,
+    load_propensities,
+    model_scores,
+    render_report,
+    render_value_report,
+    value_rows,
+    value_section,
+)
 
 
 def make_dataset() -> Dataset:
@@ -71,3 +81,66 @@ class TestRenderReport:
         )
 
         assert "42" in report
+
+
+def make_value_inputs():
+    """query 4개(후보 2개씩). 0·1번은 첫 후보가 정답, 2·3번은 둘째 후보가 정답."""
+    dataset = Dataset(
+        features=np.zeros((8, 1)), labels=np.array([3, 0, 3, 0, 0, 3, 0, 3]), group=np.array([2, 2, 2, 2]),
+        qids=["q0", "q1", "q2", "q3"], feature_names=["f"], schema_fingerprint="abc")
+    meta = QueryMeta(qids=dataset.qids, match_ids=["A", "B", "C", "D"], win=np.array([1.0, 1.0, 0.0, 0.0]),
+                     purchase_minute=np.full(4, np.nan), team_gold_diff=np.full(4, np.nan),
+                     own_total_gold=np.full(4, np.nan))
+    first = np.array([1.0, 0.0] * 4)
+    second = np.array([0.0, 1.0] * 4)
+    return dataset, meta, first, second
+
+
+class TestValueReport:
+    def test_load_propensities_follows_query_order_and_marks_missing_as_nan(self, tmp_path):
+        path = tmp_path / "propensity-game.jsonl"
+        path.write_text("\n".join(json.dumps(row) for row in [
+            {"qid": "q2", "propensity": 0.4}, {"qid": "q1", "propensity": None}]), encoding="utf-8")
+
+        propensities = load_propensities(path, ["q1", "q2", "q3"])
+
+        assert np.isnan(propensities[0]) and propensities[1] == 0.4 and np.isnan(propensities[2])
+
+    def test_model_scores_rejects_a_model_built_for_another_schema(self):
+        with pytest.raises(ValueError, match="스키마 지문"):
+            model_scores({"schema_fingerprint": "other", "trees": []}, make_dataset())
+
+    def test_model_scores_walks_the_exported_trees(self):
+        tree = {"split_feature": [0], "threshold": [0.5], "default_left": [True],
+                "left": [-1], "right": [-2], "leaf_value": [-1.0, 1.0]}
+
+        scores = model_scores({"schema_fingerprint": "abc", "trees": [tree]}, make_dataset())
+
+        np.testing.assert_array_equal(scores, np.array([1.0, -1.0, -1.0]))
+
+    def test_value_rows_compare_each_method_with_the_reference(self):
+        dataset, meta, first, second = make_value_inputs()
+
+        rows = dict(value_rows(dataset, meta, np.full(4, 0.5), [("ref", first), ("other", second)], "ref"))
+
+        assert rows["ref"]["value"].value == 1.0
+        assert rows["ref"]["difference"]["difference"] == 0.0
+        assert rows["other"]["value"].value == 0.0
+        assert rows["other"]["difference"]["difference"] == -1.0
+        assert rows["ref"]["hit_rate@5_win"] == 1.0
+
+    def test_render_value_report_shows_value_difference_and_observed_win(self):
+        dataset, meta, first, second = make_value_inputs()
+        rows = value_rows(dataset, meta, np.full(4, 0.5), [("ref", first), ("other", second)], "ref")
+
+        report = render_value_report("game split", rows, "ref")
+
+        assert "기준: ref" in report
+        assert "| other | 0.0000" in report
+        assert "-100.00" in report
+        assert "관측 승률(같은 query): 0.5000" in report
+
+    def test_value_section_explains_why_it_is_skipped_without_propensities(self, tmp_path):
+        message = value_section(tmp_path / "train.jsonl", tmp_path / "schema.json", "game", tmp_path, [], "")
+
+        assert message.startswith("V 생략") and "propensity-game.jsonl" in message
