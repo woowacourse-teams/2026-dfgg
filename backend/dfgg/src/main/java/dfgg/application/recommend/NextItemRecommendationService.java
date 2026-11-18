@@ -10,6 +10,7 @@ import dfgg.application.recommend.v3.RecommendationQuery;
 import dfgg.application.recommend.v3.HardValidityFilter;
 import dfgg.application.recommend.v3.ItemCandidate;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
+import dfgg.application.recommend.v3.ranker.CoreRanking;
 import dfgg.application.recommend.v3.explanation.ChampionDirectory;
 import dfgg.application.recommend.v3.explanation.AllyEvidence;
 import dfgg.application.recommend.v3.explanation.CounterEvidence;
@@ -70,9 +71,8 @@ public class NextItemRecommendationService {
     private final ItemService itemService;
     private final List<CandidateGenerator> generators;
     private final HardValidityFilter hardValidityFilter;
-    private final CandidateRanker candidateRanker;
+    private final CoreRanking baseline;
     private final CandidateTopK candidateTopK;
-    private final TreeShapCalculator treeShapCalculator;
     private final ChampionDirectory championDirectory;
     private final ItemTraitCatalog itemTraitCatalog;
     private final ImageUrls imageUrls;
@@ -95,9 +95,8 @@ public class NextItemRecommendationService {
         this.itemService = itemService;
         this.generators = List.copyOf(generators);
         this.hardValidityFilter = hardValidityFilter;
-        this.candidateRanker = candidateRanker;
+        this.baseline = new CoreRanking(candidateRanker, treeShapCalculator);
         this.candidateTopK = candidateTopK;
-        this.treeShapCalculator = treeShapCalculator;
         this.championDirectory = championDirectory;
         this.itemTraitCatalog = itemTraitCatalog;
         this.imageUrls = imageUrls;
@@ -107,7 +106,12 @@ public class NextItemRecommendationService {
     public NextItemRecommendationResponse recommendNextItem(
             NextItemRecommendationRequest request, Language language) {
         Champion myChampion = championService.findChampionByName(request.myChampion().name());
-        RecommendationQuery query = toQuery(request, myChampion);
+        return recommend(request, toQuery(request, myChampion), baseline, language);
+    }
+
+    /** 순위를 매길 랭커 짝을 받아 파이프라인을 돈다. 어느 모델로 매길지는 부르는 쪽이 정한다. */
+    private NextItemRecommendationResponse recommend(
+            NextItemRecommendationRequest request, RecommendationQuery query, CoreRanking ranking, Language language) {
         if (query.position().isFullBuild(query.purchasedItemCount())) {
             return new NextItemRecommendationResponse(List.of());
         }
@@ -122,7 +126,7 @@ public class NextItemRecommendationService {
         Map<Long, Item> itemById = loadItems(union, query);
         CandidateUnion valid = hardValidityFilter.filter(union, query.purchasedItemIds(), itemById);
 
-        List<RankedCandidate> ranked = candidateRanker.rank(valid, query, TOP_N);
+        List<RankedCandidate> ranked = ranking.ranker().rank(valid, query, TOP_N);
         if (ranked.isEmpty()) {
             // 기존 v3와 같은 404 계약을 유지한다. 파이프라인을 갈아끼운 것이지
             // "추천할 게 없다"를 표현하는 방식까지 바꿀 이유는 없다.
@@ -138,7 +142,7 @@ public class NextItemRecommendationService {
         for (RankedCandidate candidate : ranked) {
             Item item = itemById.get(candidate.itemId());
             ItemCandidate evidence = valid.candidateOf(candidate.itemId());
-            logContributions(candidate, evidence);
+            logContributions(candidate, evidence, ranking);
 
             recommendedItems.add(RecommendedItemDto.of(item, imageUrls.itemOf(item.getItemId()),
                     new RecommendationDescription(
@@ -164,14 +168,14 @@ public class NextItemRecommendationService {
      * 순위를 매길 때 쓴 feature 벡터를 그대로 쓴다. 다시 계산하면 서빙 점수와 어긋날 수 있다.
      * DEBUG가 꺼져 있으면 SHAP을 아예 계산하지 않는다.
      */
-    private void logContributions(RankedCandidate candidate, ItemCandidate evidence) {
+    private void logContributions(RankedCandidate candidate, ItemCandidate evidence, CoreRanking ranking) {
         if (!log.isDebugEnabled()) {
             return;
         }
         GroupedContributions contributions = GroupedContributions.of(
-                treeShapCalculator.contributions(candidate.features().values()));
+                ranking.contributions().contributions(candidate.features().values()));
         log.debug("v3 ranking model={} itemId={} score={} sources={} baseValue={} contributions=[{}]",
-                candidateRanker.modelVersion(), candidate.itemId(), candidate.modelScore(),
+                ranking.ranker().modelVersion(), candidate.itemId(), candidate.modelScore(),
                 new TreeSet<>(evidence.sources()), contributions.baseValue(), contributions.describe());
     }
 
