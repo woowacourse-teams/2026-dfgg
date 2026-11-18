@@ -4,6 +4,7 @@ import dfgg.common.exception.AugmentDataRejectedException;
 import dfgg.common.exception.AugmentDataUnavailableException;
 import dfgg.common.exception.AugmentPatchNotFoundException;
 import dfgg.common.exception.ChampionNotFoundException;
+import dfgg.common.exception.ChampionPositionNotFoundException;
 import dfgg.common.exception.ComponentRecommendationUnavailableException;
 import dfgg.common.exception.InvalidDfScoreRequestException;
 import dfgg.common.exception.InvalidPatchException;
@@ -36,7 +37,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
-    @ExceptionHandler({NextItemRecommendationNotFoundException.class, AugmentPatchNotFoundException.class})
+    @ExceptionHandler({NextItemRecommendationNotFoundException.class, AugmentPatchNotFoundException.class,
+            ChampionPositionNotFoundException.class})
     public ProblemDetail handleNotFound(RuntimeException exception) {
         log.warn("404 찾지 못함: {}", exception.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());

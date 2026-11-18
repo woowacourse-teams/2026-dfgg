@@ -1,6 +1,7 @@
 package dfgg.application.recommend;
 
 import dfgg.application.champion.ChampionService;
+import dfgg.application.counter.ChampionPositionReader;
 import dfgg.application.recommend.component.ComponentPurchaseBundleMapper;
 import dfgg.application.recommend.component.ComponentRecommendationQuery;
 import dfgg.application.recommend.component.ComponentRecommendationRuntime;
@@ -11,6 +12,7 @@ import dfgg.application.recommend.situational.SituationalItemMapper;
 import dfgg.application.recommend.v3.ReportedGameState;
 import dfgg.domain.champion.Champion;
 import dfgg.presentation.dto.SituationalItemDto;
+import dfgg.common.exception.ChampionPositionNotFoundException;
 import dfgg.common.exception.ComponentRecommendationUnavailableException;
 import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.domain.champion.ChampionPosition;
@@ -56,6 +58,7 @@ public class NextItemRecommendationV4Service {
     private final NextItemRecommendationService coreRecommendations;
     private final ComponentRecommendationRuntime components;
     private final ChampionService champions;
+    private final ChampionPositionReader positions;
     private final CompositionFeatureCalculator compositions;
     private final ComponentPurchaseBundleMapper bundles;
     private final LeagueOfLegendsVersionProperties version;
@@ -64,13 +67,14 @@ public class NextItemRecommendationV4Service {
     private final MeterRegistry meterRegistry;
 
     public NextItemRecommendationV4Service(NextItemRecommendationService coreRecommendations,
-            ComponentRecommendationRuntime components, ChampionService champions,
+            ComponentRecommendationRuntime components, ChampionService champions, ChampionPositionReader positions,
             CompositionFeatureCalculator compositions, ComponentPurchaseBundleMapper bundles,
             LeagueOfLegendsVersionProperties version, SituationalComponentRuntime situational,
             SituationalItemMapper situationalItems, MeterRegistry meterRegistry) {
         this.coreRecommendations = coreRecommendations;
         this.components = components;
         this.champions = champions;
+        this.positions = positions;
         this.compositions = compositions;
         this.bundles = bundles;
         this.version = version;
@@ -106,13 +110,14 @@ public class NextItemRecommendationV4Service {
     }
 
     /** 부하 측정에서 어느 단계가 느린지 나누어 보도록 단계마다 이어지는 구간으로 시간을 잰다. */
-    private NextItemRecommendationV4Response recommend(NextItemRecommendationV4Request request, Language language,
+    private NextItemRecommendationV4Response recommend(NextItemRecommendationV4Request requested, Language language,
             Meters meters, CoreRecommendation coreRecommendation) {
         Timer.Sample prepare = Timer.start(meterRegistry);
-        String patch = operatingPatch(request.patch());
+        String patch = operatingPatch(requested.patch());
         if (!components.isAvailable()) {
             throw new ComponentRecommendationUnavailableException();
         }
+        NextItemRecommendationV4Request request = withMyPosition(requested);
         ItemResponse catalog = components.catalog();
         ItemInventory inventory = inventory(request, catalog);
         prepare.stop(meters.stage("prepare"));
@@ -133,6 +138,18 @@ public class NextItemRecommendationV4Service {
                 .toList(), situationalItems);
         component.stop(meters.stage("component"));
         return response;
+    }
+
+    /** 훈련모드에서 포지션을 비워 보내면 밴픽 상대 라인 예측과 같은 라인 분포에서 주 라인을 고른다. */
+    private NextItemRecommendationV4Request withMyPosition(NextItemRecommendationV4Request request) {
+        if (!request.isMyPositionMissing()) {
+            return request;
+        }
+        String name = request.myChampion().name();
+        long championId = champions.findChampionByName(name).getChampionId();
+        ChampionPosition position = positions.mainPositionOf(championId)
+                .orElseThrow(() -> new ChampionPositionNotFoundException(name));
+        return request.withMyPosition(position);
     }
 
     /** Core 추천을 받는 방법. 상태 없이 받는 v4와 상태와 함께 받는 새 API가 여기서만 갈린다. */

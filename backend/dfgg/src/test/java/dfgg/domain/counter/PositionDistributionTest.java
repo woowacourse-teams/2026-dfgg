@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import dfgg.domain.champion.ChampionPosition;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -81,5 +82,33 @@ class PositionDistributionTest {
 
         // then
         assertThat(shares).isEmpty();
+    }
+
+    @Test
+    @DisplayName("가장 많이 간 라인을 주 라인으로 고른다")
+    void mostPlayed_WhenGamesGiven_ReturnTopPosition() {
+        // given
+        PositionDistribution distribution = PositionDistribution.of(Map.of(
+                ChampionPosition.TOP, 34,
+                ChampionPosition.JUNGLE, 465));
+
+        // when
+        Optional<ChampionPosition> mostPlayed = distribution.mostPlayed();
+
+        // then
+        assertThat(mostPlayed).contains(ChampionPosition.JUNGLE);
+    }
+
+    @Test
+    @DisplayName("라인 기록이 없으면 주 라인이 없다")
+    void mostPlayed_WhenNoGames_ReturnEmpty() {
+        // given
+        PositionDistribution distribution = PositionDistribution.of(Map.of());
+
+        // when
+        Optional<ChampionPosition> mostPlayed = distribution.mostPlayed();
+
+        // then
+        assertThat(mostPlayed).isEmpty();
     }
 }
