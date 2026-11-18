@@ -57,8 +57,8 @@ class CounterServiceTest {
 
     @BeforeEach
     void setUp() {
-        counterService = new CounterService(positionStatsRepository, counterRepository, championRepository,
-                PICKS_PER_ENEMY);
+        counterService = new CounterService(new ChampionPositionReader(positionStatsRepository), counterRepository,
+                championRepository, PICKS_PER_ENEMY);
         given(positionStatsRepository.findDistinctPatches()).willReturn(List.of("16.9", "16.10"));
         given(championRepository.findAllById(any())).willAnswer(invocation -> {
             Iterable<Long> ids = invocation.getArgument(0);

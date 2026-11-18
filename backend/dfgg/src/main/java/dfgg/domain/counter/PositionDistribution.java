@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 한 챔피언의 현재 패치 라인 분포. 다섯 라인을 모두 담고 비율 내림차순으로 놓는다.
@@ -41,6 +42,13 @@ public class PositionDistribution {
                 .map(this::shareOf)
                 .sorted(BY_RATE_THEN_POSITION)
                 .toList();
+    }
+
+    /** 가장 많이 간 라인. 비율이 같으면 라인 순서로 앞선 라인이고, 기록이 없으면 비어 있다. */
+    public Optional<ChampionPosition> mostPlayed() {
+        return shares().stream()
+                .findFirst()
+                .map(PositionShare::position);
     }
 
     private PositionShare shareOf(ChampionPosition position) {

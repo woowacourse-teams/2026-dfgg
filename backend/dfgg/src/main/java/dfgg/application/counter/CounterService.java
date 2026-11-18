@@ -2,12 +2,9 @@ package dfgg.application.counter;
 
 import dfgg.common.exception.ChampionNotFoundException;
 import dfgg.common.exception.InvalidRecommendationRequestException;
-import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.champion.ChampionRepository;
 import dfgg.domain.counter.ChampionCounter;
 import dfgg.domain.counter.ChampionCounterRepository;
-import dfgg.domain.counter.ChampionPositionStats;
-import dfgg.domain.counter.ChampionPositionStatsRepository;
 import dfgg.domain.counter.PositionDistribution;
 import dfgg.domain.language.Language;
 import dfgg.domain.match.PatchVersion;
@@ -17,7 +14,6 @@ import dfgg.presentation.dto.response.CounterResponse.CounterPickResponse;
 import dfgg.presentation.dto.response.CounterResponse.EnemyCounterResponse;
 import dfgg.presentation.dto.response.CounterResponse.PositionShareResponse;
 import java.util.Collection;
-import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,18 +32,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CounterService {
 
-    private final ChampionPositionStatsRepository positionStatsRepository;
+    private final ChampionPositionReader positionReader;
     private final ChampionCounterRepository counterRepository;
     private final ChampionRepository championRepository;
     private final int picksPerEnemy;
 
     public CounterService(
-            ChampionPositionStatsRepository positionStatsRepository,
+            ChampionPositionReader positionReader,
             ChampionCounterRepository counterRepository,
             ChampionRepository championRepository,
             @Value("${counter.picks-per-enemy}") int picksPerEnemy
     ) {
-        this.positionStatsRepository = positionStatsRepository;
+        this.positionReader = positionReader;
         this.counterRepository = counterRepository;
         this.championRepository = championRepository;
         this.picksPerEnemy = picksPerEnemy;
@@ -56,8 +52,8 @@ public class CounterService {
     @Transactional(readOnly = true)
     public CounterResponse recommend(CounterRequest request, Language language) {
         validateChampions(request);
-        Optional<PatchVersion> patch = PatchVersion.latest(positionStatsRepository.findDistinctPatches());
-        Map<Integer, Map<ChampionPosition, Integer>> gamesByEnemy = gamesByEnemy(patch, request.enemies());
+        Optional<PatchVersion> patch = positionReader.latestPatch();
+        Map<Integer, PositionDistribution> distributions = distributionsOf(patch, request.enemies());
         Map<Integer, List<Integer>> countersByEnemy = countersByEnemy(request);
         Map<Integer, String> names = namesOf(request.enemies(), countersByEnemy, language);
 
@@ -65,7 +61,7 @@ public class CounterService {
                 .map(enemyId -> new EnemyCounterResponse(
                         enemyId,
                         names.get(enemyId),
-                        positionsOf(gamesByEnemy.getOrDefault(enemyId, Map.of())),
+                        positionsOf(distributions.getOrDefault(enemyId, PositionDistribution.of(Map.of()))),
                         countersOf(countersByEnemy.get(enemyId), names)))
                 .toList();
         return new CounterResponse(patch.map(PatchVersion::value).orElse(null), request.myPosition(), enemies);
@@ -104,19 +100,15 @@ public class CounterService {
         return championIds.stream().filter(championId -> !seen.add(championId)).distinct().toList();
     }
 
-    private Map<Integer, Map<ChampionPosition, Integer>> gamesByEnemy(
-            Optional<PatchVersion> patch, List<Integer> enemyIds) {
+    private Map<Integer, PositionDistribution> distributionsOf(Optional<PatchVersion> patch, List<Integer> enemyIds) {
         if (patch.isEmpty()) {
             return Map.of();
         }
-        return positionStatsRepository.findByPatchAndChampionIdIn(patch.get().value(), enemyIds).stream()
-                .collect(Collectors.groupingBy(ChampionPositionStats::getChampionId,
-                        Collectors.toMap(ChampionPositionStats::getPosition, ChampionPositionStats::getGames,
-                                Integer::sum, () -> new EnumMap<>(ChampionPosition.class))));
+        return positionReader.distributionsOf(patch.get(), enemyIds);
     }
 
-    private List<PositionShareResponse> positionsOf(Map<ChampionPosition, Integer> games) {
-        return PositionDistribution.of(games).shares().stream()
+    private List<PositionShareResponse> positionsOf(PositionDistribution distribution) {
+        return distribution.shares().stream()
                 .map(share -> new PositionShareResponse(share.position(), share.rate()))
                 .toList();
     }
