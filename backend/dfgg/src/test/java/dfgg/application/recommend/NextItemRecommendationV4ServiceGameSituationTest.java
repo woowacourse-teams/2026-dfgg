@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.champion.ChampionService;
+import dfgg.application.counter.ChampionPositionReader;
 import dfgg.application.recommend.component.ComponentCandidateFeatures;
 import dfgg.application.recommend.component.ComponentPurchaseBundleMapper;
 import dfgg.application.recommend.component.ComponentRecommendationRuntime;
@@ -88,7 +89,7 @@ class NextItemRecommendationV4ServiceGameSituationTest {
     }
 
     private NextItemRecommendationV4Service service(ComponentRecommendationRuntime runtime) {
-        return new NextItemRecommendationV4Service(core, runtime, champions, compositions,
+        return new NextItemRecommendationV4Service(core, runtime, champions, mock(ChampionPositionReader.class), compositions,
                 new ComponentPurchaseBundleMapper(images), new LeagueOfLegendsVersionProperties("16.18"),
                 SituationalComponentRuntime.disabled(), new SituationalItemMapper(images, new ItemTraitCatalog()),
                 meterRegistry);

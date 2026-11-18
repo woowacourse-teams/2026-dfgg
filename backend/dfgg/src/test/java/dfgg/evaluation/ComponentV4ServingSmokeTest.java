@@ -90,6 +90,7 @@ class ComponentV4ServingSmokeTest {
                     assertThat(runtime.isAvailable()).as("실제 모델·조회표·원격 카탈로그 준비").isTrue();
                     var catalog = runtime.catalog();
                     var service = new NextItemRecommendationV4Service(core, runtime, championService,
+                            org.mockito.Mockito.mock(dfgg.application.counter.ChampionPositionReader.class),
                             new CompositionFeatureCalculator(repository),
                             new ComponentPurchaseBundleMapper(new ImageUrls("smoke-test", "ap-northeast-2", patch)),
                             new LeagueOfLegendsVersionProperties(patch),

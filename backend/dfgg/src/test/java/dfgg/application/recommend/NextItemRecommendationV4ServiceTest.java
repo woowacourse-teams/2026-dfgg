@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import dfgg.domain.item.trait.ItemTraitCatalog;
 import dfgg.domain.language.Language;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.champion.ChampionService;
+import dfgg.application.counter.ChampionPositionReader;
 import dfgg.application.recommend.component.ComponentCandidateFeatures;
 import dfgg.application.recommend.component.ComponentPurchaseBundleMapper;
 import dfgg.application.recommend.component.ComponentRecommendationQuery;
@@ -26,10 +28,12 @@ import dfgg.application.recommend.component.ScoredPurchase;
 import dfgg.application.recommend.context.CompositionFeatureCalculator;
 import dfgg.application.recommend.v3.ranker.DecisionTree;
 import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
+import dfgg.common.exception.ChampionPositionNotFoundException;
 import dfgg.common.exception.ComponentRecommendationUnavailableException;
 import dfgg.common.exception.InvalidRecommendationRequestException;
 import dfgg.common.exception.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
+import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.image.ImageUrls;
 import dfgg.infrastructure.config.LeagueOfLegendsVersionProperties;
 import dfgg.infrastructure.external.dto.ItemResponse;
@@ -45,6 +49,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.Map;
+import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -58,6 +64,7 @@ class NextItemRecommendationV4ServiceTest {
     private final ComponentRecommendationService component = mock(ComponentRecommendationService.class);
     private final ChampionService champions = mock(ChampionService.class);
     private final CompositionFeatureCalculator compositions = mock(CompositionFeatureCalculator.class);
+    private final ChampionPositionReader positions = mock(ChampionPositionReader.class);
     private final ImageUrls images = new ImageUrls("assets", "ap-northeast-2", "16.18");
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
     private ItemResponse catalog;
@@ -373,6 +380,66 @@ class NextItemRecommendationV4ServiceTest {
         assertThat(service.recommendNextItem(request(null, List.of()), Language.KO_KR).recommendedItems().getFirst().purchaseBundle()).isNull();
     }
 
+    @Test
+    @DisplayName("훈련모드에서 포지션이 비어 있으면 주 라인으로 Core와 Component를 추천한다")
+    void recommendNextItem_WhenPracticePositionMissing_RecommendWithMainPosition() {
+        // given
+        prepareCore(List.of(coreItem(3133)));
+        when(positions.mainPositionOf(86)).thenReturn(Optional.of(ChampionPosition.JUNGLE));
+        when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
+                new TargetRecommendation(3133, Status.OK, List.of(purchase(1036, 1)), null)));
+        var request = practiceRequest("");
+
+        // when
+        var response = service.recommendNextItem(request, Language.KO_KR);
+
+        // then
+        assertThat(response.recommendedItems()).singleElement()
+                .satisfies(item -> assertThat(item.purchaseBundle()).isNotNull());
+        verify(core).recommendNextItem(new NextItemRecommendationRequest(new ChampionDto("Garen", "JUNGLE"),
+                List.of(), List.of(), List.of(), null, "16.18"), Language.KO_KR);
+        var captured = ArgumentCaptor.forClass(ComponentRecommendationQuery.class);
+        verify(component).recommend(captured.capture(), eq(catalog));
+        assertThat(captured.getValue().position()).isEqualTo(ChampionPosition.JUNGLE);
+        verify(compositions).calculate(List.of(), List.of());
+    }
+
+    @Test
+    @DisplayName("훈련모드라도 포지션을 보냈으면 주 라인을 찾지 않고 그 포지션으로 추천한다")
+    void recommendNextItem_WhenPracticePositionGiven_UseGivenPosition() {
+        // given
+        prepareCore(List.of(coreItem(3133)));
+        when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
+                new TargetRecommendation(3133, Status.NO_CANDIDATE, List.of(), null)));
+
+        // when
+        service.recommendNextItem(practiceRequest("TOP"), Language.KO_KR);
+
+        // then
+        verify(positions, never()).mainPositionOf(org.mockito.ArgumentMatchers.anyLong());
+        verify(core).recommendNextItem(new NextItemRecommendationRequest(new ChampionDto("Garen", "TOP"),
+                List.of(), List.of(), List.of(), null, "16.18"), Language.KO_KR);
+    }
+
+    @Test
+    @DisplayName("훈련모드에서 주 라인 기록도 없는 챔피언이면 추천하지 않고 알린다")
+    void recommendNextItem_WhenPracticePositionMissingAndNoStats_ThrowChampionPositionNotFoundException() {
+        // given
+        prepareCore(List.of(coreItem(3133)));
+        when(positions.mainPositionOf(86)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> service.recommendNextItem(practiceRequest(""), Language.KO_KR))
+                .isInstanceOf(ChampionPositionNotFoundException.class)
+                .hasMessageContaining("Garen");
+        verifyNoInteractions(core, component);
+    }
+
+    private NextItemRecommendationV4Request practiceRequest(String position) {
+        return new NextItemRecommendationV4Request(new ChampionDto("Garen", position), List.of(), List.of(),
+                List.of(), null, null, List.of(), 1000L, 600_000L, 3140);
+    }
+
     private io.micrometer.core.instrument.Timer stageTimer(String stage) {
         return meterRegistry.get(NextItemRecommendationV4Service.STAGE_METRIC).tag("stage", stage).timer();
     }
@@ -410,7 +477,7 @@ class NextItemRecommendationV4ServiceTest {
 
     private NextItemRecommendationV4Service service(ComponentRecommendationRuntime runtime,
             dfgg.application.recommend.situational.SituationalComponentRuntime situational) {
-        return new NextItemRecommendationV4Service(core, runtime, champions, compositions,
+        return new NextItemRecommendationV4Service(core, runtime, champions, positions, compositions,
                 new ComponentPurchaseBundleMapper(images), new LeagueOfLegendsVersionProperties("16.18"),
                 situational, new dfgg.application.recommend.situational.SituationalItemMapper(images, new ItemTraitCatalog()),
                 meterRegistry);

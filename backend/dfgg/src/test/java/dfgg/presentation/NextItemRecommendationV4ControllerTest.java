@@ -20,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.champion.ChampionService;
+import dfgg.application.counter.ChampionPositionReader;
 import dfgg.application.recommend.NextItemRecommendationService;
 import dfgg.application.recommend.component.ComponentRecommendationRuntime;
 import dfgg.application.recommend.component.ComponentRecommendationService;
@@ -28,6 +29,7 @@ import dfgg.application.recommend.v3.ranker.DecisionTree;
 import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
 import dfgg.common.exception.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
+import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.language.Language;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import dfgg.presentation.dto.RecommendationDescription;
@@ -35,8 +37,10 @@ import dfgg.presentation.dto.RecommendedItemDto;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -61,6 +65,7 @@ class NextItemRecommendationV4ControllerTest {
     @MockitoBean ComponentRecommendationRuntime runtime;
     @MockitoBean ChampionService champions;
     @MockitoBean CompositionFeatureCalculator compositions;
+    @MockitoBean ChampionPositionReader positions;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -131,6 +136,7 @@ class NextItemRecommendationV4ControllerTest {
             allies | [null,null,null,null] | allies
             enemies | [] | enemies
             myChampion | {"name":"champion10","position":"INVALID"} | position
+            myChampion | {"name":"champion10","position":""} | myChampion.position
             """)
     void 잘못된_입력은_서비스_호출_전에_400으로_거부한다(String field, String value, String detail) throws Exception {
         var request = JSON.readTree(body());
@@ -140,6 +146,43 @@ class NextItemRecommendationV4ControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.detail", containsString(detail)));
         verifyNoInteractions(core, runtime, champions, compositions);
+    }
+
+    @Test
+    @DisplayName("훈련모드 요청은 아군·적과 포지션이 없어도 주 라인으로 추천한다")
+    void recommendV4_WhenPracticeToolWithoutTeamsAndPosition_RecommendWithMainPosition() throws Exception {
+        // given
+        when(positions.mainPositionOf(10L)).thenReturn(Optional.of(ChampionPosition.JUNGLE));
+        String practice = """
+                {"myChampion":{"name":"champion10","position":""},"purchasedItemIds":[],
+                 "allies":[],"enemies":[],"queueId":3140,
+                 "inventoryItems":[{"itemId":1036,"quantity":1}],"availableGold":1000,"gameTimeMs":600000}
+                """;
+
+        // when & then
+        mvc.perform(post(ENDPOINT).contentType(MediaType.APPLICATION_JSON).content(practice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendedItems[0].id").value(3133));
+        verify(core).recommendNextItem(argThat(request -> "JUNGLE".equals(request.myChampion().position())
+                && request.allies().isEmpty() && request.enemies().isEmpty()), any());
+    }
+
+    @Test
+    @DisplayName("훈련모드에서 주 라인 기록이 없는 챔피언이면 404다")
+    void recommendV4_WhenPracticeToolAndNoPositionStats_ReturnNotFound() throws Exception {
+        // given
+        when(positions.mainPositionOf(10L)).thenReturn(Optional.empty());
+        String practice = """
+                {"myChampion":{"name":"champion10","position":""},"purchasedItemIds":[],
+                 "allies":[],"enemies":[],"queueId":3140,
+                 "inventoryItems":[],"availableGold":1000,"gameTimeMs":600000}
+                """;
+
+        // when & then
+        mvc.perform(post(ENDPOINT).contentType(MediaType.APPLICATION_JSON).content(practice))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+        verifyNoInteractions(core);
     }
 
     @Test
