@@ -124,4 +124,58 @@ describe('밴픽 흐름', () => {
       });
     });
   });
+
+  describe('밴픽 모드', () => {
+    it('협곡 큐면 mode 가 rift 다', async () => {
+      league.lcu.setResponse('GET', '/lol-gameflow/v1/session', {
+        gameData: { gameId: 1, queue: { id: 420, gameMode: 'CLASSIC' } },
+      });
+
+      app.champSelect.initChampSelect();
+      app.connection.startLcuConnection();
+
+      await vi.waitFor(() =>
+        expect(app.champSelect.getChampSelectState()?.counters).toEqual(COUNTERS),
+      );
+      expect(app.champSelect.getChampSelectState()?.mode).toBe('rift');
+    });
+
+    it('아수라장(KIWI)이면 추천 증강을 받고 협곡 추천은 요청하지 않는다', async () => {
+      league.lcu.setResponse('GET', '/lol-gameflow/v1/session', {
+        gameData: { gameId: 1, queue: { id: 2400, gameMode: 'KIWI' } },
+      });
+
+      const augments = {
+        patch: '16.22',
+        augments: [
+          {
+            augmentId: 1,
+            name: '빵과 버터',
+            rarity: 'silver',
+            rank: 1,
+            pickRate: 18.4,
+            iconUrl: '',
+            description: null,
+          },
+        ],
+      };
+      backend.setResponse('/api/aram-mayhem/champions/61/augments', augments);
+
+      app.champSelect.initChampSelect();
+      app.connection.startLcuConnection();
+
+      // 내 챔피언(61)의 추천 증강을 받아 화면 상태에 담는다
+      await vi.waitFor(() =>
+        expect(app.champSelect.getChampSelectState()?.mayhemAugments).toEqual(augments),
+      );
+      expect(app.champSelect.getChampSelectState()?.mode).toBe('mayhem');
+      // 협곡이었다면 이 사이에 요청이 나갔을 시간을 조금 기다린다
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const paths = backend.requests().map((r) => r.path);
+      expect(paths).not.toContain('/api/today-picks');
+      expect(paths).not.toContain('/api/counters');
+      expect(paths).not.toContain('/api/recommendations/runes');
+    });
+  });
 });

@@ -1,5 +1,35 @@
 import type { LcuEventMap } from '../main/lcu/events';
 
+// 화면 카드 한 장의 판정 결과.
+export interface MayhemCard {
+  box: { x: number; y: number; width: number; height: number };
+  augment: MayhemAugment | null;
+}
+
+// 아수라장 한 판. 증강 창이 카드를 찾는 동안 쓴다.
+export interface MayhemSession {
+  championId: number;
+}
+
+// 아수라장 타입
+export type AugmentRarity = 'silver' | 'gold' | 'prismatic';
+
+export interface MayhemAugment {
+  augmentId: number;
+  name: string;
+  rarity: AugmentRarity;
+  rank: number | null;
+  pickRate: number | null;
+  iconUrl: string;
+  /** 게임 카드 문구 요약. 평문이고 줄바꿈은 \n. 수치를 채우지 못한 증강은 null */
+  description: string | null;
+}
+
+export interface MayhemAugments {
+  patch: string;
+  augments: MayhemAugment[];
+}
+
 export type OverlayClickTarget = 'item' | 'situational' | 'collapse' | 'expand' | 'empty' | 'other';
 
 // 전적 카드에 하이라이트 보기 버튼을 그릴 때 필요
@@ -410,8 +440,13 @@ export interface Counters {
 /** 룬을 클라이언트에 넣지 못한 이유. no-slot 은 빈 룬 페이지 칸이 없을 때 */
 export type RuneApplyError = 'no-slot' | 'failed';
 
+export type ChampSelectMode = 'rift' | 'mayhem';
+
 /** 밴픽 화면에 그릴 것 전부. 밴픽이 아니면 null 로 보낸다. */
 export interface ChampSelectState {
+  mode: ChampSelectMode;
+  /** 아수라장 밴픽에서 내 챔피언의 추천 증강. 챔피언이 없거나 받는 중이면 null */
+  mayhemAugments: MayhemAugments | null;
   /** 추천에 쓰는 포지션. 배정이 없으면 사용자가 고른 포지션, 그것도 없으면 null */
   position: Position | null;
   /** 클라이언트가 포지션을 배정했는지. 블라인드·칼바람·사용자 설정은 false 라 화면에서 고르게 한다 */

@@ -31,17 +31,22 @@ const RES_DROP = 10; // 마나, 기력 10이상 감소 = 스킬 사용
 const SPELL_LEAD_SEC = 5; // 마나만 줄어든 신호는 맞기 (또는 킬) 5초 전까지만 인정
 
 // 하이라이트에 넣을 내 이벤트인지 (KillerName은 태그 없은 riotIdGameName과 같음)
+// export function isMyHighlight(e: LiveEvent, me: string) {
+//   switch (e.EventName) {
+//     case 'ChampionKill':
+//       return e.KillerName === me || (Array.isArray(e.Assisters) && e.Assisters.includes(me));
+//     case 'DragonKill':
+//     case 'BaronKill':
+//     case 'HeraldKill':
+//       return e.KillerName === me;
+//     default:
+//       return false;
+//   }
+// }
+
+// 하이라이트에 넣을 내 이벤트인지. 내가 챔피언을 처치한 순간만 (KillerName은 태그 없는 riotIdGameName과 같음)
 export function isMyHighlight(e: LiveEvent, me: string) {
-  switch (e.EventName) {
-    case 'ChampionKill':
-      return e.KillerName === me || (Array.isArray(e.Assisters) && e.Assisters.includes(me));
-    case 'DragonKill':
-    case 'BaronKill':
-    case 'HeraldKill':
-      return e.KillerName === me;
-    default:
-      return false;
-  }
+  return e.EventName === 'ChampionKill' && e.KillerName === me;
 }
 
 // 1초 사이에 교전 신호가 있었는지(없으면 null, 있으면 시각과 "체력이 깎였는지")

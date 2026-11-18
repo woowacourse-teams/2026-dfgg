@@ -17,6 +17,7 @@ import ChampSelectSection, { useChampSelect } from './components/ChampSelect/Cha
 import EmptyState from './components/EmptyState/EmptyState';
 import FeedbackModal from './components/feedback/FeedbackModal';
 import MatchSection from './components/MatchSection/MatchSection';
+import MayhemChampSelectSection from './components/MayhemChampSelect/MayhemChampSelectSection';
 import PostGameSection from './components/PostGameSection/PostGameSection';
 import ProfileHeader from './components/ProfileHeader/ProfileHeader';
 import QueueTabs from './components/QueueTabs/QueueTabs';
@@ -234,7 +235,8 @@ function App() {
   return (
     <div className='app'>
       <ProfileHeader
-        summoner={currentSummoner}
+        // 밴픽 중에는 소환사 배너를 내리고 제목줄만 남긴다. 추천을 한 화면에 더 담는다
+        summoner={champSelect ? null : currentSummoner}
         backdropUrl={backdropUrl}
         onOpenSetting={() => {
           setIsSettingOpen(true);
@@ -246,7 +248,11 @@ function App() {
       {currentSummoner && champSelect ? (
         // 밴픽 중에는 전적 대신 밴픽 화면. 포지션이 배정되지 않는 큐는 화면에서 고르게 한다
         <main className='content'>
-          <ChampSelectSection state={champSelect} />
+          {champSelect.mode === 'mayhem' ? (
+            <MayhemChampSelectSection state={champSelect} />
+          ) : (
+            <ChampSelectSection state={champSelect} />
+          )}
         </main>
       ) : currentSummoner ? (
         <main className='content'>

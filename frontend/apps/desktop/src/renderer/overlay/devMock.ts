@@ -1,6 +1,6 @@
 /**
  * 브라우저에서 overlay 화면을 바로 열어 볼 때 쓰는 가짜 preload API.
- * 개발 서버에서만 번들에 들어간다(webpack.config.js).
+ * 개발 서버에서만 번들에 들어간다(webpack.renderer.js).
  *
  * 주소에 값을 붙여 상태를 바꾼다.
  *   /overlay/index.html                 게임 중 · 추천 5개 (기본)

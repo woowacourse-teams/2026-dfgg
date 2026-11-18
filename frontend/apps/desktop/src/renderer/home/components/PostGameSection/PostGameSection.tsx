@@ -11,6 +11,7 @@ import type {
   MatchSummary,
 } from '../../../../shared/types';
 import { t } from '../../../i18n';
+import HighlightNotice from '../HighlightSection/HighlightNotice';
 import HighlightPlayer from '../HighlightSection/HighlightPlayer';
 import { MatchCard } from '../MatchSection/MatchSection';
 
@@ -29,6 +30,7 @@ function PostGameSection({
   const [progress, setProgress] = useState<HighlightProgress | null>(null); // 만드는 중
   const [game, setGame] = useState<HighlightGame | null>(null); // 다 만든 방금 판
   const [closed, setClosed] = useState(false); // 사용자가 ✕를 눌렀는지
+  const [empty, setEmpty] = useState(false); // 다 만들었는데 남길 장면이 없었는지
   // 방금 판 DF 스코어. 어느 판 것인지 같이 들고 있어야 다음 판에 이전 점수가 안 남는다
   const [df, setDf] = useState<{ gameId: number; scores: DfScores | null } | null>(null);
 
@@ -36,6 +38,7 @@ function PostGameSection({
     () =>
       window.highlight.onProgress((p) => {
         setClosed(false); // 새 판이 끝나면 다시 보여준다
+        setEmpty(false);
         if (!p.finished) {
           setProgress(p);
           return;
@@ -45,6 +48,8 @@ function PostGameSection({
         window.highlight.list().then((list) => {
           const found = list.find((g) => g.id === p.id) ?? null;
           setGame(found);
+          // 클립이 0개면 목록에 없다. 섹션을 통째로 숨기지 않고 '남길 장면이 없었다'고 알린다
+          setEmpty(!found);
           if (found)
             window.analytics.track('postgame-highlight-show', {
               clips: found.clips.length,
@@ -79,7 +84,7 @@ function PostGameSection({
   const myScore = match && dfScores ? dfScores[match.participantId] : undefined;
 
   if (closed || NEXT_GAME_PHASES.includes(phase)) return null;
-  if (!progress && !game) return null;
+  if (!progress && !game && !empty) return null;
 
   return (
     <section className='postgame'>
@@ -101,11 +106,9 @@ function PostGameSection({
         </button>
       </div>
 
-      {progress && (
-        <p className='postgame-progress'>
-          {t.highlight.makingShort(progress.done, progress.total)}
-        </p>
-      )}
+      {progress && <HighlightNotice kind='making' done={progress.done} total={progress.total} />}
+
+      {empty && !progress && <HighlightNotice kind='empty' />}
 
       {game && (
         <>

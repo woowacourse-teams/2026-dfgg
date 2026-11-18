@@ -52,7 +52,7 @@ const TRINKET_SLOT = 6;
 const RAW_CHAMPION_NAME_PATTERNS = [/^game_character_displayname_(\w+)$/, /^Character_(\w+)_Name$/];
 
 // 형식에 기대지 않도록 '_' 로 나눈 조각 중 ddragon 챔피언 id 와 같은 것을 먼저 찾는다.
-function toChampionAlias(rawChampionName: string, championNames?: Record<string, string>) {
+export function toChampionAlias(rawChampionName: string, championNames?: Record<string, string>) {
   const known = rawChampionName.split('_').find((part) => championNames?.[part]);
   if (known) return known;
 

@@ -1,5 +1,7 @@
 import { BrowserWindow } from 'electron';
-import { GameflowPhase } from '../../shared/types';
+import type { GameflowPhase } from '../../shared/types';
+import { isOverlayQueue } from '../lcu/queue';
+import { getLcuState } from '../lcu/state';
 
 let overlayWindow: BrowserWindow | null = null;
 let enabled = true;
@@ -17,8 +19,9 @@ export function initOverlayVisibility(win: BrowserWindow, initialEnabled: boolea
   apply();
 }
 
-export function updateOverlayPhase(phase: GameflowPhase | null) {
-  inGame = phase === 'InProgress';
+export async function updateOverlayPhase(phase: GameflowPhase | null) {
+  const show = phase === 'InProgress' && (await isOverlayQueue());
+  inGame = show && getLcuState().phase === 'InProgress';
   apply();
 }
 
