@@ -24,9 +24,12 @@ export async function fetchQueue() {
 /** 소환사의 협곡 기본 모드. 사용자 설정 게임은 큐 id 가 없어 모드로 가른다 */
 const CLASSIC_MODE = 'CLASSIC';
 
+/** 훈련모드. 큐 id(3140)가 있지만 협곡 일반·랭크 큐와 섞이지 않게 모드로 가른다 */
+const PRACTICE_TOOL_MODE = 'PRACTICETOOL';
+
 /**
  * 오버레이를 띄울 판인지.
- * 협곡 일반·랭크 큐이거나, 협곡에서 하는 사용자 설정 게임이면 띄운다.
+ * 협곡 일반·랭크 큐, 협곡에서 하는 사용자 설정 게임, 훈련모드면 띄운다.
  * 사용자 설정 게임은 큐 정보가 비어 있어서 map.gameMode(없으면 queue.gameMode)로 모드를 본다.
  */
 export function isOverlayGame(session: LcuGameflowSession | null): boolean {
@@ -34,6 +37,7 @@ export function isOverlayGame(session: LcuGameflowSession | null): boolean {
   const { gameData, map } = session;
   if (OVERLAY_QUEUES.has(gameData.queue.id)) return true;
   const mode = map?.gameMode || gameData.queue.gameMode;
+  if (mode === PRACTICE_TOOL_MODE) return true;
   return gameData.isCustomGame === true && mode === CLASSIC_MODE;
 }
 
