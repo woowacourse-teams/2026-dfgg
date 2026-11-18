@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 챔피언·포지션의 추천 패치 룬 기록에서 페이지를 골라, 이름과 이미지를 붙여 내려준다.
+ * 최신 패치에서 추천이 안 나오면 이전 패치 후보로 넘어간다.
  * 이름은 룬 카탈로그에서, 이미지는 추천 패치 폴더에서 가져오므로 Data Dragon을 부르지 않는다.
  */
 @Service
@@ -66,22 +67,36 @@ public class RuneRecommendationService {
     public RuneRecommendationResponse recommend(ChampionDto myChampion, Language language) {
         Champion champion = champions.findChampionByName(myChampion.name());
         ChampionPosition position = ChampionPosition.valueOf(myChampion.position());
-        return recommendationPatch.current()
-                .map(patch -> recommend(champion, position, patch, language))
-                .orElseGet(RuneRecommendationResponse::withoutPatch);
+        List<String> patches = recommendationPatch.candidates();
+        if (patches.isEmpty()) {
+            return RuneRecommendationResponse.withoutPatch();
+        }
+        String latest = patches.getFirst();
+        RuneRecommendation latestRecommendation = recommendationOf(champion, position, latest);
+        if (!latestRecommendation.pages().isEmpty()) {
+            return toResponse(latestRecommendation, latest, language);
+        }
+        for (String patch : patches.subList(1, patches.size())) {
+            RuneRecommendation recommendation = recommendationOf(champion, position, patch);
+            if (!recommendation.pages().isEmpty()) {
+                return toResponse(recommendation, patch, language);
+            }
+        }
+        // 어느 패치에서도 추천이 안 나오면 최신 패치의 판 수를 알린다.
+        return new RuneRecommendationResponse(latest, latestRecommendation.games(), List.of());
     }
 
-    private RuneRecommendationResponse recommend(Champion champion, ChampionPosition position, String patch,
-                                                 Language language) {
+    private RuneRecommendation recommendationOf(Champion champion, ChampionPosition position, String patch) {
         List<RunePage> pages = participantRunes.findByChampionIdAndPositionInAndPatch(
                         Math.toIntExact(champion.getChampionId()), positions.riotValuesOf(position), patch)
                 .stream()
                 .map(NormalizedMatchParticipantRune::runePage)
                 .toList();
-        RuneRecommendation recommendation = new RunePageSamples(pages).recommend(policy);
-        if (recommendation.pages().isEmpty()) {
-            return new RuneRecommendationResponse(patch, recommendation.games(), List.of());
-        }
+        return new RunePageSamples(pages).recommend(policy);
+    }
+
+    private RuneRecommendationResponse toResponse(RuneRecommendation recommendation, String patch,
+                                                  Language language) {
         // 카탈로그는 계열·룬·파편을 합쳐 백 개가 안 되므로 통째로 읽는다.
         Map<Integer, Rune> catalog = runes.findAll().stream().collect(toMap(Rune::runeId, Function.identity()));
         List<RecommendedRunePageDto> recommended = recommendation.pages().stream()
