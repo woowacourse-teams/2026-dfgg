@@ -140,9 +140,9 @@ public class NextItemRecommendationV4Service {
         return response;
     }
 
-    /** 훈련모드에서 포지션을 비워 보내면 밴픽 상대 라인 예측과 같은 라인 분포에서 주 라인을 고른다. */
+    /** 훈련모드에서 포지션을 비우거나 라인이 아닌 값으로 보내면 밴픽 상대 라인 예측과 같은 라인 분포에서 주 라인을 고른다. */
     private NextItemRecommendationV4Request withMyPosition(NextItemRecommendationV4Request request) {
-        if (!request.isMyPositionMissing()) {
+        if (!request.isMyPositionUnknown()) {
             return request;
         }
         String name = request.myChampion().name();

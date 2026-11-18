@@ -4,12 +4,12 @@ import dfgg.domain.champion.ChampionPosition;
 import dfgg.presentation.dto.ChampionDto;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
-import java.util.Arrays;
 import java.util.List;
 
 /**
  * 일반 게임은 아군 4명·적 5명과 모든 포지션이 필수다.
- * 훈련모드·사용자 설정 게임은 그보다 적은 인원과 빈 포지션을 받는다. 이름과 적은 포지션의 형식은 큐와 무관하게 본다.
+ * 훈련모드·사용자 설정 게임은 그보다 적은 인원을 받고 포지션은 보지 않는다. 라인이 없어 Live API가 NONE 등을 준다.
+ * 이름은 큐와 무관하게 본다.
  */
 public class TeamRosterValidator implements ConstraintValidator<ValidTeamRoster, NextItemRecommendationV4Request> {
 
@@ -85,20 +85,16 @@ public class TeamRosterValidator implements ConstraintValidator<ValidTeamRoster,
 
     /** 위반이 없으면 null이다. */
     private String positionViolationOf(String position, boolean freeRoster) {
-        if (isBlank(position)) {
-            return blankPositionViolation(freeRoster);
-        }
-        if (Arrays.stream(ChampionPosition.values()).noneMatch(value -> value.name().equals(position))) {
-            return POSITION_FORMAT;
-        }
-        return null;
-    }
-
-    private String blankPositionViolation(boolean freeRoster) {
         if (freeRoster) {
             return null;
         }
-        return POSITION_REQUIRED;
+        if (isBlank(position)) {
+            return POSITION_REQUIRED;
+        }
+        if (!ChampionPosition.isName(position)) {
+            return POSITION_FORMAT;
+        }
+        return null;
     }
 
     private boolean isBlank(String value) {

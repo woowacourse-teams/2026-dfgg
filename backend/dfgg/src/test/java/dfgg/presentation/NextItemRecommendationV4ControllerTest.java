@@ -44,6 +44,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -148,16 +149,18 @@ class NextItemRecommendationV4ControllerTest {
         verifyNoInteractions(core, runtime, champions, compositions);
     }
 
-    @Test
-    @DisplayName("훈련모드 요청은 아군·적과 포지션이 없어도 주 라인으로 추천한다")
-    void recommendV4_WhenPracticeToolWithoutTeamsAndPosition_RecommendWithMainPosition() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"", "NONE"})
+    @DisplayName("훈련모드 요청은 아군·적이 없고 포지션이 비었거나 라인이 아니어도 주 라인으로 추천한다")
+    void recommendV4_WhenPracticeToolWithoutTeamsAndPosition_RecommendWithMainPosition(String position)
+            throws Exception {
         // given
         when(positions.mainPositionOf(10L)).thenReturn(Optional.of(ChampionPosition.JUNGLE));
         String practice = """
-                {"myChampion":{"name":"champion10","position":""},"purchasedItemIds":[],
+                {"myChampion":{"name":"champion10","position":"%s"},"purchasedItemIds":[],
                  "allies":[],"enemies":[],"queueId":3140,
                  "inventoryItems":[{"itemId":1036,"quantity":1}],"availableGold":1000,"gameTimeMs":600000}
-                """;
+                """.formatted(position);
 
         // when & then
         mvc.perform(post(ENDPOINT).contentType(MediaType.APPLICATION_JSON).content(practice))

@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class ChampionPositionTest {
 
@@ -52,5 +54,28 @@ class ChampionPositionTest {
 
         // then
         assertThat(fullBuild).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"TOP", "JUNGLE", "MID", "BOTTOM", "SUPPORT"})
+    @DisplayName("다섯 라인 이름이면 라인이다")
+    void isName_WhenLaneName_ReturnTrue(String value) {
+        // when
+        boolean lane = ChampionPosition.isName(value);
+
+        // then
+        assertThat(lane).isTrue();
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"NONE", "MIDDLE", "UTILITY", "top", " "})
+    @DisplayName("비었거나 NONE·Riot 표기·소문자면 라인이 아니다")
+    void isName_WhenNotLaneName_ReturnFalse(String value) {
+        // when
+        boolean lane = ChampionPosition.isName(value);
+
+        // then
+        assertThat(lane).isFalse();
     }
 }
