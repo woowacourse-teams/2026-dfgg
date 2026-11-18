@@ -8,19 +8,20 @@
 - game test 중 최신 패치: query ≥ 1,000일 때만 같은 두 기준. 적으면 건너뛰고 보고한다(새 패치 직후)
 - 승률 V·ESS는 행동 모델 결과(propensity)가 있으면 보고만 한다. 판정에 넣는 것은 몇 회차 본 뒤 승인받는다
 
-종료 코드: 0 통과, 1 기준 미달, 2 표본 부족(game test 전체).
+종료 코드: 0 통과, 1 기준 미달, 2 표본 부족(game test 전체), 3 비교 자체의 오류.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 
-from dfgg_ltr.dataset import Dataset, QueryMeta, load_dataset, load_query_meta
+from dfgg_ltr.dataset import Dataset, QueryMeta, baseline_view, load_dataset, load_query_meta
 from dfgg_ltr.evaluate import load_propensities, model_scores
 from dfgg_ltr.metrics import evaluate_ranking, policy_value, policy_value_difference, top1_matches
 from dfgg_ltr.propensity import select_queries
@@ -35,6 +36,8 @@ INSUFFICIENT_PREFIX = "표본 부족"
 PASSED = 0
 REJECTED = 1
 INSUFFICIENT_SAMPLE = 2
+# 예외로 끝나면 파이썬은 1을 낸다. 기준 미달과 헷갈리지 않게 따로 둔다.
+ERROR = 3
 
 
 @dataclass
@@ -91,6 +94,13 @@ def win_rate_report(dataset: Dataset, propensity: np.ndarray, win: np.ndarray, m
         "delta_v_upper": difference["upper"], "observed_win": current.observed_win,
         "coverage": current.coverage,
     }
+
+
+def scores_for(model: dict, dataset: Dataset) -> np.ndarray:
+    """모델 지문에 맞는 열로 점수를 낸다. 기준 계약 모델은 앞쪽 feature만 쓴다."""
+    if model["schema_fingerprint"] == dataset.baseline_schema_fingerprint:
+        return model_scores(model, baseline_view(dataset))
+    return model_scores(model, dataset)
 
 
 def exit_code(comparisons: list[SliceComparison]) -> int:
@@ -199,7 +209,7 @@ def main() -> None:
 
     comparisons = compare(
         dataset, meta, latest_patch(meta.patches + train_meta.patches),
-        model_scores(current_model, dataset), model_scores(candidate_model, dataset),
+        scores_for(current_model, dataset), scores_for(candidate_model, dataset),
         load_propensity_if_present(args.propensity_dir, dataset, meta),
         args.min_total_queries, args.min_latest_patch_queries)
     code = exit_code(comparisons)
@@ -216,4 +226,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        traceback.print_exc()
+        sys.exit(ERROR)
