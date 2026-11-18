@@ -1,6 +1,10 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { cutTitle, titleMask } from '../titleStrip';
-import type { Gray } from '../titleMatch';
+import { pickByTitle, type Gray } from '../titleMatch';
 
 const WIDTH = 100;
 const HEIGHT = 60;
@@ -73,5 +77,29 @@ describe('titleMask', () => {
         CARD_HEIGHT,
       )?.height,
     ).toBe(32);
+  });
+});
+
+describe('작은 화면의 실제 제목', () => {
+  // 1280×800 창 모드에서 찍은 "위력 추구" 제목 띠와, 헷갈리던 두 견본
+  const fixture = JSON.parse(
+    gunzipSync(
+      readFileSync(join(__dirname, '../../../../test/fixtures/augments/low-res-title.json.gz')),
+    ).toString(),
+  ) as {
+    strip: { width: number; height: number; data: number[] };
+    candidates: { name: string; width: number; height: number; data: number[] }[];
+  };
+
+  it('흐린 얇은 획도 살려 "가속 추구"와 가른다', () => {
+    const strip = { ...fixture.strip, data: Uint8Array.from(fixture.strip.data) };
+    const mask = titleMask(strip, strip.height / 0.13)!;
+    const candidates = fixture.candidates.map(({ name, width, height, data }) => ({
+      candidate: name,
+      mask: { width, height, data: Float32Array.from(data) },
+    }));
+    const result = pickByTitle(mask, candidates);
+    expect(result.kind).toBe('picked');
+    expect(result.picked).toBe('위력 추구');
   });
 });

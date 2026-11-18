@@ -19,11 +19,19 @@ export type Crop = { left: number; right: number; bottom: number };
 // 화면 제목 띠에서 버릴 부분: 양옆 카드 테두리, 아래 태그
 export const SCREEN_CROP: Crop = { left: 0.04, right: 0.04, bottom: 0.28 };
 
+/**
+ * 밝기를 0~1로 옮길 범위. low 이하는 0(배경), high 이상은 1(글자), 사이는 비례.
+ * 화면이 작으면 1픽셀 획이 두 픽셀에 걸쳐 흐리게 찍히는데, 0/1로 자르면 그 획이 통째로 사라진다.
+ */
+export type Soft = { low: number; high: number };
+
 // threshold 보다 밝은 픽셀(글자)만 남겨 글자 영역으로 자르고 높이를 MASK_HEIGHT로 맞춘다.
+// soft 를 주면 글자 영역은 threshold 로 찾고, 값은 0/1 대신 밝기에 비례해 넣는다.
 export function toMask(
   image: Gray,
   threshold: number,
   crop: Crop = { left: 0, right: 0, bottom: 0 },
+  soft?: Soft,
 ): Mask | null {
   const { width, height, data } = image;
 
@@ -49,13 +57,18 @@ export function toMask(
   }
   if (right < 0) return null; // 글자 픽셀이 하나도 없다
 
-  // 3. 그 사각형만 0/1로 옮기기
+  // 3. 그 사각형만 0~1로 옮기기
   const bw = right - left + 1;
   const bh = bottom - top + 1;
   const binary = new Float32Array(bw * bh);
   for (let y = 0; y < bh; y++) {
     for (let x = 0; x < bw; x++) {
-      binary[y * bw + x] = data[(top + y) * width + left + x] > threshold ? 1 : 0;
+      const value = data[(top + y) * width + left + x];
+      binary[y * bw + x] = soft
+        ? Math.min(1, Math.max(0, (value - soft.low) / (soft.high - soft.low)))
+        : value > threshold
+          ? 1
+          : 0;
     }
   }
 
@@ -207,10 +220,77 @@ export function titleScore(screen: Mask, candidate: Mask): number {
  */
 const SKIP_BELOW = MIN_TITLE_SCORE - MIN_TITLE_LEAD;
 
+// 헷갈림을 다시 가를 때, 두 후보가 다른 부분에서 이긴 쪽이 이만큼은 앞서야 한다
+const TIE_LEAD = 0.25;
+// 다시 가를 때 이긴 쪽 점수가 이보다 낮으면 둘 다 아닌 것으로 본다 (파편 같은 엉뚱한 카드)
+const TIE_MIN_SCORE = 0.4;
+// 두 후보가 가장 많이 다른 곳도 이보다 덜 다르면, 사실상 같은 모양이라 가를 수 없다
+const TIE_MIN_DIFF = 0.2;
+
+/** 무게를 준 상관계수. 무게가 큰 픽셀일수록 결과에 많이 반영된다 */
+function weightedCorrelation(x: Float32Array, y: Float32Array, weight: Float32Array): number {
+  let total = 0;
+  let meanX = 0;
+  let meanY = 0;
+  for (let i = 0; i < weight.length; i++) {
+    total += weight[i];
+    meanX += weight[i] * x[i];
+    meanY += weight[i] * y[i];
+  }
+  if (!total) return 0;
+  meanX /= total;
+  meanY /= total;
+
+  let xy = 0;
+  let xx = 0;
+  let yy = 0;
+  for (let i = 0; i < weight.length; i++) {
+    const dx = x[i] - meanX;
+    const dy = y[i] - meanY;
+    xy += weight[i] * dx * dy;
+    xx += weight[i] * dx * dx;
+    yy += weight[i] * dy * dy;
+  }
+  return xx && yy ? xy / Math.sqrt(xx * yy) : 0;
+}
+
+/**
+ * 1등과 2등이 헷갈릴 때, 두 후보가 서로 다른 픽셀에만 무게를 두고 화면과 다시 비교한다.
+ * "위력 추구"와 "가속 추구"처럼 같은 글자를 나눠 가진 제목은 같은 부분이 점수를 끌어올려 차이가 안 난다.
+ * 다른 부분("위력" / "가속")만 보면 맞는 쪽은 높고 틀린 쪽은 낮게 갈린다. 가를 수 없으면 null
+ */
+function breakTie(screen: PreparedScreen, a: Mask, b: Mask): 'a' | 'b' | null {
+  const { width, height } = screen;
+  const shapeA = blur(resample(a.data, a.width, a.height, width, height), width, height);
+  const shapeB = blur(resample(b.data, b.width, b.height, width, height), width, height);
+
+  const weight = new Float32Array(shapeA.length);
+  let maxDiff = 0;
+  for (let i = 0; i < weight.length; i++) {
+    weight[i] = Math.abs(shapeA[i] - shapeB[i]);
+    if (weight[i] > maxDiff) maxDiff = weight[i];
+  }
+  if (maxDiff < TIE_MIN_DIFF) {
+    console.log('[mayhem] 재비교 불가: 두 견본이 거의 같음', maxDiff.toFixed(3));
+    return null;
+  }
+
+  const scoreA = weightedCorrelation(screen.centered, shapeA, weight);
+  const scoreB = weightedCorrelation(screen.centered, shapeB, weight);
+  console.log(
+    '[mayhem] 재비교',
+    `1등 ${scoreA.toFixed(3)} 2등 ${scoreB.toFixed(3)} 최대차 ${maxDiff.toFixed(3)}`,
+  );
+  if (scoreA >= TIE_MIN_SCORE && scoreA - scoreB >= TIE_LEAD) return 'a';
+  if (scoreB >= TIE_MIN_SCORE && scoreB - scoreA >= TIE_LEAD) return 'b';
+  return null;
+}
+
 export type Scored<T> = { candidate: T; score: number };
 
 export type TitlePick<T> =
-  | { kind: 'picked'; picked: T; top: Scored<T>[] }
+  // tieBreak: 1등과 2등이 헷갈렸지만 다른 부분만 다시 비교해 골랐다
+  | { kind: 'picked'; picked: T; top: Scored<T>[]; tieBreak?: boolean }
   | { kind: 'low' | 'close' | 'empty'; picked: null; top: Scored<T>[] };
 
 /** 후보 중 화면 제목과 가장 닮은 하나를 고른다. 확실하지 않으면 picked 가 null */
@@ -225,16 +305,20 @@ export function pickByTitle<T>(
     .flatMap(({ candidate, mask }) => {
       const penalty = widthPenalty(screen.width, mask.width);
       if (penalty < SKIP_BELOW) return []; // 폭이 너무 달라 결과에 영향이 없다
-      return [{ candidate, score: scoreWith(prepared, mask, penalty) }];
+      return [{ candidate, mask, score: scoreWith(prepared, mask, penalty) }];
     })
     .sort((a, b) => b.score - a.score);
-  const top = scored.slice(0, 3);
+  const top = scored.slice(0, 3).map(({ candidate, score }) => ({ candidate, score }));
   const [first, second] = scored;
 
   // 모두 건너뛰었다면 어떤 후보와도 안 닮은 것이다
   if (!first || first.score < MIN_TITLE_SCORE) return { kind: 'low', picked: null, top };
   if (second && first.score - second.score < MIN_TITLE_LEAD) {
-    return { kind: 'close', picked: null, top };
+    const tie = breakTie(prepared, first.mask, second.mask);
+    const chosen = tie === 'a' ? first : tie === 'b' ? second : null;
+    // 다시 갈라도 원래 점수가 기준보다 낮은 쪽은 고르지 않는다
+    if (!chosen || chosen.score < MIN_TITLE_SCORE) return { kind: 'close', picked: null, top };
+    return { kind: 'picked', picked: chosen.candidate, top, tieBreak: true };
   }
   return { kind: 'picked', picked: first.candidate, top };
 }

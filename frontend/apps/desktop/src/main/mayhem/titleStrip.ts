@@ -1,6 +1,9 @@
-import { toMask, type Gray, type Mask } from './titleMatch';
+import { toMask, type Gray, type Mask, type Soft } from './titleMatch';
 
-const SCREEN_THRESHOLD = 150; // 이보다 밝으면 글자
+const SCREEN_THRESHOLD = 150; // 이보다 밝으면 글자 (제목 줄 찾기)
+// 마스크를 만들 때는 더 어두운 획까지 글자로 본다. 작은 화면에서 얇은 세로획은 150 아래로 흐려진다
+const MASK_THRESHOLD = 110;
+const MASK_SOFT: Soft = { low: 60, high: 180 };
 const MIN_ROW_PIXELS = 2; // 한 줄에 글자 픽셀이 이만큼은 있어야 글자 줄
 const SIDE_CROP = 0.04; // 양옆 카드 테두리 제외
 
@@ -78,5 +81,8 @@ export function cutTitle(image: Gray, cardHeight: number): Gray | null {
  */
 export function titleMask(image: Gray, cardHeight: number): Mask | null {
   const title = cutTitle(image, cardHeight);
-  return title && toMask(title, SCREEN_THRESHOLD, { left: SIDE_CROP, right: SIDE_CROP, bottom: 0 });
+  return (
+    title &&
+    toMask(title, MASK_THRESHOLD, { left: SIDE_CROP, right: SIDE_CROP, bottom: 0 }, MASK_SOFT)
+  );
 }

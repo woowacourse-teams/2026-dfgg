@@ -127,3 +127,43 @@ describe('pickByTitle', () => {
     expect(pickByTitle(screen, []).kind).toBe('empty');
   });
 });
+
+describe('pickByTitle 헷갈림 재비교', () => {
+  // 뒤쪽 막대 6개는 같고 앞쪽 4개만 다른 두 제목 ("위력 추구"와 "가속 추구" 같은 경우)
+  const COMMON: [number, number, number][] = [
+    [60, 4, 1],
+    [68, 4, 0.7],
+    [76, 4, 1],
+    [84, 4, 0.7],
+    [92, 4, 1],
+    [100, 4, 0.7],
+  ];
+  const head = (high: number, low: number): [number, number, number][] => [
+    [10, 4, high],
+    [18, 4, low],
+    [26, 4, high],
+    [34, 4, low],
+  ];
+  const word = (high: number, low: number) =>
+    toMask(drawBars(120, 60, [...head(high, low), ...COMMON]), 128)!;
+  const a = { candidate: 'A', mask: word(1, 0.5) };
+  const b = { candidate: 'B', mask: word(0.5, 1) };
+
+  it('같은 부분 때문에 점수가 붙어도, 다른 부분이 닮은 쪽을 고른다', () => {
+    const result = pickByTitle(word(0.8, 0.7), [b, a]);
+    expect(result.top[0].score - result.top[1].score).toBeLessThan(MIN_TITLE_LEAD);
+    expect(result.kind).toBe('picked');
+    expect(result.picked).toBe('A');
+    expect(result.kind === 'picked' && result.tieBreak).toBe(true);
+  });
+
+  it('다른 부분도 어느 쪽인지 애매하면 그대로 close', () => {
+    expect(pickByTitle(word(0.75, 0.75), [a, b]).kind).toBe('close');
+  });
+
+  it('차이가 큰 경우는 재비교 없이 고른다', () => {
+    const result = pickByTitle(word(0.9, 0.6), [a, b]);
+    expect(result.kind === 'picked' && result.tieBreak).toBeFalsy();
+    expect(result.picked).toBe('A');
+  });
+});
