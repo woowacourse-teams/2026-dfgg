@@ -91,7 +91,9 @@ echo "current: $current"
 
 step "export training set (queries=$queries)"
 # 야간 집계가 막 끝난 main의 통계를 그대로 쓴다. 다시 집계하면 main에 쓰게 된다.
-(cd "$repo/backend/dfgg" && SPRING_FLYWAY_ENABLED=false "$gradle" evaluationTest --tests '*TrainingSetExportTest' \
+# 스키마 검증은 서비스처럼 끈다(ddl-auto none). 평가 프로필의 validate는 export와 무관한 엔티티의 타입 차이에도 멈춘다.
+(cd "$repo/backend/dfgg" && SPRING_FLYWAY_ENABLED=false SPRING_JPA_HIBERNATE_DDL_AUTO=none \
+  "$gradle" evaluationTest --tests '*TrainingSetExportTest' \
   -Devaluation.aggregate=false \
   -Devaluation.queries="$queries" \
   -Devaluation.export.path="$data/train.jsonl")
