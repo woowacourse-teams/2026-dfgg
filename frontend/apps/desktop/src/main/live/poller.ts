@@ -12,7 +12,7 @@ import {
   recordSkip,
 } from '../analytics/gameTracker';
 import { reportError } from '../sentry';
-import { isOverlayQueue } from '../lcu/queue';
+import { fetchQueue, isOverlayQueue } from '../lcu/queue';
 
 const POLL_INTERVAL_MS = 2000;
 // 추천 요청이 실패하면 서버 부하를 줄이려고 재시도 간격을 늘린다. (2초 → 4초 → … → 30초)
@@ -42,8 +42,10 @@ let lastItemIds: number[] | null = null;
 const purchasedItemIds = new Set<number>();
 let myRiotId: string | null = null;
 let patch: string | null = null;
+// 한 판 동안 바뀌지 않아서 한 번만 읽는다. 아직 안 읽었으면 undefined, 못 읽었으면 null 이다.
+let queueId: number | null | undefined = undefined;
 
-// phase가 InProgress이고 일반, 랭크 큐면 live polling 시작하기
+// phase가 InProgress이고 일반·랭크 큐나 사용자 설정 게임·훈련모드면 live polling 시작하기
 async function syncWithPhase(phase: GameflowPhase | null) {
   if (phase !== 'InProgress') return stopLivePolling();
   if (!(await isOverlayQueue())) return stopLivePolling();
@@ -95,6 +97,8 @@ async function tick() {
       patch = currentPatch;
     }
 
+    if (queueId === undefined) queueId = (await fetchQueue())?.id ?? null;
+
     const { championNames, componentItemIds, bootsItemIds } = await getDDragonData();
 
     const players = await getPlayerList();
@@ -131,6 +135,7 @@ async function tick() {
       purchasedItemIds,
       availableGold: gold,
       gameTimeMs: (stats?.gameTime ?? 0) * SECOND_MS,
+      queueId: queueId ?? undefined,
     });
     if (!body) return;
     recordChampion(body.myChampion);
@@ -189,5 +194,6 @@ export function stopLivePolling() {
   recommendFailures = 0;
   myRiotId = null;
   patch = null;
+  queueId = undefined;
   purchasedItemIds.clear();
 }
