@@ -1,0 +1,387 @@
+.bento {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: minmax(100px, auto);
+  gap: 8px;
+}
+
+/* ---------- 칸 공통 ---------- */
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 14px;
+  /* 위쪽 테두리만 조금 밝혀 빛이 위에서 떨어지는 것처럼 보이게 한다 */
+  border: 1px solid var(--line);
+  border-top-color: var(--line-strong);
+  border-radius: var(--radius-l);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  overflow: hidden;
+  animation: tile-in 420ms var(--ease-out) backwards;
+  transition:
+    transform 260ms var(--ease-out),
+    border-color var(--duration-normal) ease;
+}
+
+/* 커서를 따라다니는 빛. 평소에는 꺼져 있다가 올라오면 켜진다. */
+.tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    160px circle at var(--pointer-x, 50%) var(--pointer-y, 50%),
+    rgb(255 255 255 / 9%),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity var(--duration-normal) ease;
+  pointer-events: none;
+}
+
+/*
+ * 올리면 칸이 살짝 눌려 들어가고 커서 자리에 빛이 맺힌다. 떼면 제자리로 돌아온다.
+ * 들어갈 때보다 나올 때가 조금 느려야 눌렸다 튀어 오르는 느낌이 난다.
+ */
+@media (hover: hover) {
+  .tile:hover {
+    border-color: var(--line-strong);
+    transform: scale(0.975);
+    transition-duration: 160ms, var(--duration-normal);
+  }
+
+  .tile:hover::after {
+    opacity: 1;
+  }
+}
+
+/* 칸이 왼쪽 위부터 차례로 자리를 잡는다 */
+.tile:nth-child(1) {
+  animation-delay: 60ms;
+}
+.tile:nth-child(2) {
+  animation-delay: 110ms;
+}
+.tile:nth-child(3) {
+  animation-delay: 160ms;
+}
+.tile:nth-child(4) {
+  animation-delay: 210ms;
+}
+.tile:nth-child(5) {
+  animation-delay: 260ms;
+}
+.tile:nth-child(6) {
+  animation-delay: 310ms;
+}
+
+@keyframes tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+.tile-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.tile-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.tile-meta {
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+.tile-sub {
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+
+/* ---------- 승률 (가장 큰 칸) ---------- */
+.tile-rate {
+  grid-row: span 2;
+}
+
+/* 이기고 있을수록 칸 아래에서 붉은 빛이 더 올라온다 */
+.tile-rate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 70% at 20% 115%, rgb(230 57 80 / 30%), transparent 70%);
+  pointer-events: none;
+}
+
+/*
+ * 큰 숫자는 글자 왼쪽에 빈 여백이 있어 '승률', '8승 4패'보다 안쪽으로 들어가 보인다.
+ * 그만큼 왼쪽으로 당겨 눈으로 봤을 때 세로선이 맞게 한다.
+ */
+.rate-value {
+  margin: 14px 0 0 -3px;
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.rate-value small {
+  margin-left: 2px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+
+/* 숫자가 0 에서 값까지 세어 올라간다. --count 를 정수로 등록해 둬서 중간값도 정수다. */
+.count {
+  counter-reset: count var(--count);
+  transition: --count 1100ms var(--ease-out) 200ms;
+
+  @starting-style {
+    --count: 0;
+  }
+}
+
+.count::after {
+  content: counter(count);
+}
+
+.rate-record {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.dots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: auto 0 0;
+  padding: 14px 0 0;
+  list-style: none;
+}
+
+/* 테두리를 크기 안에 넣어야 빈 고리와 채운 점의 크기가 같아져 한 줄에 나란히 선다 */
+.dots li {
+  box-sizing: border-box;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.dot-win {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgb(230 57 80 / 55%);
+}
+
+.dot-loss {
+  border: 1.5px solid var(--line-strong);
+}
+
+.streak {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.streak-win {
+  color: var(--accent);
+}
+
+/* ---------- 랭크 ---------- */
+.tile-rank {
+  justify-content: center;
+  gap: 2px;
+}
+
+/* 엠블럼 뒤로 티어 색 빛이 번진다 */
+.tile-rank::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    70% 110% at 100% 50%,
+    color-mix(in srgb, var(--tier) 26%, transparent),
+    transparent 72%
+  );
+  pointer-events: none;
+}
+
+.rank-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.rank-detail {
+  font-size: 11px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.rank-series {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: var(--radius-s);
+  background: var(--accent-strong);
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  vertical-align: 2px;
+}
+
+/* 엠블럼은 칸 오른쪽에 크게, 일부가 잘리도록 둔다. 작게 세우면 아이콘이 되고 크게 걸치면 그림이 된다. */
+.rank-emblem {
+  position: absolute;
+  top: 50%;
+  right: -14px;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  transform: translateY(-50%) scale(1.25);
+  pointer-events: none;
+}
+
+/* ---------- KDA ---------- */
+.kda-value {
+  margin: auto 0 2px;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+/* ---------- 모스트 챔피언 ---------- */
+.champions {
+  display: flex;
+  gap: 14px;
+  /* 첫 챔피언의 고리가 바깥으로 나가므로 그만큼 안으로 들이고, 이름표와도 띄운다 */
+  margin: auto 0 0;
+  padding: 14px 0 0 4px;
+  list-style: none;
+}
+
+.champions li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.champions img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  outline: 1px solid rgb(255 255 255 / 12%);
+  outline-offset: -1px;
+}
+
+/* 가장 많이 한 챔피언만 붉은 고리를 두른다 */
+.champions li:first-child img {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.champions li:first-child {
+  color: var(--ink);
+}
+
+/* ---------- 최고의 한 판 ---------- */
+.tile-best {
+  grid-column: span 2;
+  flex-direction: row;
+  align-items: stretch;
+  padding: 0;
+  border-color: color-mix(in srgb, var(--gold) 28%, transparent);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--gold) 12%, transparent), transparent 60%),
+    var(--surface);
+}
+
+/* 전적 카드와 같은 기울기로 자른다 */
+.best-art {
+  flex: none;
+  width: 132px;
+  object-fit: cover;
+  object-position: 50% 22%;
+  clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%);
+}
+
+.best-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 14px 14px 14px 8px;
+}
+
+.best-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.best-kda {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.best-kda i {
+  margin: 0 1px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--ink-3);
+}
+
+.tile-sub b {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ---------- 평점 색 (전적과 같이 쓴다) ---------- */
+.kda-best {
+  color: var(--gold);
+}
+
+.kda-bad {
+  color: var(--ink-3);
+}
+
+/* 통계 판 제목은 칸들과 붙어 있어야 '이 칸들이 전부 이 기준'이라는 게 읽힌다 */
+.bento-section .section-head {
+  margin-top: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile {
+    animation: none;
+    transition: none;
+  }
+
+  .tile:hover {
+    transform: none;
+  }
+
+  .count {
+    transition: none;
+  }
+}

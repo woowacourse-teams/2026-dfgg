@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 언어별 첫 화면. 서로를 hreflang 으로 묶어 검색엔진이 언어에 맞는 쪽을 보여 주게 한다. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://dfgg.pro/ko/</loc>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dfgg.pro/ko/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://dfgg.pro/en/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dfgg.pro/" />
+  </url>
+  <url>
+    <loc>https://dfgg.pro/en/</loc>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://dfgg.pro/ko/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://dfgg.pro/en/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dfgg.pro/" />
+  </url>
+  <url>
+    <loc>https://dfgg.pro/privacy</loc>
+  </url>
+</urlset>

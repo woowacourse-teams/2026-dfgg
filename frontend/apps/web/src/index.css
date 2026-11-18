@@ -1,0 +1,132 @@
+@import 'tailwindcss';
+
+/*
+ * 히어로 제목 한 줄에만 쓰는 글꼴이라, 원본(woff 407KB)에서 제목 글자만 남겨 직접 둔다(woff2 3KB).
+ * 제목 문구(i18n hero.headline)를 바꾸면 assets/fonts/README.md 대로 다시 뽑는다.
+ */
+@font-face {
+  font-family: 'Cafe24Ohsquare';
+  src: url('./assets/fonts/cafe24-ohsquare-headline.woff2') format('woff2');
+  font-display: swap;
+}
+
+@theme {
+  /* 배너 계열 */
+  --color-cornflower: #5b78dc;
+  --color-cornflower-deep: #3f57b4;
+  /*
+   * 브랜드 레드. accent 는 검은 바탕 위 글자·테두리용으로 밝게 잡았고
+   * (대비 5.1:1, 본문 크기도 읽힌다), accent-strong 은 로고에서 뽑은 값이라
+   * 채움면에 쓴다. 채움 위 글자는 흰색이어야 대비가 선다 (5.9:1).
+   */
+  --color-accent: #e63950;
+  --color-accent-strong: #c1243d;
+  --color-accent-bright: #ff5f74;
+
+  /*
+   * 채움 버튼용 그라데이션 정지색. 흰 글자를 얹으므로 양 끝 모두 어두워야 한다.
+   * accent-deep 7.4:1, accent-mid 5.1:1 — 밝은 accent-bright(2.9:1)는 채움에 쓰면 안 된다.
+   */
+  --color-accent-deep: #a51d33;
+  --color-accent-mid: #d1293f;
+
+  /*
+   * 빨강 옆에 나란히 두는 보조 버튼. 카드 테두리(--color-line #1b2344)와 같은
+   * 남색 계열이라 빨강과 부딪히지 않으면서 화면에 이미 있는 색을 쓴다.
+   * 흰 글자 13.7:1 / 7.5:1.
+   */
+  --color-cobalt-deep: #1e2a5a;
+  --color-cobalt: #3b4f9e;
+  --color-sky: #8ccbf2;
+
+  /* 바탕은 순검정, 면만 푸른기를 얹어 띄운다 */
+  --color-ground: #000000;
+  --color-surface: #080c1a;
+  --color-surface-2: #0e1428;
+  --color-line: #1b2344;
+
+  /* 중립은 순회색이 아니라 푸른기를 섞은 값 */
+  --color-ink: #e9edfb;
+  --color-ink-2: #98a5cf;
+  --color-ink-3: #6b78a4;
+
+  /* 수치 판단용 — 액센트와 분리해서 쓴다 */
+  /*
+   * 내 챔피언·내 포지션 표시. 브랜드가 빨강이 되면서 accent 로 표시하면
+   * 상대(--color-loss)와 색이 겹쳐, 아군 칸이 적팀처럼 읽혔다.
+   * 아군(초록)·상대(빨강) 어느 쪽과도 안 겹치는 금색으로 뺀다. 검정 대비 11.2:1.
+   */
+  --color-mine: #e8b64c;
+
+  --color-rank-1: #f0c060;
+  --color-rank-2: #c8ced8;
+  --color-rank-3: #d0925a;
+  --color-overlay: rgb(10 14 28 / 0.72);
+
+  --color-win: #3fc094;
+  --color-loss: #ec6d86;
+
+  --font-display:
+    'Bahnschrift', 'DIN Alternate', 'DIN Condensed', 'Oswald', 'Arial Narrow', system-ui, sans-serif;
+  --font-mono: 'Cascadia Mono', 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, monospace;
+  --font-impact: 'Cafe24Ohsquare', 'Pretendard Variable', sans-serif;
+  --font-body:
+    'Pretendard Variable', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui,
+    -apple-system, sans-serif;
+}
+
+/* 끝없이 도는 장식 애니메이션. JS 가 매 프레임 스타일을 쓰지 않게 CSS 로 둔다. */
+@keyframes pulse-ring {
+  from {
+    opacity: 0.9;
+    scale: 1;
+  }
+
+  to {
+    opacity: 0;
+    scale: 1.15;
+  }
+}
+
+@keyframes border-beam {
+  to {
+    offset-distance: 100%;
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all;
+  }
+
+  ::selection {
+    background: var(--color-accent-strong);
+    color: #fff;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  /*
+   * 기능 소개 페이지: 제목은 줄 길이를 고르게 나눠 '지금 살 / 템까지'처럼 끝 단어만 떨어지지 않게,
+   * 본문은 마지막 줄에 한 단어만 남지 않게 한다. word-break: keep-all 과 함께 어절 단위로 바뀐다.
+   */
+  .features-page :is(h1, h2, h3) {
+    text-wrap: balance;
+  }
+
+  .features-page :is(p, dd, li) {
+    text-wrap: pretty;
+  }
+}

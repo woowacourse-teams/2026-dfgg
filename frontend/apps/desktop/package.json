@@ -1,0 +1,129 @@
+{
+  "name": "desktop",
+  "productName": "dfgg",
+  "version": "2.2.2",
+  "description": "League of Legends item build recommendations from the ten champions in your match",
+  "author": {
+    "name": "dfgg"
+  },
+  "private": true,
+  "main": "out/main/main.js",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json",
+    "build:main": "webpack --config webpack.main.js --mode production",
+    "build:renderer": "webpack --config webpack.renderer.js --mode production",
+    "build": "pnpm typecheck && pnpm build:main && pnpm build:renderer",
+    "test": "pnpm typecheck && pnpm typecheck:test && vitest run",
+    "test:e2e": "pnpm typecheck && pnpm typecheck:test && pnpm build && playwright test",
+    "renderer:dev:start": "webpack server --config webpack.renderer.js --mode development",
+    "main:dev:start": "webpack --config webpack.main.js --mode development && electron .",
+    "dev": "concurrently -k \"pnpm renderer:dev:start\" \"wait-on http://localhost:3001/home/index.html && pnpm main:dev:start\"",
+    "package": "pnpm build && electron-builder --win nsis",
+    "package:store": "pnpm build && electron-builder --win appx",
+    "package:all": "pnpm build && electron-builder --win nsis appx",
+    "package:publish": "pnpm build && electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "electron-overlay-window": "^4.1.0",
+    "koffi": "^3.3.2"
+  },
+  "devDependencies": {
+    "electron-updater": "^6.8.9",
+    "ws": "^8.21.3",
+    "@playwright/test": "^1.64.1",
+    "@sentry/electron": "^7.20.0",
+    "@types/node": "^22.20.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.1",
+    "concurrently": "^10.0.5",
+    "electron": "44.4.1",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "vitest": "^5.0.3",
+    "wait-on": "^9.1.0"
+  },
+  "build": {
+    "appId": "gg.dfgg.desktop",
+    "productName": "dfgg",
+    "directories": {
+      "output": "release",
+      "buildResources": "resources/installer"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "win": {
+      "icon": "resources/icons/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "appx",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "electronLanguages": [
+      "ko",
+      "en-US"
+    ],
+    "forceCodeSigning": false,
+    "artifactName": "dfgg-setup.${ext}",
+    "appx": {
+      "identityName": "DFGG.DFGG",
+      "publisher": "CN=9DD9FAAE-E9F4-42B1-B663-BF31249E9AB8",
+      "publisherDisplayName": "DFGG",
+      "applicationId": "dfgg",
+      "displayName": "dfgg",
+      "backgroundColor": "#0e1428",
+      "languages": [
+        "ko-KR",
+        "en-US"
+      ],
+      "customExtensionsPath": "resources/installer/appx-extensions.xml"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": true,
+      "runAfterFinish": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "woowacourse-teams",
+        "repo": "2026-dfgg"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "resources/icons",
+        "to": "icons"
+      },
+      {
+        "from": "resources/ffmpeg",
+        "to": "ffmpeg",
+        "filter": [
+          "ffmpeg.exe",
+          "LICENSE.txt",
+          "NOTICE.txt"
+        ]
+      }
+    ]
+  }
+}
