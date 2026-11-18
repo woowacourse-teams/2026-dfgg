@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dfgg.application.recommend.v3.feature.FeatureName;
+import dfgg.application.recommend.v3.feature.FeatureSchemaFingerprint;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -51,6 +52,26 @@ class GameSituationModelFixtureTest {
             assertThatThrownBy(() -> LightGbmModelLoader.loadBaseline(input))
                     .isInstanceOf(IllegalStateException.class);
         }
+    }
+
+    @Test
+    @DisplayName("상황 v1 도우미 모델은 70칸 계약으로 읽히고, 뒤 칸이 붙은 벡터에서도 70칸일 때와 같은 점수를 낸다")
+    void writeSituationV1_WhenVectorHasMoreCells_ScoresLikeSeventyCells() throws IOException {
+        // given: 상대 주문력 비중이 0.5 이하면 1.0, 넘으면 2.0
+        Path file = GameSituationModelFixture.writeSituationV1(directory,
+                GameSituationModelFixture.stump(FeatureName.ENEMY_SPELL_DAMAGE_GOLD_SHARE, 0.5, 1.0, 2.0));
+        GradientBoostedTrees model;
+        try (InputStream input = Files.newInputStream(file)) {
+            model = LightGbmModelLoader.load(
+                    input, FeatureName.situationV1ExportNames(), FeatureSchemaFingerprint.SITUATION_V1);
+        }
+        double[] seventyCells = new double[FeatureName.situationV1ExportNames().size()];
+        seventyCells[FeatureName.ENEMY_SPELL_DAMAGE_GOLD_SHARE.ordinal()] = 0.8;
+        double[] allCells = featuresWith(FeatureName.ENEMY_SPELL_DAMAGE_GOLD_SHARE, 0.8);
+        allCells[FeatureName.CANDIDATE_SPELL_BLOCK_X_ENEMY_SPELL_DAMAGE_SHARE.ordinal()] = 0.8;
+
+        // when & then
+        assertThat(model.predict(allCells)).isEqualTo(model.predict(seventyCells)).isEqualTo(2.0);
     }
 
     @Test

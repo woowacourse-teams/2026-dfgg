@@ -1,15 +1,20 @@
 package dfgg.infrastructure.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dfgg.application.recommend.v3.feature.FeatureExtractionPipeline;
 import dfgg.application.recommend.v3.feature.FeatureName;
+import dfgg.application.recommend.v3.feature.FeatureSchemaFingerprint;
 import dfgg.application.recommend.v3.ranker.CoreRanking;
 import dfgg.application.recommend.v3.ranker.GameSituationRanking;
 import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
 import dfgg.application.recommend.v3.ranker.LambdaMartRanker;
 import dfgg.application.recommend.v3.ranker.LightGbmModelLoader;
 import dfgg.application.recommend.v3.ranker.TreeShapCalculator;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,6 +36,7 @@ import org.springframework.core.io.ResourceLoader;
 public class GameSituationLtrConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(GameSituationLtrConfiguration.class);
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Bean
     public GameSituationRanking gameSituationRanking(
@@ -48,21 +54,50 @@ public class GameSituationLtrConfiguration {
                     modelPath, resource.getDescription());
             return GameSituationRanking.absent();
         }
-        return GameSituationRanking.available(rankingOf(read(resource, modelPath), pipeline));
+        byte[] content = read(resource, modelPath);
+        ModelContract contract = ModelContract.of(fingerprintOf(content));
+        GradientBoostedTrees model = LightGbmModelLoader.load(
+                new ByteArrayInputStream(content), contract.names(), contract.fingerprint());
+        return GameSituationRanking.available(rankingOf(model, contract, pipeline));
     }
 
-    /** 지금 feature 목록 전체와 대조해 읽는다. 계약이 틀리면 로더가 예외를 던지고 기동이 멈춘다. */
-    private GradientBoostedTrees read(Resource resource, String modelPath) {
+    private byte[] read(Resource resource, String modelPath) {
         try (var input = resource.getInputStream()) {
-            return LightGbmModelLoader.load(input);
+            return input.readAllBytes();
         } catch (IOException exception) {
             throw new UncheckedIOException("게임 상황 Core 모델을 읽지 못했습니다: " + modelPath, exception);
         }
     }
 
-    private CoreRanking rankingOf(GradientBoostedTrees model, FeatureExtractionPipeline pipeline) {
+    /** 모델 파일에 적힌 지문. 읽지 못하면 빈 값을 돌려주고, 판단은 로더의 검사에 맡긴다. */
+    private String fingerprintOf(byte[] content) {
+        try {
+            JsonNode root = OBJECT_MAPPER.readTree(content);
+            return root == null ? "" : root.path("schema_fingerprint").asText("");
+        } catch (IOException exception) {
+            return "";
+        }
+    }
+
+    private CoreRanking rankingOf(GradientBoostedTrees model, ModelContract contract, FeatureExtractionPipeline pipeline) {
         return new CoreRanking(
-                new LambdaMartRanker(pipeline, model),
+                new LambdaMartRanker(pipeline, model, contract.fingerprint()),
                 new TreeShapCalculator(model, FeatureName.values().length));
+    }
+
+    /**
+     * 새 모델 자리에서 받아 주는 계약. 지금 feature 목록 전체이거나, dev에 먼저 올라간 상황 v1(앞 70칸)이다.
+     * <p>
+     * 상황 v1 모델은 뒤에 붙은 칸을 읽지 않으므로 목록이 길어져도 점수가 같다. 그래서 feature를 더한 코드를
+     * 새 모델보다 먼저 배포할 수 있다. 둘 다 아니면 전체 계약으로 읽어 로더가 지문이 다르다고 기동을 멈춘다.
+     */
+    private record ModelContract(List<String> names, String fingerprint) {
+
+        static ModelContract of(String modelFingerprint) {
+            if (FeatureSchemaFingerprint.SITUATION_V1.equals(modelFingerprint)) {
+                return new ModelContract(FeatureName.situationV1ExportNames(), FeatureSchemaFingerprint.SITUATION_V1);
+            }
+            return new ModelContract(FeatureName.exportNames(), FeatureName.schemaFingerprint());
+        }
     }
 }

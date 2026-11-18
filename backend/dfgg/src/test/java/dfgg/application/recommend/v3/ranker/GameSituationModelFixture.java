@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -22,7 +23,19 @@ public final class GameSituationModelFixture {
 
     /** 전체 계약(지금 feature 목록 전체와 그 지문)에 맞는 모델을 폴더에 쓰고 그 경로를 돌려준다. */
     public static Path write(Path directory, String trees) {
-        String names = FeatureName.exportNames().stream()
+        return writeModel(directory, FeatureName.exportNames(), FeatureName.schemaFingerprint(), trees);
+    }
+
+    /**
+     * 상황 v1 계약(앞 70칸과 그 지문)에 맞는 모델을 폴더에 쓰고 그 경로를 돌려준다.
+     * dev v5에 올라간 첫 게임 상황 모델과 같은 계약이다.
+     */
+    public static Path writeSituationV1(Path directory, String trees) {
+        return writeModel(directory, FeatureName.situationV1ExportNames(), FeatureName.situationV1SchemaFingerprint(), trees);
+    }
+
+    private static Path writeModel(Path directory, List<String> exportNames, String fingerprint, String trees) {
+        String names = exportNames.stream()
                 .map(name -> "\"" + name + "\"")
                 .collect(Collectors.joining(", "));
         String model = """
@@ -32,7 +45,7 @@ public final class GameSituationModelFixture {
                   "objective": "lambdarank",
                   "trees": %s
                 }
-                """.formatted(FeatureName.schemaFingerprint(), names, trees);
+                """.formatted(fingerprint, names, trees);
         Path file = directory.resolve(FILE_NAME);
         try {
             Files.writeString(file, model);
