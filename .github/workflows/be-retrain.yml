@@ -4,8 +4,9 @@ name: BE Retrain (ml)
 # ml 인스턴스를 켜고 → ml 러너에서 export·학습·비교·업로드 → 성공·실패와 무관하게 끈다.
 # 통과한 모델은 ltr/<이름>/, 탈락은 ltr/<이름>-rejected/에 올리고 current.json은 바꾸지 않는다(배포는 U12).
 #
-# 준비물: 저장소 변수 ML_INSTANCE_ID·ML_INSTANCE_ROLE_ARN(ml 인스턴스만 켜고 끄는 OIDC 역할),
-#        ml 서버의 러너(라벨 dfgg-ml)와 /opt/dfgg/ml/ml.env(main 읽기 전용 접속).
+# 준비물: 저장소 변수 ML_INSTANCE_ID, ml 서버의 러너(라벨 dfgg-ml)와 /opt/dfgg/ml/ml.env(main 읽기 전용 접속).
+# 켜기·끄기는 scheduling 러너의 인스턴스 역할(ec2-project)로 한다. 이 계정에서 IAM 역할을 새로 만들 수 없어서다.
+# training-instance.sh가 ML_INSTANCE_ID 하나만 받으므로 다른 인스턴스는 건드리지 않는다.
 on:
   workflow_dispatch:
     inputs:
@@ -34,19 +35,12 @@ env:
 jobs:
   start:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: [ self-hosted, dfgg-scheduling ]
     timeout-minutes: 15
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: backend/ops/pipeline
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.ML_INSTANCE_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
       - name: Start the ml instance
         run: backend/ops/pipeline/training-instance.sh start
 
@@ -77,19 +71,12 @@ jobs:
   stop:
     needs: [ start, retrain ]
     if: ${{ always() && github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    runs-on: [ self-hosted, dfgg-scheduling ]
     timeout-minutes: 15
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: backend/ops/pipeline
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.ML_INSTANCE_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
       - name: Stop the ml instance
         run: backend/ops/pipeline/training-instance.sh stop
 
