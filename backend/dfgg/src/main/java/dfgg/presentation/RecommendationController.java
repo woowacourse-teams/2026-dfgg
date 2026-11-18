@@ -7,6 +7,7 @@ import dfgg.application.recommend.RecommendationService;
 import dfgg.domain.language.Language;
 import dfgg.presentation.dto.request.NextItemRecommendationRequest;
 import dfgg.presentation.dto.request.NextItemRecommendationV4Request;
+import dfgg.presentation.dto.request.NextItemRecommendationV5Request;
 import dfgg.presentation.dto.request.RecommendationRequest;
 import dfgg.presentation.dto.response.MultiBuildRecommendationResponse;
 import dfgg.presentation.dto.response.NextItemRecommendationResponse;
@@ -88,6 +89,20 @@ public class RecommendationController {
     ) {
         NextItemRecommendationV4Response response = nextItemRecommendationV4Service.recommendNextItem(
                 request, Language.fromAcceptLanguage(acceptLanguage));
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * v4와 같은 추천에 10명의 지금 상태를 더 받는다. Core 순위에 게임 상황이 반영된다.
+     * 응답은 v4와 같은 모양이다. 서버에 게임 상황 모델이 없으면 지금 모델로 순위를 매긴다.
+     */
+    @PostMapping("/v5")
+    public ResponseEntity<NextItemRecommendationV4Response> recommendV5(
+            @Valid @RequestBody NextItemRecommendationV5Request request,
+            @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage
+    ) {
+        NextItemRecommendationV4Response response = nextItemRecommendationV4Service.recommendNextItem(
+                request.toV4Request(), request.toGameState(), Language.fromAcceptLanguage(acceptLanguage));
         return ResponseEntity.ok(response);
     }
 }

@@ -78,6 +78,9 @@ recommendation:
   component-ltr:
     model-path: "${COMPONENT_LTR_MODEL_PATH:}"
     policy-lookup-path: "${COMPONENT_LTR_POLICY_LOOKUP_PATH:}"
+  # 게임 상황까지 읽는 새 Core 모델. 비어 있거나 파일이 없으면 새 추천 API가 지금 모델(ltr)로 답한다.
+  game-situation-ltr:
+    model-path: "${GAME_SITUATION_LTR_MODEL_PATH:}"
   situational:
     lookup-path: "${SITUATIONAL_LOOKUP_PATH:}"
     min-lift: "${SITUATIONAL_MIN_LIFT:2.0}"
@@ -155,12 +158,15 @@ management:
       percentiles-histogram:
         "[http.server.requests]": true
         "[recommendation.v4.stage]": true
+        "[recommendation.v5.stage]": true
       minimum-expected-value:
         "[http.server.requests]": 10ms
         "[recommendation.v4.stage]": 1ms
+        "[recommendation.v5.stage]": 1ms
       maximum-expected-value:
         "[http.server.requests]": 10s
         "[recommendation.v4.stage]": 10s
+        "[recommendation.v5.stage]": 10s
 
 logging:
   file:
