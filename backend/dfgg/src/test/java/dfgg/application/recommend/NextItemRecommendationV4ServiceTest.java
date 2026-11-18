@@ -380,15 +380,16 @@ class NextItemRecommendationV4ServiceTest {
         assertThat(service.recommendNextItem(request(null, List.of()), Language.KO_KR).recommendedItems().getFirst().purchaseBundle()).isNull();
     }
 
-    @Test
-    @DisplayName("훈련모드에서 포지션이 비어 있으면 주 라인으로 Core와 Component를 추천한다")
-    void recommendNextItem_WhenPracticePositionMissing_RecommendWithMainPosition() {
+    @ParameterizedTest
+    @ValueSource(strings = {"", "NONE"})
+    @DisplayName("훈련모드에서 포지션이 비었거나 라인이 아니면 주 라인으로 Core와 Component를 추천한다")
+    void recommendNextItem_WhenPracticePositionUnknown_RecommendWithMainPosition(String position) {
         // given
         prepareCore(List.of(coreItem(3133)));
         when(positions.mainPositionOf(86)).thenReturn(Optional.of(ChampionPosition.JUNGLE));
         when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
                 new TargetRecommendation(3133, Status.OK, List.of(purchase(1036, 1)), null)));
-        var request = practiceRequest("");
+        var request = practiceRequest(position);
 
         // when
         var response = service.recommendNextItem(request, Language.KO_KR);

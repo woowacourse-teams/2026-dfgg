@@ -61,10 +61,10 @@ public record NextItemRecommendationV4Request(
         return new GameQueue(queueId);
     }
 
-    /** 훈련모드·사용자 설정 게임에서 포지션을 비워 보냈다. 일반 게임은 검증에서 걸러진다. */
+    /** 훈련모드·사용자 설정 게임에서 포지션을 비우거나 라인이 아닌 값(NONE 등)으로 보냈다. 일반 게임은 검증에서 걸러진다. */
     @JsonIgnore
-    public boolean isMyPositionMissing() {
-        return myChampion.position() == null || myChampion.position().isBlank();
+    public boolean isMyPositionUnknown() {
+        return !ChampionPosition.isName(myChampion.position());
     }
 
     public NextItemRecommendationV4Request withMyPosition(ChampionPosition position) {

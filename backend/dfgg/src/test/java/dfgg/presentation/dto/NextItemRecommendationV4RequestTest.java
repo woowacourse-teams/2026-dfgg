@@ -135,7 +135,7 @@ class NextItemRecommendationV4RequestTest {
         assertThat(json.has("inventoryItemIdsUnique")).isFalse();
         assertThat(json.has("coreRequest")).isFalse();
         assertThat(json.has("bootsInQuestSlot")).isFalse();
-        assertThat(json.has("myPositionMissing")).isFalse();
+        assertThat(json.has("myPositionUnknown")).isFalse();
     }
 
     @ParameterizedTest
@@ -189,20 +189,53 @@ class NextItemRecommendationV4RequestTest {
         assertThat(violations).contains("allies", "enemies");
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {0, 3140})
+    @DisplayName("훈련모드·사용자 설정 게임은 NONE처럼 형식에 맞지 않는 포지션도 받는다")
+    void validate_WhenFreeRosterQueueWithUnknownPositions_HaveNoViolation(int queueId) {
+        // given
+        ObjectNode body = body();
+        body.put("queueId", queueId);
+        ((ObjectNode) body.get("myChampion")).put("position", "NONE");
+        ((ObjectNode) body.get("allies").get(0)).put("position", "NONE");
+        ((ObjectNode) body.get("enemies").get(0)).put("position", "INVALID");
+
+        // when
+        Set<String> violations = violations(request(body));
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
     @Test
-    @DisplayName("훈련모드라도 챔피언 이름은 필수이고, 적은 포지션은 형식이 맞아야 한다")
-    void validate_WhenFreeRosterQueueWithBlankNameOrWrongPosition_RejectChampion() {
+    @DisplayName("훈련모드라도 챔피언 이름은 필수다")
+    void validate_WhenFreeRosterQueueWithBlankName_RejectChampion() {
         // given
         ObjectNode body = body();
         body.put("queueId", 3140);
-        ((ObjectNode) body.get("myChampion")).put("position", "INVALID");
+        ((ObjectNode) body.get("myChampion")).put("name", "");
         ((ObjectNode) body.get("allies").get(0)).put("name", "");
 
         // when
         Set<String> violations = violations(request(body));
 
         // then
-        assertThat(violations).contains("myChampion.position", "allies[0].name");
+        assertThat(violations).contains("myChampion.name", "allies[0].name");
+    }
+
+    @Test
+    @DisplayName("일반 게임은 지금처럼 형식에 맞지 않는 포지션을 거부한다")
+    void validate_WhenRegularQueueWithUnknownPosition_RejectPosition() {
+        // given
+        ObjectNode body = body();
+        body.put("queueId", 420);
+        ((ObjectNode) body.get("myChampion")).put("position", "NONE");
+
+        // when
+        Set<String> violations = violations(request(body));
+
+        // then
+        assertThat(violations).contains("myChampion.position");
     }
 
     @ParameterizedTest
@@ -236,8 +269,8 @@ class NextItemRecommendationV4RequestTest {
         var resolved = request.withMyPosition(dfgg.domain.champion.ChampionPosition.JUNGLE);
 
         // then
-        assertThat(request.isMyPositionMissing()).isTrue();
-        assertThat(resolved.isMyPositionMissing()).isFalse();
+        assertThat(request.isMyPositionUnknown()).isTrue();
+        assertThat(resolved.isMyPositionUnknown()).isFalse();
         assertThat(resolved.myChampion()).isEqualTo(new ChampionDto("Garen", "JUNGLE"));
         assertThat(resolved).usingRecursiveComparison().ignoringFields("myChampion").isEqualTo(request);
     }
