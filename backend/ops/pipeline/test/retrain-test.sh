@@ -170,9 +170,22 @@ COMPARE_CODE=2 run insufficient > /dev/null
 check "표본 부족도 -rejected로 올린다" test -f "$ltr/$today-3-rejected/model.json"
 check "표본 부족 결과를 적는다" test "$(jq -r .verdict "$work/run-insufficient/result.json")" = insufficient
 
+# 2-1. current.json이 없으면 이름 날짜가 가장 최근인 통과 묶음을 기준으로 삼고, 게임 상황 모델도 옮겨 담는다
+echo '{"model":"game-situation"}' > "$src/game-situation.json"
+MODEL_S3_PREFIX=$MODEL_S3_PREFIX "$pipeline/make-model-bundle.sh" --name ltr-991231 --core "$src/model.json" \
+  --component "$src/component" --game-situation "$src/game-situation.json" --out "$work/seed" --upload > /dev/null
+check "묶음에 게임 상황 모델을 담는다" grep -q " game-situation/model.json$" "$ltr/ltr-991231/SHA256SUMS"
+mkdir -p "$ltr/ltr-999999-rejected"
+rm "$ltr/current.json"
+COMPARE_CODE=0 run latest > /dev/null
+check "current.json이 없으면 가장 최근 통과 묶음과 비교한다" test "$(jq -r .current "$work/run-latest/result.json")" = ltr-991231
+check "현재 묶음의 게임 상황 모델을 그대로 담는다" cmp -s "$ltr/$today-4/game-situation/model.json" "$src/game-situation.json"
+check "옮겨 담은 게임 상황 모델도 해시 목록에 있다" bash -c "cd '$ltr/$today-4' && sha256sum --quiet -c SHA256SUMS && grep -q game-situation SHA256SUMS"
+echo '{"name": "ltr-261020"}' > "$ltr/current.json"
+
 # 3. 실패
 check "비교가 오류로 끝나면 실패하고" fails env COMPARE_CODE=3 "$pipeline/retrain.sh" --work "$work/run-error"
-check "아무것도 올리지 않는다" test ! -e "$ltr/$today-4" -a ! -e "$ltr/$today-4-rejected"
+check "아무것도 올리지 않는다" test ! -e "$ltr/$today-5" -a ! -e "$ltr/$today-5-rejected"
 check "DB 접속 정보가 없으면 실패한다" fails env -u EVALUATION_DB_PASSWORD "$pipeline/retrain.sh" --work "$work/run-nodb"
 mkdir -p "$work/run-dirty" && touch "$work/run-dirty/old"
 check "작업 폴더가 비어 있지 않으면 실패한다" fails run dirty
