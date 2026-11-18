@@ -10,8 +10,14 @@ import pytest
 
 from dfgg_ltr.compare import rank_change
 from dfgg_ltr.metrics import evaluate_ranking
-from dfgg_ltr.situation import load_item_catalog
-from dfgg_ltr.situation_report import SITUATION_FEATURES_NOT_RESEARCHED, main, measure_split
+from dfgg_ltr.situation import SITUATION_MATCHES, load_item_catalog
+from dfgg_ltr.situation_report import (
+    SITUATION_FEATURES_NOT_RESEARCHED,
+    main,
+    measure_split,
+    render_split,
+    researched,
+)
 
 BASELINE_NAMES = ["build_score", "counter_score", "purchased_item_count"]
 SITUATION_NAMES = [
@@ -24,8 +30,8 @@ SITUATION_NAMES = [
     "team_kill_lead", "team_assist_lead", "team_level_lead", "team_core_gold_lead",
 ]
 FEATURE_NAMES = BASELINE_NAMES + SITUATION_NAMES
-MAGIC_RESIST, ARMOR_PEN, MAGIC_PEN, PLAIN = 3111, 3036, 3135, 3031
-ITEMS = [MAGIC_RESIST, ARMOR_PEN, MAGIC_PEN, PLAIN, 3032, 3033]
+MAGIC_RESIST, ARMOR_PEN, MAGIC_PEN, PLAIN, ARMOR = 3111, 3036, 3135, 3031, 3075
+ITEMS = [MAGIC_RESIST, ARMOR_PEN, MAGIC_PEN, PLAIN, ARMOR, 3033]
 
 
 @pytest.fixture(scope="module")
@@ -45,6 +51,7 @@ def files(tmp_path_factory):
         {"item_id": ARMOR_PEN, "name": {"en_US": "Armor Pen Item"}, "tags": ["ArmorPenetration"], "total_gold": 1},
         {"item_id": MAGIC_PEN, "name": {"en_US": "Magic Pen Item"}, "tags": ["MagicPenetration"], "total_gold": 1},
         {"item_id": PLAIN, "name": {"en_US": "Plain Item"}, "tags": ["Damage"], "total_gold": 1},
+        {"item_id": ARMOR, "name": {"en_US": "Armor Item"}, "tags": ["Armor"], "total_gold": 1},
     ]}), encoding="utf-8")
 
     rng = np.random.default_rng(0)
@@ -90,6 +97,133 @@ def measured(files):
     data, schema, catalog = files
     return measure_split(data, schema, load_item_catalog(catalog), "game", rounds=30, noise_seed=1,
                          targets=[("퍼센트 관통 아이템", "enemy_armor_gold_share", {ARMOR_PEN})])
+
+
+#: 비교 기준을 기준 계약보다 뒤로 잡을 때의 칸 수. 상황 값 앞 10개까지를 기준 모델에 준다.
+REFERENCE_COUNT = len(BASELINE_NAMES) + 10
+
+
+@pytest.fixture(scope="module")
+def measured_against_reference(files):
+    """기준 모델을 앞 REFERENCE_COUNT칸으로 학습한 game split의 수치. 다음 상황 모델을 이전 상황 모델과 비교할 때의 모양이다."""
+    data, schema, catalog = files
+    return measure_split(data, schema, load_item_catalog(catalog), "game", rounds=30, noise_seed=1,
+                         targets=[], reference_count=REFERENCE_COUNT)
+
+
+class TestReferenceCount:
+    """--reference-count: 비교 기준을 기준 계약(50칸)이 아니라 앞 N칸 모델로 고른다."""
+
+    def test_the_reference_models_see_only_the_first_columns(self, measured_against_reference):
+        """기준 모델 둘(씨앗만 다름)은 앞 N칸만, 새 모델은 스키마 전체를 본다."""
+        models = measured_against_reference["models"]
+
+        assert models["baseline"].num_feature() == REFERENCE_COUNT
+        assert models["reseeded"].num_feature() == REFERENCE_COUNT
+        assert models["situational"].num_feature() == len(FEATURE_NAMES)
+        assert measured_against_reference["baseline_count"] == REFERENCE_COUNT
+
+    def test_feature_importance_covers_only_the_columns_after_the_reference(self, measured_against_reference):
+        """한 값씩의 중요도는 기준 모델에 없던 칸만 본다. 묶음과 상황 전체는 그대로 잰다."""
+        importance = measured_against_reference["importance"]
+        features = {row["name"] for row in importance if row["kind"] == "feature"}
+        groups = {row["name"] for row in importance if row["kind"] == "group"}
+
+        assert features == set(FEATURE_NAMES[REFERENCE_COUNT:])
+        assert "상황 전체" in groups
+
+    def test_the_metric_table_names_the_reference_column_count(self, measured_against_reference):
+        """표의 기준 모델 이름에 칸 수가 나온다 — 50칸 모델과 헷갈리지 않게."""
+        rendered = render_split(measured_against_reference)
+
+        assert f"기준 모델 (앞 {REFERENCE_COUNT}개)" in rendered
+
+
+SPELL_BLOCK_MATCH = "candidate_spell_block_x_enemy_spell_damage_share"
+
+
+@pytest.fixture(scope="module")
+def measured_with_candidate_cell(tmp_path_factory):
+    """상황 값 뒤에 후보 칸(마법 저항 맞춤) 하나가 붙은 데이터. 정답은 그 후보 칸이 정한다."""
+    tmp_path = tmp_path_factory.mktemp("situation-report-match")
+    names = FEATURE_NAMES + [SPELL_BLOCK_MATCH]
+    schema = tmp_path / "feature_schema.json"
+    schema.write_text(json.dumps({
+        "schema_fingerprint": "full790", "feature_count": len(names),
+        "baseline_schema_fingerprint": "base456", "baseline_feature_count": len(BASELINE_NAMES),
+        "feature_names": names,
+    }), encoding="utf-8")
+    catalog = tmp_path / "item_catalog.json"
+    catalog.write_text(json.dumps({"items": [
+        {"item_id": item_id, "name": {"en_US": str(item_id)}, "tags": [tag], "total_gold": 1}
+        for item_id, tag in ((MAGIC_RESIST, "SpellBlock"), (ARMOR_PEN, "ArmorPenetration"),
+                             (MAGIC_PEN, "MagicPenetration"), (PLAIN, "Damage"), (ARMOR, "Armor"), (3033, "Damage"))
+    ]}), encoding="utf-8")
+
+    rng = np.random.default_rng(1)
+    data = tmp_path / "train.jsonl"
+    share_column = SITUATION_NAMES.index("enemy_spell_damage_gold_share")
+    with data.open("w", encoding="utf-8") as out:
+        for query in range(300):
+            situation = rng.random(len(SITUATION_NAMES))
+            base = rng.random((len(ITEMS), len(BASELINE_NAMES)))
+            relevance = base[:, 0] + np.array([situation[share_column], 0, 0, 0, 0, 0])
+            best = int(np.argmax(relevance))
+            for candidate, item_id in enumerate(ITEMS):
+                match = situation[share_column] if item_id == MAGIC_RESIST else 0.0
+                out.write(json.dumps({
+                    "qid": f"M{query}#157#0", "label": 3 if candidate == best else 0,
+                    "item_id": item_id, "match_id": f"M{query}", "patch": "16.16",
+                    "champion_id": 157, "position": "MID", "purchase_step": 0,
+                    "split_game": "train" if query % 4 else "test", "split_patch": "train",
+                    "features": base[candidate].tolist() + situation.tolist() + [match],
+                }) + "\n")
+    return measure_split(data, schema, load_item_catalog(catalog), "game", rounds=20, noise_seed=1,
+                         targets=[], reference_count=len(FEATURE_NAMES))
+
+
+class TestImportanceWithCandidateCells:
+    def test_a_candidate_cell_has_no_permutation_drop_of_its_own(self, measured_with_candidate_cell):
+        """후보 칸은 요청 단위로 섞을 수 없다. 하락은 비워 두고 SHAP만 보인다."""
+        row = next(row for row in measured_with_candidate_cell["importance"] if row["name"] == SPELL_BLOCK_MATCH)
+
+        assert np.isnan(row["permutation"])
+        assert row["shap"] > 0
+        assert f"| {SPELL_BLOCK_MATCH} | {row['shap']:.4f} | — |" in render_split(measured_with_candidate_cell)
+
+    def test_shuffling_the_situation_reaches_the_candidate_cell(self, measured_with_candidate_cell):
+        """상대의 아이템 묶음을 섞으면 그 값을 곱한 후보 칸도 함께 바뀐다 — 후보 칸으로 상황을 읽는 모델에서도 하락이 보인다."""
+        rows = {row["name"]: row for row in measured_with_candidate_cell["importance"] if row["kind"] == "group"}
+
+        assert rows["상대의 아이템"]["permutation"] > 0
+        assert rows["상황 전체"]["permutation"] > 0
+
+
+def test_reference_count_needs_the_baseline_contract_in_the_schema(tmp_path, files):
+    """"상황 전체"는 기준 계약 뒤 전부다. 스키마에 기준 계약이 없으면 범위를 지어내지 않고 멈춘다."""
+    data, schema, catalog = files
+    without_baseline = tmp_path / "feature_schema.json"
+    without_baseline.write_text(json.dumps({
+        key: value for key, value in json.loads(schema.read_text(encoding="utf-8")).items()
+        if not key.startswith("baseline_")}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="기준 계약"):
+        measure_split(data, without_baseline, load_item_catalog(catalog), "game", rounds=5, noise_seed=1,
+                      targets=[], reference_count=REFERENCE_COUNT)
+
+
+def test_value_substitution_covers_the_four_counter_tags(measured):
+    """대상은 마법 저항·방어구·마법 관통·방어구 관통 넷이다 — 새 상황 맞춤 값이 다루는 태그와 같다."""
+    labels = " ".join(row["label"] for row in measured["substitution"])
+
+    for tag in ("SpellBlock", "Armor", "MagicPenetration", "ArmorPenetration"):
+        assert f"({tag})" in labels
+
+
+def test_candidate_situation_features_are_marked_as_not_researched():
+    """후보별 상황 맞춤 값은 사전 조사에서 확인하지 않고 넣었다. 중요도 표에 "확인함"으로 나오면 안 된다."""
+    assert not any(researched(feature) for feature, _, _ in SITUATION_MATCHES)
+    assert researched("enemy_spell_damage_gold_share")
 
 
 class TestMeasuredNumbers:

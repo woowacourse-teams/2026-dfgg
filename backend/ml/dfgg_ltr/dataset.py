@@ -117,6 +117,25 @@ def baseline_view(dataset: Dataset) -> Dataset:
     )
 
 
+def prefix_view(dataset: Dataset, count: int) -> Dataset:
+    """앞 `count`칸만 남긴 같은 표본 — 비교 기준을 기준 계약이 아닌 다른 칸 수로 고를 때 쓴다.
+
+    예를 들어 상황 값 20개까지 본 모델(앞 70칸)과, 그 뒤에 값을 더 붙인 모델을 같은 데이터로 비교한다.
+    열 번호는 그대로지만 분석 전용이라 서버가 읽을 수 있는 지문을 붙이지 않는다. 운영에 올릴 모델은
+    스키마 전체 또는 `baseline_view`로 학습한다.
+    """
+    if not 1 <= count <= len(dataset.feature_names):
+        raise ValueError(
+            f"칸 수는 1에서 {len(dataset.feature_names)} 사이여야 합니다: {count}"
+        )
+    return dataclasses.replace(
+        dataset,
+        features=dataset.features[:, :count],
+        feature_names=dataset.feature_names[:count],
+        schema_fingerprint=f"prefix{count}-not-servable",
+    )
+
+
 @dataclass(frozen=True)
 class QueryMeta:
     """query별 승패·상황 메타 값. feature가 아니라 승률 지표(V)와 행동 모델만 쓴다.
