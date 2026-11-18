@@ -9,6 +9,7 @@ import jakarta.validation.ValidatorFactory;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -134,6 +135,111 @@ class NextItemRecommendationV4RequestTest {
         assertThat(json.has("inventoryItemIdsUnique")).isFalse();
         assertThat(json.has("coreRequest")).isFalse();
         assertThat(json.has("bootsInQuestSlot")).isFalse();
+        assertThat(json.has("myPositionMissing")).isFalse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 3140})
+    @DisplayName("훈련모드·사용자 설정 게임은 아군·적이 없고 포지션이 비어 있어도 받는다")
+    void validate_WhenFreeRosterQueueWithoutTeamsAndPosition_HaveNoViolation(int queueId) {
+        // given
+        ObjectNode body = body();
+        body.put("queueId", queueId);
+        ((ObjectNode) body.get("myChampion")).put("position", "");
+        body.putArray("allies");
+        body.putArray("enemies");
+
+        // when
+        Set<String> violations = violations(request(body));
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    @Test
+    @DisplayName("훈련모드에서는 5대5가 아닌 일부 인원과 빈 포지션의 팀원도 받는다")
+    void validate_WhenFreeRosterQueueWithPartialTeams_HaveNoViolation() {
+        // given
+        ObjectNode body = body();
+        body.put("queueId", 3140);
+        body.withArray("allies").remove(0);
+        ((ObjectNode) body.get("allies").get(0)).putNull("position");
+        body.withArray("enemies").removeAll().addObject().put("name", "Ornn").put("position", "");
+
+        // when
+        Set<String> violations = violations(request(body));
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    @Test
+    @DisplayName("훈련모드라도 아군 4명·적 5명을 넘으면 거부한다")
+    void validate_WhenFreeRosterQueueWithTooManyChampions_RejectTeam() {
+        // given
+        ObjectNode body = body();
+        body.put("queueId", 3140);
+        body.withArray("allies").addObject().put("name", "Garen2").put("position", "TOP");
+        body.withArray("enemies").addObject().put("name", "Ornn2").put("position", "TOP");
+
+        // when
+        Set<String> violations = violations(request(body));
+
+        // then
+        assertThat(violations).contains("allies", "enemies");
+    }
+
+    @Test
+    @DisplayName("훈련모드라도 챔피언 이름은 필수이고, 적은 포지션은 형식이 맞아야 한다")
+    void validate_WhenFreeRosterQueueWithBlankNameOrWrongPosition_RejectChampion() {
+        // given
+        ObjectNode body = body();
+        body.put("queueId", 3140);
+        ((ObjectNode) body.get("myChampion")).put("position", "INVALID");
+        ((ObjectNode) body.get("allies").get(0)).put("name", "");
+
+        // when
+        Set<String> violations = violations(request(body));
+
+        // then
+        assertThat(violations).contains("myChampion.position", "allies[0].name");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"420", "null"})
+    @DisplayName("일반 게임은 지금처럼 포지션이 필수이고 아군 4명·적 5명이어야 한다")
+    void validate_WhenRegularQueueWithoutPositionOrFullTeams_Reject(String queueId) {
+        // given
+        ObjectNode body = body();
+        body.set("queueId", mapper.readTree(queueId));
+        ((ObjectNode) body.get("myChampion")).put("position", "");
+        ((ObjectNode) body.get("enemies").get(0)).remove("position");
+        body.withArray("allies").remove(0);
+
+        // when
+        Set<String> violations = violations(request(body));
+
+        // then
+        assertThat(violations).contains("myChampion.position", "enemies[0].position", "allies");
+    }
+
+    @Test
+    @DisplayName("포지션이 비어 있는지와, 추정한 포지션으로 바꾼 요청을 알려 준다")
+    void withMyPosition_WhenPositionMissing_ReplaceOnlyMyPosition() {
+        // given
+        ObjectNode body = body();
+        body.put("queueId", 3140);
+        ((ObjectNode) body.get("myChampion")).put("position", "");
+        var request = request(body);
+
+        // when
+        var resolved = request.withMyPosition(dfgg.domain.champion.ChampionPosition.JUNGLE);
+
+        // then
+        assertThat(request.isMyPositionMissing()).isTrue();
+        assertThat(resolved.isMyPositionMissing()).isFalse();
+        assertThat(resolved.myChampion()).isEqualTo(new ChampionDto("Garen", "JUNGLE"));
+        assertThat(resolved).usingRecursiveComparison().ignoringFields("myChampion").isEqualTo(request);
     }
 
     private Set<String> violations(NextItemRecommendationV4Request request) {
