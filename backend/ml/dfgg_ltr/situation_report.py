@@ -24,17 +24,18 @@ import lightgbm as lgb
 import numpy as np
 
 from dfgg_ltr.compare import rank_change, top_items
-from dfgg_ltr.dataset import Dataset, baseline_view, load_dataset
+from dfgg_ltr.dataset import Dataset, baseline_view, load_dataset, prefix_view
 from dfgg_ltr.importance import shap_importance_by_group
 from dfgg_ltr.metrics import evaluate_ranking
 from dfgg_ltr.situation import (
+    SITUATION_MATCHES,
     empty_value_rates,
     items_with_tag,
     load_item_catalog,
     low_and_high_values,
     query_permutation_importance,
     query_values,
-    substitute,
+    substitute_situation,
     substitution_effect,
     top1_share,
 )
@@ -50,6 +51,7 @@ TAG_SCENARIOS = [
     ("enemy_spell_damage_gold_share", "SpellBlock", "마법 저항 아이템"),
     ("enemy_armor_gold_share", "ArmorPenetration", "방어구 관통 아이템"),
     ("enemy_spell_block_gold_share", "MagicPenetration", "마법 관통 아이템"),
+    ("enemy_marksman_kill_share", "Armor", "방어구 아이템"),
 ]
 
 #: 실제 판 나눠 보기에서 "방어 아이템"으로 볼 태그.
@@ -82,6 +84,15 @@ SITUATION_FEATURES_NOT_RESEARCHED = frozenset({
     "my_level_lead", "my_kills", "my_deaths", "my_assists",
     "team_kill_lead", "team_assist_lead", "team_level_lead", "team_core_gold_lead",
 })
+
+
+#: 후보별 상황 맞춤 값. 사전 조사 없이 넣었고, 후보마다 값이 달라 요청 단위로 섞을 수 없다.
+CANDIDATE_MATCH_FEATURES = frozenset(feature for feature, _, _ in SITUATION_MATCHES)
+
+
+def researched(feature: str) -> bool:
+    """사전 조사에서 순위와의 관계를 확인한 feature인가. 후보별 상황 맞춤 값은 조사 없이 넣었다."""
+    return feature not in SITUATION_FEATURES_NOT_RESEARCHED and feature not in CANDIDATE_MATCH_FEATURES
 
 EXAMPLE_LIMIT = 5
 
@@ -132,13 +143,24 @@ def _item_name(catalog: dict[int, dict], item_id: int) -> str:
 
 
 def measure_split(data: Path, schema: Path, catalog: dict[int, dict], split: str, rounds: int,
-                  noise_seed: int, targets: list[tuple[str, str, set[int]]]) -> dict:
-    """한 분할에서 모델 셋을 학습하고 보고서에 들어갈 수치를 잰다."""
+                  noise_seed: int, targets: list[tuple[str, str, set[int]]],
+                  reference_count: int | None = None) -> dict:
+    """한 분할에서 모델 셋을 학습하고 보고서에 들어갈 수치를 잰다.
+
+    :param reference_count: 기준 모델이 볼 앞쪽 칸 수. 주지 않으면 기준 계약(지금 운영 모델의 칸)이다.
+        다음 상황 모델을 이전 상황 모델과 비교할 때 이전 모델의 칸 수를 준다
+    """
     scenarios = scenarios_of(catalog, targets)
 
     train_set = load_dataset(data, schema, split, "train")
     test_set = load_dataset(data, schema, split, "test")
-    baseline_train, baseline_test = baseline_view(train_set), baseline_view(test_set)
+    if reference_count is None:
+        baseline_train, baseline_test = baseline_view(train_set), baseline_view(test_set)
+    else:
+        if train_set.baseline_feature_count is None:
+            # "상황 전체"의 범위(기준 계약 뒤 전부)를 정할 수 없다. 지어내지 않고 멈춘다.
+            raise ValueError("스키마 파일에 기준 계약(baseline_feature_count)이 없습니다. 학습 데이터를 다시 export해야 합니다.")
+        baseline_train, baseline_test = prefix_view(train_set, reference_count), prefix_view(test_set, reference_count)
     baseline_count = len(baseline_test.feature_names)
 
     # 기준 모델과 새 모델은 씨앗을 주지 않는다 — 평소 학습과 같은 조건이다. 잡음 바닥용 모델만 씨앗을 바꾼다.
@@ -179,11 +201,12 @@ def measure_split(data: Path, schema: Path, catalog: dict[int, dict], split: str
         },
         "substitution": [
             {"feature": feature, "label": label,
-             **substitution_effect(predict, test_set, _column(test_set, feature), target_items, known)}
+             **substitution_effect(predict, test_set, _column(test_set, feature), target_items, known,
+                                   catalog=catalog)}
             for feature, label, target_items in scenarios
         ],
         "observed": _observed_split(test_set, catalog, known, scores),
-        "importance": _importance(models["situational"], predict, test_set, baseline_count),
+        "importance": _importance(models["situational"], predict, test_set, baseline_count, catalog),
         "empty": empty_value_rates(
             test_set, [_column(test_set, name) for name in ITEM_VALUE_FEATURES], steps=(0, 1), queries=known),
         "examples": _examples(predict, test_set, catalog, known),
@@ -210,28 +233,40 @@ def _observed_split(test_set: Dataset, catalog: dict[int, dict], known: np.ndarr
 
 
 def _importance(situational: lgb.Booster, predict: Callable[[np.ndarray], np.ndarray], test_set: Dataset,
-                baseline_count: int) -> list[dict]:
-    """상황 feature 하나씩, 묶음마다, 그리고 상황 전체의 중요도.
+                baseline_count: int, catalog: dict[int, dict]) -> list[dict]:
+    """기준 모델에 없던 feature 하나씩, 묶음마다, 그리고 상황 전체의 중요도.
 
     섞었을 때의 하락은 요청 단위로 섞어서 잰다. 행 단위로 섞으면 같은 요청의 후보마다 다른 상황이 들어가
-    순위와 무관한 값에도 중요도가 생긴다.
+    순위와 무관한 값에도 중요도가 생긴다. 후보별 상황 맞춤 칸은 섞지 않고, 섞인 상황 값과 후보 태그로 다시
+    계산한다. 그래서 맞춤 칸 하나만의 하락은 잴 수 없어 비워 두고(SHAP만), 그 칸은 곱하는 상황 값의 묶음에 넣는다.
+
+    "상황 전체"는 기준을 어디로 잡든 기준 계약 뒤의 모든 칸이다. 기준 칸 수를 늘려도 상황 전체의 몫은 같은 범위로 잰다.
     """
-    situation_names = test_set.feature_names[baseline_count:]
-    features = {name: [_column(test_set, name)] for name in situation_names}
-    groups = {name: [_column(test_set, member) for member in members]
+    new_names = test_set.feature_names[baseline_count:]
+    situation_start = test_set.baseline_feature_count if test_set.baseline_feature_count is not None else baseline_count
+    features = {name: [_column(test_set, name)] for name in new_names}
+    groups = {name: [_column(test_set, member) for member in _with_candidate_matches(members, test_set)]
               for name, members in SITUATION_GROUPS.items()}
-    groups[WHOLE_SITUATION] = [_column(test_set, name) for name in situation_names]
+    groups[WHOLE_SITUATION] = [_column(test_set, name) for name in test_set.feature_names[situation_start:]]
 
     columns = {**features, **groups}
     shap = shap_importance_by_group(situational, test_set.features, columns)
-    permutation = query_permutation_importance(predict, test_set, columns)
+    permutation = query_permutation_importance(predict, test_set, columns, catalog=catalog)
 
-    rows = [{"kind": "feature", "name": name, "shap": shap[name], "permutation": permutation[name],
-             "researched": name not in SITUATION_FEATURES_NOT_RESEARCHED} for name in features]
+    rows = [{"kind": "feature", "name": name, "shap": shap[name],
+             "permutation": float("nan") if name in CANDIDATE_MATCH_FEATURES else permutation[name],
+             "researched": researched(name)} for name in features]
     rows.sort(key=lambda row: -row["shap"])
     rows += [{"kind": "group", "name": name, "shap": shap[name], "permutation": permutation[name]}
              for name in groups]
     return rows
+
+
+def _with_candidate_matches(members: list[str], dataset: Dataset) -> list[str]:
+    """묶음의 상황 값에, 그 값을 곱하는 후보별 맞춤 칸(데이터에 있는 것만)을 더한다."""
+    matches = [feature for feature, source, _ in SITUATION_MATCHES
+               if source in members and feature in dataset.feature_names]
+    return members + matches
 
 
 def _examples(predict: Callable[[np.ndarray], np.ndarray], test_set: Dataset, catalog: dict[int, dict],
@@ -241,8 +276,8 @@ def _examples(predict: Callable[[np.ndarray], np.ndarray], test_set: Dataset, ca
     column = _column(test_set, feature)
     group, item_ids = list(test_set.group), test_set.item_ids
     low, high = low_and_high_values(test_set, column, known)
-    low_tops = top_items(predict(substitute(test_set.features, group, column, low, known)), group, item_ids, 3)
-    high_tops = top_items(predict(substitute(test_set.features, group, column, high, known)), group, item_ids, 3)
+    low_tops = top_items(predict(substitute_situation(test_set, column, low, known, catalog)), group, item_ids, 3)
+    high_tops = top_items(predict(substitute_situation(test_set, column, high, known, catalog)), group, item_ids, 3)
 
     rows = []
     for qid, chosen, low_top, high_top in zip(test_set.qids, known, low_tops, high_tops):
@@ -252,6 +287,10 @@ def _examples(predict: Callable[[np.ndarray], np.ndarray], test_set: Dataset, ca
             if len(rows) == EXAMPLE_LIMIT:
                 break
     return {"feature": feature, "low": low, "high": high, "rows": rows}
+
+
+def _signed(value: float) -> str:
+    return "—" if np.isnan(value) else f"{value:+.4f}"
 
 
 def _percent(value: float) -> str:
@@ -362,16 +401,17 @@ def _render_importance(rows: list[dict]) -> list[str]:
         f"### 상황 feature {feature_count}개의 중요도 (새 모델)", "",
         "평균 |SHAP|은 예측을 얼마나 밀었는지다. 섞었을 때 하락은 그 값을 **요청 단위로 섞어** 다른 요청의 값과 "
         "바꿨을 때 ndcg@5가 떨어지는 폭이다. 한 값만 섞으면 비슷한 값이 빈자리를 메워 작게 나올 수 있어, "
-        "묶음과 상황 전체도 함께 쟀다.", "",
+        "묶음과 상황 전체도 함께 쟀다. 후보별 상황 맞춤 칸(candidate_…)은 후보마다 값이 달라 섞지 않고 "
+        "섞인 상황 값으로 다시 계산하므로 칸 하나만의 하락은 —로 두고, 곱하는 상황 값의 묶음에 함께 넣었다.", "",
         "| feature | 평균 \\|SHAP\\| | 섞었을 때 ndcg@5 하락 | 사전 조사 |",
         "|---|---|---|---|",
     ]
     for row in rows:
         if row["kind"] == "feature":
             researched = "확인함" if row["researched"] else "확인하지 않음"
-            lines.append(f"| {row['name']} | {row['shap']:.4f} | {row['permutation']:+.4f} | {researched} |")
+            lines.append(f"| {row['name']} | {row['shap']:.4f} | {_signed(row['permutation'])} | {researched} |")
         else:
-            lines.append(f"| 묶음: {row['name']} | {row['shap']:.4f} | {row['permutation']:+.4f} | |")
+            lines.append(f"| 묶음: {row['name']} | {row['shap']:.4f} | {_signed(row['permutation'])} | |")
     lines.append("")
     return lines
 
@@ -421,6 +461,9 @@ def main(argv: list[str] | None = None) -> None:
                         help="잡음 바닥을 잴 때 기준 모델을 한 번 더 학습하는 씨앗")
     parser.add_argument("--targets", action="append", default=[],
                         help="'이름:feature:번호,번호' — 태그로 가를 수 없는 아이템 묶음을 번호로 지정한다. 여러 번 줄 수 있다")
+    parser.add_argument("--reference-count", type=int, default=None,
+                        help="기준 모델이 볼 앞쪽 칸 수. 주지 않으면 기준 계약(지금 운영 모델의 칸)이다. "
+                             "다음 상황 모델을 이전 상황 모델(앞 70칸)과 비교할 때 70을 준다")
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
 
@@ -432,8 +475,10 @@ def main(argv: list[str] | None = None) -> None:
 
     sections = [
         "# 게임 상황 feature 평가: 기준 모델과 새 모델", "",
-        "- 기준 모델은 스키마의 앞쪽 feature(기준 계약)만, 새 모델은 게임 상황 feature까지 본다. "
-        "둘은 같은 학습 데이터, 같은 학습 설정으로 학습했다.",
+        ("- 기준 모델은 스키마의 앞쪽 feature(기준 계약)만, 새 모델은 게임 상황 feature까지 본다. "
+         if args.reference_count is None else
+         f"- 기준 모델은 스키마의 앞 {args.reference_count}칸만, 새 모델은 스키마 전체를 본다. ")
+        + "둘은 같은 학습 데이터, 같은 학습 설정으로 학습했다.",
         "- **절대 수치는 약간 좋게 나온다.** 학습을 멈추는 시점을 테스트 데이터로 정하기 때문이다. "
         "두 모델이 같은 조건이라 비교에는 문제가 없다.",
         f"- 잡음 바닥은 씨앗만 바꿔(seed={args.noise_seed}) 다시 학습한 기준 모델과의 차이다. "
@@ -446,7 +491,8 @@ def main(argv: list[str] | None = None) -> None:
     ]
     for split in ("game", "patch"):
         sections.append(render_split(
-            measure_split(args.data, schema, catalog, split, args.rounds, args.noise_seed, targets)))
+            measure_split(args.data, schema, catalog, split, args.rounds, args.noise_seed, targets,
+                          reference_count=args.reference_count)))
 
     report = "\n".join(sections)
     print(report)

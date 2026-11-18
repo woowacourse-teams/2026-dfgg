@@ -8,7 +8,7 @@ import json
 import numpy as np
 import pytest
 
-from dfgg_ltr.dataset import baseline_view, load_dataset
+from dfgg_ltr.dataset import baseline_view, load_dataset, prefix_view
 
 
 def write_jsonl(path, rows):
@@ -219,6 +219,38 @@ def test_baseline_view_keeps_the_leading_columns_under_the_baseline_fingerprint(
     assert list(baseline.labels) == list(dataset.labels)
     assert list(baseline.group) == list(dataset.group)
     assert list(baseline.item_ids) == [3089, 3031]
+
+
+def test_prefix_view_keeps_the_first_columns_under_an_unservable_fingerprint(tmp_path, schema_with_baseline):
+    """비교 기준을 앞 N칸으로 고를 때 쓴다. 칸 번호는 그대로지만 분석용이라 서버가 읽을 수 있는 지문을 붙이지 않는다."""
+    data = tmp_path / "train.jsonl"
+    write_jsonl(data, [
+        {**row("q1", 3, [1.0, 2.0, 3.0]), "item_id": 3089},
+        {**row("q1", 0, [4.0, None, 6.0]), "item_id": 3031},
+    ])
+    dataset = load_dataset(data, schema_with_baseline, split="game", subset="train")
+
+    prefix = prefix_view(dataset, 2)
+
+    assert prefix.feature_names == ["f0", "f1"]
+    assert prefix.features.shape == (2, 2)
+    assert prefix.features[0].tolist() == [1.0, 2.0]
+    assert np.isnan(prefix.features[1, 1])
+    assert prefix.schema_fingerprint not in (dataset.schema_fingerprint, dataset.baseline_schema_fingerprint)
+    assert list(prefix.labels) == list(dataset.labels)
+    assert list(prefix.group) == list(dataset.group)
+    assert list(prefix.item_ids) == [3089, 3031]
+
+
+@pytest.mark.parametrize("count", [0, 4])
+def test_prefix_view_rejects_a_count_outside_the_schema(tmp_path, schema, count):
+    """칸 수가 스키마를 벗어나면 조용히 잘리지 않고 멈춘다."""
+    data = tmp_path / "train.jsonl"
+    write_jsonl(data, [row("q1", 3, [1.0, 2.0, 3.0])])
+    dataset = load_dataset(data, schema, split="game", subset="train")
+
+    with pytest.raises(ValueError, match="칸 수"):
+        prefix_view(dataset, count)
 
 
 def test_baseline_view_needs_the_baseline_contract(tmp_path, schema):

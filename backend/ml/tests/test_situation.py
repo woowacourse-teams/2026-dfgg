@@ -4,12 +4,15 @@
 실제 후보 묶음에서 그 값만 바꿔 다시 점수를 매긴다.
 """
 import json
+import re
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from dfgg_ltr.dataset import Dataset
 from dfgg_ltr.situation import (
+    SITUATION_MATCHES,
     best_rank_of,
     empty_value_rates,
     items_with_tag,
@@ -18,6 +21,7 @@ from dfgg_ltr.situation import (
     query_permutation_importance,
     query_values,
     substitute,
+    substitute_situation,
     substitution_effect,
     top1_share,
 )
@@ -97,6 +101,128 @@ class TestSubstitute:
         changed = substitute(features, group, ENEMY_AP_SHARE, 0.7, np.array([False, True, False]))
 
         np.testing.assert_array_equal(changed[:, ENEMY_AP_SHARE], np.array([0.0, 0.7, 0.7, 0.7, 0.0, 0.0]))
+
+
+SPELL_DAMAGE_SHARE = "enemy_spell_damage_gold_share"
+SPELL_BLOCK_MATCH = "candidate_spell_block_x_enemy_spell_damage_share"
+UNKNOWN_ITEM = 9999
+CATALOG = {
+    MAGIC_RESIST: {"item_id": MAGIC_RESIST, "name": {}, "tags": ["SpellBlock"], "total_gold": 1},
+    OTHER: {"item_id": OTHER, "name": {}, "tags": ["Damage"], "total_gold": 1},
+}
+
+
+def matched_dataset_of(shares):
+    """query마다 후보 셋(마법 저항, 다른 아이템, 아이템 정보에 없는 아이템). 열: [기본 점수, 상대 주문력 비중, 마법 저항 맞춤].
+
+    상대 주문력 비중이 0.5 이상이면 마법 저항 아이템이, 아니면 다른 아이템이 정답이다.
+    """
+    features, item_ids, labels = [], [], []
+    for share in shares:
+        features += [[0.4, share, share], [0.6, share, 0.0], [0.5, share, np.nan]]
+        item_ids += [MAGIC_RESIST, OTHER, UNKNOWN_ITEM]
+        labels += [3, 0, 0] if share >= 0.5 else [0, 3, 0]
+    return Dataset(
+        features=np.array(features, dtype=float), labels=np.array(labels),
+        group=np.array([3] * len(shares)), qids=[f"q{i}" for i in range(len(shares))],
+        feature_names=["base", SPELL_DAMAGE_SHARE, SPELL_BLOCK_MATCH],
+        schema_fingerprint="abc", item_ids=np.array(item_ids), purchase_steps=np.zeros(len(shares), dtype=int),
+    )
+
+
+class TestSubstituteSituation:
+    """상황 값을 바꾸면 그 값을 곱한 후보 칸도 함께 바뀌어야 한다. 그러지 않으면 새 모델은 바뀐 상황을 보지 못한다."""
+
+    def test_rewrites_the_matching_candidate_cell_by_tag(self):
+        """태그가 맞는 후보는 바꾼 값, 맞지 않는 후보는 0, 아이템 정보에 없는 후보는 비운다 — Java 규칙과 같다."""
+        dataset = matched_dataset_of([0.1, 0.2])
+
+        changed = substitute_situation(dataset, 1, 0.7, np.array([True, False]), CATALOG)
+
+        np.testing.assert_array_equal(changed[:3, 1], [0.7, 0.7, 0.7])
+        assert changed[0, 2] == 0.7
+        assert changed[1, 2] == 0.0
+        assert np.isnan(changed[2, 2])
+        # 고르지 않은 query는 그대로다
+        np.testing.assert_array_equal(changed[3:5, 2], [0.2, 0.0])
+
+    def test_empties_the_matching_cell_when_the_new_situation_value_is_empty(self):
+        dataset = matched_dataset_of([0.3])
+
+        changed = substitute_situation(dataset, 1, np.nan, np.array([True]), CATALOG)
+
+        assert np.isnan(changed[:, 2]).all()
+
+    def test_behaves_like_substitute_when_no_candidate_cell_uses_the_value(self):
+        """70칸 데이터처럼 맞춤 칸이 없으면 지금과 같은 결과다."""
+        dataset = dataset_of([(0.2, 0), (0.8, 1)])
+        queries = np.array([True, False])
+
+        np.testing.assert_array_equal(
+            substitute_situation(dataset, ENEMY_AP_SHARE, 0.5, queries, CATALOG),
+            substitute(dataset.features, dataset.group, ENEMY_AP_SHARE, 0.5, queries))
+
+    def test_substitution_effect_lets_a_model_reading_the_candidate_cell_see_the_change(self):
+        """맞춤 칸만 읽는 모델은 아이템 정보를 주어야 상황이 바뀐 것을 본다."""
+        dataset = matched_dataset_of(np.linspace(0.0, 1.0, 11))
+
+        def predict_from_match(features):
+            return features[:, 0] + np.nan_to_num(features[:, 2])
+
+        with_catalog = substitution_effect(
+            predict_from_match, dataset, 1, {MAGIC_RESIST}, np.ones(11, dtype=bool), catalog=CATALOG)
+        without_catalog = substitution_effect(
+            predict_from_match, dataset, 1, {MAGIC_RESIST}, np.ones(11, dtype=bool))
+
+        assert with_catalog["mean_rank_high"] < with_catalog["mean_rank_low"]
+        assert without_catalog["mean_rank_high"] == without_catalog["mean_rank_low"]
+
+
+class TestQueryPermutationWithCandidateCells:
+    """상황 값을 요청 단위로 섞으면, 그 값을 곱한 후보 칸도 섞인 값으로 다시 써야 한다."""
+
+    @staticmethod
+    def predict_from_match(features):
+        return features[:, 0] + np.nan_to_num(features[:, 2])
+
+    def test_shuffling_a_situation_value_reaches_a_model_that_reads_only_the_candidate_cell(self):
+        """후보 칸만 읽는 모델도, 아이템 정보를 주면 상황 값을 섞었을 때 지표가 떨어진다."""
+        dataset = matched_dataset_of(np.linspace(0.0, 1.0, 40))
+
+        with_catalog = query_permutation_importance(
+            self.predict_from_match, dataset, {"share": [1]}, catalog=CATALOG)
+        without_catalog = query_permutation_importance(self.predict_from_match, dataset, {"share": [1]})
+
+        assert with_catalog["share"] > 0
+        assert without_catalog["share"] == 0.0
+
+    def test_candidate_cells_are_never_spread_from_the_first_candidate(self):
+        """후보 칸은 후보마다 다르다. 첫 후보의 값을 다른 후보에 퍼뜨리지 않는다 — 상황 값에서 다시 계산할 뿐이다."""
+        dataset = matched_dataset_of(np.linspace(0.0, 1.0, 10))
+        seen = []
+
+        def recording_predict(features):
+            seen.append(features.copy())
+            return self.predict_from_match(features)
+
+        query_permutation_importance(recording_predict, dataset, {"match": [2]}, catalog=CATALOG)
+
+        for features in seen:
+            np.testing.assert_array_equal(features[:, 2], dataset.features[:, 2])
+
+
+class TestSituationMatchesAgreeWithJava:
+    """Python의 짝 목록은 값 바꿔 넣기에서만 쓴다. Java `SituationMatch`와 어긋나면 분석이 엉뚱한 칸을 바꾼다."""
+
+    def test_python_matches_are_the_java_matches_in_order(self):
+        source = (Path(__file__).resolve().parents[2] / "dfgg/src/main/java/dfgg/application/recommend/v3/feature"
+                  / "SituationMatch.java").read_text(encoding="utf-8")
+        java = [(feature.lower(), situation.lower(), tuple(re.findall(r'"(\w+)"', tags)))
+                for feature, situation, tags in re.findall(
+                    r"FeatureName\.(\w+),\s*FeatureName\.(\w+),\s*((?:\"\w+\"(?:,\s*)?)+)\)", source)]
+
+        assert java, "SituationMatch.java에서 짝을 읽지 못했습니다"
+        assert list(SITUATION_MATCHES) == java
 
 
 class TestLowAndHighValues:

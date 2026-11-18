@@ -111,6 +111,22 @@ class GameSituationLtrConfigurationTest {
     }
 
     @Test
+    @DisplayName("상황 v1 계약(앞 70칸)에 맞는 파일도 새 모델로 읽고, 랭커의 모델 버전은 상황 v1 지문으로 만든다 — feature를 더해도 dev에 올라간 모델로 서버가 뜬다")
+    void gameSituationRanking_WhenFileMatchesSituationV1Contract_AvailableWithSituationV1Version() {
+        // given
+        String modelPath = GameSituationModelFixture.writeSituationV1(directory, STUMP).toUri().toString();
+
+        // when
+        GameSituationRanking ranking = configuration.gameSituationRanking(modelPath, resources, pipeline);
+
+        // then
+        assertThat(ranking.isAvailable()).isTrue();
+        assertThat(ranking.orElse(baseline).ranker().modelVersion())
+                .isEqualTo("lambdamart-" + FeatureSchemaFingerprint.SITUATION_V1);
+        assertThat(warnings()).isEmpty();
+    }
+
+    @Test
     @DisplayName("파일은 있는데 지문이 틀리면 없음으로 넘기지 않고 기동을 멈춘다")
     void gameSituationRanking_WhenFingerprintMismatches_Throws() throws IOException {
         // given

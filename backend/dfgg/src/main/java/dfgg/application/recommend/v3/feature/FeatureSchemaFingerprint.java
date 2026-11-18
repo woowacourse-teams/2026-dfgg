@@ -8,7 +8,7 @@ package dfgg.application.recommend.v3.feature;
  */
 public final class FeatureSchemaFingerprint {
 
-    public static final String EXPECTED = "50714dac4aca299c";
+    public static final String EXPECTED = "24b965cb9a191fc6";
 
     /**
      * 기준 계약({@link FeatureName#baselineExportNames()})의 지문. 지금 운영 모델이 이 계약으로 학습됐다.
@@ -17,6 +17,14 @@ public final class FeatureSchemaFingerprint {
      * 이 값이 바뀌어야 한다면 앞쪽 feature를 건드린 것이고, 운영 모델을 그대로 쓸 수 없다.
      */
     public static final String BASELINE = "84a57f48a9e3d5f2";
+
+    /**
+     * 상황 v1 계약({@link FeatureName#situationV1ExportNames()})의 지문. dev v5에 올라간 첫 게임 상황 모델이 이 계약으로 학습됐다.
+     * <p>
+     * {@link #BASELINE}처럼 feature를 뒤에 더해도 고치지 않는다.
+     * 이 값이 바뀌어야 한다면 앞 70칸을 건드린 것이고, 그 모델을 그대로 쓸 수 없다.
+     */
+    public static final String SITUATION_V1 = "50714dac4aca299c";
 
     private FeatureSchemaFingerprint() {
     }
