@@ -23,6 +23,8 @@ export interface RecommendationBody {
   inventoryItems: InventoryItem[];
   availableGold: number;
   gameTimeMs: number;
+  /** 지금 판의 LCU 큐 id 그대로. 백엔드는 훈련모드·사용자 설정 게임이면 5대5와 포지션을 요구하지 않는다 */
+  queueId?: number;
 }
 
 interface BuildParams {
@@ -33,6 +35,7 @@ interface BuildParams {
   championNames?: Record<string, string>;
   availableGold: number;
   gameTimeMs: number;
+  queueId?: number;
 }
 
 // Live API 는 MIDDLE/UTILITY, 백엔드는 MID/SUPPORT 를 쓴다.
@@ -127,6 +130,12 @@ function toPatchVersion(gameVersion: string) {
   return gameVersion.split('.').slice(0, 2).join('.');
 }
 
+// 큐를 모르면 싣지 않는다. 백엔드는 큐가 없으면 일반 게임으로 본다.
+function toQueueField(queueId?: number) {
+  if (queueId === undefined) return {};
+  return { queueId };
+}
+
 // 라이브 플레이어들 중에서 나를 찾기
 function isMe(player: LivePlayer, myRiotId: string) {
   return player.riotId === myRiotId || player.summonerName === myRiotId;
@@ -141,6 +150,7 @@ export function buildRecommendationBody({
   purchasedItemIds,
   availableGold,
   gameTimeMs,
+  queueId,
 }: BuildParams): RecommendationBody | null {
   const me = players.find((player) => isMe(player, myRiotId));
   if (!me) return null;
@@ -160,5 +170,6 @@ export function buildRecommendationBody({
     // 백엔드는 0 이상의 정수만 받는다. Live API 골드는 소수점까지 온다.
     availableGold: Math.max(0, Math.floor(availableGold)),
     gameTimeMs: Math.max(0, Math.round(gameTimeMs)),
+    ...toQueueField(queueId),
   };
 }

@@ -36,6 +36,14 @@ describe('isOverlayGame', () => {
     );
   });
 
+  it('훈련모드면 사용자 설정 게임 여부와 상관없이 띄운다', () => {
+    const practice = session(
+      { id: 3140, gameMode: 'PRACTICETOOL' },
+      { map: { id: 11, gameMode: 'PRACTICETOOL' } },
+    );
+    expect(isOverlayGame(practice)).toBe(true);
+  });
+
   it('칼바람 사용자 설정 게임이면 띄우지 않는다', () => {
     const aram = session(
       { id: -1, gameMode: '' },
