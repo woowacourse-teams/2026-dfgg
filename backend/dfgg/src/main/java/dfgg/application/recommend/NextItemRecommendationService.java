@@ -5,12 +5,16 @@ import dfgg.application.item.ItemService;
 import dfgg.application.recommend.v3.CandidateGenerator;
 import dfgg.application.recommend.v3.CandidateTopK;
 import dfgg.application.recommend.v3.CandidateUnion;
+import dfgg.application.recommend.v3.GameSituation;
 import dfgg.application.recommend.v3.GeneratorResult;
+import dfgg.application.recommend.v3.PlayerState;
 import dfgg.application.recommend.v3.RecommendationQuery;
+import dfgg.application.recommend.v3.ReportedGameState;
 import dfgg.application.recommend.v3.HardValidityFilter;
 import dfgg.application.recommend.v3.ItemCandidate;
 import dfgg.application.recommend.v3.ranker.CandidateRanker;
 import dfgg.application.recommend.v3.ranker.CoreRanking;
+import dfgg.application.recommend.v3.ranker.GameSituationRanking;
 import dfgg.application.recommend.v3.explanation.ChampionDirectory;
 import dfgg.application.recommend.v3.explanation.AllyEvidence;
 import dfgg.application.recommend.v3.explanation.CounterEvidence;
@@ -43,8 +47,10 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -72,6 +78,7 @@ public class NextItemRecommendationService {
     private final List<CandidateGenerator> generators;
     private final HardValidityFilter hardValidityFilter;
     private final CoreRanking baseline;
+    private final GameSituationRanking gameSituationRanking;
     private final CandidateTopK candidateTopK;
     private final ChampionDirectory championDirectory;
     private final ItemTraitCatalog itemTraitCatalog;
@@ -91,11 +98,33 @@ public class NextItemRecommendationService {
             ImageUrls imageUrls,
             LeagueOfLegendsVersionProperties leagueOfLegendsVersion
     ) {
+        this(championService, itemService, generators, hardValidityFilter, candidateRanker, candidateTopK,
+                treeShapCalculator, championDirectory, itemTraitCatalog, imageUrls, leagueOfLegendsVersion,
+                GameSituationRanking.absent());
+    }
+
+    /** 게임 상황까지 읽는 새 모델을 함께 받는다. 위 생성자는 새 모델이 없는 것으로 이 생성자를 부른다. */
+    @Autowired
+    public NextItemRecommendationService(
+            ChampionService championService,
+            ItemService itemService,
+            List<CandidateGenerator> generators,
+            HardValidityFilter hardValidityFilter,
+            CandidateRanker candidateRanker,
+            CandidateTopK candidateTopK,
+            TreeShapCalculator treeShapCalculator,
+            ChampionDirectory championDirectory,
+            ItemTraitCatalog itemTraitCatalog,
+            ImageUrls imageUrls,
+            LeagueOfLegendsVersionProperties leagueOfLegendsVersion,
+            GameSituationRanking gameSituationRanking
+    ) {
         this.championService = championService;
         this.itemService = itemService;
         this.generators = List.copyOf(generators);
         this.hardValidityFilter = hardValidityFilter;
         this.baseline = new CoreRanking(candidateRanker, treeShapCalculator);
+        this.gameSituationRanking = gameSituationRanking;
         this.candidateTopK = candidateTopK;
         this.championDirectory = championDirectory;
         this.itemTraitCatalog = itemTraitCatalog;
@@ -107,6 +136,24 @@ public class NextItemRecommendationService {
             NextItemRecommendationRequest request, Language language) {
         Champion myChampion = championService.findChampionByName(request.myChampion().name());
         return recommend(request, toQuery(request, myChampion), baseline, language);
+    }
+
+    /**
+     * 요청이 보낸 10명의 상태를 상황에 싣고 추천한다.
+     * 게임 상황까지 읽는 새 모델이 있으면 그 모델로, 없으면 지금 모델로 순위를 매긴다.
+     * <p>
+     * 요청 검증과 챔피언 중복 검사는 상태 없이 부르는 길과 같은 {@code toQuery}를 탄다.
+     */
+    public NextItemRecommendationResponse recommendNextItem(
+            NextItemRecommendationRequest request, ReportedGameState state, Language language) {
+        Champion myChampion = championService.findChampionByName(request.myChampion().name());
+        RecommendationQuery query = withSituation(toQuery(request, myChampion), request, state);
+        return recommend(request, query, gameSituationRanking.orElse(baseline), language);
+    }
+
+    /** 상태와 함께 부르는 길이 새 모델로 순위를 매기는가. 응답에는 드러나지 않아 지표에 남길 때 쓴다. */
+    public boolean ranksWithGameSituationModel() {
+        return gameSituationRanking.isAvailable();
     }
 
     /** 순위를 매길 랭커 짝을 받아 파이프라인을 돈다. 어느 모델로 매길지는 부르는 쪽이 정한다. */
@@ -220,6 +267,31 @@ public class NextItemRecommendationService {
                 patchOf(request),
                 coreItemIdsOf(request)
         );
+    }
+
+    private RecommendationQuery withSituation(
+            RecommendationQuery query, NextItemRecommendationRequest request, ReportedGameState state) {
+        GameSituation situation = GameSituation.of(
+                state.me(),
+                playersOf(query.allyChampionIds(), request.allies(), state.allies()),
+                playersOf(query.enemyChampionIds(), request.enemies(), state.enemies()));
+        return new RecommendationQuery(
+                query.myChampionId(), query.position(), query.purchasedItemIds(),
+                query.allyChampionIds(), query.enemyChampionIds(),
+                query.tier(), query.patch(), query.coreItemIds(), situation);
+    }
+
+    /** 상태는 요청의 선수 목록과 같은 순서로 온다. 순서대로 챔피언 번호·포지션과 짝짓는다. */
+    private List<PlayerState> playersOf(
+            List<Long> championIds, List<ChampionDto> champions, List<ReportedGameState.Player> states) {
+        if (championIds.size() != states.size()) {
+            throw new IllegalArgumentException(
+                    "선수 수와 상태 수가 다릅니다: " + championIds.size() + "명, 상태 " + states.size() + "개");
+        }
+        return IntStream.range(0, states.size())
+                .mapToObj(index -> states.get(index).toPlayerState(
+                        championIds.get(index), ChampionPosition.valueOf(champions.get(index).position())))
+                .toList();
     }
 
     /**
