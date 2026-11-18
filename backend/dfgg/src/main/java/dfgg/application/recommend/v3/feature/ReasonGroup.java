@@ -88,7 +88,14 @@ public enum ReasonGroup {
                 FeatureName.LANE_LEVEL_LEAD, FeatureName.LANE_OPPONENT_KILLS, FeatureName.LANE_CORE_GOLD_LEAD,
                 FeatureName.MY_LEVEL_LEAD, FeatureName.MY_KILLS, FeatureName.MY_DEATHS, FeatureName.MY_ASSISTS,
                 FeatureName.TEAM_KILL_LEAD, FeatureName.TEAM_ASSIST_LEAD,
-                FeatureName.TEAM_LEVEL_LEAD, FeatureName.TEAM_CORE_GOLD_LEAD);
+                FeatureName.TEAM_LEVEL_LEAD, FeatureName.TEAM_CORE_GOLD_LEAD,
+                FeatureName.CANDIDATE_SPELL_BLOCK_X_ENEMY_SPELL_DAMAGE_SHARE,
+                FeatureName.CANDIDATE_SPELL_BLOCK_X_ENEMY_MAGE_KILL_SHARE,
+                FeatureName.CANDIDATE_ARMOR_X_ENEMY_MARKSMAN_KILL_SHARE,
+                FeatureName.CANDIDATE_ARMOR_X_ENEMY_ASSASSIN_KILL_SHARE,
+                FeatureName.CANDIDATE_MAGIC_PEN_X_ENEMY_SPELL_BLOCK_SHARE,
+                FeatureName.CANDIDATE_ARMOR_PEN_X_ENEMY_ARMOR_SHARE,
+                FeatureName.CANDIDATE_DEFENSIVE_X_MY_LEVEL_LEAD);
 
         return groups;
     }

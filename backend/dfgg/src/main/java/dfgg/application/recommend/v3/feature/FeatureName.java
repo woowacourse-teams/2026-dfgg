@@ -132,6 +132,18 @@ public enum FeatureName {
     TEAM_ASSIST_LEAD,
     TEAM_LEVEL_LEAD,
     TEAM_CORE_GOLD_LEAD,
+
+    // ═══ 여기까지가 상황 v1 계약이다. dev v5에 올라간 첫 게임 상황 모델은 위 feature만 읽는다 (situationV1ExportNames) ═══
+
+    // ─── Game Situation: 후보가 지금 상황에 맞는가 — 후보 태그 × 위의 상황 값 ────
+    // 위의 상황 값은 한 요청의 모든 후보에게 같아서 순서를 바꾸지 못한다. 후보마다 다른 값으로 만든다.
+    CANDIDATE_SPELL_BLOCK_X_ENEMY_SPELL_DAMAGE_SHARE,
+    CANDIDATE_SPELL_BLOCK_X_ENEMY_MAGE_KILL_SHARE,
+    CANDIDATE_ARMOR_X_ENEMY_MARKSMAN_KILL_SHARE,
+    CANDIDATE_ARMOR_X_ENEMY_ASSASSIN_KILL_SHARE,
+    CANDIDATE_MAGIC_PEN_X_ENEMY_SPELL_BLOCK_SHARE,
+    CANDIDATE_ARMOR_PEN_X_ENEMY_ARMOR_SHARE,
+    CANDIDATE_DEFENSIVE_X_MY_LEVEL_LEAD,
     ;
 
     public int index() {
@@ -174,6 +186,24 @@ public enum FeatureName {
      */
     public static String baselineSchemaFingerprint() {
         return fingerprintOf(baselineExportNames());
+    }
+
+    /**
+     * 상황 v1 계약의 이름 목록 — 기준 계약 뒤에 게임 상황 값 20개까지, 맨 앞부터 {@link #TEAM_CORE_GOLD_LEAD}까지다.
+     * <p>
+     * 첫 게임 상황 모델이 이 목록으로 학습됐다. 그 뒤에 feature를 더해도 이 목록은 바뀌지 않으므로,
+     * 벡터가 길어져도 그 모델을 계속 읽을 수 있다.
+     */
+    public static List<String> situationV1ExportNames() {
+        return exportNames().subList(0, TEAM_CORE_GOLD_LEAD.ordinal() + 1);
+    }
+
+    /**
+     * 상황 v1 계약의 지문. {@link FeatureSchemaFingerprint#SITUATION_V1}과 어긋나면
+     * 앞 70칸을 건드린 것이고, 첫 게임 상황 모델이 다른 칸을 읽게 된다.
+     */
+    public static String situationV1SchemaFingerprint() {
+        return fingerprintOf(situationV1ExportNames());
     }
 
     private static String fingerprintOf(List<String> exportNames) {

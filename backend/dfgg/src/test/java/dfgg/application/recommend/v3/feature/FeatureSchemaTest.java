@@ -58,13 +58,60 @@ class FeatureSchemaTest {
     }
 
     @Test
+    @DisplayName("상황 v1 계약의 지문은 바뀌지 않는다 — 앞 70칸을 건드리면 dev v5에 올라간 70칸 모델이 다른 칸을 읽는다")
+    void situationV1SchemaFingerprint_WhenFirstSeventyUntouched_MatchesSituationV1Constant() {
+        // given: 상황 v1 계약은 게임 상황 값 20개까지 학습한 첫 v5 모델의 이름 목록이다. 뒤에 feature를 더해도 그대로여야 한다.
+
+        // when
+        String actual = FeatureName.situationV1SchemaFingerprint();
+
+        // then
+        assertThat(actual).isEqualTo(FeatureSchemaFingerprint.SITUATION_V1);
+    }
+
+    @Test
+    @DisplayName("상황 v1 계약의 이름은 스키마 맨 앞 70개다 — 기준 계약 50개와 게임 상황 값 20개다")
+    void situationV1ExportNames_WhenSchemaHasMoreFeatures_ReturnsTheFirstSeventy() {
+        // given
+        int situationV1Count = 70;
+
+        // when
+        var situationV1 = FeatureName.situationV1ExportNames();
+
+        // then
+        assertThat(situationV1).hasSize(situationV1Count);
+        assertThat(situationV1).isEqualTo(FeatureName.exportNames().subList(0, situationV1Count));
+        assertThat(situationV1.getLast()).isEqualTo("team_core_gold_lead");
+    }
+
+    @Test
+    @DisplayName("후보별 상황 값 7개는 상황 v1 계약 바로 뒤에 온다 — 이 순서가 다음 게임 상황 모델의 칸 번호다")
+    void exportNames_WhenReadAfterSituationV1_ListsCandidateSituationFeaturesInOrder() {
+        // given
+        int situationV1Count = FeatureName.situationV1ExportNames().size();
+
+        // when
+        var appended = FeatureName.exportNames().subList(situationV1Count, FeatureName.values().length);
+
+        // then
+        assertThat(appended).containsExactly(
+                "candidate_spell_block_x_enemy_spell_damage_share",
+                "candidate_spell_block_x_enemy_mage_kill_share",
+                "candidate_armor_x_enemy_marksman_kill_share",
+                "candidate_armor_x_enemy_assassin_kill_share",
+                "candidate_magic_pen_x_enemy_spell_block_share",
+                "candidate_armor_pen_x_enemy_armor_share",
+                "candidate_defensive_x_my_level_lead");
+    }
+
+    @Test
     @DisplayName("게임 상황 feature 20개는 기준 계약 바로 뒤에 온다 — 이 순서가 새 모델의 칸 번호다")
     void exportNames_WhenReadAfterBaseline_ListsSituationFeaturesInOrder() {
         // given
         int baselineCount = FeatureName.baselineExportNames().size();
 
         // when
-        var appended = FeatureName.exportNames().subList(baselineCount, FeatureName.values().length);
+        var appended = FeatureName.exportNames().subList(baselineCount, FeatureName.situationV1ExportNames().size());
 
         // then
         assertThat(appended).containsExactly(
