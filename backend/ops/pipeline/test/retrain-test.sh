@@ -80,7 +80,7 @@ EOF
 cat > "$work/bin/fake-gradle" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-echo "gradle flyway=${SPRING_FLYWAY_ENABLED:-} $*" >> "$CALLS"
+echo "gradle flyway=${SPRING_FLYWAY_ENABLED:-} ddl=${SPRING_JPA_HIBERNATE_DDL_AUTO:-} $*" >> "$CALLS"
 for arg in "$@"; do
   case "$arg" in
     -Devaluation.export.path=*)
@@ -155,7 +155,7 @@ check "결과 JSON에 통과와 이름이 있다" test "$(jq -r '.verdict + " " 
 check "GITHUB_OUTPUT에 이름·판정을 적는다" grep -qx "verdict=passed" "$GITHUB_OUTPUT"
 check "current.json은 바꾸지 않는다" test "$(jq -r .name "$ltr/current.json")" = ltr-261020
 check "export는 통계를 다시 집계하지 않는다" logged "-Devaluation.aggregate=false"
-check "export는 Flyway를 끄고 돈다" logged "gradle flyway=false evaluationTest --tests *TrainingSetExportTest"
+check "export는 Flyway와 스키마 검증을 끄고 돈다" logged "gradle flyway=false ddl=none evaluationTest --tests *TrainingSetExportTest"
 check "query 수를 export에 넘긴다" logged "-Devaluation.queries=5000"
 check "후보는 game split·기준 계약으로 학습한다" logged "--split game --baseline"
 check "비교는 현재 운영 모델과 한다" logged "--current $work/run-pass/current/model.json"
