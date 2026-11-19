@@ -30,6 +30,7 @@ import dfgg.application.recommend.v3.ranker.GradientBoostedTrees;
 import dfgg.common.exception.NextItemRecommendationNotFoundException;
 import dfgg.domain.champion.Champion;
 import dfgg.domain.champion.ChampionPosition;
+import dfgg.presentation.dto.ChampionDto;
 import dfgg.domain.language.Language;
 import dfgg.infrastructure.external.dto.ItemResponse;
 import dfgg.presentation.dto.RecommendationDescription;
@@ -168,6 +169,30 @@ class NextItemRecommendationV4ControllerTest {
                 .andExpect(jsonPath("$.recommendedItems[0].id").value(3133));
         verify(core).recommendNextItem(argThat(request -> "JUNGLE".equals(request.myChampion().position())
                 && request.allies().isEmpty() && request.enemies().isEmpty()), any());
+    }
+
+    @Test
+    @DisplayName("훈련모드 요청은 인원이 넘치고 챔피언이 겹치거나 이름이 비어도 추천한다")
+    void recommendV4_WhenPracticeToolWithOverfullDuplicatedTeams_Recommend() throws Exception {
+        // given
+        String practice = """
+                {"myChampion":{"name":"champion10","position":"TOP"},"purchasedItemIds":[],
+                 "allies":[{"name":"champion10","position":""},{"name":"champion1","position":""},
+                           {"name":"champion2","position":""},{"name":"champion3","position":""},
+                           {"name":"champion4","position":""},{"name":"","position":""}],
+                 "enemies":[{"name":"champion1","position":""},{"name":"champion5","position":""},
+                            {"name":"champion5","position":""},{"name":"champion6","position":""},
+                            {"name":"champion7","position":""},{"name":"champion8","position":""}],
+                 "queueId":3140,"inventoryItems":[],"availableGold":1000,"gameTimeMs":600000}
+                """;
+
+        // when & then
+        mvc.perform(post(ENDPOINT).contentType(MediaType.APPLICATION_JSON).content(practice))
+                .andExpect(status().isOk());
+        verify(core).recommendNextItem(argThat(request -> request.allies().stream().map(ChampionDto::name).toList()
+                        .equals(List.of("champion2", "champion3", "champion4"))
+                && request.enemies().stream().map(ChampionDto::name).toList()
+                        .equals(List.of("champion1", "champion5", "champion6", "champion7", "champion8"))), any());
     }
 
     @Test
