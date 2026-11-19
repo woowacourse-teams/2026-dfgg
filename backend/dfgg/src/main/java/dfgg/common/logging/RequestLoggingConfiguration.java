@@ -11,9 +11,10 @@ public class RequestLoggingConfiguration {
 
     @Bean
     public FilterRegistrationBean<RequestLoggingFilter> requestLoggingFilter(
-            @Value("${logging.slow-request-threshold-millis:1000}") long slowRequestMillis) {
+            @Value("${logging.slow-request-threshold-millis:1000}") long slowRequestMillis,
+            AccessLogProperties accessLog) {
         FilterRegistrationBean<RequestLoggingFilter> registration =
-                new FilterRegistrationBean<>(new RequestLoggingFilter(slowRequestMillis));
+                new FilterRegistrationBean<>(new RequestLoggingFilter(slowRequestMillis, accessLog));
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return registration;
     }

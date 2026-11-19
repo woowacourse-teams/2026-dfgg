@@ -187,6 +187,15 @@ logging:
       add:
         slot: "${DFGG_SLOT:local}"
   slow-request-threshold-millis: "${LOGGING_SLOW_REQUEST_THRESHOLD_MILLIS:1000}"
+  # 요청·응답 본문을 남길 경로(접두어). 사용자 화면에 그려지는 API만 둔다.
+  access:
+    body-paths:
+      - /api/recommendations/
+      - /api/df-score
+      - /api/counters
+      - /api/today-picks
+      - /api/aram-mayhem/
+    max-body-bytes: 8192
 
 assets:
   s3:
