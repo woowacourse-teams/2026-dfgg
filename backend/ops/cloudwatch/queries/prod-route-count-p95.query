@@ -1,0 +1,8 @@
+# dfgg/prod 4. 경로별 건수와 p95 지연
+# 로그 그룹: /dfgg/prod
+# method·uri·duration_ms가 아직 message 문자열 안에 있어 parse로 꺼낸다. parse로 만든 필드에는 filter를 걸지 않는다(결과가 빈다).
+fields @timestamp, message
+| filter @logStream like "app-" and logger_name = "dfgg.common.logging.RequestLoggingFilter" and message like "duration_ms="
+| parse message "method=* uri=* status=* duration_ms=*" as method, uri, status, duration_ms
+| stats count(*) as requests, pct(duration_ms, 95) as p95_ms by method, uri
+| sort requests desc

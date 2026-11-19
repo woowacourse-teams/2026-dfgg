@@ -1,0 +1,20 @@
+{
+  "entries": {
+    "cherry_bluntforce_summary": "Gain %i:scaleAD% <scaleAD>@ADAmp*100@% Attack Damage</scaleAD>.",
+    "cherry_courageofthecolossus_summary": "Gain <shield>@TotalShield@ Shield</shield> after <status>Immobilizing</status> or <status>Grounding</status> an enemy champion.<br>",
+    "cherry_jeweledgauntlet_summary": "Your Abilities can <crit>Critically Strike</crit>. <br><br>Gain <crit>%i:scaleCrit% @CritGranted@ Crit Chance</crit>.",
+    "cherry_scopierweapons_summary": "Gain @RangeIncrease@ Attack Range.",
+    "cherry_witchfulthinking_summary": "Gain %i:scaleAP% <scaleAP>@AP@ Ability Power</scaleAP>.",
+    "kiwi_augment_totentanz_description": "Replace a Summoner Spell with <spellName>{{Kiwi_Augment_Totentanz_Summoner_Name}}</spellName>.<br><br><spellName>{{Kiwi_Augment_Totentanz_Summoner_Name}}</spellName>: Blink forward and become <attention>Unkillable</attention>. Get a takedown within @Buff_Duration@ seconds or else<br><danger>YOU DIE</danger>.",
+    "kiwi_augment_totentanz_summoner_name": "A Dance with Death",
+    "kiwi_doubletap_summary": "Your <crit>Critical Strikes</crit> apply <OnHit>%i:OnHit% On-Hit</OnHit> effects an additional time.<br><br>Gain <crit>%i:scaleCrit% @Calc_Crit_Chance@ Crit chance</crit>.",
+    "kiwi_littleextrahelp_summary": "Gain @RangeIncrease@ Attack Range and @ExtraAttackSpeed@ <attackSpeed>Attack Speed</attackSpeed> during your {{SpellName}} duration.",
+    "kiwi_proteinshake_summary": "Gain <healing>%i:scaleHealShield%@BonusHSPower@% Heal and Shield Power</healing> based on bonus <scaleArmor>Armor</scaleArmor> and <scaleMR>Magic Resist</scaleMR>.",
+    "kiwi_quest_urfschampion_summary": "<font color='#F0C200'>QUEST:</font> Score @QuestRequirement@ takedowns.<br><br>REWARD: Golden Spatula",
+    "kiwi_rabblerousing_summary": "Using {{SpellName}} restores <healing>Health</healing>.",
+    "kiwi_titanspulse_summary": "When {{Spellname}} damages enemy champions, gain @ARMR_Inc@ <scaleArmor>Armor</scaleArmor> and <scaleMR>Magic Resistance</scaleMR>.",
+    "kiwi_twinfire_summary": "On ability damage, fire 1 plus @AdditionalMis@ missiles that deal <magicDamage>@Damage@ magic damage</magicDamage> each. <br><br>Gain <attention>%i:scaleCrit% @CrtiChance*100@% Critical Strike Chance</attention>.",
+    "generatedtip_unrelated_entry": "Unrelated"
+  },
+  "version": "16.22"
+}

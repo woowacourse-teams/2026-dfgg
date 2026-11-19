@@ -6,3 +6,5 @@ ALTER DATABASE dfgg OWNER TO dfgg;
 CREATE DATABASE dfgg_test;
 GRANT ALL PRIVILEGES ON DATABASE dfgg_test TO dfgg;
 ALTER DATABASE dfgg_test OWNER TO dfgg;
+
+CREATE DATABASE dfgg_backtest OWNER dfgg;
