@@ -7,9 +7,8 @@ import jakarta.validation.ConstraintValidatorContext;
 import java.util.List;
 
 /**
- * 일반 게임은 아군 4명·적 5명과 모든 포지션이 필수다.
- * 훈련모드·사용자 설정 게임은 그보다 적은 인원을 받고 포지션은 보지 않는다. 라인이 없어 Live API가 NONE 등을 준다.
- * 이름은 큐와 무관하게 본다.
+ * 일반 게임은 아군 4명·적 5명과 모든 챔피언의 이름·포지션이 필수다.
+ * 훈련모드·사용자 설정 게임은 내 챔피언 이름만 본다. 인원·포지션·팀원 이름은 정해져 있지 않다.
  */
 public class TeamRosterValidator implements ConstraintValidator<ValidTeamRoster, NextItemRecommendationV4Request> {
 
@@ -24,7 +23,7 @@ public class TeamRosterValidator implements ConstraintValidator<ValidTeamRoster,
     public boolean isValid(NextItemRecommendationV4Request request, ConstraintValidatorContext context) {
         context.disableDefaultConstraintViolation();
         boolean freeRoster = request.gameQueue().hasFreeRoster();
-        boolean valid = isChampionValid(request.myChampion(), freeRoster,
+        boolean valid = isChampionValid(request.myChampion(), true, freeRoster,
                 (message, property) -> addViolation(context, message, "myChampion", property));
         valid &= isTeamValid(request.allies(), "allies", ALLY_COUNT, "아군", freeRoster, context);
         valid &= isTeamValid(request.enemies(), "enemies", ENEMY_COUNT, "적군", freeRoster, context);
@@ -39,7 +38,7 @@ public class TeamRosterValidator implements ConstraintValidator<ValidTeamRoster,
         boolean valid = isSizeValid(team.size(), field, count, label, freeRoster, context);
         for (int index = 0; index < team.size(); index++) {
             int memberIndex = index;
-            valid &= isChampionValid(team.get(index), freeRoster,
+            valid &= isChampionValid(team.get(index), !freeRoster, freeRoster,
                     (message, property) -> addMemberViolation(context, message, field, memberIndex, property));
         }
         return valid;
@@ -47,31 +46,22 @@ public class TeamRosterValidator implements ConstraintValidator<ValidTeamRoster,
 
     private boolean isSizeValid(int size, String field, int count, String label, boolean freeRoster,
             ConstraintValidatorContext context) {
-        if (freeRoster && size <= count) {
+        if (freeRoster || size == count) {
             return true;
         }
-        if (!freeRoster && size == count) {
-            return true;
-        }
-        context.buildConstraintViolationWithTemplate(sizeMessage(label, count, freeRoster))
+        context.buildConstraintViolationWithTemplate(label + "은 " + count + "명이어야 합니다")
                 .addPropertyNode(field)
                 .addConstraintViolation();
         return false;
     }
 
-    private String sizeMessage(String label, int count, boolean freeRoster) {
-        if (freeRoster) {
-            return label + "은 " + count + "명까지입니다";
-        }
-        return label + "은 " + count + "명이어야 합니다";
-    }
-
-    private boolean isChampionValid(ChampionDto champion, boolean freeRoster, ViolationTarget target) {
+    private boolean isChampionValid(ChampionDto champion, boolean nameRequired, boolean freeRoster,
+            ViolationTarget target) {
         if (champion == null) {
             return true;
         }
         boolean valid = true;
-        if (isBlank(champion.name())) {
+        if (nameRequired && isBlank(champion.name())) {
             target.add(NAME_REQUIRED, "name");
             valid = false;
         }
