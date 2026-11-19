@@ -10,7 +10,9 @@ import ch.qos.logback.core.read.ListAppender;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -191,5 +193,60 @@ class RequestLoggingFilterTest {
 
         // then
         assertThat(MDC.get("traceId")).isNull();
+    }
+
+    @Test
+    @DisplayName("본문 기록 경로면 요청·응답 본문을 key-value로 남기고 응답은 그대로 내보낸다")
+    void doFilter_WhenBodyPath_LogRequestAndResponseBody() throws Exception {
+        // given
+        RequestLoggingFilter filter = new RequestLoggingFilter(
+                NEVER_SLOW, new AccessLogProperties(List.of("/api/df-score"), 8192));
+        MockHttpServletRequest request = request("POST", "/api/df-score");
+        request.setContent("{\"queueId\":420,\"puuid\":\"Ab3xQwErTy\"}".getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        filter.doFilter(request, response, echoChain("{\"score\":7.4}"));
+
+        // then
+        assertThat(keyValue("req")).isEqualTo(Map.of("queueId", 420, "puuid", "Ab3x…"));
+        assertThat(keyValue("res")).isEqualTo(Map.of("score", 7.4));
+        assertThat(response.getContentAsString())
+                .as("응답 래퍼가 본문을 돌려주지 않으면 클라이언트가 빈 응답을 받는다")
+                .isEqualTo("{\"score\":7.4}");
+    }
+
+    @Test
+    @DisplayName("본문 기록 경로가 아니면 본문을 남기지 않는다")
+    void doFilter_WhenNotBodyPath_SkipBody() throws Exception {
+        // given
+        RequestLoggingFilter filter = new RequestLoggingFilter(
+                NEVER_SLOW, new AccessLogProperties(List.of("/api/df-score"), 8192));
+        MockHttpServletRequest request = request("POST", "/api/feedback");
+        request.setContent("{\"text\":\"사용자가 쓴 글\"}".getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        filter.doFilter(request, response, echoChain("{}"));
+
+        // then
+        assertThat(events().getFirst().getKeyValuePairs()).isNullOrEmpty();
+        assertThat(response.getContentAsString()).isEqualTo("{}");
+    }
+
+    // 컨트롤러처럼 요청 본문을 끝까지 읽고 응답 본문을 쓴다.
+    private FilterChain echoChain(String responseBody) {
+        return (req, res) -> {
+            req.getInputStream().readAllBytes();
+            res.getOutputStream().write(responseBody.getBytes(StandardCharsets.UTF_8));
+        };
+    }
+
+    private Object keyValue(String key) {
+        return events().getFirst().getKeyValuePairs().stream()
+                .filter(pair -> pair.key.equals(key))
+                .map(pair -> pair.value)
+                .findFirst()
+                .orElse(null);
     }
 }
