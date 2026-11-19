@@ -46,7 +46,7 @@ public record NextItemRecommendationV4Request(
         @PositiveOrZero(message = "게임 경과 시간은 0 이상이어야 합니다")
         Long gameTimeMs,
 
-        /** 선택. 훈련모드·사용자 설정 게임이면 5대5가 아니어도 되고 포지션을 비워도 된다. 비우면 일반 게임이다. */
+        /** 선택. 훈련모드·사용자 설정 게임이면 인원·포지션·팀원 이름을 검증하지 않는다. 비우면 일반 게임이다. */
         Integer queueId
 ) {
     public NextItemRecommendationV4Request(ChampionDto myChampion, List<Long> purchasedItemIds, List<ChampionDto> allies,
@@ -70,6 +70,11 @@ public record NextItemRecommendationV4Request(
     public NextItemRecommendationV4Request withMyPosition(ChampionPosition position) {
         return new NextItemRecommendationV4Request(new ChampionDto(myChampion.name(), position.name()),
                 purchasedItemIds, allies, enemies, tier, patch, inventoryItems, availableGold, gameTimeMs, queueId);
+    }
+
+    public NextItemRecommendationV4Request withTeams(List<ChampionDto> allies, List<ChampionDto> enemies) {
+        return new NextItemRecommendationV4Request(myChampion, purchasedItemIds, allies, enemies, tier, patch,
+                inventoryItems, availableGold, gameTimeMs, queueId);
     }
 
     public NextItemRecommendationRequest toCoreRequest() {

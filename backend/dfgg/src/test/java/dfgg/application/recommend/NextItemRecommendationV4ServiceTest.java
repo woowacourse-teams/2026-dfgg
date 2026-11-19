@@ -436,6 +436,56 @@ class NextItemRecommendationV4ServiceTest {
         verifyNoInteractions(core, component);
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {0, 3140})
+    @DisplayName("훈련모드·사용자 설정 게임은 나와 겹치거나 중복이거나 모르는 챔피언을 빼고 추천한다")
+    void recommendNextItem_WhenFreeRosterHasDuplicatesAndUnknowns_RecommendWithCleanRoster(int queueId) {
+        // given
+        prepareCore(List.of(coreItem(3133)));
+        when(champions.findChampionByName("Target Dummy"))
+                .thenThrow(new dfgg.common.exception.ChampionNotFoundException("Target Dummy"));
+        when(component.recommend(any(), eq(catalog))).thenReturn(List.of(
+                new TargetRecommendation(3133, Status.NO_CANDIDATE, List.of(), null)));
+        var request = new NextItemRecommendationV4Request(new ChampionDto("Garen", "TOP"), List.of(),
+                List.of(new ChampionDto("Garen", "NONE"), new ChampionDto("champion1", "NONE"),
+                        new ChampionDto("champion2", "NONE"), new ChampionDto("champion2", "NONE"),
+                        new ChampionDto("", "NONE")),
+                List.of(new ChampionDto("Garen", "NONE"), new ChampionDto("champion1", "NONE"),
+                        new ChampionDto("champion1", "NONE"), new ChampionDto("Target Dummy", "NONE"),
+                        new ChampionDto(null, "NONE")),
+                null, null, List.of(), 1000L, 600_000L, queueId);
+
+        // when
+        service.recommendNextItem(request, Language.KO_KR);
+
+        // then
+        verify(core).recommendNextItem(new NextItemRecommendationRequest(new ChampionDto("Garen", "TOP"), List.of(),
+                List.of(new ChampionDto("champion2", "NONE")), List.of(new ChampionDto("champion1", "NONE")),
+                null, "16.18"), Language.KO_KR);
+        verify(compositions).calculate(List.of(2L), List.of(1L));
+    }
+
+    @Test
+    @DisplayName("일반 게임은 명단을 고치지 않고 그대로 Core에 넘긴다")
+    void recommendNextItem_WhenRegularQueueHasDuplicates_PassRosterAsIs() {
+        // given
+        prepareCore(List.of(coreItem(3133)));
+        var allies = List.of(new ChampionDto("Garen", "MID"), new ChampionDto("champion2", "JUNGLE"),
+                new ChampionDto("champion3", "BOTTOM"), new ChampionDto("champion4", "SUPPORT"));
+        var enemies = List.of(new ChampionDto("champion2", "TOP"), new ChampionDto("champion5", "JUNGLE"),
+                new ChampionDto("champion6", "MID"), new ChampionDto("champion7", "BOTTOM"),
+                new ChampionDto("champion8", "SUPPORT"));
+        var request = new NextItemRecommendationV4Request(new ChampionDto("Garen", "TOP"), List.of(), allies,
+                enemies, null, null, List.of(), 1000L, 600_000L, 420);
+
+        // when
+        service.recommendNextItem(request, Language.KO_KR);
+
+        // then
+        verify(core).recommendNextItem(new NextItemRecommendationRequest(new ChampionDto("Garen", "TOP"), List.of(),
+                allies, enemies, null, "16.18"), Language.KO_KR);
+    }
+
     private NextItemRecommendationV4Request practiceRequest(String position) {
         return new NextItemRecommendationV4Request(new ChampionDto("Garen", position), List.of(), List.of(),
                 List.of(), null, null, List.of(), 1000L, 600_000L, 3140);

@@ -174,8 +174,8 @@ class NextItemRecommendationV4RequestTest {
     }
 
     @Test
-    @DisplayName("훈련모드라도 아군 4명·적 5명을 넘으면 거부한다")
-    void validate_WhenFreeRosterQueueWithTooManyChampions_RejectTeam() {
+    @DisplayName("훈련모드는 아군 4명·적 5명을 넘어도 받는다")
+    void validate_WhenFreeRosterQueueWithTooManyChampions_HaveNoViolation() {
         // given
         ObjectNode body = body();
         body.put("queueId", 3140);
@@ -186,7 +186,7 @@ class NextItemRecommendationV4RequestTest {
         Set<String> violations = violations(request(body));
 
         // then
-        assertThat(violations).contains("allies", "enemies");
+        assertThat(violations).isEmpty();
     }
 
     @ParameterizedTest
@@ -208,19 +208,20 @@ class NextItemRecommendationV4RequestTest {
     }
 
     @Test
-    @DisplayName("훈련모드라도 챔피언 이름은 필수다")
-    void validate_WhenFreeRosterQueueWithBlankName_RejectChampion() {
+    @DisplayName("훈련모드라도 내 챔피언 이름은 필수지만 팀원 이름은 비어도 받는다")
+    void validate_WhenFreeRosterQueueWithBlankName_RejectOnlyMyChampion() {
         // given
         ObjectNode body = body();
         body.put("queueId", 3140);
         ((ObjectNode) body.get("myChampion")).put("name", "");
         ((ObjectNode) body.get("allies").get(0)).put("name", "");
+        ((ObjectNode) body.get("enemies").get(0)).remove("name");
 
         // when
         Set<String> violations = violations(request(body));
 
         // then
-        assertThat(violations).contains("myChampion.name", "allies[0].name");
+        assertThat(violations).containsExactly("myChampion.name");
     }
 
     @Test

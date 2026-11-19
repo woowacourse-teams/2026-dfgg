@@ -12,6 +12,7 @@ import dfgg.application.recommend.situational.SituationalItemMapper;
 import dfgg.application.recommend.v3.ReportedGameState;
 import dfgg.domain.champion.Champion;
 import dfgg.presentation.dto.SituationalItemDto;
+import dfgg.common.exception.ChampionNotFoundException;
 import dfgg.common.exception.ChampionPositionNotFoundException;
 import dfgg.common.exception.ComponentRecommendationUnavailableException;
 import dfgg.common.exception.InvalidRecommendationRequestException;
@@ -32,9 +33,12 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -117,7 +121,7 @@ public class NextItemRecommendationV4Service {
         if (!components.isAvailable()) {
             throw new ComponentRecommendationUnavailableException();
         }
-        NextItemRecommendationV4Request request = withMyPosition(requested);
+        NextItemRecommendationV4Request request = withPlayableTeams(withMyPosition(requested));
         ItemResponse catalog = components.catalog();
         ItemInventory inventory = inventory(request, catalog);
         prepare.stop(meters.stage("prepare"));
@@ -150,6 +154,42 @@ public class NextItemRecommendationV4Service {
         ChampionPosition position = positions.mainPositionOf(championId)
                 .orElseThrow(() -> new ChampionPositionNotFoundException(name));
         return request.withMyPosition(position);
+    }
+
+    /**
+     * 훈련모드·사용자 설정 게임은 명단을 거부하지 않고 추천에 쓸 수 있는 챔피언만 남긴다.
+     * 빈 이름·모르는 이름, 나와 같은 챔피언, 이미 나온 챔피언을 뺀다. 적을 먼저 보아 겹치면 적 쪽이 남는다.
+     */
+    private NextItemRecommendationV4Request withPlayableTeams(NextItemRecommendationV4Request request) {
+        if (!request.gameQueue().hasFreeRoster()) {
+            return request;
+        }
+        Set<Long> seen = new HashSet<>();
+        seen.add(champions.findChampionByName(request.myChampion().name()).getChampionId());
+        List<ChampionDto> enemies = playable(request.enemies(), seen);
+        List<ChampionDto> allies = playable(request.allies(), seen);
+        return request.withTeams(allies, enemies);
+    }
+
+    private List<ChampionDto> playable(List<ChampionDto> team, Set<Long> seen) {
+        List<ChampionDto> playable = new ArrayList<>();
+        for (ChampionDto champion : team) {
+            if (isNewChampion(champion.name(), seen)) {
+                playable.add(champion);
+            }
+        }
+        return playable;
+    }
+
+    private boolean isNewChampion(String name, Set<Long> seen) {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        try {
+            return seen.add(champions.findChampionByName(name).getChampionId());
+        } catch (ChampionNotFoundException exception) {
+            return false;
+        }
     }
 
     /** Core 추천을 받는 방법. 상태 없이 받는 v4와 상태와 함께 받는 새 API가 여기서만 갈린다. */
