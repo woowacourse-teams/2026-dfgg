@@ -33,6 +33,28 @@
           "text": "prod",
           "value": "prod"
         }
+      },
+      {
+        "name": "traceId",
+        "label": "traceId",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "description": "응답 헤더 X-Trace-Id 값. 비우면 모든 요청을 보여 준다."
+      },
+      {
+        "name": "installId",
+        "label": "installId",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "description": "앱의 설치 ID(X-Install-Id). 한 기기의 요청 흐름을 본다. 비우면 모든 요청을 보여 준다."
       }
     ]
   },
@@ -1327,6 +1349,46 @@
             }
           ],
           "expression": "fields @timestamp, level, slot, logger_name, message, traceId, installId\n| filter @logStream like \"app-\" and level in [\"WARN\", \"ERROR\"]\n| fields concat(level, \" [\", slot, \"] \", logger_name, \" - \", message) as line\n| display @timestamp, line, level, traceId, installId\n| sort @timestamp desc\n| limit 100"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "요청 추적 (access 로그, 200 포함)",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "dfgg-cloudwatch"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      },
+      "description": "요청 한 건이 끝날 때 남는 access 줄을 레벨과 관계없이 보여 준다. 정상 응답(200)도 여기서 본다.\n위의 traceId·installId 입력칸으로 좁힌다. 비워 두면 전체다(빈 문자열 like는 모든 줄과 맞는다).\n허용 목록 API는 req·res가 붙어 있다. 줄을 펼치면 JSON이 들여쓰기된다.",
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": false,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "dfgg-cloudwatch"
+          },
+          "queryMode": "Logs",
+          "region": "ap-northeast-2",
+          "logGroups": [
+            {
+              "arn": "/dfgg/$env",
+              "name": "/dfgg/$env"
+            }
+          ],
+          "expression": "fields @timestamp, @message, level, traceId, installId\n| filter @logStream like \"app-\" and logger_name = \"dfgg.common.logging.RequestLoggingFilter\"\n| filter @message like \"$traceId\" and @message like \"$installId\"\n| sort @timestamp desc\n| limit 200"
         }
       ]
     }

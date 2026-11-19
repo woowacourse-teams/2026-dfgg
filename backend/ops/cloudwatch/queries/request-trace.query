@@ -1,0 +1,8 @@
+# dfgg/요청 추적 (access 로그, 200 포함)
+# 로그 그룹: /dfgg/prod 또는 /dfgg/dev
+# 정상 응답도 보인다. 허용 목록 API는 req·res가 붙어 있다.
+# 특정 기기만 보려면 filter 줄 끝에 and installId = "..." 을, 한 요청만 보려면 and traceId = "..." 을 붙인다.
+fields @timestamp, level, slot, traceId, installId, message, req, res
+| filter @logStream like "app-" and logger_name = "dfgg.common.logging.RequestLoggingFilter"
+| sort @timestamp desc
+| limit 200
