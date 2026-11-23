@@ -2,7 +2,7 @@ name: BE Retrain (ml)
 
 # Core 모델 재학습 (U11). 화·토 야간 파이프라인이 복제 뒤에 수동 실행으로 건다. 사람이 직접 걸어도 된다.
 # ml 인스턴스를 켜고 → ml 러너에서 export·학습·비교·업로드 → 성공·실패와 무관하게 끈다.
-# 통과한 모델은 ltr/<이름>/, 탈락은 ltr/<이름>-rejected/에 올리고 current.json은 바꾸지 않는다(배포는 U12).
+# 통과한 모델은 ltr/<이름>/, 탈락은 ltr/<이름>-rejected/에 올린다. 통과하면 모델 배포(be-model-deploy.yml, U12)를 건다.
 #
 # 준비물: 저장소 변수 ML_INSTANCE_ID, ml 서버의 러너(라벨 dfgg-ml)와 /opt/dfgg/ml/ml.env(main 읽기 전용 접속).
 # 켜기·끄기는 scheduling 러너의 인스턴스 역할(ec2-project)로 한다. 이 계정에서 IAM 역할을 새로 만들 수 없어서다.
@@ -80,8 +80,27 @@ jobs:
       - name: Stop the ml instance
         run: backend/ops/pipeline/training-instance.sh stop
 
+  # 통과한 모델을 dev에 배포하고 prod 승인을 요청한다. 배포는 1시간 가까이 걸려 기다리지 않는다. 결과는 그 실행이 알린다.
+  deploy-model:
+    needs: [ retrain, stop ]
+    if: ${{ !cancelled() && needs.retrain.outputs.verdict == 'passed' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Start the model deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ needs.retrain.outputs.name }}
+        run: .github/scripts/dispatch-and-wait.sh be-model-deploy.yml "$GITHUB_REF_NAME" --no-wait -f "model=$NAME"
+
   notify:
-    needs: [ start, retrain, stop ]
+    needs: [ start, retrain, stop, deploy-model ]
     if: ${{ always() && github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -95,6 +114,7 @@ jobs:
           START: ${{ needs.start.result }}
           RETRAIN: ${{ needs.retrain.result }}
           STOP: ${{ needs.stop.result }}
+          DEPLOY: ${{ needs.deploy-model.result }}
           NAME: ${{ needs.retrain.outputs.name }}
           VERDICT: ${{ needs.retrain.outputs.verdict }}
           S3: ${{ needs.retrain.outputs.s3 }}
@@ -102,7 +122,7 @@ jobs:
           set -euo pipefail
           level=notice
           case "$VERDICT" in
-            passed) text="재학습 모델이 비교 기준을 통과했습니다: $NAME ($S3). 배포는 be-cd model=$NAME으로 합니다." ;;
+            passed) text="재학습 모델이 비교 기준을 통과했습니다: $NAME ($S3). dev 배포를 시작합니다(모델 배포 시작 $DEPLOY). 검증이 끝나면 prod 승인 요청이 따로 옵니다." ;;
             rejected) text="재학습 모델이 비교 기준에 못 미쳐 탈락했습니다: $NAME (${S3}report/compare.json)" ;;
             insufficient) text="평가 표본이 모자라 판정하지 않았습니다: $NAME (${S3}report/compare.json)" ;;
             *) level=failure; text="재학습이 끝나지 못했습니다. 켜기 $START · 재학습 $RETRAIN · 끄기 $STOP" ;;
