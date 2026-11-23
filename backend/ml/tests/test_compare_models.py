@@ -3,6 +3,7 @@
 game test 전체로 판정하고, 최신 패치는 표본이 충분할 때만 판정한다. 승률 V는 보고에만 실린다.
 """
 import numpy as np
+import pytest
 
 from dfgg_ltr.compare_models import (
     INSUFFICIENT_SAMPLE,
@@ -15,6 +16,7 @@ from dfgg_ltr.compare_models import (
     judge_total,
     latest_patch,
     render_summary,
+    scores_for,
 )
 from dfgg_ltr.dataset import Dataset, QueryMeta
 
@@ -99,3 +101,28 @@ def test_compare_judges_total_and_latest_patch_and_reports_win_rate_only():
     assert total.candidate["hit_rate@5"] == 1.0 and total.failures == [] and latest.failures == []
     assert total.win_rate["candidate_v"] == 0.5
     assert np.isnan(total.win_rate["current_v"])
+
+
+def baseline_dataset():
+    return Dataset(
+        features=np.array([[1.0, 9.0], [0.0, 9.0]]), labels=np.array([3, 0]), group=np.array([2]),
+        qids=["q0"], feature_names=["a", "b"], schema_fingerprint="full",
+        baseline_feature_count=1, baseline_schema_fingerprint="base")
+
+
+def one_split_model(fingerprint, feature):
+    """feature가 0.5보다 크면 1, 아니면 0을 내는 나무 하나."""
+    tree = {"split_feature": [feature], "threshold": [0.5], "default_left": [True], "left": [-1], "right": [-2],
+            "leaf_value": [0.0, 1.0]}
+    return {"schema_fingerprint": fingerprint, "trees": [tree]}
+
+
+def test_baseline_model_is_scored_on_baseline_columns():
+    scores = scores_for(one_split_model("base", 0), baseline_dataset())
+
+    assert list(scores) == [1.0, 0.0]
+
+
+def test_model_with_unknown_fingerprint_is_refused():
+    with pytest.raises(ValueError):
+        scores_for(one_split_model("other", 0), baseline_dataset())

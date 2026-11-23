@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# retrain.sh·training-instance.sh·ml/idle-stop.sh를 AWS·DB·학습 없이 시험한다.
+# retrain.sh, model-deploy-check.sh, training-instance.sh, ml/idle-stop.sh를 AWS, DB, 학습 없이 시험한다.
 # 가짜 aws가 로컬 폴더를 버킷처럼 쓰고, 가짜 gradle·uv가 산출물만 만든다.
 #
 #   사용법: backend/ops/pipeline/test/retrain-test.sh
@@ -80,7 +80,7 @@ EOF
 cat > "$work/bin/fake-gradle" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-echo "gradle flyway=${SPRING_FLYWAY_ENABLED:-} $*" >> "$CALLS"
+echo "gradle flyway=${SPRING_FLYWAY_ENABLED:-} ddl=${SPRING_JPA_HIBERNATE_DDL_AUTO:-} $*" >> "$CALLS"
 for arg in "$@"; do
   case "$arg" in
     -Devaluation.export.path=*)
@@ -105,7 +105,7 @@ case "$module" in
   dfgg_ltr.propensity) dir=$(value_of --out-dir "$@"); mkdir -p "$dir"; echo '{}' > "$dir/propensity-game-report.json" ;;
   dfgg_ltr.export_parity_sample) out=$(value_of --out "$@"); echo '{}' > "$out" ;;
   dfgg_ltr.compare_models)
-    out=$(value_of --out "$@"); echo "{\"exit_code\": ${COMPARE_CODE:-0}}" > "$out"
+    out=$(value_of --out "$@"); echo "{\"exit_code\": ${COMPARE_CODE:-0}, \"summary\": \"모델 비교 요약\"}" > "$out"
     exit "${COMPARE_CODE:-0}" ;;
   *) exit 9 ;;
 esac
@@ -155,7 +155,7 @@ check "결과 JSON에 통과와 이름이 있다" test "$(jq -r '.verdict + " " 
 check "GITHUB_OUTPUT에 이름·판정을 적는다" grep -qx "verdict=passed" "$GITHUB_OUTPUT"
 check "current.json은 바꾸지 않는다" test "$(jq -r .name "$ltr/current.json")" = ltr-261020
 check "export는 통계를 다시 집계하지 않는다" logged "-Devaluation.aggregate=false"
-check "export는 Flyway를 끄고 돈다" logged "gradle flyway=false evaluationTest --tests *TrainingSetExportTest"
+check "export는 Flyway와 스키마 검증을 끄고 돈다" logged "gradle flyway=false ddl=none evaluationTest --tests *TrainingSetExportTest"
 check "query 수를 export에 넘긴다" logged "-Devaluation.queries=5000"
 check "후보는 game split·기준 계약으로 학습한다" logged "--split game --baseline"
 check "비교는 현재 운영 모델과 한다" logged "--current $work/run-pass/current/model.json"
@@ -170,15 +170,44 @@ COMPARE_CODE=2 run insufficient > /dev/null
 check "표본 부족도 -rejected로 올린다" test -f "$ltr/$today-3-rejected/model.json"
 check "표본 부족 결과를 적는다" test "$(jq -r .verdict "$work/run-insufficient/result.json")" = insufficient
 
+# 2-1. current.json이 없으면 이름 날짜가 가장 최근인 통과 묶음을 기준으로 삼고, 게임 상황 모델도 옮겨 담는다
+echo '{"model":"game-situation"}' > "$src/game-situation.json"
+MODEL_S3_PREFIX=$MODEL_S3_PREFIX "$pipeline/make-model-bundle.sh" --name ltr-991231 --core "$src/model.json" \
+  --component "$src/component" --game-situation "$src/game-situation.json" --out "$work/seed" --upload > /dev/null
+check "묶음에 게임 상황 모델을 담는다" grep -q " game-situation/model.json$" "$ltr/ltr-991231/SHA256SUMS"
+mkdir -p "$ltr/ltr-999999-rejected"
+rm "$ltr/current.json"
+COMPARE_CODE=0 run latest > /dev/null
+check "current.json이 없으면 가장 최근 통과 묶음과 비교한다" test "$(jq -r .current "$work/run-latest/result.json")" = ltr-991231
+check "현재 묶음의 게임 상황 모델을 그대로 담는다" cmp -s "$ltr/$today-4/game-situation/model.json" "$src/game-situation.json"
+check "옮겨 담은 게임 상황 모델도 해시 목록에 있다" bash -c "cd '$ltr/$today-4' && sha256sum --quiet -c SHA256SUMS && grep -q game-situation SHA256SUMS"
+echo '{"name": "ltr-261020"}' > "$ltr/current.json"
+
 # 3. 실패
 check "비교가 오류로 끝나면 실패하고" fails env COMPARE_CODE=3 "$pipeline/retrain.sh" --work "$work/run-error"
-check "아무것도 올리지 않는다" test ! -e "$ltr/$today-4" -a ! -e "$ltr/$today-4-rejected"
+check "아무것도 올리지 않는다" test ! -e "$ltr/$today-5" -a ! -e "$ltr/$today-5-rejected"
 check "DB 접속 정보가 없으면 실패한다" fails env -u EVALUATION_DB_PASSWORD "$pipeline/retrain.sh" --work "$work/run-nodb"
 mkdir -p "$work/run-dirty" && touch "$work/run-dirty/old"
 check "작업 폴더가 비어 있지 않으면 실패한다" fails run dirty
 check "query 수가 숫자가 아니면 실패한다" fails run badq --queries 3k
 echo '{"model":"tampered"}' > "$ltr/ltr-261020/component/model.json"
 check "현재 묶음의 해시가 다르면 실패한다" fails run tampered
+
+# 3-1. model-deploy-check.sh
+deploy_check() { "$pipeline/model-deploy-check.sh" "$@"; }
+output_of() { sed -n "s/^$1=//p" <<< "$2"; }
+out=$(deploy_check --model "$today")
+check "통과 묶음은 배포할 수 있다" test "$(output_of status "$out")" = ready
+check "되돌릴 묶음은 current.json의 묶음이다" test "$(output_of previous "$out")" = ltr-261020
+check "비교 요약을 알림에 넘긴다" grep -qx "모델 비교 요약" <<< "$out"
+out=$(deploy_check --model ltr-261020)
+check "current.json이 가리키는 묶음은 이미 배포된 것으로 본다" test "$(output_of status "$out")" = already
+check "탈락 묶음 이름은 받지 않는다" fails deploy_check --model "$today-2-rejected"
+check "없는 묶음은 실패한다" fails deploy_check --model ltr-000101
+rm "$ltr/current.json"
+out=$(deploy_check --model "$today")
+check "current.json이 없으면 가장 최근의 다른 통과 묶음으로 되돌린다" test "$(output_of previous "$out")" = ltr-991231
+echo '{"name": "ltr-261020"}' > "$ltr/current.json"
 
 # 4. training-instance.sh
 export ML_INSTANCE_ID=i-0123456789abcdef0 POLL_SECONDS=0 WAIT_SECONDS=5

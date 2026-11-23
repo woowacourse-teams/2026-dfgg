@@ -166,14 +166,14 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: .github/scripts/notify-pipeline.sh
 
+  # 판단은 main을 읽어야 해서 scheduling에서, 재학습 시작은 gh가 있는 GitHub 러너(start-retrain)에서 한다.
   retrain:
     needs: [ dump, load-prod ]
     if: ${{ !cancelled() && needs.dump.result == 'success' && inputs.retrain != 'skip' }}
     runs-on: [ self-hosted, dfgg-scheduling ]
     timeout-minutes: 15
-    permissions:
-      contents: read
-      actions: write
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -208,21 +208,28 @@ jobs:
           MESSAGE: "오늘 재학습을 건너뛰었습니다. 현재 패치 데이터가 없습니다: ${{ steps.decide.outputs.reason }}"
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: .github/scripts/notify-pipeline.sh
-      # 재학습(be-retrain.yml)은 3~4시간 걸려 기다리지 않는다. 결과는 재학습 실행이 Slack으로 알린다.
+
+  # 재학습(be-retrain.yml)은 2시간 가까이 걸려 기다리지 않는다. 결과와 모델 배포는 재학습 실행이 이어서 알린다.
+  start-retrain:
+    needs: retrain
+    if: needs.retrain.outputs.run == 'yes'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+          sparse-checkout: .github/scripts
       - name: Start retraining
-        if: steps.decide.outputs.run == 'yes'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          if ! gh workflow view be-retrain.yml --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            echo "::notice::be-retrain.yml is not available yet (U11); retraining was not started"
-            exit 0
-          fi
-          .github/scripts/dispatch-and-wait.sh be-retrain.yml "$SOURCE_REF" --no-wait
+        run: .github/scripts/dispatch-and-wait.sh be-retrain.yml "$SOURCE_REF" --no-wait
 
   notify-failure:
-    needs: [ aggregate, dump, load-dev, restart-dev, load-prod, restart-prod, retrain ]
+    needs: [ aggregate, dump, load-dev, restart-dev, load-prod, restart-prod, retrain, start-retrain ]
     if: ${{ always() && contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -237,7 +244,7 @@ jobs:
           LEVEL: failure
           MESSAGE: |
             집계 ${{ needs.aggregate.result }} · 덤프 ${{ needs.dump.result }} · dev 교체 ${{ needs.load-dev.result }} · dev 재기동 ${{ needs.restart-dev.result }}
-            prod 교체 ${{ needs.load-prod.result }} · prod 재기동 요청 ${{ needs.restart-prod.result }} · 재학습 판단 ${{ needs.retrain.result }}
+            prod 교체 ${{ needs.load-prod.result }}, prod 재기동 요청 ${{ needs.restart-prod.result }}, 재학습 판단 ${{ needs.retrain.result }}, 재학습 시작 ${{ needs.start-retrain.result }}
             실패한 단계 뒤는 진행하지 않았습니다. 교체 중 실패했다면 기존 테이블이 그대로 서비스 중입니다.
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: .github/scripts/notify-pipeline.sh

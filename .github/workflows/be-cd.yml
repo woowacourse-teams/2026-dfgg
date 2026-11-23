@@ -155,7 +155,10 @@ jobs:
       name: production
     steps:
       - name: Record approval
-        run: echo "prod 배포 승인됨. 체류 검증이 끝나면 배포가 시작된다."
+        env:
+          IMAGE: ${{ inputs.image }}
+          MODEL: ${{ inputs.model }}
+        run: echo "prod 배포 승인됨 (image=${IMAGE:-이번 빌드}, model=${MODEL:-켜진 슬롯 묶음}). 체류 검증이 끝나면 배포가 시작된다."
 
   # dev에서 5분 검증을 통과한 것과 같은 digest를 prod에 올린다. prod 롤백은 지정한 이미지를 올린다.
   deploy-prod:
@@ -175,6 +178,40 @@ jobs:
       profile: prod
       image: ${{ inputs.image || needs.image.outputs.image }}
       model: ${{ inputs.model }}
+
+  # prod가 묶음 이름으로 배포되면 current.json을 그 묶음으로 바꾼다. dev와 prod는 같은 모델을 쓰고,
+  # 재학습은 current.json의 묶음과 비교한다. S3 쓰기 권한이 있는 scheduling 러너(ec2-project)에서 한다.
+  record-model:
+    needs: deploy-prod
+    if: ${{ !cancelled() && needs.deploy-prod.result == 'success' && startsWith(inputs.model, 'ltr-') }}
+    runs-on: [ self-hosted, dfgg-scheduling ]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Point current.json at the deployed bundle
+        env:
+          MODEL: ${{ inputs.model }}
+          PREFIX: s3://techcourse-project-2026/dfgg/ltr
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$MODEL" =~ ^ltr-[0-9]{6}(-[0-9]+)?$ ]] || { echo "::error::Invalid model bundle: $MODEL"; exit 1; }
+          jq -n --arg name "$MODEL" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg run "$RUN_URL" \
+            '{name: $name, deployedAt: $at, run: $run}' \
+            | aws s3 cp --only-show-errors --content-type application/json - "$PREFIX/current.json"
+          aws s3 cp "$PREFIX/current.json" - | jq -e --arg name "$MODEL" '.name == $name' > /dev/null
+          echo "current.json -> $MODEL"
+      - name: Notify Slack
+        if: failure()
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          LEVEL: failure
+          TITLE: 모델 배포
+          MESSAGE: "prod는 ${{ inputs.model }}로 배포됐지만 current.json을 바꾸지 못했습니다. 다음 재학습이 이전 모델과 비교합니다. 손으로 고쳐 주세요."
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: .github/scripts/notify-pipeline.sh
 
   notify-dev-failure:
     needs: [ image, deploy-dev, verify-dev ]

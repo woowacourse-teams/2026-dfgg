@@ -2,7 +2,8 @@
 # ml 서버에서 Core 모델을 재학습해 현재 운영 모델과 비교하고 S3에 올린다 (U11).
 # export(main 읽기 전용) → 학습(game train) → 행동 모델 → 비교(U10) → Java parity → 묶음 → S3.
 # 통과하면 ltr/<이름>/, 기준 미달·표본 부족이면 ltr/<이름>-rejected/에 올린다. current.json은 바꾸지 않는다.
-# Component·조회표는 재학습하지 않고 현재 운영 묶음의 세 파일을 그대로 담는다.
+# Component·조회표와 게임 상황 모델(v5, 있으면)은 재학습하지 않고 현재 운영 묶음의 것을 그대로 담는다.
+# 현재 운영 묶음은 current.json이 가리키는 묶음이고, current.json이 없으면 이름 날짜가 가장 최근인 통과 묶음이다.
 #
 #   사용법: retrain.sh --work <폴더> [--queries N]
 #   마지막 줄에 결과 JSON 경로를 출력한다. 비교 결과와 무관하게 끝까지 가면 0, 중간에 실패하면 0이 아니다.
@@ -46,11 +47,23 @@ work=$(cd "$work" && pwd)
 data="$work/data"
 mkdir -p "$data" "$work/candidate" "$work/report"
 
-# 현재 운영 묶음을 받아 해시를 확인한다. 비교 기준이자 Component 세 파일의 출처다.
+# current.json이 있으면 그 이름, 없으면 이름 날짜가 가장 최근인 묶음(-rejected 제외)을 쓴다.
+current_name() {
+  local listing
+  if aws s3 ls "$prefix/current.json" > /dev/null 2>&1; then
+    aws s3 cp "$prefix/current.json" - | jq -er '.name | select(type == "string")'
+    return
+  fi
+  listing=$(aws s3 ls "$prefix/" | awk '$1 == "PRE" { sub("/$", "", $2); print $2 }' | grep -E "$name_pattern" || true)
+  [[ -n "$listing" ]] || return 1
+  # ltr-YYMMDD 뒤의 -N을 숫자로 비교한다. 번호가 없으면 1번째다.
+  awk -F- '{ n = ($3 == "" ? 1 : $3); printf "%s %06d %s\n", $2, n, $0 }' <<< "$listing" | sort | tail -1 | cut -d' ' -f3
+}
+
+# 현재 운영 묶음을 받아 해시를 확인한다. 비교 기준이자 Component·게임 상황 모델의 출처다.
 fetch_current() {
   local current
-  current=$(aws s3 cp "$prefix/current.json" - | jq -er '.name | select(type == "string")') \
-    || fail "cannot read $prefix/current.json"
+  current=$(current_name) || fail "cannot find the current bundle under $prefix/"
   [[ "$current" =~ $name_pattern ]] || fail "invalid current bundle name: $current"
   aws s3 cp --recursive --only-show-errors "$prefix/$current/" "$work/current/" \
     || fail "download failed: $prefix/$current/"
@@ -78,7 +91,9 @@ echo "current: $current"
 
 step "export training set (queries=$queries)"
 # 야간 집계가 막 끝난 main의 통계를 그대로 쓴다. 다시 집계하면 main에 쓰게 된다.
-(cd "$repo/backend/dfgg" && SPRING_FLYWAY_ENABLED=false "$gradle" evaluationTest --tests '*TrainingSetExportTest' \
+# 스키마 검증은 서비스처럼 끈다(ddl-auto none). 평가 프로필의 validate는 export와 무관한 엔티티의 타입 차이에도 멈춘다.
+(cd "$repo/backend/dfgg" && SPRING_FLYWAY_ENABLED=false SPRING_JPA_HIBERNATE_DDL_AUTO=none \
+  "$gradle" evaluationTest --tests '*TrainingSetExportTest' \
   -Devaluation.aggregate=false \
   -Devaluation.queries="$queries" \
   -Devaluation.export.path="$data/train.jsonl")
@@ -122,8 +137,12 @@ step "check Java parity"
 
 step "build bundle"
 name=$(next_name)
+carried=()
+if [[ -f "$work/current/game-situation/model.json" ]]; then
+  carried=(--game-situation "$work/current/game-situation/model.json")
+fi
 "$here/make-model-bundle.sh" --name "$name" --core "$work/candidate/model.json" \
-  --component "$work/current/component" --out "$work/bundles"
+  --component "$work/current/component" ${carried[@]+"${carried[@]}"} --out "$work/bundles"
 destination="$name"
 [[ "$verdict" == passed ]] || destination="$name-rejected"
 # 보고서는 묶음 해시 목록 밖에 둔다. 서버가 받을 때 검증하는 파일이 아니다.
