@@ -103,6 +103,7 @@ value_of() { local key=$1; shift; while (($#)); do [[ "$1" == "$key" ]] && { ech
 case "$module" in
   dfgg_ltr.train) out=$(value_of --out "$@"); echo '{"trees":[2],"objective":"lambdarank"}' > "$out" ;;
   dfgg_ltr.propensity) dir=$(value_of --out-dir "$@"); mkdir -p "$dir"; echo '{}' > "$dir/propensity-game-report.json" ;;
+  dfgg_ltr.outcome) dir=$(value_of --out-dir "$@"); mkdir -p "$dir"; echo 'tree' > "$dir/outcome-game.txt" ;;
   dfgg_ltr.export_parity_sample) out=$(value_of --out "$@"); echo '{}' > "$out" ;;
   dfgg_ltr.compare_models)
     out=$(value_of --out "$@"); echo "{\"exit_code\": ${COMPARE_CODE:-0}, \"summary\": \"모델 비교 요약\"}" > "$out"
@@ -160,6 +161,9 @@ check "query 수를 export에 넘긴다" logged "-Devaluation.queries=5000"
 check "후보는 game split·기준 계약으로 학습한다" logged "--split game --baseline"
 check "비교는 현재 운영 모델과 한다" logged "--current $work/run-pass/current/model.json"
 check "Java parity는 기준 계약으로 확인한다" logged "-Devaluation.core.contract=baseline"
+check "비교에 승리 확률 모델과 행동 모델을 넘긴다" logged "--propensity-dir $work/run-pass/propensity --outcome-dir $work/run-pass/outcome"
+check "비교 요약에 후보와 현재 묶음 이름을 쓴다" logged "--current-name ltr-261020 --candidate-name $today"
+check "GITHUB_OUTPUT에 비교 요약을 적는다" grep -qx "모델 비교 요약" "$GITHUB_OUTPUT"
 unset GITHUB_OUTPUT
 
 # 2. 탈락·표본 부족은 -rejected로, 이름이 겹치지 않게 번호를 붙인다

@@ -3,10 +3,10 @@
 평가셋은 game split의 test다. 후보는 game split의 train으로만 학습해야 한다. 그래야 test 경기가 후보 학습에
 들어가지 않는다. patch split은 쓰지 않는다. 배포할 후보는 최신 패치까지 학습하므로 patch test가 학습에 섞인다.
 
-판정 (11/17 승인):
-- game test 전체: query ≥ 최소 표본(기본 5,000), NDCG@5 ≥ 현재 − 0.005, HitRate@5 ≥ 현재 − 0.01
-- game test 중 최신 패치: query ≥ 1,000일 때만 같은 두 기준. 적으면 건너뛰고 보고한다(새 패치 직후)
-- 승률 V·ESS는 행동 모델 결과(propensity)가 있으면 보고만 한다. 판정에 넣는 것은 몇 회차 본 뒤 승인받는다
+판정 (11/26 변경):
+- game test 전체: query ≥ 최소 표본(기본 5,000), DR 승률 차이(후보 − 현재) ≥ 0, NDCG@5 ≥ 현재 − 0.005,
+  HitRate@1 ≥ 현재 − 0.01. DR 승률을 잴 수 없으면(행동 모델이나 승리 확률 모델 없음) 표본 부족으로 둔다
+- game test 중 최신 패치: query ≥ 1,000일 때만 같은 세 기준. 적으면 건너뛰고 보고한다(새 패치 직후)
 
 종료 코드: 0 통과, 1 기준 미달, 2 표본 부족(game test 전체), 3 비교 자체의 오류.
 """
@@ -19,12 +19,21 @@ import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import lightgbm as lgb
 import numpy as np
 
 from dfgg_ltr.dataset import Dataset, QueryMeta, baseline_view, load_dataset, load_query_meta
 from dfgg_ltr.evaluate import load_propensities, model_scores
-from dfgg_ltr.metrics import evaluate_ranking, policy_value, policy_value_difference, top1_matches
-from dfgg_ltr.propensity import select_queries
+from dfgg_ltr.metrics import (
+    doubly_robust_difference,
+    doubly_robust_terms,
+    doubly_robust_value,
+    evaluate_ranking,
+    top1_matches,
+    top1_values,
+)
+from dfgg_ltr.outcome import outcome_scores
+from dfgg_ltr.propensity import select_queries, with_situation
 
 EVALUATION_SPLIT = "game"
 NDCG_TOLERANCE = 0.005
@@ -48,17 +57,29 @@ class SliceComparison:
     candidate: dict
     failures: list[str] = field(default_factory=list)
     skipped: str | None = None
-    win_rate: dict | None = None
+    #: DR 승률. current, candidate는 doubly_robust_value, difference는 doubly_robust_difference의 결과다.
+    dr: dict | None = None
 
 
 def ranking_failures(current: dict, candidate: dict) -> list[str]:
     failures = []
     if candidate["ndcg@5"] < current["ndcg@5"] - NDCG_TOLERANCE:
         failures.append(f"NDCG@5 {candidate['ndcg@5']:.4f} < 현재 {current['ndcg@5']:.4f} − {NDCG_TOLERANCE}")
-    if candidate["hit_rate@5"] < current["hit_rate@5"] - HIT_RATE_TOLERANCE:
+    if candidate["hit_rate@1"] < current["hit_rate@1"] - HIT_RATE_TOLERANCE:
         failures.append(
-            f"HitRate@5 {candidate['hit_rate@5']:.4f} < 현재 {current['hit_rate@5']:.4f} − {HIT_RATE_TOLERANCE}")
+            f"HitRate@1 {candidate['hit_rate@1']:.4f} < 현재 {current['hit_rate@1']:.4f} − {HIT_RATE_TOLERANCE}")
     return failures
+
+
+def win_rate_failures(dr: dict | None) -> list[str]:
+    """DR 승률이 현재보다 낮으면 탈락이다. 잴 수 없으면 표본 부족으로 둔다."""
+    if dr is None or np.isnan(dr["difference"]["difference"]):
+        return [f"{INSUFFICIENT_PREFIX}: DR 승률을 잴 수 없다(행동 모델, 승리 확률 모델, 승패 중 없는 것이 있다)"]
+    difference = dr["difference"]["difference"]
+    if difference < 0:
+        return [f"DR 승률 {_points(difference)} < 0 (후보 {dr['candidate']['value']:.4f}, "
+                f"현재 {dr['current']['value']:.4f})"]
+    return []
 
 
 def judge_total(comparison: SliceComparison, min_queries: int) -> SliceComparison:
@@ -66,6 +87,7 @@ def judge_total(comparison: SliceComparison, min_queries: int) -> SliceCompariso
     if comparison.queries < min_queries:
         comparison.failures.append(f"{INSUFFICIENT_PREFIX}: test query {comparison.queries} < {min_queries}")
         return comparison
+    comparison.failures.extend(win_rate_failures(comparison.dr))
     comparison.failures.extend(ranking_failures(comparison.current, comparison.candidate))
     return comparison
 
@@ -75,25 +97,9 @@ def judge_latest_patch(comparison: SliceComparison, min_queries: int) -> SliceCo
     if comparison.queries < min_queries:
         comparison.skipped = f"query {comparison.queries} < {min_queries}라 판정에서 뺐다"
         return comparison
+    comparison.failures.extend(win_rate_failures(comparison.dr))
     comparison.failures.extend(ranking_failures(comparison.current, comparison.candidate))
     return comparison
-
-
-def win_rate_report(dataset: Dataset, propensity: np.ndarray, win: np.ndarray, match_ids: list[str],
-                    current_scores: np.ndarray, candidate_scores: np.ndarray) -> dict:
-    """보고 전용. 후보·현재의 V와 ESS, 같은 부트스트랩 표본으로 잰 ΔV."""
-    current_matches = top1_matches(dataset.labels, current_scores, dataset.group)
-    candidate_matches = top1_matches(dataset.labels, candidate_scores, dataset.group)
-    current = policy_value(current_matches, propensity, win, match_ids)
-    candidate = policy_value(candidate_matches, propensity, win, match_ids)
-    difference = policy_value_difference(candidate_matches, current_matches, propensity, win, match_ids)
-    return {
-        "current_v": current.value, "current_ess": current.ess,
-        "candidate_v": candidate.value, "candidate_ess": candidate.ess,
-        "delta_v": difference["difference"], "delta_v_lower": difference["lower"],
-        "delta_v_upper": difference["upper"], "observed_win": current.observed_win,
-        "coverage": current.coverage,
-    }
 
 
 def scores_for(model: dict, dataset: Dataset) -> np.ndarray:
@@ -117,20 +123,21 @@ def latest_patch(patches: list[str]) -> str:
 
 
 def compare(dataset: Dataset, meta: QueryMeta, latest: str, current_scores: np.ndarray,
-            candidate_scores: np.ndarray, propensity: np.ndarray | None,
+            candidate_scores: np.ndarray, propensity: np.ndarray | None, outcome: np.ndarray | None,
             min_total_queries: int = DEFAULT_MIN_TOTAL_QUERIES,
             min_latest_patch_queries: int = DEFAULT_MIN_LATEST_PATCH_QUERIES) -> list[SliceComparison]:
-    """game test 전체와 그중 최신 패치 query를 각각 판정한다."""
+    """game test 전체와 그중 최신 패치 query를 각각 판정한다. outcome은 행마다의 승리 확률 Q다."""
     total = _slice("game test 전체", np.ones(len(dataset.group), dtype=bool), dataset, meta,
-                   current_scores, candidate_scores, propensity)
+                   current_scores, candidate_scores, propensity, outcome)
     latest_mask = np.array([patch == latest for patch in meta.patches])
     latest_slice = _slice(f"game test 중 최신 패치 {latest}", latest_mask, dataset, meta,
-                          current_scores, candidate_scores, propensity)
+                          current_scores, candidate_scores, propensity, outcome)
     return [judge_total(total, min_total_queries), judge_latest_patch(latest_slice, min_latest_patch_queries)]
 
 
 def _slice(name: str, query_mask: np.ndarray, dataset: Dataset, meta: QueryMeta, current_scores: np.ndarray,
-           candidate_scores: np.ndarray, propensity: np.ndarray | None) -> SliceComparison:
+           candidate_scores: np.ndarray, propensity: np.ndarray | None,
+           outcome: np.ndarray | None) -> SliceComparison:
     subset = select_queries(dataset, query_mask)
     row_mask = np.repeat(query_mask, dataset.group)
     current = current_scores[row_mask]
@@ -138,17 +145,32 @@ def _slice(name: str, query_mask: np.ndarray, dataset: Dataset, meta: QueryMeta,
     comparison = SliceComparison(
         name=name, queries=int(query_mask.sum()),
         current=_ranking(subset, current), candidate=_ranking(subset, candidate))
-    if propensity is not None and subset.group.size > 0:
-        comparison.win_rate = win_rate_report(
-            subset, propensity[query_mask], meta.win[query_mask],
-            list(np.asarray(meta.match_ids)[query_mask]), current, candidate)
+    if propensity is not None and outcome is not None and subset.group.size > 0:
+        comparison.dr = _doubly_robust(subset, propensity[query_mask], meta.win[query_mask],
+                                       list(np.asarray(meta.match_ids)[query_mask]), outcome[row_mask],
+                                       current, candidate)
     return comparison
+
+
+def _doubly_robust(dataset: Dataset, propensity: np.ndarray, win: np.ndarray, match_ids: list[str],
+                   outcome: np.ndarray, current_scores: np.ndarray, candidate_scores: np.ndarray) -> dict:
+    """후보와 현재의 DR 승률, 같은 부트스트랩 표본으로 잰 차이."""
+    terms = {}
+    for name, scores in (("current", current_scores), ("candidate", candidate_scores)):
+        matches = top1_matches(dataset.labels, scores, dataset.group)
+        q_top = top1_values(outcome, scores, dataset.group)
+        terms[name] = doubly_robust_terms(matches, q_top, propensity, win)
+    return {
+        "current": doubly_robust_value(terms["current"], match_ids),
+        "candidate": doubly_robust_value(terms["candidate"], match_ids),
+        "difference": doubly_robust_difference(terms["candidate"], terms["current"], match_ids),
+    }
 
 
 def _ranking(dataset: Dataset, scores: np.ndarray) -> dict:
     if dataset.group.size == 0:
-        return {"ndcg@5": float("nan"), "hit_rate@5": float("nan"), "queries": 0}
-    return evaluate_ranking(dataset.labels, scores, list(dataset.group))
+        return {"ndcg@5": float("nan"), "hit_rate@1": float("nan"), "queries": 0}
+    return evaluate_ranking(dataset.labels, scores, list(dataset.group), hit_k=1)
 
 
 def render_summary(candidate_name: str, current_name: str, comparisons: list[SliceComparison], code: int) -> str:
@@ -156,11 +178,11 @@ def render_summary(candidate_name: str, current_name: str, comparisons: list[Sli
     verdicts = {PASSED: "통과", REJECTED: "기준 미달", INSUFFICIENT_SAMPLE: "표본 부족"}
     lines = [f"모델 비교: {candidate_name} vs 현재 {current_name} → *{verdicts[code]}*"]
     for comparison in comparisons:
+        lines.append(f"• {comparison.name} (query {comparison.queries:,})")
+        lines.append(_win_rate_line(comparison.dr))
         lines.append(
-            f"• {comparison.name} (query {comparison.queries:,}): "
-            f"NDCG@5 {comparison.candidate['ndcg@5']:.4f} (현재 {comparison.current['ndcg@5']:.4f}), "
-            f"HitRate@5 {comparison.candidate['hit_rate@5']:.4f} (현재 {comparison.current['hit_rate@5']:.4f})")
-        lines.append(_win_rate_line(comparison.win_rate))
+            f"  NDCG@5 {comparison.candidate['ndcg@5']:.4f} (현재 {comparison.current['ndcg@5']:.4f}), "
+            f"HitRate@1 {comparison.candidate['hit_rate@1']:.4f} (현재 {comparison.current['hit_rate@1']:.4f})")
         if comparison.skipped is not None:
             lines.append(f"  – 건너뜀: {comparison.skipped}")
         for failure in comparison.failures:
@@ -168,23 +190,37 @@ def render_summary(candidate_name: str, current_name: str, comparisons: list[Sli
     return "\n".join(lines)
 
 
-def _win_rate_line(win_rate: dict | None) -> str:
-    if win_rate is None:
-        return "  승률 V: 보고 없음 (행동 모델 결과 또는 export의 승패가 없다)"
-    return (f"  승률 V(보고만): {win_rate['candidate_v']:.4f} (현재 {win_rate['current_v']:.4f}), "
-            f"ΔV {win_rate['delta_v'] * 100:+.2f}%p ({win_rate['delta_v_lower'] * 100:+.2f}, "
-            f"{win_rate['delta_v_upper'] * 100:+.2f}), ESS {win_rate['candidate_ess']:,.0f} "
-            f"(현재 {win_rate['current_ess']:,.0f})")
+def _win_rate_line(dr: dict | None) -> str:
+    if dr is None:
+        return "  DR 승률: 없음 (행동 모델, 승리 확률 모델 또는 export의 승패가 없다)"
+    difference = dr["difference"]
+    return (f"  DR 승률 {dr['candidate']['value']:.4f} (현재 {dr['current']['value']:.4f}), "
+            f"차이 {_points(difference['difference'])} (95% {_points(difference['lower'])} ~ "
+            f"{_points(difference['upper'])})")
+
+
+def _points(value: float) -> str:
+    return f"{value * 100:+.2f}%p"
 
 
 def load_propensity_if_present(propensity_dir: Path | None, dataset: Dataset, meta: QueryMeta) -> np.ndarray | None:
-    """행동 모델 결과나 export의 승패가 없으면 V를 보고하지 않는다."""
+    """행동 모델 결과나 export의 승패가 없으면 DR 승률을 잴 수 없다."""
     if propensity_dir is None:
         return None
     path = propensity_dir / f"propensity-{EVALUATION_SPLIT}.jsonl"
     if not path.exists() or np.isnan(meta.win).all():
         return None
     return load_propensities(path, dataset.qids)
+
+
+def load_outcome_if_present(outcome_dir: Path | None, dataset: Dataset, meta: QueryMeta) -> np.ndarray | None:
+    """승리 확률 모델로 test 행마다 Q를 낸다. 모델 파일이 없으면 None."""
+    if outcome_dir is None:
+        return None
+    path = outcome_dir / f"outcome-{EVALUATION_SPLIT}.txt"
+    if not path.exists():
+        return None
+    return outcome_scores(lgb.Booster(model_file=str(path)), with_situation(dataset, meta))
 
 
 def main() -> None:
@@ -194,10 +230,12 @@ def main() -> None:
     parser.add_argument("--current", type=Path, required=True, help="현재 운영 모델 JSON")
     parser.add_argument("--candidate", type=Path, required=True,
                         help="후보 모델 JSON. game split의 train으로만 학습한 모델이어야 한다")
+    parser.add_argument("--current-name", default=None, help="요약에 쓸 현재 모델 이름 (기본값 파일 이름)")
+    parser.add_argument("--candidate-name", default=None, help="요약에 쓸 후보 모델 이름 (기본값 파일 이름)")
     parser.add_argument("--min-total-queries", type=int, default=DEFAULT_MIN_TOTAL_QUERIES)
     parser.add_argument("--min-latest-patch-queries", type=int, default=DEFAULT_MIN_LATEST_PATCH_QUERIES)
-    parser.add_argument("--propensity-dir", type=Path, default=None,
-                        help="propensity-game.jsonl 폴더. 주면 승률 V를 보고에 넣는다(판정에는 쓰지 않음)")
+    parser.add_argument("--propensity-dir", type=Path, default=None, help="propensity-game.jsonl 폴더 (DR 승률)")
+    parser.add_argument("--outcome-dir", type=Path, default=None, help="outcome-game.txt 폴더 (DR 승률)")
     parser.add_argument("--out", type=Path, default=None, help="비교 결과 JSON")
     args = parser.parse_args()
 
@@ -211,9 +249,11 @@ def main() -> None:
         dataset, meta, latest_patch(meta.patches + train_meta.patches),
         scores_for(current_model, dataset), scores_for(candidate_model, dataset),
         load_propensity_if_present(args.propensity_dir, dataset, meta),
+        load_outcome_if_present(args.outcome_dir, dataset, meta),
         args.min_total_queries, args.min_latest_patch_queries)
     code = exit_code(comparisons)
-    summary = render_summary(args.candidate.name, args.current.name, comparisons, code)
+    summary = render_summary(args.candidate_name or args.candidate.name, args.current_name or args.current.name,
+                             comparisons, code)
     print(summary)
     if args.out is not None:
         args.out.parent.mkdir(parents=True, exist_ok=True)
