@@ -210,9 +210,10 @@ jobs:
         run: .github/scripts/notify-pipeline.sh
 
   # 재학습(be-retrain.yml)은 2시간 가까이 걸려 기다리지 않는다. 결과와 모델 배포는 재학습 실행이 이어서 알린다.
+  # 앞쪽 잡(restart-dev 등)이 건너뛰어지면 기본 success()가 거짓이 되어 이 잡도 건너뛴다(11/24). 그래서 !cancelled()를 쓴다.
   start-retrain:
     needs: retrain
-    if: needs.retrain.outputs.run == 'yes'
+    if: ${{ !cancelled() && needs.retrain.outputs.run == 'yes' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
