@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ml 서버에서 Core 모델을 재학습해 현재 운영 모델과 비교하고 S3에 올린다 (U11).
-# export(main 읽기 전용) → 학습(game train) → 행동 모델 → 비교(U10) → Java parity → 묶음 → S3.
+# export(main 읽기 전용) → 학습(game train) → 행동 모델, 승리 확률 모델 → 비교(U10) → Java parity → 묶음 → S3.
 # 통과하면 ltr/<이름>/, 기준 미달·표본 부족이면 ltr/<이름>-rejected/에 올린다. current.json은 바꾸지 않는다.
 # Component·조회표와 게임 상황 모델(v5, 있으면)은 재학습하지 않고 현재 운영 묶음의 것을 그대로 담는다.
 # 현재 운영 묶음은 current.json이 가리키는 묶음이고, current.json이 없으면 이름 날짜가 가장 최근인 통과 묶음이다.
@@ -12,7 +12,7 @@
 #   MODEL_S3_PREFIX  묶음 위치 (기본값 s3://techcourse-project-2026/dfgg/ltr)
 #   REPO_ROOT        저장소 위치 (기본값 이 스크립트 기준)
 #   GRADLE, UV       명령 (기본값 ./gradlew, uv. 시험에서 바꾼다)
-#   GITHUB_OUTPUT    있으면 name·verdict·s3를 적는다
+#   GITHUB_OUTPUT    있으면 name, verdict, s3, summary(비교 요약)를 적는다
 
 set -Eeuo pipefail
 
@@ -88,6 +88,9 @@ next_name() {
 step "fetch current bundle"
 current=$(fetch_current | tail -1)
 echo "current: $current"
+# 이름은 비교 요약에도 쓰므로 미리 정한다.
+name=$(next_name)
+echo "candidate: $name"
 
 step "export training set (queries=$queries)"
 # 야간 집계가 막 끝난 main의 통계를 그대로 쓴다. 다시 집계하면 main에 쓰게 된다.
@@ -114,11 +117,18 @@ step "train behavior model"
   --split game --out-dir "$work/propensity"
 cp "$work/propensity/propensity-game-report.json" "$work/report/" 2> /dev/null || true
 
+step "train outcome model"
+# DR 승률의 승리 확률 모델 Q. 행동 모델처럼 후보, 현재가 같은 Q로 비교된다.
+"$uv" run python -m dfgg_ltr.outcome --data "$data/train.jsonl" --schema "$data/feature_schema.json" \
+  --split game --out-dir "$work/outcome"
+cp "$work/outcome/outcome-game-report.json" "$work/report/" 2> /dev/null || true
+
 step "compare with $current"
 code=0
 "$uv" run python -m dfgg_ltr.compare_models --data "$data/train.jsonl" --schema "$data/feature_schema.json" \
   --current "$work/current/model.json" --candidate "$work/candidate/model.json" \
-  --propensity-dir "$work/propensity" --out "$work/report/compare.json" || code=$?
+  --current-name "$current" --candidate-name "$name" \
+  --propensity-dir "$work/propensity" --outcome-dir "$work/outcome" --out "$work/report/compare.json" || code=$?
 case "$code" in
   0) verdict=passed ;;
   1) verdict=rejected ;;
@@ -136,7 +146,6 @@ step "check Java parity"
   -Devaluation.core.contract=baseline)
 
 step "build bundle"
-name=$(next_name)
 carried=()
 if [[ -f "$work/current/game-situation/model.json" ]]; then
   carried=(--game-situation "$work/current/game-situation/model.json")
@@ -163,6 +172,9 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     echo "name=$destination"
     echo "verdict=$verdict"
     echo "s3=$prefix/$destination/"
+    echo 'summary<<SUMMARY_EOF'
+    jq -r '.summary // empty' "$work/report/compare.json"
+    echo 'SUMMARY_EOF'
   } >> "$GITHUB_OUTPUT"
 fi
 echo "$result"

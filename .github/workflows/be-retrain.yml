@@ -52,6 +52,7 @@ jobs:
       name: ${{ steps.retrain.outputs.name }}
       verdict: ${{ steps.retrain.outputs.verdict }}
       s3: ${{ steps.retrain.outputs.s3 }}
+      summary: ${{ steps.retrain.outputs.summary }}
     steps:
       - uses: actions/checkout@v4
       - name: Retrain, compare and upload
@@ -118,6 +119,7 @@ jobs:
           NAME: ${{ needs.retrain.outputs.name }}
           VERDICT: ${{ needs.retrain.outputs.verdict }}
           S3: ${{ needs.retrain.outputs.s3 }}
+          SUMMARY: ${{ needs.retrain.outputs.summary }}
         run: |
           set -euo pipefail
           level=notice
@@ -127,6 +129,9 @@ jobs:
             insufficient) text="평가 표본이 모자라 판정하지 않았습니다: $NAME (${S3}report/compare.json)" ;;
             *) level=failure; text="재학습이 끝나지 못했습니다. 켜기 $START · 재학습 $RETRAIN · 끄기 $STOP" ;;
           esac
+          if [[ -n "$SUMMARY" ]]; then
+            text="$text"$'\n'"$SUMMARY"
+          fi
           if [[ "$STOP" != success ]]; then
             level=failure
             text="$text"$'\n'"ml 인스턴스 끄기가 $STOP 입니다. 콘솔에서 상태를 확인하세요."
