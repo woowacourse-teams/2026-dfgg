@@ -239,3 +239,67 @@ def _bootstrap_interval(weight_sets: list[np.ndarray], rewards: np.ndarray, matc
         return float("nan"), float("nan")
     lower, upper = np.percentile(samples, [2.5, 97.5])
     return float(lower), float(upper)
+
+
+# --- DR 승률: 승리 확률 모델 Q의 직접 추정에 IPS 보정을 더한다 ---
+#   DR = 평균 [ Q(x, π(x)) + [π(x) = 실제 구매] × (r − Q(x, π(x))) / p ]
+#   1순위가 실제 구매와 다른 query도 Q로 값을 내므로 SNIPS V보다 분산이 작다.
+
+
+def top1_values(values: np.ndarray, scores: np.ndarray, group: np.ndarray) -> np.ndarray:
+    """query마다 점수 1순위 행의 값."""
+    bounds = np.concatenate([[0], np.cumsum(group)])
+    result = np.empty(len(group))
+    for index, (start, end) in enumerate(zip(bounds[:-1], bounds[1:])):
+        result[index] = values[start + int(np.argsort(-scores[start:end], kind="stable")[0])]
+    return result
+
+
+def doubly_robust_terms(matches: np.ndarray, q_top: np.ndarray, propensity: np.ndarray, win: np.ndarray,
+                        p_min: float = P_MIN) -> np.ndarray:
+    """query마다 DR 항. p나 승패를 모르는 query는 NaN이다."""
+    usable = _usable(propensity, win) & ~np.isnan(q_top)
+    weights = _weights(matches, propensity, usable, p_min)
+    return np.where(usable, q_top + weights * (np.nan_to_num(win) - q_top), np.nan)
+
+
+def doubly_robust_value(terms: np.ndarray, match_ids: list[str], rounds: int = BOOTSTRAP_ROUNDS,
+                        seed: int = 0) -> dict[str, float]:
+    """DR 승률과 경기 단위 부트스트랩 95% 구간."""
+    lower, upper = _cluster_mean_interval(terms, match_ids, rounds, seed)
+    return {"value": _nan_mean(terms), "lower": lower, "upper": upper, "usable": int((~np.isnan(terms)).sum())}
+
+
+def doubly_robust_difference(candidate_terms: np.ndarray, baseline_terms: np.ndarray, match_ids: list[str],
+                             rounds: int = BOOTSTRAP_ROUNDS, seed: int = 0) -> dict[str, float]:
+    """후보 DR − 기준 DR과 95% 구간. query마다 짝지은 차이를 부트스트랩한다."""
+    difference = candidate_terms - baseline_terms
+    lower, upper = _cluster_mean_interval(difference, match_ids, rounds, seed)
+    return {"difference": _nan_mean(difference), "lower": lower, "upper": upper}
+
+
+def _nan_mean(values: np.ndarray) -> float:
+    known = values[~np.isnan(values)]
+    if known.size == 0:
+        return float("nan")
+    return float(known.mean())
+
+
+def _cluster_mean_interval(values: np.ndarray, match_ids: list[str], rounds: int,
+                           seed: int) -> tuple[float, float]:
+    """값을 아는 query가 속한 경기를 복원 추출해 평균의 2.5%, 97.5% 분위를 낸다."""
+    known = ~np.isnan(values)
+    ids = np.asarray(match_ids)[known]
+    if ids.size == 0:
+        return float("nan"), float("nan")
+    _, cluster = np.unique(ids, return_inverse=True)
+    clusters = cluster.max() + 1
+    sums = np.bincount(cluster, values[known], clusters)
+    counts = np.bincount(cluster, minlength=clusters).astype(float)
+    rng = np.random.default_rng(seed)
+    samples = []
+    for start in range(0, rounds, BOOTSTRAP_CHUNK):
+        draws = rng.integers(0, clusters, (min(BOOTSTRAP_CHUNK, rounds - start), clusters))
+        samples.append(sums[draws].sum(axis=1) / counts[draws].sum(axis=1))
+    lower, upper = np.percentile(np.concatenate(samples), [2.5, 97.5])
+    return float(lower), float(upper)
