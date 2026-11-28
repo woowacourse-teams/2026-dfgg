@@ -56,7 +56,7 @@ public class BuildTransitionConfiguration {
             ItemService itemService,
             @Value("${recommendation.build-cache.warmup.max-keys:5000}") int maxKeys,
             @Value("${recommendation.build-cache.warmup.parallelism:4}") int parallelism,
-            @Value("${recommendation.build-cache.warmup.timeout:120s}") Duration timeout
+            @Value("${recommendation.build-cache.warmup.timeout:45s}") Duration timeout
     ) {
         return new BuildCacheWarmer(buildTransitionReader, championItemStatsRepository, itemService,
                 new WarmupLimit(maxKeys, parallelism, timeout), Clock.systemUTC());
