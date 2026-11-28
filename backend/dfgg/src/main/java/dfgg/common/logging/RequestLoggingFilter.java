@@ -81,6 +81,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String traceId = newTraceId();
         MDC.put(TRACE_ID, traceId);
+        MDC.put(InstallId.MDC_KEY, InstallId.from(request.getHeader(InstallId.HEADER)).logValue());
         response.setHeader(TRACE_ID_HEADER, traceId);
         long startedAt = System.nanoTime();
         try {
@@ -94,6 +95,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         } finally {
             // 스레드는 재사용된다. 비우지 않으면 다음 요청이 남의 추적 번호를 달고 나간다.
             MDC.remove(TRACE_ID);
+            MDC.remove(InstallId.MDC_KEY);
         }
     }
 
@@ -102,7 +104,12 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
                 .setMessage("{} status={} duration_ms={}")
                 .addArgument(describe(request))
                 .addArgument(status)
-                .addArgument(durationMillis);
+                .addArgument(durationMillis)
+                .addKeyValue("method", request.getMethod())
+                .addKeyValue("uri", request.getRequestURI())
+                .addKeyValue("status", status)
+                .addKeyValue("duration_ms", durationMillis)
+                .addKeyValue("clientVersion", ClientVersion.from(request.getHeader(ClientVersion.HEADER)).logValue());
         addBodies(event, request, response);
         event.log();
     }

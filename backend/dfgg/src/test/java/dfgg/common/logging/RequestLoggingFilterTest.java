@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -230,8 +231,86 @@ class RequestLoggingFilterTest {
         filter.doFilter(request, response, echoChain("{}"));
 
         // then
-        assertThat(events().getFirst().getKeyValuePairs()).isNullOrEmpty();
+        assertThat(keyValue("req")).isNull();
+        assertThat(keyValue("res")).isNull();
         assertThat(response.getContentAsString()).isEqualTo("{}");
+    }
+
+    @Test
+    @DisplayName("설치 ID 헤더를 MDC에 넣어 요청 처리 중의 모든 로그 줄과 access 줄에 붙인다")
+    void doFilter_WhenInstallIdHeaderPresent_PutInstallIdInMdc() throws Exception {
+        // given
+        RequestLoggingFilter filter = new RequestLoggingFilter(NEVER_SLOW);
+        MockHttpServletRequest request = request("GET", "/api/champions");
+        request.addHeader("X-Install-Id", "3f2a9c1e-7b4d-4e2a-9c1e-5d6f7a8b9c0d");
+        AtomicReference<String> duringChain = new AtomicReference<>();
+
+        // when
+        filter.doFilter(request, new MockHttpServletResponse(), (req, res) -> duringChain.set(MDC.get("installId")));
+
+        // then
+        assertThat(duringChain.get())
+                .as("컨트롤러와 예외 처리기가 남기는 줄에도 같은 값이 붙어야 한다")
+                .isEqualTo("3f2a9c1e-7b4d-4e2a-9c1e-5d6f7a8b9c0d");
+        assertThat(events().getFirst().getMDCPropertyMap())
+                .containsEntry("installId", "3f2a9c1e-7b4d-4e2a-9c1e-5d6f7a8b9c0d");
+    }
+
+    @Test
+    @DisplayName("설치 ID 헤더가 없어도 요청은 처리하고 none으로 남긴다")
+    void doFilter_WhenInstallIdHeaderAbsent_LogNone() throws Exception {
+        // given
+        RequestLoggingFilter filter = new RequestLoggingFilter(NEVER_SLOW);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        filter.doFilter(request("GET", "/api/champions"), response, new MockFilterChain());
+
+        // then
+        assertThat(events().getFirst().getMDCPropertyMap()).containsEntry("installId", "none");
+        assertThat(response.getStatus())
+                .as("이전 버전 앱은 헤더를 보내지 않는다. 거절하면 안 된다")
+                .isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("요청이 끝나면 MDC에서 설치 ID도 비운다")
+    void doFilter_AfterRequest_ClearInstallIdFromMdc() throws Exception {
+        // given
+        RequestLoggingFilter filter = new RequestLoggingFilter(NEVER_SLOW);
+        MockHttpServletRequest request = request("GET", "/api/champions");
+        request.addHeader("X-Install-Id", "3f2a9c1e-7b4d-4e2a-9c1e-5d6f7a8b9c0d");
+
+        // when
+        filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+        // then
+        assertThat(MDC.get("installId"))
+                .as("스레드는 재사용된다. 안 비우면 다음 요청이 남의 설치 ID를 달고 나간다")
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("access 줄에 클라이언트 버전과 검색용 메서드, 경로, 상태코드, 소요시간을 key-value로 붙인다")
+    void doFilter_WhenRequestCompletes_AddSearchableKeyValues() throws Exception {
+        // given
+        RequestLoggingFilter filter = new RequestLoggingFilter(NEVER_SLOW);
+        MockHttpServletRequest request = request("POST", "/api/df-score");
+        request.addHeader("X-Client-Version", "1.4.2");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        response.setStatus(200);
+
+        // when
+        filter.doFilter(request, response, new MockFilterChain());
+
+        // then
+        assertThat(keyValue("clientVersion")).isEqualTo("1.4.2");
+        assertThat(keyValue("method")).isEqualTo("POST");
+        assertThat(keyValue("uri")).isEqualTo("/api/df-score");
+        assertThat(keyValue("status"))
+                .as("숫자여야 Insights에서 status >= 400처럼 비교할 수 있다")
+                .isEqualTo(200);
+        assertThat(keyValue("duration_ms")).isInstanceOf(Long.class);
     }
 
     // 컨트롤러처럼 요청 본문을 끝까지 읽고 응답 본문을 쓴다.

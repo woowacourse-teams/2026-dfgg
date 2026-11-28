@@ -11,6 +11,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import dfgg.common.handler.GlobalExceptionHandler;
 import dfgg.common.logging.RequestLoggingFilter;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
@@ -36,6 +37,7 @@ class RequestLoggingWiringTest {
     private int port;
 
     private final Logger filterLogger = (Logger) LoggerFactory.getLogger(RequestLoggingFilter.class);
+    private final Logger handlerLogger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
 
     @BeforeEach
@@ -44,11 +46,13 @@ class RequestLoggingWiringTest {
         appender.setContext((LoggerContext) LoggerFactory.getILoggerFactory());
         appender.start();
         filterLogger.addAppender(appender);
+        handlerLogger.addAppender(appender);
     }
 
     @AfterEach
     void tearDown() {
         filterLogger.detachAppender(appender);
+        handlerLogger.detachAppender(appender);
     }
 
     @Test
@@ -86,6 +90,31 @@ class RequestLoggingWiringTest {
         assertThat(keyValue(accessLine, "res"))
                 .asInstanceOf(MAP)
                 .containsEntry("status", 400);
+    }
+
+    @Test
+    @DisplayName("설치 ID 헤더를 보내면 4xx 사유 줄과 access 줄에 같은 설치 ID와 추적 번호가 붙는다")
+    void request_WhenInstallIdSent_TagWarnAndAccessLinesWithSameInstallId() {
+        // when
+        given().contentType(ContentType.JSON)
+                .header("X-Install-Id", "3f2a9c1e-7b4d-4e2a-9c1e-5d6f7a8b9c0d")
+                .header("X-Client-Version", "1.4.2")
+                .body("{}")
+                .when().post("/api/df-score")
+                .then().statusCode(400);
+
+        // then
+        ILoggingEvent warnLine = appender.list.stream()
+                .filter(event -> event.getLoggerName().equals(GlobalExceptionHandler.class.getName()))
+                .findFirst()
+                .orElseThrow();
+        ILoggingEvent accessLine = appender.list.getLast();
+        assertThat(warnLine.getMDCPropertyMap())
+                .containsEntry("installId", "3f2a9c1e-7b4d-4e2a-9c1e-5d6f7a8b9c0d")
+                .containsEntry("traceId", accessLine.getMDCPropertyMap().get("traceId"));
+        assertThat(accessLine.getMDCPropertyMap())
+                .containsEntry("installId", "3f2a9c1e-7b4d-4e2a-9c1e-5d6f7a8b9c0d");
+        assertThat(keyValue(accessLine, "clientVersion")).isEqualTo("1.4.2");
     }
 
     private Object keyValue(ILoggingEvent event, String key) {
