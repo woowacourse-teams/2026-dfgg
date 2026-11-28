@@ -1,0 +1,7 @@
+# dfgg/traceId 추적
+# 로그 그룹: /dfgg/prod, /dfgg/dev
+# 아래 값을 응답 헤더 X-Trace-Id 값으로 바꿔 실행한다. 4바이트라 겹칠 수 있으니 시간 범위를 좁혀서 본다.
+fields @timestamp, @logStream, level, logger_name, installId, message, stack_trace
+| filter traceId = "0f56051d"
+| sort @timestamp asc
+| limit 200

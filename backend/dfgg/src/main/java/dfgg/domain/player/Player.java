@@ -19,6 +19,12 @@ public class Player {
     @Column(name = "platform", nullable = false, length = 16)
     private String platform;
 
+    @Column(name = "tier", length = 32)
+    private String tier;
+
+    @Column(name = "division", length = 4)
+    private String division;
+
     @Column(name = "first_seen_at", nullable = false)
     private Instant firstSeenAt;
 
@@ -28,14 +34,23 @@ public class Player {
     protected Player() {
     }
 
-    public Player(String puuid, String platform, Instant seenAt) {
-        // 이 부분 나중에 검토 예정.
+    public Player(
+            String puuid,
+            String platform,
+            String tier,
+            String division,
+            Instant seenAt
+    ) {
         Assert.hasText(puuid, "puuid must not be blank");
         Assert.hasText(platform, "platform must not be blank");
+        Assert.hasText(tier, "tier must not be blank");
+        Assert.hasText(division, "division must not be blank");
         Objects.requireNonNull(seenAt, "seenAt must not be null");
 
         this.puuid = puuid;
         this.platform = platform;
+        this.tier = tier;
+        this.division = division;
         this.firstSeenAt = seenAt;
         this.lastSeenAt = seenAt;
     }
@@ -46,6 +61,28 @@ public class Player {
 
     public String getPlatform() {
         return platform;
+    }
+
+    public String getTier() {
+        return tier;
+    }
+
+    public String getDivision() {
+        return division;
+    }
+
+    public void updateRank(
+            String tier,
+            String division,
+            Instant observedAt
+    ) {
+        Assert.hasText(tier, "tier must not be blank");
+        Assert.hasText(division, "division must not be blank");
+        Objects.requireNonNull(observedAt, "observedAt must not be null");
+
+        this.tier = tier;
+        this.division = division;
+        this.lastSeenAt = observedAt;
     }
 
     public Instant getFirstSeenAt() {

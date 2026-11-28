@@ -1,0 +1,72 @@
+name: be-ci
+
+on:
+  pull_request:
+    branches: [main, dev, BE/dev]
+    paths: ["backend/dfgg/**", ".github/workflows/be-ci.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: backend/dfgg
+
+jobs:
+  be-test:
+    name: BE-CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # 테스트는 H2가 아니라 실제 PostgreSQL에 Flyway로 스키마를 만든다.
+    # init.sql과 같은 계정·DB를 서비스 환경변수로 만든다(서비스 컨테이너는 checkout 전에 떠서 파일을 마운트할 수 없다).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dfgg
+          POSTGRES_PASSWORD: dfgg
+          POSTGRES_DB: dfgg_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dfgg -d dfgg_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_DB_URL: jdbc:postgresql://127.0.0.1:5432/dfgg_test
+      TEST_DB_USERNAME: dfgg
+      TEST_DB_PASSWORD: dfgg
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: JDK 21 설치
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Gradle 설치
+        uses: gradle/actions/setup-gradle@v4
+
+      # @Tag("evaluation")은 build.gradle에서 기본 test 태스크에서 빠진다(실 데이터 DB가 필요하다).
+      - name: 테스트
+        run: ./gradlew test
+
+      - name: 실패 시 테스트 리포트 업로드
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: be-test-report
+          path: |
+            backend/dfgg/build/reports/tests/test
+            backend/dfgg/build/test-results/test
+          retention-days: 7
