@@ -176,6 +176,44 @@ groups:
           dashboard: Grafana → dfgg 폴더 → dfgg — 서비스 건강
         noDataState: OK
         execErrState: Error
+      - uid: dfgg-build-cache-hit-rate
+        title: Build 캐시 히트율 90% 미만
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: dfgg-prometheus
+            model:
+              refId: A
+              # 조회가 초당 0.5건 넘을 때만 본다. 트래픽이 적으면 첫 조회(미스) 비중이 커서 히트율이 흔들린다.
+              expr: (sum(rate(cache_gets_total{job=~"dfgg-app.*", cache="build_transition", result="hit"}[10m])) by (env) / sum(rate(cache_gets_total{job=~"dfgg-app.*", cache="build_transition"}[10m])) by (env)) and on(env) (sum(rate(cache_gets_total{job=~"dfgg-app.*", cache="build_transition"}[10m])) by (env) > 0.5)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params:
+                      - 0.9
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.env }} Build 전이 캐시 히트율이 15분째 90% 미만입니다(기대 98~99%). 대시보드 Build 전이 캐시에서 밀려남이 늘었으면 BUILD_CACHE_MAXIMUM_SIZE를 올리고, 세대가 계속 오르면 데이터 버전 계산을 확인합니다.'
+          dashboard: Grafana → dfgg 폴더 → dfgg — 서비스 건강
+        noDataState: OK
+        execErrState: Error
       - uid: dfgg-rds-credit
         title: RDS CPU 크레딧 부족 (prod)
         condition: C

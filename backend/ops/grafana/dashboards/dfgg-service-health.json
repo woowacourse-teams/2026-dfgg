@@ -717,13 +717,204 @@
     },
     {
       "type": "row",
-      "title": "호스트 (node_exporter)",
+      "title": "Build 전이 캐시",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 31
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Build 캐시 히트율",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dfgg-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 32
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dfgg-prometheus"
+          },
+          "expr": "sum(rate(cache_gets_total{cache=\"build_transition\", env=\"$env\", result=\"hit\"}[5m])) by (slot) / sum(rate(cache_gets_total{cache=\"build_transition\", env=\"$env\"}[5m])) by (slot)",
+          "legendFormat": "{{slot}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "시뮬레이션 기대값은 98~99%다. 배포 직후가 아닌데 크게 떨어지면 용량 부족(밀려남 패널)이나 세대가 자주 바뀌는지(크기 패널) 본다."
+    },
+    {
+      "type": "timeseries",
+      "title": "Build 캐시 조회와 밀려남",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dfgg-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 32
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dfgg-prometheus"
+          },
+          "expr": "sum(rate(cache_gets_total{cache=\"build_transition\", env=\"$env\", result=\"miss\"}[5m])) by (slot)",
+          "legendFormat": "{{slot}} 미스(DB 조회)/초",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dfgg-prometheus"
+          },
+          "expr": "sum(rate(cache_evictions_total{cache=\"build_transition\", env=\"$env\"}[5m])) by (slot)",
+          "legendFormat": "{{slot}} 밀려남/초",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "미스는 DB까지 간 조회 수다. 하루 고유 키가 용량보다 많아 꽉 찬 뒤 밀려남이 있는 건 정상이다. 밀려남이 늘면서 히트율이 같이 떨어지면 용량이 활성 키보다 작다는 뜻이라 BUILD_CACHE_MAXIMUM_SIZE를 올린다."
+    },
+    {
+      "type": "timeseries",
+      "title": "Build 캐시 크기와 세대",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dfgg-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 32
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dfgg-prometheus"
+          },
+          "expr": "sum(cache_size{cache=\"build_transition\", env=\"$env\"}) by (slot)",
+          "legendFormat": "{{slot}} 키 수",
+          "editorMode": "code",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dfgg-prometheus"
+          },
+          "expr": "max(build_cache_generation{env=\"$env\"}) by (slot)",
+          "legendFormat": "{{slot}} 세대",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "키 수가 용량(기본 20,000)에 붙어 있으면 용량이 모자라다. 세대는 패치 창이나 Core 아이템 목록이 바뀔 때만 오른다."
+    },
+    {
+      "type": "row",
+      "title": "호스트 (node_exporter)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
       },
       "panels": []
     },
@@ -738,7 +929,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 32
+        "y": 41
       },
       "targets": [
         {
@@ -790,7 +981,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 32
+        "y": 41
       },
       "targets": [
         {
@@ -843,7 +1034,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 32
+        "y": 41
       },
       "targets": [
         {
@@ -893,7 +1084,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 49
       },
       "panels": []
     },
@@ -908,7 +1099,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 41
+        "y": 50
       },
       "targets": [
         {
@@ -989,7 +1180,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 41
+        "y": 50
       },
       "targets": [
         {
@@ -1069,7 +1260,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 41
+        "y": 50
       },
       "targets": [
         {
@@ -1151,7 +1342,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 49
+        "y": 58
       },
       "targets": [
         {
@@ -1232,7 +1423,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 49
+        "y": 58
       },
       "targets": [
         {
@@ -1310,7 +1501,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 66
       },
       "panels": []
     },
@@ -1325,7 +1516,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 58
+        "y": 67
       },
       "description": "지표에서 이상을 보면 시간 범위를 좁힌다. 이 패널도 같은 범위를 따라온다.\n앱 로그는 JSON이라 level·traceId 같은 필드를 parse 없이 바로 거른다. JSON 전환 전의 텍스트 줄은 나오지 않는다.",
       "options": {
@@ -1363,7 +1554,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 68
+        "y": 77
       },
       "description": "요청 한 건이 끝날 때 남는 access 줄을 레벨과 관계없이 보여 준다. 정상 응답(200)도 여기서 본다.\n위의 traceId·installId 입력칸으로 좁힌다. 비워 두면 전체다(빈 문자열 like는 모든 줄과 맞는다).\n허용 목록 API는 req·res가 붙어 있다. 줄을 펼치면 JSON이 들여쓰기된다.",
       "options": {
