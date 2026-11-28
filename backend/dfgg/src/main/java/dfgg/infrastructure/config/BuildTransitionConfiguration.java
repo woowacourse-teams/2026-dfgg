@@ -1,14 +1,21 @@
 package dfgg.infrastructure.config;
 
 import dfgg.application.ChampionPositionNormalizer;
+import dfgg.application.item.ItemService;
 import dfgg.application.recommend.v3.generator.RecentPatchWindowCache;
+import dfgg.application.recommend.v3.generator.transition.BuildCacheWarmer;
+import dfgg.application.recommend.v3.generator.transition.BuildCacheWarmer.WarmupLimit;
 import dfgg.application.recommend.v3.generator.transition.BuildTransitionReader;
 import dfgg.application.recommend.v3.generator.transition.CachingBuildTransitionReader;
 import dfgg.application.recommend.v3.generator.transition.DatabaseBuildTransitionReader;
+import dfgg.domain.itemstats.ChampionItemStatsRepository;
 import dfgg.domain.match.NormalizedMatchParticipantRepository;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Clock;
+import java.time.Duration;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -38,5 +45,20 @@ public class BuildTransitionConfiguration {
                 database, recentPatchWindow, maximumSize);
         meterRegistry.ifAvailable(caching::bindMetrics);
         return caching;
+    }
+
+    @Bean
+    @ConditionalOnExpression(
+            "${recommendation.build-cache.enabled:true} and ${recommendation.build-cache.warmup.enabled:true}")
+    BuildCacheWarmer buildCacheWarmer(
+            BuildTransitionReader buildTransitionReader,
+            ChampionItemStatsRepository championItemStatsRepository,
+            ItemService itemService,
+            @Value("${recommendation.build-cache.warmup.max-keys:5000}") int maxKeys,
+            @Value("${recommendation.build-cache.warmup.parallelism:4}") int parallelism,
+            @Value("${recommendation.build-cache.warmup.timeout:120s}") Duration timeout
+    ) {
+        return new BuildCacheWarmer(buildTransitionReader, championItemStatsRepository, itemService,
+                new WarmupLimit(maxKeys, parallelism, timeout), Clock.systemUTC());
     }
 }

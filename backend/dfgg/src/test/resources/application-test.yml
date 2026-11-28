@@ -37,6 +37,10 @@ recommendation:
   v3:
     tiers: "EMERALD,DIAMOND,MASTER,GRANDMASTER,CHALLENGER"
   recent-patch-window-size: 3
+  # 테스트 기동마다 DB를 훑지 않는다. 워밍업은 단위 테스트로 확인한다.
+  build-cache:
+    warmup:
+      enabled: false
   counter:
   pair-lift:
     smoothing-alpha: 1.0

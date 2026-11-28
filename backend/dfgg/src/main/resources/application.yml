@@ -87,9 +87,15 @@ recommendation:
     min-base-rate: "${SITUATIONAL_MIN_BASE_RATE:0.01}"
   recent-patch-window-size: "${RECOMMENDATION_RECENT_PATCH_WINDOW_SIZE:3}"
   # Build 전이 쿼리 캐시. 용량은 피크 동시 게임 × 2로 잡는다(활성 키보다 작으면 히트율이 무너진다).
+  # 워밍업은 readiness 전에 돌아 빈 캐시로 트래픽을 받지 않게 한다.
   build-cache:
     enabled: "${BUILD_CACHE_ENABLED:true}"
     maximum-size: "${BUILD_CACHE_MAXIMUM_SIZE:20000}"
+    warmup:
+      enabled: "${BUILD_CACHE_WARMUP_ENABLED:true}"
+      max-keys: "${BUILD_CACHE_WARMUP_MAX_KEYS:5000}"
+      parallelism: "${BUILD_CACHE_WARMUP_PARALLELISM:4}"
+      timeout: "${BUILD_CACHE_WARMUP_TIMEOUT:120s}"
   rune:
     # 비우면 룬 기록의 최신 패치부터 patch-window개를 차례로 보고 추천이 나오는 패치를 쓴다. 값을 넣으면 그 패치로 고정한다. 통계와 룬 이미지가 함께 따른다.
     patch: "${RUNE_RECOMMENDATION_PATCH:}"

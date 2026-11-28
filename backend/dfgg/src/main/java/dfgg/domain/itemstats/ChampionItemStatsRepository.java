@@ -19,6 +19,16 @@ public interface ChampionItemStatsRepository extends JpaRepository<ChampionItemS
 
     List<ChampionItemStats> findByChampionIdAndPosition(Integer championId, ChampionPosition position);
 
+    /** 판 수가 많은 챔피언, 포지션부터. Build 캐시 워밍업이 어디부터 채울지 정할 때 쓴다. */
+    @Query("""
+            SELECT new dfgg.domain.itemstats.ChampionPositionGameCount(
+                       s.championId, s.position, max(s.championGameCountAll))
+            FROM ChampionItemStats s
+            GROUP BY s.championId, s.position
+            ORDER BY max(s.championGameCountAll) DESC, s.championId, s.position
+            """)
+    List<ChampionPositionGameCount> findGameCountsByChampionPosition();
+
     /** 추천 후보를 찾을 때 쓴다. 통계에 섞인 Core가 아닌 아이템을 읽지 않는다(#297). */
     List<ChampionItemStats> findByChampionIdAndPositionAndItemIdIn(
             Integer championId, ChampionPosition position, Collection<Long> itemIds);
