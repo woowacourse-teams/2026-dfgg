@@ -1,23 +1,21 @@
 package dfgg.application.recommend.v3.generator;
 
-import dfgg.application.ChampionPositionNormalizer;
 import dfgg.application.recommend.v3.CandidateGenerator;
 import dfgg.application.recommend.v3.CandidateSource;
 import dfgg.application.recommend.v3.GeneratorResult;
 import dfgg.application.recommend.v3.RecommendationQuery;
 import dfgg.application.recommend.v3.ScoredItem;
+import dfgg.application.recommend.v3.generator.transition.BuildTransitionReader;
+import dfgg.application.recommend.v3.generator.transition.BuildTransitionRequest;
+import dfgg.application.recommend.v3.generator.transition.TransitionRow;
 import dfgg.application.utils.WilsonScoreCalculator;
 import dfgg.domain.itemstats.ChampionItemStats;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
-import dfgg.domain.match.NormalizedMatchParticipantRepository;
-import dfgg.domain.match.RecentPatchWindow;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /**
@@ -34,24 +32,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class BuildCandidateGenerator implements CandidateGenerator {
 
-    private final NormalizedMatchParticipantRepository participantRepository;
+    private final BuildTransitionReader transitionReader;
     private final ChampionItemStatsRepository championItemStatsRepository;
-    private final ChampionPositionNormalizer positionNormalizer;
     private final WilsonScoreCalculator wilsonScoreCalculator;
-    private final RecentPatchWindowCache recentPatchWindow;
 
     public BuildCandidateGenerator(
-            NormalizedMatchParticipantRepository participantRepository,
+            BuildTransitionReader transitionReader,
             ChampionItemStatsRepository championItemStatsRepository,
-            ChampionPositionNormalizer positionNormalizer,
-            WilsonScoreCalculator wilsonScoreCalculator,
-            RecentPatchWindowCache recentPatchWindow
+            WilsonScoreCalculator wilsonScoreCalculator
     ) {
-        this.participantRepository = participantRepository;
+        this.transitionReader = transitionReader;
         this.championItemStatsRepository = championItemStatsRepository;
-        this.positionNormalizer = positionNormalizer;
         this.wilsonScoreCalculator = wilsonScoreCalculator;
-        this.recentPatchWindow = recentPatchWindow;
     }
 
     @Override
@@ -61,14 +53,14 @@ public class BuildCandidateGenerator implements CandidateGenerator {
 
     @Override
     public GeneratorResult generate(RecommendationQuery query, int topK) {
-        Collection<String> recentPatches = recentPatches();
+        BuildTransitionRequest request = BuildTransitionRequest.from(query);
 
-        List<ScoredItem> exactPrefix = rankTransitions(exactPrefixRows(query, recentPatches), topK);
+        List<ScoredItem> exactPrefix = rankTransitions(transitionReader.exactPrefix(request), topK);
         if (!exactPrefix.isEmpty()) {
             return GeneratorResult.of(source(), exactPrefix, BuildBackoffLevel.EXACT_PREFIX.ordinal());
         }
 
-        List<ScoredItem> lastItem = rankTransitions(lastItemRows(query, recentPatches), topK);
+        List<ScoredItem> lastItem = rankTransitions(lastItemRows(request), topK);
         if (!lastItem.isEmpty()) {
             return GeneratorResult.of(source(), lastItem, BuildBackoffLevel.LAST_ITEM.ordinal());
         }
@@ -76,29 +68,11 @@ public class BuildCandidateGenerator implements CandidateGenerator {
         return GeneratorResult.of(source(), championLevel(query, topK), BuildBackoffLevel.CHAMPION.ordinal());
     }
 
-    private List<Object[]> exactPrefixRows(RecommendationQuery query, Collection<String> recentPatches) {
-        String prefix = query.purchasedItemIds().stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining(","));
-        return participantRepository.findNextItemAfterExactPrefix(
-                query.myChampionId(), riotPositions(query), prefix,
-                query.purchasedItemCount() + 1, recentPatches, coreItemIdTexts(query)
-        );
-    }
-
-    private List<Object[]> lastItemRows(RecommendationQuery query, Collection<String> recentPatches) {
-        if (query.purchasedItemIds().isEmpty()) {
+    private List<TransitionRow> lastItemRows(BuildTransitionRequest request) {
+        if (!request.hasPurchasedItem()) {
             return List.of();
         }
-        Long lastItemId = query.purchasedItemIds().get(query.purchasedItemCount() - 1);
-        return participantRepository.findNextItemAfterLastItem(
-                query.myChampionId(), riotPositions(query), lastItemId, recentPatches, coreItemIdTexts(query)
-        );
-    }
-
-    /** 구매 순서 쿼리는 아이템 ID를 문자열로 다룬다. */
-    private List<String> coreItemIdTexts(RecommendationQuery query) {
-        return query.coreItemIds().stream().map(String::valueOf).toList();
+        return transitionReader.lastItem(request);
     }
 
     /**
@@ -106,18 +80,18 @@ public class BuildCandidateGenerator implements CandidateGenerator {
      * 표본이 얇을수록 보수적으로 깎인다. 승률이 아니라 전개 비율을 재는 이유는 Build의 질문이
      * "무엇을 사는가"이지 "무엇이 이기는가"가 아니기 때문이다 — 승률은 LTR이 별도 feature로 본다.
      */
-    private List<ScoredItem> rankTransitions(List<Object[]> rows, int topK) {
+    private List<ScoredItem> rankTransitions(List<TransitionRow> rows, int topK) {
         if (rows.isEmpty()) {
             return List.of();
         }
-        int totalAll = rows.stream().mapToInt(row -> intAt(row, 1)).sum();
-        int totalRecent = rows.stream().mapToInt(row -> intAt(row, 3)).sum();
+        int totalAll = rows.stream().mapToInt(TransitionRow::supportAll).sum();
+        int totalRecent = rows.stream().mapToInt(TransitionRow::supportRecent).sum();
 
         List<TransitionScore> scores = rows.stream()
                 .map(row -> new TransitionScore(
-                        Long.valueOf((String) row[0]),
-                        wilsonScoreCalculator.lowerBound(intAt(row, 1), totalAll),
-                        wilsonScoreCalculator.lowerBound(intAt(row, 3), totalRecent)
+                        row.itemId(),
+                        wilsonScoreCalculator.lowerBound(row.supportAll(), totalAll),
+                        wilsonScoreCalculator.lowerBound(row.supportRecent(), totalRecent)
                 ))
                 .toList();
         return unionOfTopK(scores, topK);
@@ -175,22 +149,6 @@ public class BuildCandidateGenerator implements CandidateGenerator {
                 .limit(topK)
                 .map(TransitionScore::itemId)
                 .toList();
-    }
-
-    private Collection<String> recentPatches() {
-        RecentPatchWindow window = recentPatchWindow.current();
-        if (window.isEmpty()) {
-            return List.of("");
-        }
-        return window.patches();
-    }
-
-    private List<String> riotPositions(RecommendationQuery query) {
-        return positionNormalizer.riotValuesOf(query.position());
-    }
-
-    private int intAt(Object[] row, int index) {
-        return ((Number) row[index]).intValue();
     }
 
     private record TransitionScore(Long itemId, double scoreAll, double scoreRecent) {

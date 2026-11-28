@@ -10,6 +10,7 @@ import dfgg.application.recommend.v3.generator.RecentPatchWindowCache;
 import dfgg.application.utils.WilsonScoreCalculator;
 import dfgg.domain.champion.ChampionPosition;
 import java.util.List;
+import dfgg.infrastructure.config.BuildTransitionConfiguration;
 import dfgg.infrastructure.config.TierScopeConfiguration;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +26,8 @@ import org.springframework.test.context.jdbc.Sql;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({TierScopeConfiguration.class, BuildCandidateGenerator.class, RecentPatchWindowCache.class, ItemStatsAggregationService.class,
+@Import({TierScopeConfiguration.class, BuildCandidateGenerator.class, BuildTransitionConfiguration.class,
+        RecentPatchWindowCache.class, ItemStatsAggregationService.class,
         ChampionPositionNormalizer.class, WilsonScoreCalculator.class})
 @Sql("/sql/build-generator-test-data.sql")
 class BuildCandidateGeneratorTest {

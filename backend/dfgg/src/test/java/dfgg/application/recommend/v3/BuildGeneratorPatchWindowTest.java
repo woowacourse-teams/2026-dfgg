@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dfgg.application.ChampionPositionNormalizer;
 import dfgg.application.recommend.v3.generator.BuildCandidateGenerator;
 import dfgg.application.recommend.v3.generator.RecentPatchWindowCache;
+import dfgg.application.recommend.v3.generator.transition.DatabaseBuildTransitionReader;
 import dfgg.application.utils.WilsonScoreCalculator;
 import dfgg.domain.champion.ChampionPosition;
 import dfgg.domain.itemstats.ChampionItemStatsRepository;
@@ -43,11 +44,11 @@ class BuildGeneratorPatchWindowTest {
     private ChampionItemStatsRepository championItemStatsRepository;
 
     private BuildCandidateGenerator generatorWithWindow(int recentPatchWindowSize) {
-        return new BuildCandidateGenerator(
-                participantRepository, championItemStatsRepository,
-                new ChampionPositionNormalizer(), new WilsonScoreCalculator(),
+        DatabaseBuildTransitionReader transitionReader = new DatabaseBuildTransitionReader(
+                participantRepository, new ChampionPositionNormalizer(),
                 new RecentPatchWindowCache(participantRepository, recentPatchWindowSize)
         );
+        return new BuildCandidateGenerator(transitionReader, championItemStatsRepository, new WilsonScoreCalculator());
     }
 
     private double scoreOf(BuildCandidateGenerator generator, long itemId) {
